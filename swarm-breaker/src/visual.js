@@ -2557,6 +2557,10 @@ export function createVisual(opts) {
     get cell() { return CELL; },
     get origin() { return ORIGIN; },
     get quality() { return quality; },
+    /** Vertical offset the field is being drawn at right now, in pixels.
+     *  Anything a caller draws ON a block has to use the same one, or it
+     *  detaches from the block for the length of every descent. */
+    get slideOffset() { return (sliding ? ease(slide) - 1 : 0) * CELL; },
   };
 }
 

@@ -64,6 +64,9 @@ export const CONFIG = {
 
     // Shown when a block reaches the swarm line.
     overTitle:   'the swarm is overrun',
+    // Shown when the tier runs out of field and the board is clear.
+    winTitle:    'the field is broken',
+    endlessButton: 'go on forever',
     overAgain:   'again',
     overDepth:   'depth',
     overSwarm:   'swarm',
@@ -107,6 +110,62 @@ export const CONFIG = {
              + 'bars, canopy - then dealt one row at a time so it assembles as '
              + 'it falls. The field widens to give the figures room. Rougher, '
              + 'and still being worked on.',
+      },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
+  // BLOCKS - what a block can be besides a number
+  //
+  // Special blocks are rare on purpose. A player has to trust the ordinary
+  // rule before breaking it means anything, so nothing here can appear in the
+  // opening minute, and after that a few blocks in a hundred are something
+  // else. Which ones is decided from the run's seed, so a seed always produces
+  // the same field including its surprises.
+  //
+  // A kind is data. `effect` is the shared vocabulary the game applies:
+  //
+  //   burst   {count, speed, life}  bodies thrown out in every direction. They
+  //                                 break blocks and collect markers like any
+  //                                 other body, and then they are gone - a
+  //                                 burst is a good turn, never a permanent
+  //                                 gain, which is what keeps it from becoming
+  //                                 the only thing worth aiming at.
+  //   essence n                     paid on top of what the block was worth
+  //   balls   n                     added to the swarm permanently
+  //   clearRow                      destroy the lowest row outright
+  //
+  // Adding a kind means adding an entry here. It needs code only if it wants a
+  // verb this list does not have.
+  // -------------------------------------------------------------------------
+  blocks: {
+    // Share of blocks that carry a kind at all. Rare enough that seeing one is
+    // an event and not a mechanic to plan around.
+    share: 0.045,
+
+    // Nothing special until the field has been ordinary for a while.
+    firstDepth: 8,
+
+    kinds: [
+      {
+        id: 'burst',
+        name: 'burst',
+        weight: 1,
+        // Marks the block before it breaks, so a player can choose to save it.
+        tint: '#ff8a3c',
+        effect: {
+          burst: {
+            // Bodies thrown out, evenly around the circle.
+            count: 26,
+            // Share of normal body speed. Slower reads as a spray rather than
+            // as a second volley, and keeps them on screen long enough to see.
+            speed: 0.78,
+            // Frames they last. They also die on the floor like anything else;
+            // this is what guarantees a turn ends even for a body thrown flat
+            // enough that it would otherwise bounce between the walls forever.
+            life: 150,
+          },
+        },
       },
     ],
   },
@@ -457,6 +516,7 @@ export function applyIdentity(doc) {
   put('overtitle',   t.overTitle);
   put('again',       t.overAgain);
   put('overmodes',   t.overMenu);
+  put('endless',     t.endlessButton);
   put('over-lbl-depth', t.overDepth);
   put('over-lbl-swarm', t.overSwarm);
 

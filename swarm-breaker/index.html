@@ -64,6 +64,9 @@
   #over.on{display:flex}
   #over h1{font-size:22px; margin:0; font-weight:600; letter-spacing:-0.02em}
   .row{display:flex; gap:8px}
+  #endless{display:none; border-color:var(--pickup); color:var(--pickup)}
+  #endless.on{display:block}
+  #endless:hover{border-color:var(--pickup); background:var(--pickup); color:var(--bg)}
 
   /* the mode screen */
   #menu{
@@ -133,6 +136,7 @@
   <h1 id="overtitle">the swarm is overrun</h1>
   <div style="color:var(--dim)"><span id="over-lbl-depth">depth</span> <b id="overdepth">0</b> &middot; <span id="over-lbl-swarm">swarm</span> <b id="overballs">0</b></div>
   <span class="row">
+    <button id="endless">go on forever</button>
     <button id="again">again</button>
     <button id="overmodes">modes</button>
   </span>
@@ -174,6 +178,7 @@ import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, latticeAt, leftEdgeAt,
          storageKey, offerCost, applyIdentity } from './config.js';
 import { createJuice } from './src/juice.js';
 import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js';
+import { createBlockKinds } from './src/blocks.js';
 import { createSave, fieldFingerprint } from './src/save.js';
 import { createLeaderboard } from './src/leaderboard.js';
 import * as Tiers from './src/tiers.js';
@@ -269,6 +274,7 @@ let S;
 function fresh(){
   S = {
     depth: 1, balls: Tiers.tierOf(TIER).supply.start, gold: 0, tier: TIER,
+    endless: false, won: false,
     rows: [],            // {c, r, hp, max} in grid coords
     drops: [],           // {c, r, kind}
     owed: { ball: 0, gold: 0 },   // markers the field still has to find room for
@@ -286,6 +292,7 @@ function fresh(){
   S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
   // The formation source is the fractal mode's own; nothing else has one.
   S.form = S.field.key === 'fractal' ? S.field.source : null;
+  S.kinds = createBlockKinds(S.seed);
   S.dealt = 0;
   // A field that does not widen sits at the starting width for the whole run.
   retarget(S.field.widens ? latticeAt(0) : CONFIG.board.cols);
@@ -300,7 +307,7 @@ function fresh(){
 
 function addRow(){
   const d = S.depth;
-  if (!Tiers.spawnsRowAt(S.tier, d)) return;
+  if (!Tiers.spawnsRowAt(S.tier, d, tmode())) return;
 
   // The width is known before the row is, which is how the view learns it has
   // to pull back. A field that never widens answers the same number forever,
@@ -322,12 +329,22 @@ function addRow(){
     ? Math.min(CONFIG.economy.rowShareMax,
         Math.max(CONFIG.economy.rowShareMin, CONFIG.economy.rowBlocks / n))
     : 1;
-  const hp = Math.max(1, Math.round(Tiers.healthNumber(S.tier, d) * share));
-  cells.forEach((on, j) => { if (on) S.rows.push({ c: lo + j, r: 0, hp, max: hp }); });
+  const hp = Math.max(1, Math.round(Tiers.healthNumber(S.tier, d, tmode()) * share));
+  // A few blocks in a hundred are something other than a number. Which ones is
+  // decided from the seed and the block's own position, never from where it
+  // came in the loop, so a field is the same field every time it is built.
+  cells.forEach((on, j) => {
+    if (!on) return;
+    const c = lo + j;
+    const k = S.kinds.rollFor(d, c);
+    const b = { c, r: 0, hp, max: hp };
+    if (k) b.k = k;
+    S.rows.push(b);
+  });
 
   // The resupply line is the difficulty. Starve it and the angle has to choose
   // between damage and collection; keep it full and it never has to.
-  if (Tiers.spawnsPickupAt(S.tier, d)) S.owed.ball++;
+  if (Tiers.spawnsPickupAt(S.tier, d, tmode())) S.owed.ball++;
   if (Tiers.spawnsWindfallAt(S.tier, d)) S.owed.gold++;
   placeDrops(cells, lo, d);
 }
@@ -349,7 +366,7 @@ function placeDrops(cells, lo, d){
 }
 
 function step(){
-  if (!Tiers.fieldDescends(S.tier, S.depth)) return;
+  if (!Tiers.fieldDescends(S.tier, S.depth, tmode())) return;
   look.descend(S.rows);
   S.rows.forEach(b => b.r++);
   S.drops.forEach(p => p.r++);
@@ -373,6 +390,26 @@ function figureName(){
   return S.field ? S.field.label(S.depth) : 'drift';
 }
 
+// --- the end of a run -------------------------------------------------------
+//
+// A difficulty tier is a finite thing. It has a FINISH depth, and past it the
+// field stops producing rows and stops closing on the swarm line, because what
+// is left on the board is then something to break rather than a threat still
+// coming. Reaching that point is the run being WON.
+//
+// Endless is what happens after, for anyone who wants it: the field never stops
+// and block health compounds instead of climbing in a line, so it always ends
+// eventually. That is the point of endless.
+//
+// Every tier question has to be asked in the right one of those two, or a run
+// that has chosen endless is answered as though it were still on the ladder.
+const tmode = () => (S && S.endless ? 'endless' : undefined);
+
+/** Has this run passed the end of its tier? */
+function pastFinish(){
+  return !Tiers.spawnsRowAt(S.tier, S.depth, tmode());
+}
+
 const xOf = c => ORIGIN + c * CELL;              // left edge of a world column
 const cx = c => xOf(c) + CELL / 2;               // its centre
 const cyOf = r => TOP + r * CELL + CELL / 2;
@@ -392,21 +429,54 @@ function fire(){
 
 function endTurn(){
   S.firing = false;
+  // Belt and braces. The fuse and the floor already account for every sprayed
+  // body; this makes "only for that turn" true by construction rather than by
+  // two other things happening to work.
+  S.live = S.live.filter(b => !b.temp);
   if (S.nextOrigin != null) S.origin = S.nextOrigin;
   step();
   S.depth++;
   addRow();
   // lose when a block crosses the swarm line
   if (S.rows.some(b => cyOf(b.r) + CELL / 2 >= FLOOR)) return die();
+  // The tier has run out of field and the board is clear. Nothing is coming and
+  // nothing is left, so the run is over and it was won. Without this the game
+  // becomes an empty screen that cannot be lost, cannot be finished, and gives
+  // the player nothing to do.
+  if (pastFinish() && S.rows.length === 0) return win();
   store.mark();
   paintShop();
 }
 
-function die(){
+/** The field is spent and the board is clear. */
+function win(){
   S.dead = true;
+  S.won = true;
   recordBest();
   store.mark();
-  board.finish({ tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none' });
+  board.finish({
+    tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold,
+    doctrine: 'none', endless: !!S.endless,
+  });
+  const t = CONFIG.text;
+  document.getElementById('overtitle').textContent = S.endless ? t.overTitle : t.winTitle;
+  document.getElementById('overdepth').textContent = S.depth;
+  document.getElementById('overballs').textContent = S.balls;
+  // Endless has no further gear to change into, so the offer is only made once.
+  document.getElementById('endless').classList.toggle('on', !S.endless);
+  document.getElementById('over').classList.add('on');
+}
+
+function die(){
+  S.dead = true;
+  document.getElementById('overtitle').textContent = CONFIG.text.overTitle;
+  document.getElementById('endless').classList.remove('on');
+  recordBest();
+  store.mark();
+  board.finish({
+    tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold,
+    doctrine: 'none', endless: !!S.endless,
+  });
   document.getElementById('overdepth').textContent = S.depth;
   document.getElementById('overballs').textContent = S.balls;
   document.getElementById('over').classList.add('on');
@@ -426,6 +496,13 @@ function sim(){
 
   for (let i = S.live.length - 1; i >= 0; i--){
     const b = S.live[i];
+    // A sprayed body burns down. Nothing else carries a fuse, so nothing else
+    // is touched by this.
+    if (b.life !== undefined && --b.life <= 0){
+      look.splash(b.x, 0.5);
+      S.live.splice(i, 1);
+      continue;
+    }
     juice.trail(b.x, b.y, b.vx, b.vy);
     // substep so fast balls cannot tunnel through a block
     for (let s = 0; s < SUBSTEPS; s++){
@@ -451,8 +528,11 @@ function sim(){
       }
     }
     if (b.y > FLOOR - R){
-      if (S.nextOrigin == null) S.nextOrigin = Math.max(R, Math.min(W - R, b.x));
-      look.splash(b.x, 1);
+      // Where the next shot starts is decided by the swarm, never by a spray.
+      // A burst throws bodies at every angle, so letting one of them claim the
+      // launcher would move it somewhere the player did not choose.
+      if (!b.temp && S.nextOrigin == null) S.nextOrigin = Math.max(R, Math.min(W - R, b.x));
+      look.splash(b.x, b.temp ? 0.5 : 1);
       S.live.splice(i, 1);
     }
   }
@@ -504,9 +584,76 @@ function hitBlocks(b){
       juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
       S.rows.splice(i, 1);
       S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+      if (bl.k) applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2);
     }
     return;
   }
+}
+
+// A special block is marked at its EDGE and never across its middle. The health
+// number lives in the middle, and putting a second thing there is what made a
+// pickup over a block unreadable. Four corner brackets in the kind's colour say
+// "this one is different" from across the field without touching the figure.
+function markSpecials(X){
+  if (!S.kinds) return;
+  const off = look.slideOffset || 0;
+  const pad = CELL * 0.046;
+  X.save();
+  X.lineWidth = 2;
+  for (let i = 0; i < S.rows.length; i++){
+    const bl = S.rows[i];
+    if (!bl.k) continue;
+    const k = S.kinds.byId(bl.k);
+    if (!k || !k.tint) continue;
+    const x = xOf(bl.c) + pad, y = TOP + bl.r * CELL + pad + off;
+    const w = CELL - pad * 2, h = CELL - pad * 2;
+    const t = Math.min(w, h) * 0.26;
+    X.strokeStyle = k.tint;
+    X.beginPath();
+    X.moveTo(x, y + t);         X.lineTo(x, y);             X.lineTo(x + t, y);
+    X.moveTo(x + w - t, y);     X.lineTo(x + w, y);         X.lineTo(x + w, y + t);
+    X.moveTo(x + w, y + h - t); X.lineTo(x + w, y + h);     X.lineTo(x + w - t, y + h);
+    X.moveTo(x + t, y + h);     X.lineTo(x, y + h);         X.lineTo(x, y + h - t);
+    X.stroke();
+  }
+  X.restore();
+}
+
+// --- what a special block does when it breaks -------------------------------
+//
+// The verbs are shared. A kind names one; this is the only place that knows how
+// to carry it out, so a new kind is usually a config entry and no code at all.
+
+function applyBlockEffect(e, x, y){
+  if (!e) return;
+  if (e.burst) spray(x, y, e.burst);
+  if (e.essence) S.gold += e.essence;
+  if (e.balls) S.balls += e.balls;
+  if (e.clearRow){
+    let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
+    S.rows = S.rows.filter(b => b.r !== lo);
+  }
+}
+
+// Bodies thrown out of a block in every direction. They break blocks and
+// collect markers exactly like the swarm does, and then they are gone: they
+// never join the count, so a burst is a good turn rather than a permanent gain.
+//
+// The fuse is not decoration. A body thrown out flat has almost no vertical
+// speed, and bounces preserve it, so without a fuse that body would cross the
+// field forever and the turn would never close.
+function spray(x, y, spec){
+  const n = Math.max(1, spec.count | 0);
+  const sp = SPEED * (spec.speed > 0 ? spec.speed : 1);
+  const life = Math.max(1, spec.life | 0) || 150;
+  for (let i = 0; i < n; i++){
+    const a = (i + 0.5) / n * Math.PI * 2;
+    S.live.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      temp: true, life, size: 0.68,
+    });
+  }
+  juice.destroy(x, y, CONFIG.palette.hot, 0, -1);
 }
 
 // --- render -----------------------------------------------------------------
@@ -523,6 +670,7 @@ function draw(){
   look.background(X);
   look.horizon(X, S.rows);
   look.blocks(X, S.rows);
+  markSpecials(X);
   look.pickups(X, S.drops);
 
   if (S.aiming && !S.firing && !S.dead){
@@ -603,13 +751,15 @@ const store = createSave({
   fingerprint: () => (S && S.field && typeof S.field.rowFor === 'function')
     ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
   capture: () => ({
-    mode: S.mode,
+    mode: S.mode, endless: S.endless, won: S.won,
     seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold, dealt: S.dealt,
     owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
-    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max })),
+    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind })),
-    live: S.live.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
+    // A sprayed body belongs to the turn it was thrown in, and a save is taken
+    // between turns, so only the swarm is worth writing down.
+    live: S.live.filter(b => !b.temp).map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
     firing: S.firing, queue: S.queue, dir: S.dir || null,
   }),
   restore: (v) => {
@@ -621,6 +771,7 @@ const store = createSave({
     S.seed = v.seed >>> 0;
     S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
     S.form = S.field.key === 'fractal' ? S.field.source : null;
+    S.kinds = createBlockKinds(S.seed);
     // A field that deals a sequence has no way to be asked for row N, so it is
     // restored by replaying it up to where the run had got to.
     S.dealt = v.dealt | 0;
@@ -629,6 +780,7 @@ const store = createSave({
     // easing across from the starting width.
     retarget(S.field.width());
     CELL = cellT; ORIGIN = originT;
+    S.endless = !!v.endless; S.won = !!v.won;
     S.depth = v.depth | 0; S.balls = v.balls | 0; S.gold = v.gold | 0;
     S.owed = { ball: (v.owed && v.owed.ball) | 0, gold: (v.owed && v.owed.gold) | 0 };
     S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
@@ -639,7 +791,7 @@ const store = createSave({
     S.firing = !!v.firing; S.queue = v.queue | 0; S.dir = v.dir || null;
     S.dead = !!v.dead;
     juice.clear();
-    if (S.dead) die(); else document.getElementById('over').classList.remove('on');
+    if (S.dead) (S.won ? win() : die()); else document.getElementById('over').classList.remove('on');
     paintShop();
   },
 });
@@ -753,6 +905,20 @@ document.getElementById('overmodes').onclick = () => {
   openMenu();
 };
 document.getElementById('resume').onclick = closeMenu;
+
+// Carrying on past the finish. The field starts arriving again from where it
+// stopped, and from here block health compounds rather than climbing in a line,
+// so endless always ends - which is the point of endless.
+document.getElementById('endless').onclick = () => {
+  if (!S || !S.won) return;
+  S.endless = true;
+  S.dead = false;
+  S.won = false;
+  document.getElementById('over').classList.remove('on');
+  addRow();
+  store.mark();
+  paintShop();
+};
 function restart(){ document.getElementById('over').classList.remove('on'); closeMenu(); fresh(); }
 
 // --- loop -------------------------------------------------------------------
