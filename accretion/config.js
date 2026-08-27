@@ -265,23 +265,32 @@ export function applyIdentity(doc) {
 
   d.title = CONFIG.identity.name;
 
+  // A headless harness supplies enough of a document to boot the game and no
+  // more, so every surface touched here is optional.
   const root = d.documentElement;
-  root.style.setProperty('--void', p.void);
-  root.style.setProperty('--ink', p.ink);
-  root.style.setProperty('--figure', p.figure);
-  root.style.setProperty('--label', p.label);
-  root.style.setProperty('--quiet', p.quiet);
+  const setVar = (name, value) => {
+    if (root && root.style && typeof root.style.setProperty === 'function') {
+      root.style.setProperty(name, value);
+    }
+  };
+  setVar('--void', p.void);
+  setVar('--ink', p.ink);
+  setVar('--figure', p.figure);
+  setVar('--label', p.label);
+  setVar('--quiet', p.quiet);
 
-  const hud = d.getElementById('hud');
+  const byId = (id) => (typeof d.getElementById === 'function' ? d.getElementById(id) : null);
+
+  const hud = byId('hud');
   if (hud) {
     hud.style.left = CONFIG.layout.hudLeft + 'px';
     hud.style.top = CONFIG.layout.hudTop + 'px';
   }
 
-  const label = d.getElementById('masslabel');
+  const label = byId('masslabel');
   if (label) label.textContent = CONFIG.text.massLabel;
 
-  const note = d.getElementById('note');
+  const note = byId('note');
   if (note) {
     note.textContent = CONFIG.text.promptFirst;
     note.style.left = CONFIG.layout.promptLeft + 'px';
@@ -297,7 +306,8 @@ export function applyIdentity(doc) {
     '<circle cx="27" cy="9" r="1.6" fill="' + p.ink + '"/>' +
     '<circle cx="6" cy="23" r="2.2" fill="' + p.ink + '"/>' +
     '</svg>';
-  let icon = d.getElementById('cfg-favicon');
+  if (typeof d.createElement !== 'function' || !d.head) return;
+  let icon = byId('cfg-favicon');
   if (!icon) {
     icon = d.createElement('link');
     icon.id = 'cfg-favicon';

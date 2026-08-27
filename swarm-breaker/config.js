@@ -325,19 +325,29 @@ export function applyIdentity(doc) {
 
   d.title = CONFIG.identity.name;
 
+  // The headless test harness supplies enough of a document to boot the game
+  // and no more, so every surface touched here is optional.
   const root = d.documentElement;
   const p = CONFIG.palette;
-  root.style.setProperty('--bg', p.void);
-  root.style.setProperty('--panel', p.panel);
-  root.style.setProperty('--line', p.rule);
-  root.style.setProperty('--ink', p.ink);
-  root.style.setProperty('--dim', p.dim);
-  root.style.setProperty('--hot', p.hot);
-  root.style.setProperty('--swarm', p.swarm);
-  root.style.setProperty('--block', p.rule);
-  root.style.setProperty('--pickup', p.essence);
+  const setVar = (name, value) => {
+    if (root && root.style && typeof root.style.setProperty === 'function') {
+      root.style.setProperty(name, value);
+    }
+  };
+  setVar('--bg', p.void);
+  setVar('--panel', p.panel);
+  setVar('--line', p.rule);
+  setVar('--ink', p.ink);
+  setVar('--dim', p.dim);
+  setVar('--hot', p.hot);
+  setVar('--swarm', p.swarm);
+  setVar('--block', p.rule);
+  setVar('--pickup', p.essence);
 
-  const put = (id, value) => { const el = d.getElementById(id); if (el) el.textContent = value; };
+  const put = (id, value) => {
+    const el = typeof d.getElementById === 'function' ? d.getElementById(id) : null;
+    if (el) el.textContent = value;
+  };
   const t = CONFIG.text;
   put('lbl-depth',   t.stats.depth);
   put('lbl-swarm',   t.stats.swarm);
@@ -350,10 +360,12 @@ export function applyIdentity(doc) {
   put('over-lbl-depth', t.overDepth);
   put('over-lbl-swarm', t.overSwarm);
 
-  const sel = d.getElementById('tier');
+  const byId = (id) => (typeof d.getElementById === 'function' ? d.getElementById(id) : null);
+
+  const sel = byId('tier');
   if (sel) sel.title = t.difficultyLabel;
 
-  const canvas = d.getElementById('c');
+  const canvas = byId('c');
   if (canvas) { canvas.width = CONFIG.board.width; canvas.height = CONFIG.board.height; }
 
   // The tab icon is drawn from the palette rather than shipped as a file, so a
@@ -365,7 +377,8 @@ export function applyIdentity(doc) {
     '<rect x="17" y="5" width="9" height="7" fill="' + p.rule + '"/>' +
     '<circle cx="16" cy="23" r="4" fill="' + p.swarm + '"/>' +
     '</svg>';
-  let icon = d.getElementById('cfg-favicon');
+  if (typeof d.createElement !== 'function' || !d.head) return;
+  let icon = byId('cfg-favicon');
   if (!icon) {
     icon = d.createElement('link');
     icon.id = 'cfg-favicon';
