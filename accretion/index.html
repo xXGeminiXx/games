@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accretion</title>
+<style>
+  /* Colours arrive from config.js as custom properties; the values here are
+     only what the page shows before that file has run. */
+  :root{--void:#04050a; --ink:#c8cede; --figure:#e6ebf5; --label:#5d6579; --quiet:#4a5164}
+  html,body{height:100%;margin:0;background:var(--void);overflow:hidden}
+  body{
+    font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color:var(--ink); -webkit-user-select:none; user-select:none;
+  }
+  canvas{display:block;width:100vw;height:100vh;cursor:crosshair}
+  #hud{
+    position:fixed; left:30px; top:74px; pointer-events:none;
+    font-variant-numeric:tabular-nums; letter-spacing:.02em;
+  }
+  #hud b{display:block;font-size:22px;font-weight:600;letter-spacing:-.01em;color:var(--figure)}
+  #hud span{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--label)}
+  #note{
+    position:fixed; left:30px; bottom:30px; color:var(--quiet); font-size:11px;
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="v"></canvas>
+<div id="hud"><b id="mass">0</b><span id="masslabel">bound mass</span></div>
+<div id="note">click the void</div>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Accretion - first playable cut.
+//
+// A blank field. A click puts something in it. A second thing pulls on the
+// first, and nothing after that is scripted: what forms, forms because the
+// field says so.
+//
+// This wires the simulation to the renderer and does nothing else. The arc,
+// the research and the ending exist as designed modules and are deliberately
+// not connected yet - the first thing worth knowing is whether the field
+// itself is good to touch.
+// ---------------------------------------------------------------------------
+
+import { CONFIG, simOptions, applyIdentity } from './config.js';
+import { createSim, magToString } from './src/sim.js';
+import { createRenderer, createSimAdapter } from './src/render.js';
+
+// Name, prompts and colours all arrive from config.js, so the markup above
+// never has to be edited to rename or recolour anything.
+applyIdentity(document);
+
+const canvas = document.getElementById('v');
+const sim = createSim(simOptions());
+const view = createRenderer(canvas, {});
+const adapt = createSimAdapter({});
+
+// A click is a seed, not a placement: mass arrives with a little scatter and a
+// little momentum, so two clicks in the same place still make a system rather
+// than a stack.
+let clicks = 0;
+function seedAt(sx, sy) {
+  const w = view.screenToWorld(sx, sy);
+  if (!w) return;
+  const seed = CONFIG.seeding;
+  const spread = seed.spreadBase + clicks * seed.spreadGrowth;
+  const step = 6.2831853 / Math.max(1, seed.bodiesPerClick);
+  for (let k = 0; k < seed.bodiesPerClick; k++) {
+    const a = (clicks * 2.3999632 + k * step) % 6.2831853;
+    sim.addBody({
+      x: w.x + Math.cos(a) * spread,
+      y: w.y + Math.sin(a) * spread,
+      vx: Math.cos(a + 1.5708) * seed.launchSpeed,
+      vy: Math.sin(a + 1.5708) * seed.launchSpeed,
+      mass: seed.massPerBody,
+    });
+  }
+  clicks++;
+  const note = document.getElementById('note');
+  if (clicks === 1) note.textContent = CONFIG.text.promptSecond;
+  else if (clicks === seed.promptFadesAt) note.textContent = CONFIG.text.promptDone;
+}
+
+canvas.addEventListener('pointerdown', e => seedAt(e.clientX, e.clientY));
+addEventListener('resize', () => view.resize());
+addEventListener('wheel', e => view.nudgeZoom(e.deltaY > 0 ? -CONFIG.camera.zoomStep : CONFIG.camera.zoomStep), { passive: true });
+
+const fmt = document.getElementById('mass');
+let last = 0;
+
+function frame(now) {
+  const dt = last ? Math.min(CONFIG.field.maxStepSeconds, (now - last) / 1000) : 1 / 60;
+  last = now;
+
+  const vp = view.getViewport();
+  if (vp) sim.setView({ cx: vp.cx, cy: vp.cy, pxPerUnit: vp.pxPerUnit, w: vp.w, h: vp.h });
+
+  sim.step(dt);
+
+  // Events are how the field tells the view that something happened - a merge,
+  // an ignition, a crossing into a new order of magnitude.
+  const events = sim.drainEvents ? sim.drainEvents() : [];
+  for (let i = 0; i < events.length; i++) view.emit(events[i]);
+
+  const s = sim.stats ? sim.stats() : null;
+
+  // The renderer frames on the extent of the field. It arrives as a magnitude
+  // pair, and without it the camera has nothing to size itself against.
+  let extent = 0;
+  if (s && s.extent) {
+    const e = s.extent.m * Math.pow(10, s.extent.e);
+    if (Number.isFinite(e) && e > 0) extent = e;
+  }
+
+  const world = adapt(sim.getRenderView(), { t: now / 1000, events, extent });
+  view.renderFrame(world, now);
+
+  if (s && s.totalMass) fmt.textContent = magToString(s.totalMass, 2);
+
+  requestAnimationFrame(frame);
+}
+
+// The renderer can drive itself, but the field has to step first, so frames
+// are driven from here. Calling start() as well would paint twice per frame,
+// and with additive blending a second pass simply blows the exposure out.
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

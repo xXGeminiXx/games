@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Games</title>
+<style>
+  :root{
+    --void:#08090c; --panel:#0e1016; --rule:#1c2029;
+    --ink:#e6e9ef; --dim:#7a828f; --accent:#5ad1ff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--void); color:var(--ink);
+    font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    display:flex; align-items:center; justify-content:center; padding:32px 20px;
+  }
+  main{width:100%; max-width:560px}
+  h1{
+    font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:.22em;
+    color:var(--dim); margin:0 0 26px;
+  }
+  a.card{
+    display:block; text-decoration:none; color:inherit;
+    border:1px solid var(--rule); background:var(--panel);
+    padding:18px 20px; margin-bottom:12px;
+    transition:border-color .14s linear;
+  }
+  a.card:hover{border-color:var(--accent)}
+  a.card b{display:block; font-size:20px; font-weight:600; letter-spacing:-.02em}
+  a.card:hover b{color:var(--accent)}
+  a.card p{margin:6px 0 0; color:var(--dim); font-size:13px; line-height:1.5}
+  footer{margin-top:26px; color:var(--dim); font-size:11px; line-height:1.7}
+  footer code{color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Games</h1>
+  <div id="list"></div>
+  <footer>
+    Nothing here loads an image, plays a sound, or sends a request anywhere.
+    Every game runs entirely in this tab.<br>
+    Tune one without editing anything: add <code>?set=path=value</code> to its
+    address. Each game's <code>config.js</code> lists what it accepts.
+  </footer>
+</main>
+
+<script>
+// Everything the page shows. Add a game by adding a line.
+const GAMES = [
+  {
+    dir:  'swarm-breaker',
+    name: 'Swarm Breaker',
+    line: 'One decision a turn: the angle. A growing swarm of bodies does the rest ' +
+          'while blocks descend toward the line you are defending.',
+  },
+  {
+    dir:  'accretion',
+    name: 'Accretion',
+    line: 'A blank field. A click puts something in it. Nothing after that is ' +
+          'scripted - what forms, forms because gravity says so.',
+  },
+];
+
+const list = document.getElementById('list');
+for (const g of GAMES) {
+  const a = document.createElement('a');
+  a.className = 'card';
+  a.href = g.dir + '/';
+  const b = document.createElement('b');
+  b.textContent = g.name;
+  const p = document.createElement('p');
+  p.textContent = g.line;
+  a.append(b, p);
+  list.appendChild(a);
+}
+</script>
+</body>
+</html>

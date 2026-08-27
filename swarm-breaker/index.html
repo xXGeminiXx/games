@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swarm Breaker</title>
+<style>
+  :root{
+    --bg:#08090c; --panel:#0e1016; --line:#1c2029;
+    --ink:#e6e9ef; --dim:#7a828f; --hot:#ff5c46;
+    --swarm:#5ad1ff; --block:#2a3040; --pickup:#ffc94a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    display:flex; flex-direction:column; align-items:center;
+    -webkit-user-select:none; user-select:none;
+  }
+  header{
+    width:100%; max-width:520px; display:flex; gap:0;
+    border-bottom:1px solid var(--line); padding:10px 12px;
+    justify-content:space-between; align-items:baseline;
+  }
+  .stat{display:flex; flex-direction:column; gap:2px}
+  .stat b{
+    font-size:19px; font-weight:600; font-variant-numeric:tabular-nums;
+    letter-spacing:-0.02em;
+  }
+  .stat span{font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em}
+  .swarmv{color:var(--swarm)}
+  .hotv{color:var(--hot)}
+  .goldv{color:var(--pickup)}
+  canvas{display:block; touch-action:none}
+  footer{
+    width:100%; max-width:520px; padding:8px 12px 14px;
+    color:var(--dim); font-size:11px; display:flex; justify-content:space-between;
+    border-top:1px solid var(--line);
+  }
+  button{
+    font:inherit; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); padding:4px 10px; cursor:pointer;
+  }
+  button:hover{border-color:var(--swarm)}
+  button:disabled{opacity:.35; cursor:default; border-color:var(--line)}
+  select{
+    font:inherit; font-size:11px; background:var(--panel); color:var(--dim);
+    border:1px solid var(--line); padding:3px 6px; max-width:230px; cursor:pointer;
+  }
+  select:hover{color:var(--ink); border-color:var(--swarm)}
+  footer{gap:8px}
+  #shop{
+    width:100%; max-width:520px; display:none; gap:6px; padding:8px 12px;
+    border-top:1px solid var(--line); flex-wrap:wrap;
+  }
+  #shop.on{display:flex}
+  .buy{flex:1 1 150px; text-align:left; line-height:1.3}
+  .buy small{display:block; color:var(--dim); font-size:10px}
+  #over{
+    position:fixed; inset:0; background:rgba(8,9,12,.93); display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  }
+  #over.on{display:flex}
+  #over h1{font-size:22px; margin:0; font-weight:600; letter-spacing:-0.02em}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="stat"><b id="lvl">1</b><span id="lbl-depth">depth</span></div>
+  <div class="stat"><b class="swarmv" id="balls">1</b><span id="lbl-swarm">swarm</span></div>
+  <div class="stat"><b class="goldv" id="gold">0</b><span id="lbl-essence">essence</span></div>
+  <div class="stat"><b id="rule" style="font-size:15px">drift</b><span id="lbl-pattern">pattern</span></div>
+</header>
+
+<canvas id="c" width="520" height="620"></canvas>
+
+<div id="shop"></div>
+
+<footer>
+  <span id="hint">drag to aim &middot; release to fire</span>
+  <select id="tier" title="difficulty"></select>
+  <button id="reset">reset</button>
+</footer>
+
+<div id="over">
+  <h1 id="overtitle">the swarm is overrun</h1>
+  <div style="color:var(--dim)"><span id="over-lbl-depth">depth</span> <b id="overdepth">0</b> &middot; <span id="over-lbl-swarm">swarm</span> <b id="overballs">0</b></div>
+  <button id="again">again</button>
+</div>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Swarm Breaker - prototype
+//
+// One decision per turn: pick an angle. Everything after that runs itself.
+// The swarm does the work; you only choose where to point it.
+//
+// Every visual is drawn from primitives. There are no image files and there is
+// no audio - all state is legible on screen.
+// ---------------------------------------------------------------------------
+
+import { CONFIG, CELL, TOP, FLOOR, MIN_AIM_Y, storageKey, offerCost, applyIdentity } from './config.js';
+import { createJuice } from './src/juice.js';
+import { createPatternSource } from './src/patterns.js';
+import { createSave, fieldFingerprint } from './src/save.js';
+import { createLeaderboard } from './src/leaderboard.js';
+import * as Tiers from './src/tiers.js';
+import { createOnboarding } from './src/onboarding.js';
+import { createVisual } from './src/visual.js';
+
+// Names, labels, colours and canvas size all arrive from config.js, so the
+// markup above never has to be edited to rename or resize anything.
+applyIdentity(document);
+
+const C = document.getElementById('c');
+const X = C.getContext('2d');
+const W = C.width, H = C.height;
+
+const COLS = CONFIG.board.cols;
+const R = CONFIG.swarm.radius;
+const SPEED = CONFIG.swarm.speed;
+const SUBSTEPS = CONFIG.swarm.substeps;
+
+// All impact feedback lives here: trails, shatter, damage numbers, shake.
+const juice = createJuice({
+  width: W, height: H, floorY: FLOOR,
+  trailColor: CONFIG.palette.swarm,
+  shake: CONFIG.feel.shake,
+  particles: CONFIG.feel.particles,
+  reducedMotion: CONFIG.feel.reducedMotion === null ? undefined : CONFIG.feel.reducedMotion,
+});
+
+// Everything the field looks like. Blocks that touch fuse into architecture,
+// health is carried by fracture rather than by hue, and the swarm lights the
+// world it sits under.
+const look = createVisual({
+  width: W, height: H, top: TOP, floorY: FLOOR, cols: COLS,
+  reducedMotion: CONFIG.feel.reducedMotion === null ? undefined : CONFIG.feel.reducedMotion,
+});
+
+// The first minute is taught by what the field does, not by any text. This
+// draws nothing once a player has played.
+const teach = createOnboarding({
+  width: W, height: H, floorY: FLOOR, topY: TOP, cols: COLS, cell: CELL, ballRadius: R,
+  canAfford: () => OFFERS.some(o => S.gold >= o.cost(S.depth)),
+});
+
+let TIER = (() => {
+  try { const v = localStorage.getItem(storageKey('tier')); if (v && Tiers.tierOf(v)) return v; } catch (e) {}
+  return CONFIG.difficulty.defaultTier;
+})();
+
+let S;
+function fresh(){
+  S = {
+    depth: 1, balls: Tiers.tierOf(TIER).supply.start, gold: 0, tier: TIER,
+    rows: [],            // {c, r, hp, max} in grid coords
+    drops: [],           // {c, r, kind}
+    live: [], firing: false, queue: 0, fireT: 0,
+    origin: W / 2, nextOrigin: null,
+    aiming: false, aim: {x: W / 2, y: FLOOR - 120},
+    dead: false,
+    power: CONFIG.swarm.startingPower,
+    gain: CONFIG.swarm.startingGain,   // gain = essence per block destroyed
+    seed: 0,
+    field: null,
+  };
+  S.seed = (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
+  S.field = createPatternSource(S.seed);
+  juice.clear();
+  // seed a couple of rows so the field is never empty on turn one
+  addRow(); step(); addRow();
+  paintShop();
+}
+
+// --- field ------------------------------------------------------------------
+
+function addRow(){
+  const d = S.depth;
+  if (!Tiers.spawnsRowAt(S.tier, d)) return;
+  const cells = S.field.rowFor(d);
+  const hp = Math.max(1, Tiers.healthNumber(S.tier, d));
+  let any = false;
+  cells.forEach((on, c) => {
+    if (!on) return;
+    any = true;
+    S.rows.push({ c, r: 0, hp, max: hp });
+  });
+  if (!any) S.rows.push({ c: (d * 3) % COLS, r: 0, hp, max: hp });
+
+  // The resupply line is the difficulty. Starve it and the angle has to choose
+  // between damage and collection; keep it full and it never has to.
+  if (Tiers.spawnsPickupAt(S.tier, d)) S.drops.push({ c: (d * 5 + 2) % COLS, r: 0, kind: 'ball' });
+  if (Tiers.spawnsWindfallAt(S.tier, d)) S.drops.push({ c: (d * 2 + 5) % COLS, r: 0, kind: 'gold' });
+}
+
+function step(){
+  if (!Tiers.fieldDescends(S.tier, S.depth)) return;
+  look.descend(S.rows);
+  S.rows.forEach(b => b.r++);
+  S.drops.forEach(p => p.r++);
+  // A marker that reaches the line is gone. Without this they descend past the
+  // canvas forever and the list grows for the whole run.
+  S.drops = S.drops.filter(p => cyOf(p.r) < FLOOR + CELL);
+}
+
+const cx = c => c * CELL + CELL / 2;
+const cyOf = r => TOP + r * CELL + CELL / 2;
+
+// --- turn cycle -------------------------------------------------------------
+
+function fire(){
+  if (S.firing || S.dead) return;
+  const dx = S.aim.x - S.origin, dy = S.aim.y - (FLOOR - R);
+  const len = Math.hypot(dx, dy);
+  if (len < 12 || -dy / len < MIN_AIM_Y) return;   // shots flatter than the configured angle are refused
+  S.dir = { x: dx / len, y: dy / len };
+  S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
+  store.mark();
+  juice.launch(S.origin, FLOOR - R, S.dir.x, S.dir.y);
+}
+
+function endTurn(){
+  S.firing = false;
+  if (S.nextOrigin != null) S.origin = S.nextOrigin;
+  step();
+  S.depth++;
+  addRow();
+  // lose when a block crosses the swarm line
+  if (S.rows.some(b => cyOf(b.r) + CELL / 2 >= FLOOR)) return die();
+  store.mark();
+  paintShop();
+}
+
+function die(){
+  S.dead = true;
+  store.mark();
+  board.finish({ tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none' });
+  document.getElementById('overdepth').textContent = S.depth;
+  document.getElementById('overballs').textContent = S.balls;
+  document.getElementById('over').classList.add('on');
+}
+
+// --- simulation -------------------------------------------------------------
+
+function sim(){
+  if (S.firing){
+    S.fireT++;
+    const gap = Math.max(1, Math.round(CONFIG.swarm.launchGap - S.balls / CONFIG.swarm.launchCrowd));
+    if (S.queue > 0 && S.fireT % gap === 0){
+      S.live.push({ x: S.origin, y: FLOOR - R, vx: S.dir.x * SPEED, vy: S.dir.y * SPEED });
+      S.queue--;
+    }
+  }
+
+  for (let i = S.live.length - 1; i >= 0; i--){
+    const b = S.live[i];
+    juice.trail(b.x, b.y, b.vx, b.vy);
+    // substep so fast balls cannot tunnel through a block
+    for (let s = 0; s < SUBSTEPS; s++){
+      b.x += b.vx / SUBSTEPS; b.y += b.vy / SUBSTEPS;
+      if (b.x < R){ b.x = R; b.vx = Math.abs(b.vx); }
+      if (b.x > W - R){ b.x = W - R; b.vx = -Math.abs(b.vx); }
+      if (b.y < TOP + R){ b.y = TOP + R; b.vy = Math.abs(b.vy); }
+      hitBlocks(b);
+    }
+    // pickups
+    for (let j = S.drops.length - 1; j >= 0; j--){
+      const p = S.drops[j];
+      if (Math.hypot(b.x - cx(p.c), b.y - cyOf(p.r)) < CELL * 0.32){
+        if (p.kind === 'ball'){
+          S.balls += 1;
+          juice.pickup(cx(p.c), cyOf(p.r), 'ball', 1);
+        } else {
+          const n = CONFIG.economy.windfallBase + S.depth;
+          S.gold += n;
+          juice.pickup(cx(p.c), cyOf(p.r), 'gold', n);
+        }
+        S.drops.splice(j, 1);
+      }
+    }
+    if (b.y > FLOOR - R){
+      if (S.nextOrigin == null) S.nextOrigin = Math.max(R, Math.min(W - R, b.x));
+      look.splash(b.x, 1);
+      S.live.splice(i, 1);
+    }
+  }
+
+  if (S.firing && S.queue === 0 && S.live.length === 0) endTurn();
+}
+
+function hitBlocks(b){
+  for (let i = S.rows.length - 1; i >= 0; i--){
+    const bl = S.rows[i];
+    const bx = bl.c * CELL + 3, by = TOP + bl.r * CELL + 3;
+    const bw = CELL - 6, bh = CELL - 6;
+    if (b.x + R < bx || b.x - R > bx + bw || b.y + R < by || b.y - R > by + bh) continue;
+
+    const ox = Math.min(b.x + R - bx, bx + bw - (b.x - R));
+    const oy = Math.min(b.y + R - by, by + bh - (b.y - R));
+
+    // An axis the ball is already leaving must not be reflected. Without this
+    // the substep after a resolution reads as a fresh contact, flips the ball
+    // back and displaces it INTO the block it was escaping.
+    const mx = bx + bw / 2, my = by + bh / 2;
+    const awayX = (b.x <= mx && b.vx < 0) || (b.x >= mx && b.vx > 0);
+    const awayY = (b.y <= my && b.vy < 0) || (b.y >= my && b.vy > 0);
+    if (awayX && awayY) continue;
+
+    // Choose the axis by TIME to clear, not by depth. Depth alone picks the
+    // shallower overlap even when the ball is barely moving along it - which is
+    // how a near-vertical ball in the six-pixel gutter between two columns had
+    // its negligible horizontal speed flipped and carried straight on through
+    // the block, for as long as the block had health to spend.
+    const sx = Math.abs(b.vx), sy = Math.abs(b.vy);
+    const tx = (!awayX && sx > 1e-6) ? ox / sx : Infinity;
+    const ty = (!awayY && sy > 1e-6) ? oy / sy : Infinity;
+    if (tx === Infinity && ty === Infinity) continue;
+
+    if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
+    else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
+
+    const nx = b.vx, ny = b.vy;
+    const m = look.materialFor(bl.max).mat;
+    const shade = `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
+    bl.hp -= S.power;
+    juice.hit(b.x, b.y, S.power, nx, ny);
+    if (bl.hp <= 0){
+      juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
+      S.rows.splice(i, 1);
+      S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    }
+    return;
+  }
+}
+
+// --- render -----------------------------------------------------------------
+
+function draw(){
+  look.update(1 / 60);
+  look.setDepth(S.depth);
+  look.setSwarm(S.balls);
+  look.setRegime({ name: S.field.nameFor(S.depth), key: S.field.regimeAt ? S.field.regimeAt(S.depth).key : null });
+
+  juice.begin(X);
+
+  look.background(X);
+  look.horizon(X, S.rows);
+  look.blocks(X, S.rows);
+  look.pickups(X, S.drops);
+
+  if (S.aiming && !S.firing && !S.dead){
+    const dx = S.aim.x - S.origin, dy = S.aim.y - (FLOOR - R), len = Math.hypot(dx, dy);
+    if (len > 12 && -dy / len >= MIN_AIM_Y) look.aim(X, S.origin, FLOOR - R, dx / len, dy / len, len);
+  }
+
+  look.bodies(X, S.live, R);
+  look.launcher(X, S.origin, FLOOR - R);
+  look.swarmBand(X);
+
+  juice.swarm(S.balls);
+  juice.draw(X);
+  juice.end(X);
+
+  look.foreground(X);
+  if (CONFIG.feel.onboarding) teach.draw(X);
+}
+
+// --- shop -------------------------------------------------------------------
+// Essence is the economy seed. Blocks and pickups pay it out; it buys the
+// things that would otherwise be a grind. Buying past tedium is the loop.
+
+function lowestRowSize(){
+  let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
+  return S.rows.filter(b => b.r === lo).length;
+}
+
+// What each offer DOES. The list itself, its names, its prices and its order
+// live in config.js; this only says what buying one changes.
+const EFFECTS = {
+  ball:  o => { S.balls += o.amount; },
+  power: o => { S.power += o.amount; },
+  gain:  o => { S.gain  += o.amount; },
+  clear: () => {
+    let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
+    S.rows = S.rows.filter(b => b.r !== lo);
+  },
+};
+
+// Clearing a row is priced by how much of the field it removes, so a wide row
+// costs more than a thin one. Everything else is priced straight off its entry.
+const PRICING = {
+  clear: (o, d) => Math.round(offerCost(o, d) * Math.max(1, lowestRowSize()) / 2),
+};
+
+const OFFERS = CONFIG.economy.offers
+  .filter(o => EFFECTS[o.id])
+  .map(o => ({
+    id: o.id, name: o.name, desc: o.desc,
+    cost: d => (PRICING[o.id] ? PRICING[o.id](o, d) : offerCost(o, d)),
+    buy: () => EFFECTS[o.id](o),
+  }));
+
+function paintShop(){
+  const el = document.getElementById('shop');
+  el.classList.add('on');
+  el.innerHTML = '';
+  OFFERS.forEach(o => {
+    const c = o.cost(S.depth);
+    const b = document.createElement('button');
+    b.className = 'buy';
+    b.innerHTML = `${o.name} &middot; ${c}<small>${o.desc}</small>`;
+    b.disabled = S.gold < c || S.firing;
+    b.onclick = () => { if (S.gold >= c){ S.gold -= c; o.buy(); store.mark(); paintShop(); } };
+    el.appendChild(b);
+  });
+}
+
+// --- persistence ------------------------------------------------------------
+
+const board = createLeaderboard({ defaultTier: CONFIG.difficulty.defaultTier });
+
+const store = createSave({
+  key: storageKey('run'),
+  fingerprint: () => S && S.field ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
+  capture: () => ({
+    seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold,
+    power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
+    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max })),
+    drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind })),
+    live: S.live.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
+    firing: S.firing, queue: S.queue, dir: S.dir || null,
+  }),
+  restore: (v) => {
+    if (!v || typeof v !== 'object') return;
+    S.seed = v.seed >>> 0;
+    S.field = createPatternSource(S.seed);
+    S.depth = v.depth | 0; S.balls = v.balls | 0; S.gold = v.gold | 0;
+    S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
+    S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
+    S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
+    S.drops = Array.isArray(v.drops) ? v.drops.slice() : [];
+    S.live = Array.isArray(v.live) ? v.live.slice() : [];
+    S.firing = !!v.firing; S.queue = v.queue | 0; S.dir = v.dir || null;
+    S.dead = !!v.dead;
+    juice.clear();
+    if (S.dead) die(); else document.getElementById('over').classList.remove('on');
+    paintShop();
+  },
+});
+
+// --- input ------------------------------------------------------------------
+
+function pos(e){
+  const r = C.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return { x: (p.clientX - r.left) * (W / r.width), y: (p.clientY - r.top) * (H / r.height) };
+}
+const onDown = e => { if (S.firing || S.dead) return; S.aiming = true; S.aim = pos(e); e.preventDefault(); };
+const onMove = e => { if (!S.aiming) return; S.aim = pos(e); e.preventDefault(); };
+const onUp   = e => { if (!S.aiming) return; S.aiming = false; fire(); e.preventDefault(); };
+
+C.addEventListener('mousedown', onDown); addEventListener('mousemove', onMove); addEventListener('mouseup', onUp);
+C.addEventListener('touchstart', onDown, {passive:false});
+C.addEventListener('touchmove', onMove, {passive:false});
+C.addEventListener('touchend', onUp, {passive:false});
+
+const tierSel = document.getElementById('tier');
+// Every tier is selectable while this is a prototype. The ladder is designed
+// to be earned one rung at a time and that gating is not enforced yet.
+Tiers.unlockedTiers(Tiers.emptyProgress(), { unlockAll: CONFIG.difficulty.unlockAll }).forEach(t => {
+  const o = document.createElement('option');
+  o.value = t.id; o.textContent = t.name + ' \u00b7 ' + t.tell;
+  if (t.id === TIER) o.selected = true;
+  tierSel.appendChild(o);
+});
+tierSel.onchange = () => {
+  TIER = tierSel.value;
+  try { localStorage.setItem(storageKey('tier'), TIER); } catch (e) {}
+  restart();
+};
+
+addEventListener('keydown', e => { if (e.key === 'Escape') teach.skip(); });
+
+document.getElementById('reset').onclick = restart;
+document.getElementById('again').onclick = restart;
+function restart(){ document.getElementById('over').classList.remove('on'); fresh(); }
+
+// --- loop -------------------------------------------------------------------
+
+function hud(){
+  document.getElementById('lvl').textContent = S.depth;
+  document.getElementById('balls').textContent = S.balls;
+  document.getElementById('gold').textContent = S.gold;
+  document.getElementById('rule').textContent = S.field.nameFor(S.depth);
+  document.getElementById('hint').textContent = S.firing
+    ? CONFIG.text.hintFiring
+    : CONFIG.text.hintIdle;
+}
+
+let shopT = 0, last = 0;
+function tick(now){
+  const dt = last ? (now - last) / 1000 : 1 / 60;
+  last = now;
+  juice.update(dt);
+  if (!S.dead){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
+  draw(); hud();
+  if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
+  requestAnimationFrame(tick);
+}
+
+fresh();
+const resumed = store.load();
+store.start();
+tick();
+
+// The personal best sits in the footer. It works with no server configured.
+(function showBest(){
+  const b = board.best(TIER);
+  if (b && b.depth > 1) document.getElementById('hint').dataset.best = String(b.depth);
+})();
+</script>
+</body>
+</html>

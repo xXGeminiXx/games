@@ -1,0 +1,377 @@
+// ===========================================================================
+// CONFIGURATION
+//
+// Every name, every label, every number worth turning lives in this file and
+// nowhere else. Change something here and the whole game follows: the browser
+// tab, the header, the shop, the colours, the physics, the save slot.
+//
+// Nothing in here is read more than once per load, so a change takes effect on
+// refresh. Nothing in here needs a build step.
+//
+// HOW TO RENAME THE GAME
+//   Set identity.name. That alone retitles the tab, the header and the save
+//   slot. If you want the save from the old name to carry over, leave
+//   identity.storagePrefix pinned to its current value instead of letting it
+//   follow the name.
+//
+// HOW TO TRY A NUMBER WITHOUT EDITING THIS FILE
+//   Append overrides to the URL, which is the fastest way to test a hosted
+//   build from a phone:
+//     ?set=board.cols=10&set=swarm.speed=16
+//   They last for that one page load. To make one stick in this browser, open
+//   the console and run:
+//     localStorage.setItem('cfg', '{"board":{"cols":10}}')
+//   Clear it with localStorage.removeItem('cfg'). Set dev.allowOverrides to
+//   false to switch both off entirely.
+// ===========================================================================
+
+export const CONFIG = {
+
+  // -------------------------------------------------------------------------
+  // IDENTITY - what the game is called and where it keeps its things
+  // -------------------------------------------------------------------------
+  identity: {
+    name: 'Swarm Breaker',
+    tagline: 'aim once. the swarm does the work.',
+
+    // Prefixes every browser storage key this game writes. Changing it starts
+    // every player from a clean slate; keeping it preserves saves across a
+    // rename.
+    storagePrefix: 'swarmbreaker',
+  },
+
+  // -------------------------------------------------------------------------
+  // TEXT - every word the player reads
+  //
+  // Nothing below is referenced by id anywhere else, so any of it can be
+  // rewritten freely. Renaming a currency here renames it everywhere it is
+  // shown.
+  // -------------------------------------------------------------------------
+  text: {
+    // The four figures across the top of the screen.
+    stats: {
+      depth:   'depth',      // how far the field has descended
+      swarm:   'swarm',      // how many bodies fire each turn
+      essence: 'essence',    // the currency
+      pattern: 'pattern',    // which generator is drawing the field
+    },
+
+    hintIdle:    'drag to aim · release to fire',
+    hintFiring:  'the swarm is working',
+
+    difficultyLabel: 'difficulty',
+    resetButton:     'reset',
+
+    // Shown when a block reaches the swarm line.
+    overTitle:   'the swarm is overrun',
+    overAgain:   'again',
+    overDepth:   'depth',
+    overSwarm:   'swarm',
+  },
+
+  // -------------------------------------------------------------------------
+  // BOARD - the shape of the playfield
+  //
+  // The canvas is a fixed pixel grid scaled to fit the window, so these are
+  // authoring units, not screen units. Cell size is width / cols and is not
+  // set directly.
+  // -------------------------------------------------------------------------
+  board: {
+    width:  520,
+    height: 620,
+
+    // Columns across the field. The generator caps filled cells at cols - 2 so
+    // two lanes always stay open; going below 4 leaves it nothing to draw with.
+    cols: 8,
+
+    // Pixels of headroom at the top of the canvas, under the readout.
+    topGap: 40,
+
+    // Pixels from the bottom of the canvas to the swarm line. A block crossing
+    // that line ends the run.
+    floorGap: 86,
+  },
+
+  // -------------------------------------------------------------------------
+  // SWARM - the bodies, and how they move
+  // -------------------------------------------------------------------------
+  swarm: {
+    radius: 5,          // body radius in board units
+    speed:  11,         // board units per frame
+
+    // Collision is checked this many times per frame. Lower it and a fast body
+    // can pass through a block; raise it and the cost per body climbs.
+    substeps: 3,
+
+    // Shots below this angle above the horizontal are refused, because a flat
+    // shot rattles along the floor and returns nothing.
+    minAngleDeg: 15,
+
+    // Frames between bodies leaving the launcher, before the crowding term.
+    // A larger swarm fires tighter: gap = max(1, round(baseGap - swarm/crowd)).
+    launchGap:   4,
+    launchCrowd: 20,
+
+    // What a new run starts with when the difficulty tier does not say
+    // otherwise. Tiers normally do say otherwise.
+    startingPower: 1,   // damage per hit
+    startingGain:  0,   // bonus essence per block destroyed
+  },
+
+  // -------------------------------------------------------------------------
+  // ECONOMY - what things pay, and what things cost
+  //
+  // Costs are linear in depth: cost = base + perDepth * depth. The shop reads
+  // this list in order, so reordering it reorders the buttons and deleting an
+  // entry removes the offer. The `id` is what wires an entry to its effect;
+  // everything else is free to change.
+  // -------------------------------------------------------------------------
+  economy: {
+    // Essence a destroyed block pays: max(1, round(blockHealth * blockShare))
+    // plus whatever `harvest` has been bought.
+    blockShare: 0.5,
+
+    // An essence pickup collected at depth d pays windfallBase + d.
+    windfallBase: 5,
+
+    offers: [
+      { id: 'ball',  name: 'conscript', desc: '+1 to the swarm',        base: 12, perDepth: 4,  amount: 1 },
+      { id: 'power', name: 'sharpen',   desc: '+1 damage per hit',      base: 25, perDepth: 10, amount: 1 },
+      { id: 'gain',  name: 'harvest',   desc: '+2 essence per block',   base: 30, perDepth: 8,  amount: 2 },
+
+      // Priced by how much it actually removes, so clearing a wide row costs
+      // more than clearing a thin one.
+      { id: 'clear', name: 'purge row', desc: 'destroy the lowest row', base: 25, perDepth: 6,  amount: 1 },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
+  // DIFFICULTY - which ladder rung a run is played on
+  //
+  // The tiers themselves live in src/tiers.js, where each one carries the
+  // measurements it was built from. Override numbers here rather than editing
+  // that file, so the reasoning next to each number stays intact.
+  //
+  //   tierOverrides: { shallows: { supply: { start: 8 } } }
+  //
+  // Only the keys you name are replaced; the rest of the tier is untouched.
+  // -------------------------------------------------------------------------
+  difficulty: {
+    defaultTier: 'swell',
+
+    // Tiers are designed to open one at a time. While true, every rung is
+    // selectable from the start.
+    unlockAll: true,
+
+    tierOverrides: {},
+  },
+
+  // -------------------------------------------------------------------------
+  // PALETTE - the whole colour vocabulary
+  //
+  // A colour in this game says one thing and only that thing. Change a value
+  // and every surface carrying that meaning changes with it: the readout, the
+  // blocks, the particles, the shop.
+  // -------------------------------------------------------------------------
+  palette: {
+    void:  '#08090c',   // the ground everything sits on
+    panel: '#0e1016',   // raised surfaces, readout backing
+    rule:  '#1c2029',   // hairlines, frames, grid
+
+    ink:   '#e6e9ef',   // anything that must be read
+    dim:   '#7a828f',   // labels, units, secondary figures
+
+    swarm:   '#5ad1ff', // the player: bodies, the pool, the launcher
+    essence: '#ffc94a', // value: payout, pickups, prices
+    hot:     '#ff5c46', // threat: proximity to the line, breach, loss
+    force:   '#b98cff', // curvature: gravity, orbits, anything that bends
+    trade:   '#6ee7a8', // supply: material, fills, contracts
+    tithe:   '#8f9aa8', // obligation: costs, interest, what is owed
+  },
+
+  // -------------------------------------------------------------------------
+  // FEEL - effects that change nothing about the outcome
+  // -------------------------------------------------------------------------
+  feel: {
+    shake:     1,       // screen shake multiplier; 0 turns it off
+    particles: 1,       // particle density, 0 to 1
+
+    // null follows the operating system's reduced motion setting. true or
+    // false overrides it.
+    reducedMotion: null,
+
+    // Draws the wordless opening lesson for a player who has never fired.
+    onboarding: true,
+  },
+
+  // -------------------------------------------------------------------------
+  // DEV - switches that only matter while tuning
+  // -------------------------------------------------------------------------
+  dev: {
+    // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
+    // anything above. Turn off for a build you do not want poked at.
+    allowOverrides: true,
+  },
+};
+
+
+// ---------------------------------------------------------------------------
+// OVERRIDES
+//
+// Applied in order: this file, then browser storage, then the URL. The URL wins
+// so a link can carry a whole configuration.
+// ---------------------------------------------------------------------------
+
+function assignPath(target, path, value) {
+  const keys = path.split('.');
+  let node = target;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (node[keys[i]] === null || typeof node[keys[i]] !== 'object') return false;
+    node = node[keys[i]];
+  }
+  const leaf = keys[keys.length - 1];
+  if (!(leaf in node)) return false;
+
+  // The type already in place decides how the text is read, so a number stays
+  // a number and a colour stays a string.
+  const was = node[leaf];
+  if (typeof was === 'number') {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return false;
+    node[leaf] = n;
+  } else if (typeof was === 'boolean') {
+    node[leaf] = value === 'true' || value === '1';
+  } else {
+    node[leaf] = value;
+  }
+  return true;
+}
+
+function mergeDeep(target, patch) {
+  for (const k of Object.keys(patch)) {
+    const v = patch[k];
+    if (v && typeof v === 'object' && !Array.isArray(v) &&
+        target[k] && typeof target[k] === 'object' && !Array.isArray(target[k])) {
+      mergeDeep(target[k], v);
+    } else {
+      target[k] = v;
+    }
+  }
+}
+
+/** Everything an override actually changed, so a session can show its own
+ *  configuration rather than guessing at it. */
+export const appliedOverrides = [];
+
+(function applyOverrides() {
+  if (!CONFIG.dev.allowOverrides) return;
+  if (typeof window === 'undefined') return;
+
+  try {
+    const raw = localStorage.getItem('cfg');
+    if (raw) {
+      const patch = JSON.parse(raw);
+      if (patch && typeof patch === 'object') {
+        mergeDeep(CONFIG, patch);
+        appliedOverrides.push('storage:cfg');
+      }
+    }
+  } catch (e) { /* a malformed override must never stop the game loading */ }
+
+  try {
+    const params = new URLSearchParams(location.search);
+    for (const entry of params.getAll('set')) {
+      const eq = entry.indexOf('=');
+      if (eq < 1) continue;
+      const path = entry.slice(0, eq).trim();
+      const value = entry.slice(eq + 1);
+      if (assignPath(CONFIG, path, value)) appliedOverrides.push(path + '=' + value);
+    }
+  } catch (e) { /* same */ }
+})();
+
+
+// ---------------------------------------------------------------------------
+// DERIVED VALUES
+//
+// Read these rather than recomputing them, so one definition of a cell or a
+// storage key exists.
+// ---------------------------------------------------------------------------
+
+export const CELL = CONFIG.board.width / CONFIG.board.cols;
+export const TOP = CONFIG.board.topGap;
+export const FLOOR = CONFIG.board.height - CONFIG.board.floorGap;
+
+/** Minimum vertical component of a legal shot, as a unit vector term. */
+export const MIN_AIM_Y = Math.sin(CONFIG.swarm.minAngleDeg * Math.PI / 180);
+
+/** Namespaced browser storage key. */
+export const storageKey = (slot) => CONFIG.identity.storagePrefix + '.' + slot;
+
+/** Cost of an offer at a given depth, before any per offer multiplier. */
+export const offerCost = (offer, depth) => Math.round(offer.base + offer.perDepth * depth);
+
+
+// ---------------------------------------------------------------------------
+// APPLYING IDENTITY TO THE PAGE
+//
+// The document carries the game's name and colours in half a dozen places.
+// This puts them all there from the one source, so the markup never has to
+// repeat a value that lives above.
+// ---------------------------------------------------------------------------
+
+export function applyIdentity(doc) {
+  const d = doc || document;
+
+  d.title = CONFIG.identity.name;
+
+  const root = d.documentElement;
+  const p = CONFIG.palette;
+  root.style.setProperty('--bg', p.void);
+  root.style.setProperty('--panel', p.panel);
+  root.style.setProperty('--line', p.rule);
+  root.style.setProperty('--ink', p.ink);
+  root.style.setProperty('--dim', p.dim);
+  root.style.setProperty('--hot', p.hot);
+  root.style.setProperty('--swarm', p.swarm);
+  root.style.setProperty('--block', p.rule);
+  root.style.setProperty('--pickup', p.essence);
+
+  const put = (id, value) => { const el = d.getElementById(id); if (el) el.textContent = value; };
+  const t = CONFIG.text;
+  put('lbl-depth',   t.stats.depth);
+  put('lbl-swarm',   t.stats.swarm);
+  put('lbl-essence', t.stats.essence);
+  put('lbl-pattern', t.stats.pattern);
+  put('hint',        t.hintIdle);
+  put('reset',       t.resetButton);
+  put('overtitle',   t.overTitle);
+  put('again',       t.overAgain);
+  put('over-lbl-depth', t.overDepth);
+  put('over-lbl-swarm', t.overSwarm);
+
+  const sel = d.getElementById('tier');
+  if (sel) sel.title = t.difficultyLabel;
+
+  const canvas = d.getElementById('c');
+  if (canvas) { canvas.width = CONFIG.board.width; canvas.height = CONFIG.board.height; }
+
+  // The tab icon is drawn from the palette rather than shipped as a file, so a
+  // recolour needs no asset and the game still has no binary dependencies.
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+    '<rect width="32" height="32" fill="' + p.void + '"/>' +
+    '<rect x="6" y="5" width="9" height="7" fill="' + p.rule + '"/>' +
+    '<rect x="17" y="5" width="9" height="7" fill="' + p.rule + '"/>' +
+    '<circle cx="16" cy="23" r="4" fill="' + p.swarm + '"/>' +
+    '</svg>';
+  let icon = d.getElementById('cfg-favicon');
+  if (!icon) {
+    icon = d.createElement('link');
+    icon.id = 'cfg-favicon';
+    icon.rel = 'icon';
+    d.head.appendChild(icon);
+  }
+  icon.type = 'image/svg+xml';
+  icon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
