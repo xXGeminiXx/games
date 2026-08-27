@@ -67,6 +67,48 @@ export const CONFIG = {
     overAgain:   'again',
     overDepth:   'depth',
     overSwarm:   'swarm',
+    overMenu:    'modes',
+
+    // The mode screen.
+    menuPlay:       'play',
+    menuResume:     'resume run',
+    menuButton:     'modes',
+    menuModeLabel:  'mode',
+    menuBestLabel:  'best depth',
+    menuNoBest:     'not yet played',
+    menuHint:       'esc opens this  \u00b7  drag to aim, release to fire',
+  },
+
+  // -------------------------------------------------------------------------
+  // MODES - the fields a run can be played on
+  //
+  // A mode changes what descends and nothing else. The swarm, the angle, the
+  // economy and the difficulty ladder are the same in all of them, so a mode
+  // is safe to add: give it an id here, give it a row source in src/modes.js,
+  // and the menu picks it up.
+  // -------------------------------------------------------------------------
+  modes: {
+    // What a fresh install plays.
+    default: 'swarm',
+
+    list: [
+      {
+        id: 'swarm',
+        name: 'swarm',
+        tell: 'the main game',
+        blurb: 'Eight columns, one row at a time, drawn by an automaton that '
+             + 'changes its rule as you descend. Tuned, and the one to play.',
+      },
+      {
+        id: 'fractal',
+        name: 'fractal',
+        tell: 'whole figures, dealt downward',
+        blurb: 'A complete construction is built first - gasket, mesh, Cantor '
+             + 'bars, canopy - then dealt one row at a time so it assembles as '
+             + 'it falls. The field widens to give the figures room. Rougher, '
+             + 'and still being worked on.',
+      },
+    ],
   },
 
   // -------------------------------------------------------------------------
@@ -414,8 +456,17 @@ export function applyIdentity(doc) {
   put('reset',       t.resetButton);
   put('overtitle',   t.overTitle);
   put('again',       t.overAgain);
+  put('overmodes',   t.overMenu);
   put('over-lbl-depth', t.overDepth);
   put('over-lbl-swarm', t.overSwarm);
+
+  // The mode screen.
+  put('menutitle',      CONFIG.identity.name);
+  put('menutag',        CONFIG.identity.tagline);
+  put('lbl-difficulty', t.difficultyLabel);
+  put('modes',          t.menuButton);
+  put('resume',         t.menuResume);
+  put('menuhint',       t.menuHint);
 
   const byId = (id) => (typeof d.getElementById === 'function' ? d.getElementById(id) : null);
 

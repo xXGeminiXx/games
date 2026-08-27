@@ -63,6 +63,49 @@
   }
   #over.on{display:flex}
   #over h1{font-size:22px; margin:0; font-weight:600; letter-spacing:-0.02em}
+  .row{display:flex; gap:8px}
+
+  /* the mode screen */
+  #menu{
+    position:fixed; inset:0; background:rgba(8,9,12,.96); display:none;
+    align-items:center; justify-content:center; padding:20px; overflow:auto;
+  }
+  #menu.on{display:flex}
+  .card{
+    width:100%; max-width:460px; display:flex; flex-direction:column; gap:16px;
+  }
+  .card h1{
+    font-size:26px; margin:0; font-weight:600; letter-spacing:-0.03em;
+  }
+  .card .tag{margin:0; color:var(--dim); font-size:12px}
+  .setting{display:flex; align-items:center; gap:10px}
+  .setting span{
+    font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em;
+  }
+  .setting select{max-width:none; flex:1}
+  #modelist{display:flex; flex-direction:column; gap:8px}
+  .mode{
+    display:block; width:100%; text-align:left; padding:11px 13px;
+    border:1px solid var(--line); background:var(--panel); cursor:pointer;
+    line-height:1.45;
+  }
+  .mode:hover{border-color:var(--swarm)}
+  .mode .head{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
+  .mode .nm{font-size:16px; font-weight:600; letter-spacing:-0.02em}
+  .mode .tell{color:var(--dim); font-size:11px}
+  .mode .best{
+    color:var(--pickup); font-size:11px; font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .mode .blurb{color:var(--dim); font-size:11px; margin-top:5px}
+  .mode.playing{border-color:var(--swarm)}
+  .mode.playing .nm{color:var(--swarm)}
+  #menufoot{
+    display:flex; flex-direction:column; gap:10px; align-items:flex-start;
+  }
+  #menuhint{color:var(--dim); font-size:10.5px}
+  #resume{display:none}
+  #resume.on{display:block}
 </style>
 </head>
 <body>
@@ -80,14 +123,40 @@
 
 <footer>
   <span id="hint">drag to aim &middot; release to fire</span>
-  <select id="tier" title="difficulty"></select>
-  <button id="reset">reset</button>
+  <span class="row">
+    <button id="modes">modes</button>
+    <button id="reset">reset</button>
+  </span>
 </footer>
 
 <div id="over">
   <h1 id="overtitle">the swarm is overrun</h1>
   <div style="color:var(--dim)"><span id="over-lbl-depth">depth</span> <b id="overdepth">0</b> &middot; <span id="over-lbl-swarm">swarm</span> <b id="overballs">0</b></div>
-  <button id="again">again</button>
+  <span class="row">
+    <button id="again">again</button>
+    <button id="overmodes">modes</button>
+  </span>
+</div>
+
+<div id="menu">
+  <div class="card">
+    <div>
+      <h1 id="menutitle">Swarm Breaker</h1>
+      <p class="tag" id="menutag">aim once. the swarm does the work.</p>
+    </div>
+
+    <label class="setting">
+      <span id="lbl-difficulty">difficulty</span>
+      <select id="tier" title="difficulty"></select>
+    </label>
+
+    <div id="modelist"></div>
+
+    <div id="menufoot">
+      <button id="resume">resume run</button>
+      <span id="menuhint"></span>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -104,8 +173,7 @@
 import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, latticeAt, leftEdgeAt,
          storageKey, offerCost, applyIdentity } from './config.js';
 import { createJuice } from './src/juice.js';
-import { createPatternSource } from './src/patterns.js';
-import { createFormationSource } from './src/formations.js';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js';
 import { createSave, fieldFingerprint } from './src/save.js';
 import { createLeaderboard } from './src/leaderboard.js';
 import * as Tiers from './src/tiers.js';
@@ -190,12 +258,20 @@ let TIER = (() => {
   return CONFIG.difficulty.defaultTier;
 })();
 
+// Which field a run descends through. A mode changes what descends and nothing
+// else - see src/modes.js. The words belong to config.js.
+let MODE = (() => {
+  try { const v = localStorage.getItem(storageKey('mode')); if (v) return normaliseMode(v); } catch (e) {}
+  return DEFAULT_MODE;
+})();
+
 let S;
 function fresh(){
   S = {
     depth: 1, balls: Tiers.tierOf(TIER).supply.start, gold: 0, tier: TIER,
     rows: [],            // {c, r, hp, max} in grid coords
     drops: [],           // {c, r, kind}
+    owed: { ball: 0, gold: 0 },   // markers the field still has to find room for
     live: [], firing: false, queue: 0, fireT: 0,
     origin: W / 2, nextOrigin: null,
     aiming: false, aim: {x: W / 2, y: FLOOR - 120},
@@ -205,11 +281,14 @@ function fresh(){
     seed: 0,
     field: null,
   };
+  S.mode = MODE;
   S.seed = (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
-  S.field = createPatternSource(S.seed);
-  S.form = createFormationSource(S.seed, FORM_OPTS);
+  S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
+  // The formation source is the fractal mode's own; nothing else has one.
+  S.form = S.field.key === 'fractal' ? S.field.source : null;
   S.dealt = 0;
-  retarget(latticeAt(0));
+  // A field that does not widen sits at the starting width for the whole run.
+  retarget(S.field.widens ? latticeAt(0) : CONFIG.board.cols);
   CELL = cellT; ORIGIN = originT;
   juice.clear();
   // seed a couple of rows so the field is never empty on turn one
@@ -223,23 +302,23 @@ function addRow(){
   const d = S.depth;
   if (!Tiers.spawnsRowAt(S.tier, d)) return;
 
-  // The field is a sequence of fractal figures dealt one row at a time, so the
-  // shape assembles on screen as it descends. An empty row is not a failure to
-  // generate: the holes in a gasket are the gasket, and forcing a block into
-  // one would be filling the figure in.
   // The width is known before the row is, which is how the view learns it has
-  // to pull back. A figure never changes width part way through being dealt.
-  const fig = S.form.figure();
-  if (fig.width !== COLS) retarget(fig.width);
-  const lo = leftEdgeAt(fig.width);
+  // to pull back. A field that never widens answers the same number forever,
+  // and a field that deals whole figures never changes width part way through
+  // one.
+  const width = S.field.width();
+  if (width !== COLS) retarget(width);
+  const lo = leftEdgeAt(width);
 
-  const cells = S.form.nextRow();
+  const cells = S.field.nextRow(d);
   S.dealt++;
 
-  // The tier's health number describes a ROW, so it is shared among however
-  // many blocks the figure put in this one. See economy.rowBlocks for why.
+  // Where a row's health number goes. A field that deals a whole figure puts a
+  // varying number of blocks in a row, so the number describes the ROW and is
+  // shared among them - see economy.rowBlocks. A field that draws one row at a
+  // time gives it to each block, because that is what it was tuned against.
   const n = cells.reduce((k, on) => k + (on ? 1 : 0), 0);
-  const share = n > 0
+  const share = (S.field.sharesHealth && n > 0)
     ? Math.min(CONFIG.economy.rowShareMax,
         Math.max(CONFIG.economy.rowShareMin, CONFIG.economy.rowBlocks / n))
     : 1;
@@ -248,9 +327,25 @@ function addRow(){
 
   // The resupply line is the difficulty. Starve it and the angle has to choose
   // between damage and collection; keep it full and it never has to.
-  const lane = (k) => lo + ((d * k) % fig.width);
-  if (Tiers.spawnsPickupAt(S.tier, d)) S.drops.push({ c: lane(5) , r: 0, kind: 'ball' });
-  if (Tiers.spawnsWindfallAt(S.tier, d)) S.drops.push({ c: lane(2), r: 0, kind: 'gold' });
+  if (Tiers.spawnsPickupAt(S.tier, d)) S.owed.ball++;
+  if (Tiers.spawnsWindfallAt(S.tier, d)) S.owed.gold++;
+  placeDrops(cells, lo, d);
+}
+
+// A marker goes in a HOLE in the row, never on top of a block. Both are drawn
+// in the same cell, and a ring laid over a health number leaves neither one
+// readable. A row can be solid all the way across - a gate row is - so a marker
+// that finds no room is owed, and lands in the first row that has some.
+function placeDrops(cells, lo, d){
+  const open = [];
+  cells.forEach((on, j) => { if (!on) open.push(lo + j); });
+  if (!open.length) return;
+  const take = (kind, k) => {
+    const i = ((d * k) % open.length + open.length) % open.length;
+    S.drops.push({ c: open.splice(i, 1)[0], r: 0, kind });
+  };
+  while (S.owed.ball > 0 && open.length){ S.owed.ball--; take('ball', 5); }
+  while (S.owed.gold > 0 && open.length){ S.owed.gold--; take('gold', 2); }
 }
 
 function step(){
@@ -272,17 +367,10 @@ const FORM_OPTS = {
   gap: 1,
 };
 
-// The backdrop draws a signature per regime. Pointing each figure at the
-// signature that echoes its construction makes the background agree with the
-// field instead of arguing with it.
-const FIGURE_SIGS = {
-  gasket: 'sierpinski', corner: 'sierpinski', mesh: 'lattice',
-  bars: 'cantor', canopy: 'growth', rift: 'chaos',
-};
-
+// What the readout calls the thing currently drawing the field. Each mode
+// names its own.
 function figureName(){
-  const f = S.form && S.form.figure();
-  return f ? f.name : 'drift';
+  return S.field ? S.field.label(S.depth) : 'drift';
 }
 
 const xOf = c => ORIGIN + c * CELL;              // left edge of a world column
@@ -316,6 +404,7 @@ function endTurn(){
 
 function die(){
   S.dead = true;
+  recordBest();
   store.mark();
   board.finish({ tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none' });
   document.getElementById('overdepth').textContent = S.depth;
@@ -427,8 +516,7 @@ function draw(){
   look.update(1 / 60);
   look.setDepth(S.depth);
   look.setSwarm(S.balls);
-  const fig = S.form.figure();
-  look.setRegime({ name: figureName(), key: fig ? (FIGURE_SIGS[fig.key] || fig.key) : null });
+  look.setRegime(S.field.signature(S.depth));
 
   juice.begin(X);
 
@@ -510,9 +598,14 @@ const board = createLeaderboard({ defaultTier: CONFIG.difficulty.defaultTier });
 
 const store = createSave({
   key: storageKey('run'),
-  fingerprint: () => S && S.field ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
+  // Only a field that can be asked for a row by depth has a fingerprint. One
+  // that deals a sequence is checked by replaying it instead.
+  fingerprint: () => (S && S.field && typeof S.field.rowFor === 'function')
+    ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
   capture: () => ({
+    mode: S.mode,
     seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold, dealt: S.dealt,
+    owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
     rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind })),
@@ -521,17 +614,23 @@ const store = createSave({
   }),
   restore: (v) => {
     if (!v || typeof v !== 'object') return;
+    // A saved run is played on the field it was started on, whatever the menu
+    // happens to be pointing at now.
+    MODE = normaliseMode(v.mode);
+    S.mode = MODE;
     S.seed = v.seed >>> 0;
-    S.field = createPatternSource(S.seed);
-    // The figure source is a sequence, so it is restored by replaying it.
-    S.form = createFormationSource(S.seed, FORM_OPTS);
+    S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
+    S.form = S.field.key === 'fractal' ? S.field.source : null;
+    // A field that deals a sequence has no way to be asked for row N, so it is
+    // restored by replaying it up to where the run had got to.
     S.dealt = v.dealt | 0;
-    for (let i = 0; i < S.dealt; i++) S.form.nextRow();
-    // The view is wherever the figure being dealt says it is, and arrives
-    // there rather than easing across from the starting width.
-    retarget(S.form.figure().width);
+    if (S.form) for (let i = 0; i < S.dealt; i++) S.form.nextRow();
+    // The view is wherever the field says it is, and arrives there rather than
+    // easing across from the starting width.
+    retarget(S.field.width());
     CELL = cellT; ORIGIN = originT;
     S.depth = v.depth | 0; S.balls = v.balls | 0; S.gold = v.gold | 0;
+    S.owed = { ball: (v.owed && v.owed.ball) | 0, gold: (v.owed && v.owed.gold) | 0 };
     S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
     S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
@@ -552,7 +651,7 @@ function pos(e){
   const p = e.touches ? e.touches[0] : e;
   return { x: (p.clientX - r.left) * (W / r.width), y: (p.clientY - r.top) * (H / r.height) };
 }
-const onDown = e => { if (S.firing || S.dead) return; S.aiming = true; S.aim = pos(e); e.preventDefault(); };
+const onDown = e => { if (S.firing || S.dead || paused) return; S.aiming = true; S.aim = pos(e); e.preventDefault(); };
 const onMove = e => { if (!S.aiming) return; S.aim = pos(e); e.preventDefault(); };
 const onUp   = e => { if (!S.aiming) return; S.aiming = false; fire(); e.preventDefault(); };
 
@@ -560,6 +659,12 @@ C.addEventListener('mousedown', onDown); addEventListener('mousemove', onMove); 
 C.addEventListener('touchstart', onDown, {passive:false});
 C.addEventListener('touchmove', onMove, {passive:false});
 C.addEventListener('touchend', onUp, {passive:false});
+
+// --- the mode screen --------------------------------------------------------
+//
+// One place to choose what a run is: which field it descends through and how
+// hard it is. It is also where a run goes when it ends, so a player never has
+// to reload the page to try the other one.
 
 const tierSel = document.getElementById('tier');
 // Every tier is selectable while this is a prototype. The ladder is designed
@@ -573,14 +678,82 @@ Tiers.unlockedTiers(Tiers.emptyProgress(), { unlockAll: CONFIG.difficulty.unlock
 tierSel.onchange = () => {
   TIER = tierSel.value;
   try { localStorage.setItem(storageKey('tier'), TIER); } catch (e) {}
-  restart();
+  paintMenu();
+  startRun(MODE);
 };
 
-addEventListener('keydown', e => { if (e.key === 'Escape') teach.skip(); });
+// Deepest run per field per difficulty. Kept here rather than on the
+// leaderboard because it answers a different question: not who is best, but
+// whether this player has tried this mode yet.
+const bestKey = (mode, tier) => storageKey('best.' + mode + '.' + tier);
+function bestDepth(mode, tier){
+  try {
+    const v = parseInt(localStorage.getItem(bestKey(mode, tier)), 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch (e) { return 0; }
+}
+function recordBest(){
+  if (!S || !S.mode) return;
+  try {
+    if (S.depth > bestDepth(S.mode, S.tier)) {
+      localStorage.setItem(bestKey(S.mode, S.tier), String(S.depth));
+    }
+  } catch (e) {}
+}
+
+let paused = false;
+const menuEl  = () => document.getElementById('menu');
+const isMenuOpen = () => menuEl().classList.contains('on');
+function openMenu(){ paused = true; paintMenu(); menuEl().classList.add('on'); }
+function closeMenu(){ paused = false; menuEl().classList.remove('on'); }
+
+function paintMenu(){
+  const t = CONFIG.text;
+  const list = document.getElementById('modelist');
+  list.innerHTML = '';
+  MODE_IDS.forEach(id => {
+    const m = modeOf(id) || { id, name: id, tell: '', blurb: '' };
+    const best = bestDepth(id, TIER);
+    const b = document.createElement('button');
+    b.className = 'mode' + (id === MODE ? ' playing' : '');
+    b.innerHTML =
+      '<span class="head">'
+      + '<span><span class="nm">' + m.name + '</span> <span class="tell">' + m.tell + '</span></span>'
+      + '<span class="best">' + (best ? t.menuBestLabel + ' ' + best : t.menuNoBest) + '</span>'
+      + '</span>'
+      + '<span class="blurb">' + m.blurb + '</span>';
+    b.onclick = () => startRun(id);
+    list.appendChild(b);
+  });
+  // Only offer to go back to a run there is something to go back to.
+  const live = !!S && !S.dead && S.depth > 1;
+  document.getElementById('resume').classList.toggle('on', live);
+}
+
+/** Begin a run on a given field. Remembered, so a reload comes back here. */
+function startRun(id){
+  MODE = normaliseMode(id);
+  try { localStorage.setItem(storageKey('mode'), MODE); } catch (e) {}
+  document.getElementById('over').classList.remove('on');
+  fresh();
+  closeMenu();
+}
+
+addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  teach.skip();
+  if (isMenuOpen()) closeMenu(); else openMenu();
+});
 
 document.getElementById('reset').onclick = restart;
 document.getElementById('again').onclick = restart;
-function restart(){ document.getElementById('over').classList.remove('on'); fresh(); }
+document.getElementById('modes').onclick = openMenu;
+document.getElementById('overmodes').onclick = () => {
+  document.getElementById('over').classList.remove('on');
+  openMenu();
+};
+document.getElementById('resume').onclick = closeMenu;
+function restart(){ document.getElementById('over').classList.remove('on'); closeMenu(); fresh(); }
 
 // --- loop -------------------------------------------------------------------
 
@@ -600,7 +773,7 @@ function tick(now){
   last = now;
   juice.update(dt);
   easeView(dt);
-  if (!S.dead){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
+  if (!S.dead && !paused){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
   draw(); hud();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
   requestAnimationFrame(tick);
@@ -609,6 +782,9 @@ function tick(now){
 fresh();
 const resumed = store.load();
 store.start();
+// A player with a run in progress is dropped back into it; anyone else is
+// asked what they want to play.
+if (!(resumed && resumed.ok && resumed.found)) openMenu();
 tick();
 
 // The personal best sits in the footer. It works with no server configured.
