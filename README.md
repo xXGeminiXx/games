@@ -1,13 +1,13 @@
 # Games
 
-Playable builds, served straight from this repository.
+The index of the games, plus the builds of the two that are served from here.
 
 **https://xxgeminixx.github.io/games/**
 
-Each game is plain ES modules: no build step, no package manager, no bundler,
-no dependencies, and nothing fetched from anywhere. Clone it and it runs, as
-long as it is served over http rather than opened off the filesystem, which is
-the one thing browsers refuse to do with modules.
+The two hosted here are plain ES modules: no build step, no package manager, no
+bundler, no dependencies, and nothing fetched from anywhere. Clone one and it
+runs, as long as it is served over http rather than opened off the filesystem,
+which is the one thing browsers refuse to do with modules.
 
 ## What is here
 
@@ -16,10 +16,16 @@ the one thing browsers refuse to do with modules.
 | [swarm-breaker](swarm-breaker/) | One decision a turn: the angle. A growing swarm does the rest. |
 | [accretion](accretion/) | A blank field, a click, and whatever gravity makes of it. |
 
+And one that is listed but not hosted here:
+
+| | |
+|---|---|
+| [Iron Spine](https://xxgeminixx.github.io/TheIronSpine/) | A modular weapon train, merged car by car through twenty waves. Lives at [its own repository](https://github.com/xXGeminiXx/TheIronSpine) and stays there: a save belongs to the address it was made at, and moving the game would discard every one of them. |
+
 ## Changing things without editing files
 
-Every name, label, colour and tunable number in a game lives in its
-`config.js`. Anything in there can also be set from the address bar for a
+Every name, label, colour and tunable number in the two games hosted here lives
+in that game's `config.js`. Anything in there can also be set from the address bar for a
 single page load, which is the quickest way to try something on a phone:
 
     ?set=board.cols=12
@@ -30,16 +36,19 @@ To make a change stick in one browser, put a patch in storage from the console:
     localStorage.setItem('cfg', '{"board":{"cols":12}}')
     localStorage.removeItem('cfg')
 
-## Constraints these share
+## Constraints
 
-**No assets.** Every pixel is drawn from primitives and math. No images, no
-sprites, no webfonts.
+Everything listed here draws its graphics from primitives and math rather than
+from image files, sends nothing anywhere, and measures nothing. A save lives in
+the browser that made it.
+
+The two hosted here hold to two more that Iron Spine does not:
 
 **No audio.** Nothing is signalled by sound. Every piece of state a player needs
 is on screen where it can be read.
 
-**No network.** Nothing is sent anywhere and nothing is measured. A save lives in
-the browser it was made in.
+**No dependencies.** Nothing is fetched from a CDN or anywhere else. Iron Spine
+loads Phaser from one, which is why it is linked rather than served from here.
 
 ## License
 

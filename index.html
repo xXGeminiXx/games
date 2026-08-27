@@ -41,10 +41,11 @@
   <h1>Games</h1>
   <div id="list"></div>
   <footer>
-    Nothing here loads an image, plays a sound, or sends a request anywhere.
-    Every game runs entirely in this tab.<br>
-    Tune one without editing anything: add <code>?set=path=value</code> to its
-    address. Each game's <code>config.js</code> lists what it accepts.
+    No game here sends anything anywhere, and none of them load an image.
+    Saves live in the browser that made them.<br>
+    Swarm Breaker and Accretion take a setting straight off the address bar:
+    add <code>?set=path=value</code> and their <code>config.js</code> lists
+    what it accepts.
   </footer>
 </main>
 
@@ -63,13 +64,23 @@ const GAMES = [
     line: 'A blank field. A click puts something in it. Nothing after that is ' +
           'scripted - what forms, forms because gravity says so.',
   },
+  {
+    // Hosted at its own address since 2025 and left there: a save lives with
+    // the address it was made at, so moving the game would throw away every
+    // one of them.
+    href: 'https://xxgeminixx.github.io/TheIronSpine/',
+    name: 'Iron Spine',
+    line: 'Command a modular weapon train. Collect cars, merge matching pairs ' +
+          'into heavier ones, and hold out for twenty waves.',
+  },
 ];
 
 const list = document.getElementById('list');
 for (const g of GAMES) {
   const a = document.createElement('a');
   a.className = 'card';
-  a.href = g.dir + '/';
+  a.href = g.href || (g.dir + '/');
+  if (g.href) a.rel = 'noopener';
   const b = document.createElement('b');
   b.textContent = g.name;
   const p = document.createElement('p');
