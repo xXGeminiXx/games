@@ -101,9 +101,11 @@
 // no audio - all state is legible on screen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, CELL, TOP, FLOOR, MIN_AIM_Y, storageKey, offerCost, applyIdentity } from './config.js';
+import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, latticeAt, leftEdgeAt,
+         storageKey, offerCost, applyIdentity } from './config.js';
 import { createJuice } from './src/juice.js';
 import { createPatternSource } from './src/patterns.js';
+import { createFormationSource } from './src/formations.js';
 import { createSave, fieldFingerprint } from './src/save.js';
 import { createLeaderboard } from './src/leaderboard.js';
 import * as Tiers from './src/tiers.js';
@@ -118,7 +120,43 @@ const C = document.getElementById('c');
 const X = C.getContext('2d');
 const W = C.width, H = C.height;
 
-const COLS = CONFIG.board.cols;
+// ---------------------------------------------------------------------------
+// THE VIEW
+//
+// The field widens as a run goes on. Rather than move the blocks, the view
+// pulls back: a block carries a WORLD column that never changes, and what moves
+// is the size of a cell and where world column zero sits on screen.
+//
+// Both are eased, and easing them TOGETHER is what makes a widening invisible.
+// At the moment the lattice changes, the eased pair is still exactly what it
+// was, so nothing on screen shifts by a pixel; it then contracts smoothly
+// toward the new width over the next second. Snapping either one alone would
+// jump the whole field sideways.
+// ---------------------------------------------------------------------------
+let COLS = CONFIG.board.cols;          // columns filling the screen, target
+let CELL = CELL0;                      // eased cell size, pixels
+let ORIGIN = 0;                        // eased position of world column zero
+let cellT = CELL0, originT = 0;        // where the ease is heading
+
+function retarget(cols){
+  COLS = cols;
+  cellT = W / cols;
+  originT = -leftEdgeAt(cols) * cellT;
+}
+
+function easeView(dt){
+  // Never while the swarm is in flight. A widening lands at the end of a turn,
+  // and moving the field under bodies that are already travelling would change
+  // the geometry a shot was aimed at after it was taken.
+  if (S && S.firing) return;
+  // Exponential settle, framerate independent. Snaps the last fraction of a
+  // pixel so the field cannot creep forever.
+  const k = 1 - Math.exp(-dt / Math.max(0.05, CONFIG.board.viewEase / 3));
+  CELL += (cellT - CELL) * k;
+  ORIGIN += (originT - ORIGIN) * k;
+  if (Math.abs(cellT - CELL) < 0.01) CELL = cellT;
+  if (Math.abs(originT - ORIGIN) < 0.01) ORIGIN = originT;
+}
 const R = CONFIG.swarm.radius;
 const SPEED = CONFIG.swarm.speed;
 const SUBSTEPS = CONFIG.swarm.substeps;
@@ -136,14 +174,14 @@ const juice = createJuice({
 // health is carried by fracture rather than by hue, and the swarm lights the
 // world it sits under.
 const look = createVisual({
-  width: W, height: H, top: TOP, floorY: FLOOR, cols: COLS,
+  width: W, height: H, top: TOP, floorY: FLOOR, cols: COLS, origin: 0,
   reducedMotion: CONFIG.feel.reducedMotion === null ? undefined : CONFIG.feel.reducedMotion,
 });
 
 // The first minute is taught by what the field does, not by any text. This
 // draws nothing once a player has played.
 const teach = createOnboarding({
-  width: W, height: H, floorY: FLOOR, topY: TOP, cols: COLS, cell: CELL, ballRadius: R,
+  width: W, height: H, floorY: FLOOR, topY: TOP, cols: COLS, cell: CELL0, ballRadius: R,
   canAfford: () => OFFERS.some(o => S.gold >= o.cost(S.depth)),
 });
 
@@ -169,6 +207,10 @@ function fresh(){
   };
   S.seed = (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
   S.field = createPatternSource(S.seed);
+  S.form = createFormationSource(S.seed, FORM_OPTS);
+  S.dealt = 0;
+  retarget(latticeAt(0));
+  CELL = cellT; ORIGIN = originT;
   juice.clear();
   // seed a couple of rows so the field is never empty on turn one
   addRow(); step(); addRow();
@@ -180,20 +222,35 @@ function fresh(){
 function addRow(){
   const d = S.depth;
   if (!Tiers.spawnsRowAt(S.tier, d)) return;
-  const cells = S.field.rowFor(d);
-  const hp = Math.max(1, Tiers.healthNumber(S.tier, d));
-  let any = false;
-  cells.forEach((on, c) => {
-    if (!on) return;
-    any = true;
-    S.rows.push({ c, r: 0, hp, max: hp });
-  });
-  if (!any) S.rows.push({ c: (d * 3) % COLS, r: 0, hp, max: hp });
+
+  // The field is a sequence of fractal figures dealt one row at a time, so the
+  // shape assembles on screen as it descends. An empty row is not a failure to
+  // generate: the holes in a gasket are the gasket, and forcing a block into
+  // one would be filling the figure in.
+  // The width is known before the row is, which is how the view learns it has
+  // to pull back. A figure never changes width part way through being dealt.
+  const fig = S.form.figure();
+  if (fig.width !== COLS) retarget(fig.width);
+  const lo = leftEdgeAt(fig.width);
+
+  const cells = S.form.nextRow();
+  S.dealt++;
+
+  // The tier's health number describes a ROW, so it is shared among however
+  // many blocks the figure put in this one. See economy.rowBlocks for why.
+  const n = cells.reduce((k, on) => k + (on ? 1 : 0), 0);
+  const share = n > 0
+    ? Math.min(CONFIG.economy.rowShareMax,
+        Math.max(CONFIG.economy.rowShareMin, CONFIG.economy.rowBlocks / n))
+    : 1;
+  const hp = Math.max(1, Math.round(Tiers.healthNumber(S.tier, d) * share));
+  cells.forEach((on, j) => { if (on) S.rows.push({ c: lo + j, r: 0, hp, max: hp }); });
 
   // The resupply line is the difficulty. Starve it and the angle has to choose
   // between damage and collection; keep it full and it never has to.
-  if (Tiers.spawnsPickupAt(S.tier, d)) S.drops.push({ c: (d * 5 + 2) % COLS, r: 0, kind: 'ball' });
-  if (Tiers.spawnsWindfallAt(S.tier, d)) S.drops.push({ c: (d * 2 + 5) % COLS, r: 0, kind: 'gold' });
+  const lane = (k) => lo + ((d * k) % fig.width);
+  if (Tiers.spawnsPickupAt(S.tier, d)) S.drops.push({ c: lane(5) , r: 0, kind: 'ball' });
+  if (Tiers.spawnsWindfallAt(S.tier, d)) S.drops.push({ c: lane(2), r: 0, kind: 'gold' });
 }
 
 function step(){
@@ -206,7 +263,30 @@ function step(){
   S.drops = S.drops.filter(p => cyOf(p.r) < FLOOR + CELL);
 }
 
-const cx = c => c * CELL + CELL / 2;
+// A figure spans the visible field, so it is as tall as the field can show.
+const FORM_OPTS = {
+  ladder: CONFIG.board.ladder,
+  // A figure is as tall as the field can show at its own width, so it grows in
+  // both directions at once and always arrives as a whole shape.
+  heightFor: (cols) => Math.max(3, Math.round((FLOOR - TOP) / (W / cols))),
+  gap: 1,
+};
+
+// The backdrop draws a signature per regime. Pointing each figure at the
+// signature that echoes its construction makes the background agree with the
+// field instead of arguing with it.
+const FIGURE_SIGS = {
+  gasket: 'sierpinski', corner: 'sierpinski', mesh: 'lattice',
+  bars: 'cantor', canopy: 'growth', rift: 'chaos',
+};
+
+function figureName(){
+  const f = S.form && S.form.figure();
+  return f ? f.name : 'drift';
+}
+
+const xOf = c => ORIGIN + c * CELL;              // left edge of a world column
+const cx = c => xOf(c) + CELL / 2;               // its centre
 const cyOf = r => TOP + r * CELL + CELL / 2;
 
 // --- turn cycle -------------------------------------------------------------
@@ -294,8 +374,12 @@ function sim(){
 function hitBlocks(b){
   for (let i = S.rows.length - 1; i >= 0; i--){
     const bl = S.rows[i];
-    const bx = bl.c * CELL + 3, by = TOP + bl.r * CELL + 3;
-    const bw = CELL - 6, bh = CELL - 6;
+    // Insets are a share of the cell rather than a fixed three pixels, so a
+    // block keeps its proportions as the view pulls back and the gutter does
+    // not swallow the block at the far end of the ladder.
+    const pad = CELL * 0.046;
+    const bx = xOf(bl.c) + pad, by = TOP + bl.r * CELL + pad;
+    const bw = CELL - pad * 2, bh = CELL - pad * 2;
     if (b.x + R < bx || b.x - R > bx + bw || b.y + R < by || b.y - R > by + bh) continue;
 
     const ox = Math.min(b.x + R - bx, bx + bw - (b.x - R));
@@ -339,10 +423,12 @@ function hitBlocks(b){
 // --- render -----------------------------------------------------------------
 
 function draw(){
+  look.setLattice(COLS, CELL, ORIGIN);
   look.update(1 / 60);
   look.setDepth(S.depth);
   look.setSwarm(S.balls);
-  look.setRegime({ name: S.field.nameFor(S.depth), key: S.field.regimeAt ? S.field.regimeAt(S.depth).key : null });
+  const fig = S.form.figure();
+  look.setRegime({ name: figureName(), key: fig ? (FIGURE_SIGS[fig.key] || fig.key) : null });
 
   juice.begin(X);
 
@@ -426,7 +512,7 @@ const store = createSave({
   key: storageKey('run'),
   fingerprint: () => S && S.field ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
   capture: () => ({
-    seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold,
+    seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold, dealt: S.dealt,
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
     rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind })),
@@ -437,6 +523,14 @@ const store = createSave({
     if (!v || typeof v !== 'object') return;
     S.seed = v.seed >>> 0;
     S.field = createPatternSource(S.seed);
+    // The figure source is a sequence, so it is restored by replaying it.
+    S.form = createFormationSource(S.seed, FORM_OPTS);
+    S.dealt = v.dealt | 0;
+    for (let i = 0; i < S.dealt; i++) S.form.nextRow();
+    // The view is wherever the figure being dealt says it is, and arrives
+    // there rather than easing across from the starting width.
+    retarget(S.form.figure().width);
+    CELL = cellT; ORIGIN = originT;
     S.depth = v.depth | 0; S.balls = v.balls | 0; S.gold = v.gold | 0;
     S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
@@ -494,7 +588,7 @@ function hud(){
   document.getElementById('lvl').textContent = S.depth;
   document.getElementById('balls').textContent = S.balls;
   document.getElementById('gold').textContent = S.gold;
-  document.getElementById('rule').textContent = S.field.nameFor(S.depth);
+  document.getElementById('rule').textContent = figureName();
   document.getElementById('hint').textContent = S.firing
     ? CONFIG.text.hintFiring
     : CONFIG.text.hintIdle;
@@ -505,6 +599,7 @@ function tick(now){
   const dt = last ? (now - last) / 1000 : 1 / 60;
   last = now;
   juice.update(dt);
+  easeView(dt);
   if (!S.dead){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
   draw(); hud();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync

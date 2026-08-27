@@ -686,6 +686,13 @@ export function createVisual(opts) {
   let FLOOR = o.floorY > 0 ? o.floorY : H - 54;
   let COLS = o.cols > 0 ? o.cols : 8;
   let CELL = W / COLS;
+
+  // The field widens as a run goes on: the view pulls back, cells shrink, and
+  // more columns fit. A block therefore carries a WORLD column, which never
+  // moves, rather than a screen column, which does. ORIGIN is where world
+  // column zero sits, in pixels. Everything that draws a BLOCK goes through it;
+  // the column grid does not, because the grid is a property of the screen.
+  let ORIGIN = o.origin || 0;
   let BAND = H - FLOOR;
 
   let quality = o.quality === undefined ? 1 : clamp(o.quality, 0.25, 1);
@@ -1107,7 +1114,7 @@ export function createVisual(opts) {
     return 'bd|' + curSigs[0] + '|' + curSigs[1] + '|' + Math.round(hue / 15)
       + '|' + Math.round(quality * 4) + '|' + (SIG_WEIGHT[regimeKey] || 1)
       + '|' + (W | 0) + 'x' + (H | 0)
-      + '|' + (TOP | 0) + '|' + (FLOOR | 0) + '|' + COLS;
+      + '|' + (TOP | 0) + '|' + (FLOOR | 0) + '|' + COLS + '|' + Math.round(CELL);
   }
 
   /** The void gradient, rebuilt against whichever context is painting it. */
@@ -1328,7 +1335,7 @@ export function createVisual(opts) {
         ctx.fillStyle = tone.a(hslHex(hue, 26, 58), a);
         for (let c = 0; c < COLS && c < row.length; c++) {
           if (!row[c]) continue;
-          ctx.fillRect(c * CELL + inset, y, CELL - inset * 2, rh);
+          ctx.fillRect(ORIGIN + c * CELL + inset, y, CELL - inset * 2, rh);
         }
       }
     }
@@ -1489,7 +1496,7 @@ export function createVisual(opts) {
         : n === 0 ? ROLE_SOLITARY : ROLE_EDGE;
 
       const ins = LOOK.inset;
-      bx[i] = c * CELL + (mask & 1 ? 0 : ins);
+      bx[i] = ORIGIN + c * CELL + (mask & 1 ? 0 : ins);
       bw[i] = CELL - (mask & 1 ? 0 : ins) - (mask & 2 ? 0 : ins);
       const top = (mask & 4 ? 0 : ins), bot = (mask & 8 ? 0 : ins);
       by[i] += top;
@@ -1515,7 +1522,7 @@ export function createVisual(opts) {
       if (rec.frame === frameId) return;
       const c = rec.c;
       scars.push({
-        x: c * CELL + LOOK.inset,
+        x: ORIGIN + c * CELL + LOOK.inset,
         y: TOP + rec.r * CELL + LOOK.inset,
         w: CELL - LOOK.inset * 2, h: CELL - LOOK.inset * 2,
         t: 1, hex: MAT_EDGE[rec.mat][rec.grade],
@@ -1880,7 +1887,7 @@ export function createVisual(opts) {
   function block(ctx, b, x, y, size) {
     if (!ctx || !b) return;
     const s = size > 0 ? size : CELL - LOOK.inset * 2;
-    const px = x === undefined ? b.c * CELL + LOOK.inset : x;
+    const px = x === undefined ? ORIGIN + b.c * CELL + LOOK.inset : x;
     const py = y === undefined ? TOP + b.r * CELL + LOOK.inset : y;
     const m = materialFor(b.max);
     const lh = log10Of(b.hp), lm = log10Of(b.max);
@@ -1928,7 +1935,7 @@ export function createVisual(opts) {
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       if (!p) continue;
-      const px = p.c * CELL + CELL / 2;
+      const px = ORIGIN + p.c * CELL + CELL / 2;
       const py = TOP + p.r * CELL + CELL / 2 + off;
       const r = CELL * 0.20;
       const gold = p.kind === 'gold' || p.kind === 'essence';
@@ -2498,6 +2505,21 @@ export function createVisual(opts) {
     layers.clear();
   }
 
+  /**
+   * Move the lattice. `cols` is how many columns fill the screen, `cell` their
+   * width in pixels, and `origin` where world column zero sits.
+   *
+   * Called every frame while the view is pulling back, so it clears nothing:
+   * the backdrop is keyed on the cell size and the layer cache evicts by
+   * budget, which turns a continuous ease into a handful of bakes rather than
+   * one per frame.
+   */
+  function setLattice(cols, cell, origin) {
+    if (cols > 0) COLS = cols;
+    CELL = cell > 0 ? cell : W / COLS;
+    ORIGIN = Number.isFinite(origin) ? origin : 0;
+  }
+
   /** Detail multiplier, 0.25 (bare) to 1 (full). Pins auto-quality off. */
   function setQuality(v) {
     quality = clamp(Number(v) || 1, 0.25, 1);
@@ -2529,10 +2551,11 @@ export function createVisual(opts) {
     // signals
     setDepth, setSwarm, setRegime, setFlight, splash, descend, resolve,
     // control
-    clear, resize, setQuality, setAutoQuality, setReducedMotion, stats,
+    clear, resize, setLattice, setQuality, setAutoQuality, setReducedMotion, stats,
     // helpers, exposed so a caller never has to reimplement them
     format, formatTight, materialFor, palette: PALETTE,
     get cell() { return CELL; },
+    get origin() { return ORIGIN; },
     get quality() { return quality; },
   };
 }

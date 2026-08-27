@@ -80,9 +80,33 @@ export const CONFIG = {
     width:  520,
     height: 620,
 
-    // Columns across the field. The generator caps filled cells at cols - 2 so
-    // two lanes always stay open; going below 4 leaves it nothing to draw with.
+    // Columns the field STARTS at. It does not stay here: see `ladder`.
     cols: 8,
+
+    // THE VIEW PULLS BACK AS A RUN GOES ON.
+    //
+    // One width per figure, and the last entry repeats forever. Each step
+    // shrinks the blocks a little and fits more of them, which is the only way
+    // the fractal constructions get room to be themselves: eight columns holds
+    // three levels of recursion and no exact Cantor set at all. Nine and
+    // twenty seven are on the ladder because the base three figures - dust,
+    // cross, carpet - are exact only at a power of three, and sixteen and
+    // twenty four because the bisecting one is exact only at a multiple of
+    // eight.
+    //
+    // Keep the steps small. A figure is dealt one row per turn that the
+    // difficulty tier lets a row descend, which on the middle tiers is about
+    // every other turn, so a figure lasts roughly twice its height in turns and
+    // a widening lands about every twenty. Each step should read as the field
+    // having a little more room, never as the camera moving. The far rungs are
+    // deliberately out of reach of a short run: a twenty seven wide carpet is
+    // something to play toward.
+    ladder: [8, 9, 10, 12, 14, 16, 18, 21, 24, 27],
+
+    // Seconds the view takes to settle after a widening. The lattice changes
+    // between figures in one step; what the player sees is this ease. Long
+    // enough not to snap, short enough to finish inside one turn.
+    viewEase: 0.9,
 
     // Pixels of headroom at the top of the canvas, under the readout.
     topGap: 40,
@@ -130,6 +154,26 @@ export const CONFIG = {
     // Essence a destroyed block pays: max(1, round(blockHealth * blockShare))
     // plus whatever `harvest` has been bought.
     blockShare: 0.5,
+
+    // HOW MUCH HEALTH A ROW IS WORTH, RATHER THAN A BLOCK.
+    //
+    // The difficulty ladder decides how much health a block carries, and it was
+    // measured against a generator that put about three blocks in a row. A
+    // fractal figure does not care about that: a carpet row can be solid and a
+    // gasket row can hold one block. Taking the tier at its word would mean a
+    // solid row arriving with nearly three times the health the tier intended,
+    // which kills a run in single digit depths.
+    //
+    // So the tier's number is treated as the health of a ROW, and shared out
+    // among whatever blocks the figure put in it. A dense row is many soft
+    // blocks, a sparse row is a few hard ones, and the material colouring makes
+    // which is which readable at a glance.
+    rowBlocks: 3,
+
+    // Bounds on that sharing, so a one block row is not an unbreakable pillar
+    // and a solid row is not free.
+    rowShareMin: 0.5,
+    rowShareMax: 2,
 
     // An essence pickup collected at depth d pays windfallBase + d.
     windfallBase: 5,
@@ -298,7 +342,20 @@ export const appliedOverrides = [];
 // storage key exists.
 // ---------------------------------------------------------------------------
 
-export const CELL = CONFIG.board.width / CONFIG.board.cols;
+/** Cell size at the STARTING width. The live one moves as the view pulls back
+ *  and is owned by the game, not by this file. */
+export const CELL0 = CONFIG.board.width / CONFIG.board.cols;
+
+/** Width the figure numbered n is dealt at. The last rung repeats. */
+export const latticeAt = (n) => {
+  const L = CONFIG.board.ladder;
+  return L[Math.min(Math.max(0, n | 0), L.length - 1)];
+};
+
+/** Leftmost WORLD column at a given width. World column zero is the left edge
+ *  of the starting field, so widening opens negative columns on one side and
+ *  columns past the start width on the other, symmetrically. */
+export const leftEdgeAt = (cols) => -Math.floor((cols - CONFIG.board.cols) / 2);
 export const TOP = CONFIG.board.topGap;
 export const FLOOR = CONFIG.board.height - CONFIG.board.floorGap;
 
