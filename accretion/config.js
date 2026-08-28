@@ -58,6 +58,30 @@ export const CONFIG = {
     // more. The arc has an authored end designed for it; this is what stands in
     // for that end until it is built.
     promptFull:   'the field will take no more',
+
+    // WHAT THE FIELD SAYS THE FIRST TIME IT MAKES SOMETHING. One line, along
+    // the bottom, the first time each of these happens, then quiet. Keyed by
+    // what happened; the wording is the whole of the game's narration.
+    discoveries: {
+      rock: 'rock',
+      planetesimal: 'planetesimal',
+      planet: 'a world',
+      'gas giant': 'a gas giant',
+      'brown dwarf': 'a brown dwarf - not quite a star',
+      star: 'first light',
+      'red giant': 'the star swells: a red giant',
+      'red supergiant': 'a red supergiant',
+      'planetary nebula': 'the envelope lifts off',
+      supernova: 'supernova',
+      collapse: 'the core gives way. the star goes dark from the inside',
+      detonation: 'the white dwarf detonates',
+      'white dwarf': 'a white dwarf, cooling for ever',
+      'neutron star': 'a neutron star',
+      'black hole': 'a black hole',
+      'second generation': 'the thrown gas gathers and ignites again',
+    },
+    // How long a discovery line stays before the bottom goes quiet again.
+    captionSeconds: 7,
   },
 
   // -------------------------------------------------------------------------
@@ -140,10 +164,10 @@ export const CONFIG = {
 
     // WHERE THE FIELD STOPS TAKING MASS.
     //
-    // The whole ladder fits under this: the black hole rung begins at 2^82 of
-    // absolute mass, about 4.8e24, and in a measured full run the first black
-    // hole formed at a total of 4.8e26 - so this ceiling ends a run just past
-    // the top of the arc rather than four rungs short of it.
+    // The ladder no longer has a top rung by mass - a black hole is something
+    // a star becomes by dying, not a weight class - so this is only the stop
+    // that keeps a finished run from compounding for ever. It sits far past
+    // anything a session reaches.
     //
     // This used to be 1e12, pinned there by a defect, not a decision: seeding
     // mixed absolute and code units, which broke mass conservation the moment
@@ -159,7 +183,7 @@ export const CONFIG = {
     // compounding forever. The deepest total a stopped run can touch is about
     // 1.03e27 - the ceiling plus one final click - and runs were measured
     // clean to twice that through this exact path.
-    massCeiling: 1e27,
+    massCeiling: 1e45,
 
     // Clicks after which the prompt goes quiet for good.
     promptFadesAt: 3,
@@ -172,6 +196,13 @@ export const CONFIG = {
   // BLOCKED event the moment the field has earned a promotion it cannot take.
   // That event is the arc: it fires exactly when the player has built something
   // the world does not have a name for yet.
+  //
+  // STARS ARE NOT IN THESE TABLES. A star's colour, brightness and size follow
+  // from its mass through the real relations in src/stellar.js - a red dwarf
+  // at 2300 K, the sun at 5800, a blue giant past 30000 - and a giant, a white
+  // dwarf, a neutron star and thrown gas each have their own law there. The
+  // entries at those indices below are only fallbacks for a consumer that
+  // cannot ask.
   //
   // TEMPERATURE IS THE WHOLE VISUAL LANGUAGE. The renderer colours a body by
   // its temperature, and with none supplied every object in the universe came
@@ -207,8 +238,8 @@ export const CONFIG = {
     // scale is mostly unresolved small bodies, so it is warm rather than
     // stellar; the larger tiers are dominated by starlight and are given it.
     temperature: [
-      120, 310, 640, 1250, 900, 2600, 5800, 3400,
-      16000, 40000, 22000, 1600, 4200, 4600, 5000, 5400,
+      120, 310, 640, 1250, 900, 1500, 5800, 3700,
+      30000, 46000, 22000, 1600, 4200, 4600, 5000, 5400,
     ],
 
     // How brightly each kind shines, relative to a main-sequence star at 1.
@@ -221,9 +252,19 @@ export const CONFIG = {
     // thing in it starts producing its own light everything else sinks into
     // the dark around it. Flat values here and nothing ever stands out.
     luminosity: [
-      0.07, 0.11, 0.15, 0.22, 0.30, 0.62, 1.00, 0.88,
-      1.00, 1.25, 1.00, 0.70, 0.70, 0.70, 0.70, 0.70,
+      0.07, 0.11, 0.15, 0.22, 0.30, 0.12, 1.00, 1.40,
+      0.60, 1.60, 1.00, 0.70, 0.70, 0.70, 0.70, 0.70,
     ],
+
+    // HOW BRIGHT A STAR IS, FOR THE APERTURE. Real luminosity spans nine
+    // orders of magnitude across the main sequence, and an aperture that
+    // exposed for that would show one star and nothing else. The drawn
+    // brightness is luminosity to this power: a red dwarf comes out a third
+    // of the sun, a ten-solar-mass star a few times it. The floor and ceiling
+    // bound it.
+    starLumExponent: 0.18,
+    starLumFloor: 0.22,
+    starLumCeiling: 3.2,
 
     // How much a body's own heat may lift it above its kind's temperature, as
     // a share. Bounded, because heat is not calibrated against anything - what
@@ -306,6 +347,58 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
+  // STELLAR - how long stars live and how they die
+  //
+  // The relations themselves are physics (src/stellar.js); these set the
+  // clock they run on and the visible size of a few things that are, in
+  // truth, too extreme to draw. Handed to the simulation at creation.
+  // -------------------------------------------------------------------------
+  stellar: {
+    // How long a sun-like star shines, in seconds of play. Lifetime falls as
+    // mass to the -2.5: a half-sun lives six times this, a three-sun star a
+    // sixteenth of it. FEEDING A STAR SHORTENS ITS LIFE, which is the one real
+    // decision a player has about one.
+    sunLifeSeconds: 240,
+    // No star dies faster than this once it has ignited, so a massive star is
+    // on screen long enough to be seen as the blue thing it is before it goes.
+    lifeFloorSeconds: 12,
+    // The giant phase, as a share of main-sequence life, with its own floor so
+    // the swelling is watchable.
+    giantShare: 0.12,
+    giantFloorSeconds: 9,
+    // How much a giant swells. Real giants swell a hundredfold; in a field
+    // where orbits sit a few radii out that would swallow the whole system
+    // every time, so these are the visible fraction of the truth.
+    giantSwell: 6,
+    supergiantSwell: 11,
+    // Mass at death, in suns, deciding what is left: below the first, a white
+    // dwarf; then a neutron star; then a black hole born in a supernova; then
+    // a black hole born without one, the star going dark from the inside;
+    // then pair instability, which leaves nothing at all.
+    fateWhiteDwarf: 8,
+    fateNeutronStar: 25,
+    fateBlackHole: 40,
+    fatePairInstability: 130,
+    fateDirectAgain: 250,
+    // A white dwarf fed past the first detonates; a neutron star fed past the
+    // second collapses, quietly, into a black hole.
+    chandrasekhar: 1.4,
+    tov: 2.3,
+    // How long thrown gas must cool before it can gather into a new star, and
+    // how long it lasts before it has thinned into the void if nothing does.
+    gasCoolSeconds: 25,
+    gasLifeSeconds: 75,
+    // How long each way of dying takes, in seconds.
+    deathSeconds: {
+      collapse: 3.6,
+      supernova: 5.0,
+      nebula: 7.0,
+      detonation: 1.8,
+      quiet: 1.4,
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // FIELD - the simulation itself
   //
   // These are handed straight to the simulation. Full notes on what each one
@@ -314,6 +407,14 @@ export const CONFIG = {
   field: {
     // Identical seeds and identical inputs produce an identical universe.
     seed: 20260827,
+
+    // WHAT ONE UNIT OF LENGTH IS, IN METRES. The field's own units are
+    // arbitrary; this is what lets the view print a span in kilometres and
+    // name the scale it is looking at. It follows from the mass unit: a star
+    // ignites at 2^64 units of mass and at 0.08 solar masses, so one unit is
+    // about nine billion kilograms - a boulder some ninety metres across -
+    // and a solid of unit mass has unit radius.
+    metersPerUnit: 88,
 
     capacity: 4096,      // starting pool size; grows on demand
     hardCap:  32768,     // absolute ceiling on individually tracked bodies
@@ -535,6 +636,7 @@ export const simOptions = () => ({
   hardCap: CONFIG.field.hardCap,
   budgetMs: CONFIG.field.budgetMs,
   theta: CONFIG.field.theta,
+  stellar: CONFIG.stellar,
 });
 
 

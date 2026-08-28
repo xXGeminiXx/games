@@ -33,21 +33,21 @@
 
 <script type="module">
 // ---------------------------------------------------------------------------
-// Accretion - first playable cut.
+// Accretion.
 //
 // A blank field. A click puts something in it. A second thing pulls on the
 // first, and nothing after that is scripted: what forms, forms because the
 // field says so.
 //
-// This wires the simulation to the renderer and does nothing else. The arc,
-// the research and the ending exist as designed modules and are deliberately
-// not connected yet - the first thing worth knowing is whether the field
-// itself is good to touch.
+// This is the composition root: it wires the simulation to the renderer,
+// decides what a click is worth, translates what the field reports into what
+// the view can draw, and names things the first time they happen.
 // ---------------------------------------------------------------------------
 
 import { CONFIG, simOptions, applyIdentity } from './config.js';
-import { createSim, magToString, EVENT, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE } from './src/sim.js';
+import { createSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js';
 import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js';
+import * as Stellar from './src/stellar.js';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
@@ -92,49 +92,81 @@ setSpectrum({
 const sim = createSim(simOptions());
 const view = createRenderer(canvas, {});
 
-// WHAT COLOUR A THING IS.
+// WHAT COLOUR A THING IS, AND HOW BRIGHT.
 //
-// The renderer paints a body by black-body temperature, and the adapter takes a
-// mapping from the field's own quantities to kelvin. None was supplied, so
-// every object in the universe arrived with no temperature at all and the
-// renderer fell back on a single default - one dull red for dust, for planets,
-// and for stars alike. The field could not appear to change because nothing in
-// it was ever a different colour.
-//
-// Kind sets the band and the body's own heat lifts it within that band, so a
-// violently accreting world runs hotter than a settled one.
-// Kind sets the band and the body's own heat lifts it within that band, so a
-// violently accreting world runs hotter than a settled one. Named rather than
-// inlined because the event bridge needs the same answer for the same body: a
-// merge flash the colour of something else is worse than no flash at all.
-function temperatureOf(heat, kind) {
-  const table = CONFIG.matter.temperature;
-  const base = table[kind] !== undefined ? table[kind] : table[0];
-  const lift = 1 + CONFIG.matter.heatLift *
-    Math.min(1, Math.log10(1 + Math.max(0, heat)) / 12);
-  return base * lift;
+// Cold matter takes its colour from a table - grains, rock, worlds - lifted a
+// little by its own heat, so a violently accreting body runs hotter than a
+// settled one. Everything from a brown dwarf up is physics: a star's colour
+// and brightness follow from its mass alone, a giant is red, a white dwarf is
+// born blue-white and cools, a neutron star is hotter than the ramp resolves,
+// and gas thrown off a dying star cools as it spreads. One function decides
+// each, and the event bridge below asks the same one, so a flash is always
+// the colour of the thing it came from.
+// Gas remembers which death threw it: a supernova's shell is shocked and
+// glows, a shed envelope or a collapse's last puff is cool and dim.
+const gasIsHot = (b) => b.fate === STAGE.SUPERNOVA || b.fate === STAGE.DETONATION;
+
+const solarOf = (b) => {
+  if (!b) return 0;
+  if (b.solar !== undefined) return b.solar;
+  const m = b.m !== undefined ? b.m : b.mass;
+  return Stellar.solar(Math.log2(Math.max(m || 1e-12, 1e-12)) + (b.expMass || 0));
+};
+
+function temperatureOf(heat, kind, b) {
+  if (b && (b.gas || b.isGas)) {
+    return Stellar.gasTemperature(b.phase !== undefined ? b.phase : (b.burn || 0), gasIsHot(b));
+  }
+  switch (kind) {
+    case KIND.BROWN_DWARF: return Stellar.BROWN_DWARF_TEMPERATURE;
+    case KIND.STAR: return Stellar.mainSequence(solarOf(b)).T;
+    case KIND.GIANT_STAR: return Stellar.giantTemperature(solarOf(b), CONFIG.stellar);
+    case KIND.WHITE_DWARF: return Stellar.whiteDwarfTemperature(b ? (b.phase !== undefined ? b.phase : b.burn) : 0);
+    case KIND.NEUTRON_STAR: return Stellar.NEUTRON_STAR_TEMPERATURE;
+    default: {
+      const table = CONFIG.matter.temperature;
+      const base = table[kind] !== undefined ? table[kind] : table[0];
+      const lift = 1 + CONFIG.matter.heatLift *
+        Math.min(1, Math.log10(1 + Math.max(0, heat)) / 12);
+      return base * lift;
+    }
+  }
+}
+
+function luminosityOf(heat, kind, b) {
+  const M = CONFIG.matter;
+  if (b && (b.gas || b.isGas)) {
+    const age = b.phase !== undefined ? b.phase : (b.burn || 0);
+    // Cooling, and thinning to nothing over the last stretch of its life.
+    const life = CONFIG.stellar.gasLifeSeconds;
+    const fade = Math.min(1, Math.max(0, (life - age) / (life * 0.3)));
+    // Bright enough to register beside the star that threw it - a shell drawn
+    // at a few percent of its star's brightness is a shell nobody sees - and
+    // shocked gas far brighter than merely shed gas.
+    return (gasIsHot(b) ? 0.14 + 0.5 * Math.exp(-age / 12) : 0.06 + 0.16 * Math.exp(-age / 12)) * fade;
+  }
+  const starLum = (L) => Math.min(M.starLumCeiling, Math.max(M.starLumFloor, Math.pow(L, M.starLumExponent)));
+  switch (kind) {
+    case KIND.STAR: return starLum(Stellar.mainSequence(solarOf(b)).L);
+    case KIND.GIANT_STAR: return Math.max(0.9, starLum(Stellar.giantLuminosity(solarOf(b))));
+    case KIND.WHITE_DWARF: return Stellar.remnantLuminosity('white dwarf', b ? (b.phase !== undefined ? b.phase : b.burn) : 0);
+    case KIND.NEUTRON_STAR: return Stellar.remnantLuminosity('neutron star', 0);
+    default: {
+      const table = M.luminosity;
+      return table[kind] !== undefined ? table[kind] : table[0];
+    }
+  }
 }
 
 const adapt = createSimAdapter({
   // WHAT AN AGGREGATE IS, by the simulation's own flag and threshold rather
-  // than by the adapter's defaults. With no flag supplied the adapter falls
-  // back to a hardcoded kind threshold that happened to equal the field's -
-  // agreement by coincidence, which would have drifted silently the first time
-  // the kind list changed. Passing both makes the agreement structural.
+  // than by the adapter's defaults, so the agreement is structural and cannot
+  // drift the first time the kind list changes.
   flagAggregate: FLAG_AGGREGATE,
   aggFirstKind: AGG_FIRST,
+  flagGas: FLAG_GAS,
   temperature: temperatureOf,
-  // HOW BRIGHTLY IT SHINES, which is the other half of the same sentence.
-  //
-  // Temperature alone gives every kind its own hue and leaves them all equally
-  // luminous, so a field of cold dust and a field of stars are the same picture
-  // in different colours. The aperture exposes for the brightest thing on
-  // screen, so brightness is what makes ignition an event: the moment one body
-  // starts producing its own light, everything cold around it sinks.
-  luminosity(heat, kind) {
-    const table = CONFIG.matter.luminosity;
-    return table[kind] !== undefined ? table[kind] : table[0];
-  },
+  luminosity: luminosityOf,
 });
 
 // Deterministic scatter. Identical inputs have to produce an identical
@@ -150,16 +182,11 @@ function hash2(a, b) {
 // little momentum, so two clicks in the same place still make a system rather
 // than a stack.
 //
-// THE SCATTER IS MEASURED IN PIXELS, NOT WORLD UNITS, and that is the whole of
-// a bug worth naming. It used to be a world-space radius that GREW with the
-// number of clicks - so by the fiftieth click mass was arriving a long way from
-// the cursor, and the game was answering somewhere the player had not pointed.
-// It was also wrong at every scale but one: six world units is the whole screen
-// early on and an invisible speck an hour later.
-//
-// A few pixels of scatter converted through the live projection is right at
-// every scale and always lands under the cursor, which is the only thing a
-// click has to promise.
+// THE SCATTER IS MEASURED IN PIXELS, NOT WORLD UNITS. It used to be a
+// world-space radius that GREW with the number of clicks, so by the fiftieth
+// click mass was arriving a long way from the cursor. A few pixels converted
+// through the live projection is right at every scale and always lands under
+// the cursor, which is the only thing a click has to promise.
 let clicks = 0;
 function seedAt(sx, sy) {
   const w = view.screenToWorld(sx, sy);
@@ -168,49 +195,41 @@ function seedAt(sx, sy) {
   const vp = view.getViewport();
   const perUnit = vp && vp.pxPerUnit > 0 ? vp.pxPerUnit : 1;
 
-  // What a click is worth. A share of what is already there, floored at the
+  // What a click is worth: a share of what is already there, floored at the
   // base - see seeding.clickShare for why a flat contribution could not work
   // against an exponential ladder.
   const st = sim.stats ? sim.stats() : null;
   const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
-  // Past the top of the ladder the field stops taking on mass. See
-  // seeding.massCeiling: the simulation is sound over the range the arc uses
-  // and starts quarantining its own bodies past it, so a run that kept
-  // compounding would dissolve into infinities while the player watched.
-  if (held >= seed.massCeiling) { note.textContent = CONFIG.text.promptFull; return; }
+  if (held >= seed.massCeiling) { say(CONFIG.text.promptFull, 0); return; }
   // The share is decided in ABSOLUTE units - the ladder and the ceiling live
   // there - but addBody takes the field's own CODE units, which the ledger
-  // re-centres as the run grows. The two coincide until the ledger's first
-  // rebase and then diverge by 2^expMass, so an unconverted seed lands about a
-  // million times too heavy and every click multiplies the field instead of
-  // feeding it. The conversion is asked of the field, which owns the ledger.
+  // re-centres as the run grows. The conversion is asked of the field, which
+  // owns the ledger.
   const perAbs = Math.max(seed.massPerBody,
                           (held * seed.clickShare) / Math.max(1, seed.bodiesPerClick));
-  const per = sim.codeMassFromAbsolute ? sim.codeMassFromAbsolute(perAbs) : perAbs;
-  const floor = sim.codeMassFromAbsolute
-    ? sim.codeMassFromAbsolute(seed.massPerBody * 0.1) : seed.massPerBody * 0.1;
+  const per = sim.codeMassFromAbsolute(perAbs);
+  const floor = sim.codeMassFromAbsolute(seed.massPerBody * 0.1);
 
-  // Far enough apart to BE apart. A few pixels on screen so the click reads as
-  // a scatter, and never closer than a few radii of whatever is being placed -
-  // otherwise the bodies are born inside one another and merge on the first
-  // step, so every click looks like three arrivals and is one.
-  const bodyR = sim.radiusForMass ? sim.radiusForMass(per) : 0;
+  // Far enough apart to BE apart: a few pixels on screen so the click reads as
+  // a scatter, and never closer than a few radii of whatever is being placed.
+  const bodyR = sim.radiusForMass(per);
   const spread = Math.min(seed.spreadMaxPixels / perUnit,
                           Math.max(seed.spreadPixels / perUnit, bodyR * seed.spreadRadii));
+
+  // WHAT A CLICK IS, LATE IN A RUN. Once a click's share of the field is
+  // more than a star's worth of matter, it does not arrive as a star: nothing
+  // that heavy arrives as anything but a cloud. It comes in as gas, which
+  // cools, and either gathers into a star of its own or is captured by one
+  // that is already there. That is star formation, and it is also what stops
+  // a late field filling with instant stars three at a time.
+  const asCloud = Math.log2(perAbs) >= Stellar.IGNITION_LOG2;
 
   const step = 6.2831853 / Math.max(1, seed.bodiesPerClick);
   for (let k = 0; k < seed.bodiesPerClick; k++) {
     // The golden angle keeps successive clicks from landing on the same spokes.
     const jitter = (hash2(clicks, k) - 0.5) * step * seed.angleJitter;
     const a = (clicks * 2.3999632 + k * step + jitter) % 6.2831853;
-    // How far out along its spoke this one lands. Floored well above zero: the
-    // scatter is sized so that bodies clear each other at full extension, and a
-    // body pulled most of the way back to the centre would be inside its
-    // neighbours again.
     const near = 0.6 + 0.4 * hash2(clicks ^ 0x9e37, k);
-    // Mass varies about its mean rather than arriving as the same three
-    // identical things every time. A field made of one repeated object never
-    // looks like it grew, it looks like it was stamped.
     const vary = 1 + (hash2(clicks, k ^ 0x5bf0) - 0.5) * 2 * seed.massJitter;
     sim.addBody({
       x: w.x + Math.cos(a) * spread * near,
@@ -218,81 +237,107 @@ function seedAt(sx, sy) {
       vx: Math.cos(a + 1.5708) * seed.launchSpeed,
       vy: Math.sin(a + 1.5708) * seed.launchSpeed,
       mass: Math.max(floor, per * vary),
+      kind: asCloud ? KIND.DUST : undefined,
+      gas: asCloud,
     });
   }
   clicks++;
-  if (clicks === 1) note.textContent = CONFIG.text.promptSecond;
-  else if (clicks === seed.promptFadesAt) note.textContent = CONFIG.text.promptDone;
+  if (clicks === 1) say(CONFIG.text.promptSecond, 0);
+  else if (clicks === seed.promptFadesAt) say(CONFIG.text.promptDone, 0);
 }
 
 canvas.addEventListener('pointerdown', e => seedAt(e.clientX, e.clientY));
 addEventListener('resize', () => view.resize());
 // NO WHEEL HANDLER HERE. The renderer binds its own, anchored at the cursor,
-// and a second one on the window meant every notch was applied twice - once
-// toward the pointer and once toward the centre of the screen, at two
-// different step sizes. That is most of why the zoom could not be controlled.
+// and a second one on the window meant every notch was applied twice.
+
+// THE LINE ALONG THE BOTTOM. It says what the field just did for the first
+// time, and then goes quiet. A duration of 0 keeps a line until the next.
+const note = document.getElementById('note');
+let noteUntil = 0;
+function say(text, seconds) {
+  note.textContent = text || '';
+  noteUntil = seconds > 0 ? performance.now() + seconds * 1000 : 0;
+}
+const seen = new Set();
+function discover(key, fallback) {
+  if (seen.has(key)) return;
+  seen.add(key);
+  const words = CONFIG.text.discoveries[key];
+  say(CONFIG.matter.discoveryPrefix + (words === undefined ? (fallback || key) : words),
+      CONFIG.text.captionSeconds);
+}
 
 // WHAT THE FIELD DID, IN WORDS THE RENDERER KNOWS.
 //
-// TWO VOCABULARIES THAT HAVE NEVER MET. The field reports what happened as
-// integer codes - EVENT.MERGE is 1, EVENT.COLLAPSE is 4 - and the renderer's
-// emit() switches on names: 'merge', 'collapse', 'birth'. No case could ever
-// match, so every flash, every shock ring, every ejecta spray and the field
-// inversion reserved for a collapse have never once played. Nothing threw and
-// nothing warned; the effects layer was simply never reached.
-//
-// The two also disagree about what an event IS. The field names the thing it
-// happened to - an id - because a body is where its own position lives. The
-// renderer needs the position, because it has to draw it somewhere. So this
-// looks the body up and hands over both.
-//
-// Only the three that are worth seeing are translated. A rebase or an epoch
-// advance is bookkeeping, and a promotion already has a voice of its own along
-// the bottom of the screen.
-const SEEN = {
-  [EVENT.MERGE]: 'merge',
-  [EVENT.COLLAPSE]: 'collapse',
-  [EVENT.CONDENSE]: 'birth',
-};
-
+// The field reports what happened as integer codes and names the BODY it
+// happened to; the renderer switches on names and needs the PLACE. This looks
+// the body up and hands over both, and it decides which events are worth
+// light at all: a rock meeting a rock is silent, a star swallowing something
+// flares, a supernova is the one flash in the game that is earned, and a
+// direct collapse is drawn on the star itself rather than announced.
 function dress(e) {
-  const name = SEEN[e.type];
+  let name = null;
+  switch (e.type) {
+    case EVENT.MERGE: name = 'merge'; break;
+    case EVENT.CONDENSE: name = 'birth'; break;
+    case EVENT.COLLAPSE: name = 'collapse'; break;
+    case EVENT.KIND_CHANGE: if (e.kind === KIND.STAR) name = 'ignite'; break;
+    case EVENT.EJECT:
+      if (e.stage === STAGE.SUPERNOVA) name = 'supernova';
+      else if (e.stage === STAGE.NEBULA) name = 'nebula';
+      else if (e.stage === STAGE.DETONATION) name = 'detonation';
+      break;
+    default: break;
+  }
   if (!name) return e;
-  const b = sim.getBody ? sim.getBody(e.id) : null;
+  const b = sim.getBody(e.id);
   if (!b) return e;
-  const out = { type: name, x: b.x, y: b.y, r: b.radius, T: temperatureOf(b.heat, b.kind) };
+  const out = { type: name, x: b.x, y: b.y, r: b.radius, T: temperatureOf(b.heat, b.kind, b) };
   if (name === 'merge') {
-    // How hard it landed. One body absorbing a dozen should not look like one
-    // absorbing one, and the renderer scales its flash and its ejecta by this.
+    // How hard it landed, and whether anything in it was shining.
     out.energy = Math.max(0.2, Math.min(4, 1 + (e.absorbed || 0) * 0.35));
-  } else if (name === 'collapse') {
-    // The renderer wants the radius before and after. What a collapse means is
-    // that the two are far apart, and only the after is a fact the field still
-    // holds - the before is reconstructed from the rung it fell from.
-    out.r1 = b.radius;
-    out.r0 = b.radius * (CONFIG.matter.collapseFrom || 12);
+    out.hot = b.kind >= KIND.BROWN_DWARF && b.kind < AGG_FIRST && !b.isGas;
   }
   return out;
 }
 
-// THE ARC.
-//
-// Every kind above dust is gated in the simulation, and it emits BLOCKED the
-// moment the field has earned a promotion it is not allowed to take. Nothing
-// was listening, so nothing was ever unlocked and a run could only ever be
-// dust - which is the whole reason the field appeared to do nothing however
-// long it was fed. The ladder climbs to a star; none of it was reachable.
-//
-// A blocked promotion IS the discovery: the player has built something the
-// world does not have a name for, so it gets one. The research layer designed
-// in src/progression.js is a richer answer to the same moment and is still
-// unwired; this is the smallest thing that makes the ladder a ladder.
-const note = document.getElementById('note');
-function discover(e) {
-  if (!e || e.type !== EVENT.BLOCKED) return;
-  if (sim.isKindUnlocked && sim.isKindUnlocked(e.kind)) return;
-  sim.setKindUnlocked(e.kind, true);
-  note.textContent = CONFIG.matter.discoveryPrefix + (KIND_NAME[e.kind] || '');
+// NAMING THINGS. Every first happening is said once along the bottom: each
+// rung of the ladder, first light, the swelling, each way of dying and each
+// thing left behind. Kinds above dust are gated in the simulation and it
+// emits BLOCKED when the field has earned one it may not take; the smallest
+// thing that makes the ladder a ladder is to grant it and say its name.
+function witness(e) {
+  switch (e.type) {
+    case EVENT.BLOCKED:
+      if (!sim.isKindUnlocked(e.kind)) {
+        sim.setKindUnlocked(e.kind, true);
+        discover(KIND_NAME[e.kind]);
+      }
+      break;
+    case EVENT.KIND_CHANGE: {
+      if (e.kind === KIND.STAR) {
+        const b = sim.getBody(e.id);
+        discover(b && b.isGas === false && e.from === KIND.BROWN_DWARF ? 'star' : 'star');
+      } else if (e.kind === KIND.GIANT_STAR) {
+        const b = sim.getBody(e.id);
+        discover(b && Stellar.isSupergiant(b.solar, CONFIG.stellar) ? 'red supergiant' : 'red giant');
+      } else if (e.kind < KIND.STAR) {
+        discover(KIND_NAME[e.kind]);
+      }
+      break;
+    }
+    case EVENT.DEATH:
+      if (e.stage === STAGE.NEBULA) discover('planetary nebula');
+      else if (e.stage === STAGE.SUPERNOVA) discover('supernova');
+      else if (e.stage === STAGE.COLLAPSE) discover('collapse');
+      else if (e.stage === STAGE.DETONATION) discover('detonation');
+      break;
+    case EVENT.REMNANT:
+      if (e.kind >= 0) discover(KIND_NAME[e.kind]);
+      break;
+    default: break;
+  }
 }
 
 const fmt = document.getElementById('mass');
@@ -308,11 +353,11 @@ function frame(now) {
   sim.step(dt);
 
   // Events are how the field tells the view that something happened - a merge,
-  // an ignition, a crossing into a new order of magnitude.
-  const events = sim.drainEvents ? sim.drainEvents() : [];
-  for (let i = 0; i < events.length; i++) { view.emit(dress(events[i])); discover(events[i]); }
+  // an ignition, a death, a crossing into a new order of magnitude.
+  const events = sim.drainEvents();
+  for (let i = 0; i < events.length; i++) { view.emit(dress(events[i])); witness(events[i]); }
 
-  const s = sim.stats ? sim.stats() : null;
+  const s = sim.stats();
 
   // The renderer frames on the extent of the field. It arrives as a magnitude
   // pair, and without it the camera has nothing to size itself against.
@@ -322,13 +367,22 @@ function frame(now) {
     if (Number.isFinite(e) && e > 0) extent = e;
   }
 
-  const world = adapt(sim.getRenderView(), { t: now / 1000, events, extent });
+  // What a world unit is in metres, for the span the view prints and the
+  // scale it names. Code units re-centre as the run grows, so the exponent
+  // follows the ledger.
+  const exp = Math.log10(CONFIG.field.metersPerUnit) + (s ? s.ledger.expLen : 0) * Math.log10(2);
+  const world = adapt(sim.getRenderView(), { t: now / 1000, events, extent, exp });
   view.renderFrame(world, now);
 
   if (s && s.totalMass) fmt.textContent = magToString(s.totalMass, 2);
+  if (noteUntil && now >= noteUntil) { note.textContent = ''; noteUntil = 0; }
 
   requestAnimationFrame(frame);
 }
+
+// The live objects, for tuning from the console the way the config layer
+// allows from the address bar. Nothing in the game reads this.
+if (typeof window !== 'undefined') window.accretion = { sim, view, adapt, seedAt, Stellar, KIND, STAGE, FATE, CONFIG };
 
 // The renderer can drive itself, but the field has to step first, so frames
 // are driven from here. Calling start() as well would paint twice per frame,

@@ -217,6 +217,8 @@
  * `checksum()` hashes the raw bits of the live state for regression tests.
  */
 
+import * as Stellar from './stellar.js';
+
 /* ========================================================================== *
  * SECTION 1 - CONSTANTS
  * ========================================================================== */
@@ -354,7 +356,8 @@ export const KIND = Object.freeze({
   PLANETESIMAL: 2,
   PLANET: 3,
   GAS_GIANT: 4,
-  PROTOSTAR: 5,
+  BROWN_DWARF: 5,
+  PROTOSTAR: 5,      // the older name for the same rung; kept so nothing breaks
   STAR: 6,
   GIANT_STAR: 7,
   WHITE_DWARF: 8,
@@ -372,15 +375,30 @@ export const AGG_FIRST = KIND.CLUSTER;
 
 export const KIND_NAME = Object.freeze([
   'dust', 'rock', 'planetesimal', 'planet', 'gas giant',
-  'protostar', 'star', 'giant star', 'white dwarf', 'neutron star',
+  'brown dwarf', 'star', 'giant star', 'white dwarf', 'neutron star',
   'black hole', 'cluster', 'galaxy', 'supercluster', 'universe', 'dimension',
 ]);
 
 /**
- * The main-sequence ladder of individually tracked kinds, in ascending order of
- * mass, with the base-2 logarithm of the ABSOLUTE mass at which each begins.
- * Absolute, not code units, so the ladder does not move when the ledger rebases.
- * One unit of mass is one dot.
+ * The mass ladder of individually tracked kinds, in ascending order, with the
+ * base-2 logarithm of the ABSOLUTE mass at which each begins. Absolute, not
+ * code units, so the ladder does not move when the ledger rebases. One unit
+ * of mass is one dot.
+ *
+ * THE LADDER ENDS AT THE MAIN SEQUENCE. Mass alone makes dust into rock, rock
+ * into worlds, a world into a gas giant, a giant into a brown dwarf and a
+ * brown dwarf into a star - and there it stops, because nothing above a star
+ * is reached by adding mass. A star becomes a giant by running out of fuel
+ * and becomes a remnant by dying, and which remnant is decided by its mass at
+ * that moment. That is evolve()'s job, driven by the clock, using the
+ * relations in stellar.js.
+ *
+ * The rungs above ignition are spaced as the real ones are: a gas giant is a
+ * few Earth masses and up, a brown dwarf begins near thirteen Jupiter masses
+ * (deuterium burning), and hydrogen ignites at eighty (0.08 solar masses).
+ * Solids hold their density (r ~ m^1/3); gas giants and brown dwarfs barely
+ * grow with mass at all, which is why Jupiter and a brown dwarf are the same
+ * size; a main-sequence star grows as m^0.8.
  */
 const LADDER = [
   { kind: KIND.DUST, log2m: -Infinity, rexp: 1 / 3 },
@@ -388,11 +406,21 @@ const LADDER = [
   { kind: KIND.PLANETESIMAL, log2m: 24, rexp: 1 / 3 },
   { kind: KIND.PLANET, log2m: 36, rexp: 1 / 3 },
   { kind: KIND.GAS_GIANT, log2m: 48, rexp: 0.10 },
-  { kind: KIND.PROTOSTAR, log2m: 58, rexp: 0.45 },
-  { kind: KIND.STAR, log2m: 64, rexp: 0.80 },
-  { kind: KIND.GIANT_STAR, log2m: 74, rexp: 0.90 },
-  { kind: KIND.BLACK_HOLE, log2m: 82, rexp: 1.00 },
+  { kind: KIND.BROWN_DWARF, log2m: 61, rexp: 0.0 },
+  { kind: KIND.STAR, log2m: Stellar.IGNITION_LOG2, rexp: 0.80 },
 ];
+
+/** The top of the ladder: where a gas cloud, or anything else, ignites. */
+const IGNITE_LOG2 = Stellar.IGNITION_LOG2;
+
+/**
+ * A black hole's drawn radius as a share of the main-sequence radius of the
+ * twenty-solar-mass star it is anchored to. See the radius law below.
+ */
+const BLACK_HOLE_SHADOW_SHARE = 0.03;
+
+/** How much larger a body of gas is than a solid of the same mass. */
+const GAS_PUFF = 3.0;
 
 /**
  * Radius coefficients, solved at module load so that the radius law is
@@ -425,14 +453,36 @@ const R_EXP = new Float64Array(KIND_COUNT);
     //   coef_prev * mb^e_prev == coef_cur * mb^e_cur
     LOG2_R_COEF[cur.kind] = LOG2_R_COEF[prev.kind] + cur.log2m * (prev.rexp - cur.rexp);
   }
-  // Degenerate side branches. Not on the ladder - the progression layer places
-  // a body here explicitly when a star ends. Anchored to a fraction of the
-  // main-sequence radius at the star threshold so they read as compact.
-  const log2rStar = LOG2_R_COEF[KIND.STAR] + R_EXP[KIND.STAR] * 64;
+  // THE EVOLVED KINDS. None of them is on the ladder: a star does not become
+  // a giant by gaining mass, it becomes one by running out of fuel, and what
+  // it leaves behind is decided by its mass at death - see evolve(). Their
+  // laws are anchored to the main-sequence law so a transition is continuous
+  // at the instant it starts; the swelling and shrinking of the transition
+  // itself is carried by the per-body rscale factor.
+  //
+  // A giant is a main-sequence star swollen by rscale, so it shares the law.
+  R_EXP[KIND.GIANT_STAR] = R_EXP[KIND.STAR];
+  LOG2_R_COEF[KIND.GIANT_STAR] = LOG2_R_COEF[KIND.STAR];
+  // A black hole's radius is LINEAR in mass - the one law in physics that is
+  // - and it is far smaller than any star of the same mass. Anchored at
+  // twenty solar masses to a few percent of the star it collapsed from. The
+  // true ratio is a hundred thousand times smaller still, which would put
+  // every stellar black hole under a pixel; this is the visible fraction of
+  // the truth. The slope is exact, so a hole that has eaten a galaxy is drawn
+  // to scale against one that has not.
+  const anchor = Stellar.log2FromSolar(20);
+  const starAtAnchor = LOG2_R_COEF[KIND.STAR] + R_EXP[KIND.STAR] * anchor;
+  R_EXP[KIND.BLACK_HOLE] = 1.0;
+  LOG2_R_COEF[KIND.BLACK_HOLE] = starAtAnchor + Math.log2(BLACK_HOLE_SHADOW_SHARE) - anchor;
+  // Degenerate remnants shrink as they gain mass (r ~ m^-1/3). A white dwarf
+  // is a few times the size of a black hole of its mass, a neutron star a
+  // fraction of one - the real proportions are a thousand to one each way,
+  // and both would be invisible at that.
+  const holeAt = (M) => LOG2_R_COEF[KIND.BLACK_HOLE] + Stellar.log2FromSolar(M);
   R_EXP[KIND.WHITE_DWARF] = -1 / 3;
-  LOG2_R_COEF[KIND.WHITE_DWARF] = log2rStar + Math.log2(0.02) + 64 / 3;
+  LOG2_R_COEF[KIND.WHITE_DWARF] = holeAt(0.6) + Math.log2(4) + Stellar.log2FromSolar(0.6) / 3;
   R_EXP[KIND.NEUTRON_STAR] = -1 / 3;
-  LOG2_R_COEF[KIND.NEUTRON_STAR] = log2rStar + Math.log2(2e-5) + 64 / 3;
+  LOG2_R_COEF[KIND.NEUTRON_STAR] = holeAt(1.4) + Math.log2(0.25) + Stellar.log2FromSolar(1.4) / 3;
   // Aggregates carry their own measured half-mass radius; the law is unused.
   for (let k = AGG_FIRST; k < KIND_COUNT; k++) {
     LOG2_R_COEF[k] = 0;
@@ -484,6 +534,42 @@ const FLAG_NONE = 0;
 export const FLAG_AGGREGATE = 1;
 const FLAG_NO_CONDENSE = 2;
 const FLAG_ALWAYS_ACTIVE = 4;
+/** Diffuse gas thrown off a dying star. It holds no shape of its own: however
+ *  much of it gathers it stays gas, until something solid captures it or
+ *  until enough collects in one place to ignite. Exported for the seam. */
+export const FLAG_GAS = 8;
+/** A dying body that has already thrown its shell. */
+const FLAG_EJECTED = 16;
+
+/** The death sequence a body is in. STAGE.NONE for almost everything. */
+export const STAGE = Object.freeze({
+  NONE: 0,
+  COLLAPSE: 1,      // direct collapse: the shadow spreads from the core, the halo, then nothing
+  SUPERNOVA: 2,     // core collapse, the flash, the shell
+  NEBULA: 3,        // the envelope lifts off slowly around the exposed core
+  DETONATION: 4,    // everything, at once, and nothing left
+  QUIET: 5,         // a neutron star past its limit winks out
+});
+const STAGE_NAME = ['', 'collapse', 'supernova', 'nebula', 'detonation', 'quiet'];
+const STAGE_OF = { collapse: STAGE.COLLAPSE, supernova: STAGE.SUPERNOVA, nebula: STAGE.NEBULA, detonation: STAGE.DETONATION, quiet: STAGE.QUIET };
+
+/** What a dying body is on its way to. */
+export const FATE = Object.freeze({
+  NONE: 0, WHITE_DWARF: 1, NEUTRON_STAR: 2, BLACK_HOLE: 3, DIRECT: 4, PAIR: 5, DETONATION: 6, QUIET: 7,
+});
+export const FATE_NAME = Object.freeze([
+  '', 'white dwarf', 'neutron star', 'black hole', 'direct collapse', 'pair instability',
+  'detonation', 'quiet collapse',
+]);
+const FATE_OF_NAME = { 'white dwarf': FATE.WHITE_DWARF, 'neutron star': FATE.NEUTRON_STAR, 'black hole': FATE.BLACK_HOLE, 'direct collapse': FATE.DIRECT, 'pair instability': FATE.PAIR };
+/** Which stage each fate plays out. */
+const STAGE_FOR_FATE = [STAGE.NONE, STAGE.NEBULA, STAGE.SUPERNOVA, STAGE.SUPERNOVA, STAGE.COLLAPSE, STAGE.DETONATION, STAGE.DETONATION, STAGE.QUIET];
+/** The kind each fate leaves behind, or -1 for nothing. */
+const REMNANT_OF_FATE = [-1, KIND.WHITE_DWARF, KIND.NEUTRON_STAR, KIND.BLACK_HOLE, KIND.BLACK_HOLE, -1, -1, KIND.BLACK_HOLE];
+/** Where in the sequence the body starts shrinking toward its remnant. */
+const SHRINK_FROM = [0, 0.55, 0.32, 0.06, 0.30, 0.0];
+/** How many pieces a thrown shell arrives as. */
+const EJECTA_COUNT = [0, 12, 24, 16, 28, 0];
 
 /** Events drained by the progression layer. */
 export const EVENT = Object.freeze({
@@ -496,6 +582,10 @@ export const EVENT = Object.freeze({
   REBASE: 7,         // unit ledger re-centred
   EPOCH: 8,          // named epoch advanced
   QUARANTINE: 9,     // a body failed the finiteness audit (should never fire)
+  DEATH: 10,         // a star began to die: {id, fate, stage}
+  EJECT: 11,         // a dying star threw its shell: {id, fate, stage, n, thrown}
+  REMNANT: 12,       // the sequence ended: {id, fate, kind} (kind -1: nothing left)
+  DISPERSE: 13,      // thrown gas thinned away into the void: {id, mass}
 });
 
 /* ========================================================================== *
@@ -709,6 +799,21 @@ export function createSim(opts = {}) {
   let protectUntil = new Int32Array(capacity);
   let idOfSlot = new Int32Array(capacity);
 
+  // Stellar evolution. `burn` is the share of the current phase already spent
+  // - main sequence, then giant, then the death sequence itself; for a
+  // remnant it is its age, and for gas the seconds since it was thrown.
+  // `stage` names the death sequence a body is in (STAGE.NONE for nearly
+  // everything), `fate` what it is dying into, and `rscale` multiplies the
+  // radius law while a body swells or shrinks through a transition.
+  let burn = new Float64Array(capacity);
+  let stage = new Uint8Array(capacity);
+  let fate = new Uint8Array(capacity);
+  let rscale = new Float64Array(capacity).fill(1);
+  // The radius a dying body started from and the one it is shrinking to, by
+  // id. Populated only while a death is in progress, so it is nearly always
+  // empty and never touched in the force path.
+  const deathRec = new Map();
+
   // Aggregate-only fields. Dense with the pool for cache reasons; only read
   // when FLAG_AGGREGATE is set.
   let aggN = new Float64Array(capacity);      // represented population
@@ -802,6 +907,9 @@ export function createSim(opts = {}) {
    * 5.4 Runtime / governor state
    * ---------------------------------------------------------------------- */
   const rng = makeRng((opts.seed | 0) || 1);
+  // The stellar relations' tunables: lifetimes, fates, limits. A host hands
+  // its own over; anything unspecified falls back to stellar.js's defaults.
+  let stellarP = Object.assign({}, Stellar.DEFAULTS, opts.stellar || {});
   let theta = opts.theta > 0 ? opts.theta : DEFAULT_THETA;
   let budgetMs = opts.budgetMs > 0 ? opts.budgetMs : FRAME_BUDGET_MS;
   let forceTiering = opts.forceTiering !== false;
@@ -818,6 +926,7 @@ export function createSim(opts = {}) {
   let lostMass = 0;
   let quarantined = 0;
   let heatRadiated = 0;
+  let dispersed = 0;   // gas that thinned into the void, code units
 
   // Kinds the progression layer has researched. Everything at or below DUST is
   // available from the first click; the rest is gated.
@@ -842,7 +951,7 @@ export function createSim(opts = {}) {
   // zero when they do not. Same live buffers, so carrying them costs nothing.
   const renderView = {
     count: 0, px, py, vx, vy, radius, mass, kind, flags, idOfSlot,
-    aggN, aggR, aggSigma, aggPhase, pop, heat, spin,
+    aggN, aggR, aggSigma, aggPhase, pop, heat, spin, burn, stage, fate,
   };
 
   /* ====================================================================== *
@@ -862,6 +971,8 @@ export function createSim(opts = {}) {
     kind = growU8(kind, c); flags = growU8(flags, c); ftier = growU8(ftier, c);
     lastForce = growI32(lastForce, c); protectUntil = growI32(protectUntil, c);
     idOfSlot = growI32(idOfSlot, c);
+    burn = growF64(burn, c); stage = growU8(stage, c); fate = growU8(fate, c);
+    { const was = rscale.length; rscale = growF64(rscale, c); rscale.fill(1, was); }
     aggN = growF64(aggN, c); aggR = growF64(aggR, c);
     aggSigma = growF64(aggSigma, c); aggPhase = growF64(aggPhase, c);
     aggBorn = growI32(aggBorn, c); aggSeed = growU32(aggSeed, c);
@@ -887,6 +998,7 @@ export function createSim(opts = {}) {
     renderView.idOfSlot = idOfSlot; renderView.aggN = aggN; renderView.aggR = aggR;
     renderView.aggSigma = aggSigma; renderView.aggPhase = aggPhase;
     renderView.pop = pop; renderView.heat = heat; renderView.spin = spin;
+    renderView.burn = burn; renderView.stage = stage; renderView.fate = fate;
   }
 
   function allocId() {
@@ -915,6 +1027,8 @@ export function createSim(opts = {}) {
     aggN[to] = aggN[from]; aggR[to] = aggR[from];
     aggSigma[to] = aggSigma[from]; aggPhase[to] = aggPhase[from];
     aggBorn[to] = aggBorn[from]; aggSeed[to] = aggSeed[from];
+    burn[to] = burn[from]; stage[to] = stage[from]; fate[to] = fate[from];
+    rscale[to] = rscale[from];
     if (flags[from] & FLAG_AGGREGATE) {
       aggCensus.copyWithin(to * KIND_COUNT, from * KIND_COUNT, from * KIND_COUNT + KIND_COUNT);
     }
@@ -1005,7 +1119,10 @@ export function createSim(opts = {}) {
       eps2[i] = Math.max(r * r, EPS2_FLOOR);
       return;
     }
-    const r = codeRadius(mass[i], k);
+    let r = codeRadius(mass[i], k) * (rscale[i] > 0 ? rscale[i] : 1);
+    // Gas is diffuse: the same mass spread over a far larger volume, so it is
+    // both bigger and softer than the solid it would make.
+    if (flags[i] & FLAG_GAS) r *= GAS_PUFF;
     radius[i] = r;
     // Softening is the body's own radius: two bodies cannot approach closer
     // than the sum of their radii without merging, so the force kernel never
@@ -1043,9 +1160,12 @@ export function createSim(opts = {}) {
    * surfaced to the player as something straining to happen.
    */
   function applyLadder(i) {
-    if (flags[i] & FLAG_AGGREGATE) return;
+    if (flags[i] & (FLAG_AGGREGATE | FLAG_GAS)) return;
     const k = kind[i];
-    if (k === KIND.WHITE_DWARF || k === KIND.NEUTRON_STAR) return; // side branches
+    // Everything past the main sequence left the ladder for good: a giant is a
+    // star that ran out of fuel, and a remnant is what one left behind. Mass
+    // moves none of them back onto it, and a body mid-death is left alone.
+    if (k > KIND.STAR || stage[i] !== STAGE.NONE) return;
     const log2m = Math.log2(Math.max(mass[i], MASS_FLOOR)) + expMass;
     let want = KIND.DUST;
     for (let li = 0; li < LADDER.length; li++) {
@@ -1067,11 +1187,9 @@ export function createSim(opts = {}) {
       }
       kind[i] = next;
       refreshDerived(i);
-      pushEvent({
-        type: next === KIND.BLACK_HOLE ? EVENT.COLLAPSE : EVENT.KIND_CHANGE,
-        id: idOfSlot[i], from: cur, kind: next, step: stepCount,
-      });
-      if (next >= KIND.STAR) flags[i] |= FLAG_ALWAYS_ACTIVE;
+      pushEvent({ type: EVENT.KIND_CHANGE, id: idOfSlot[i], from: cur, kind: next, step: stepCount });
+      // A star's clock starts at ignition.
+      if (next === KIND.STAR) { burn[i] = 0; flags[i] |= FLAG_ALWAYS_ACTIVE; }
       cur = next;
     }
   }
@@ -1166,6 +1284,11 @@ export function createSim(opts = {}) {
     // and the absolute figures stats() derives from it would be wrong.
     heatRadiated *= fh;
     lostMass *= fm;
+    dispersed *= fm;
+    // A death in progress remembers two radii in code units; they move with
+    // every other length or the shrink runs from a radius 2^kl too large and
+    // the dying star swallows its own shell back.
+    for (const rec of deathRec.values()) { rec.r0 *= fl; rec.r1 *= fl; }
     expMass += km;
     expLen += kl;
     expTime += (3 * kl - km) >> 1;
@@ -1676,6 +1799,7 @@ export function createSim(opts = {}) {
       let M = 0, cx = 0, cy = 0, mvx = 0, mvy = 0, max = 0, may = 0;
       let survivor = -1, bestM = -1;
       let population = 0, heatSum = 0, spinSum = 0, bindSum = 0, maxKind = 0;
+      let gasMass = 0, anyHole = false;
       for (let k = 0; k < g.length; k++) {
         const s = slotOfId[g[k]];
         if (s < 0) continue;
@@ -1685,7 +1809,9 @@ export function createSim(opts = {}) {
         max += m * ax[s]; may += m * ay[s];
         population += pop[s]; heatSum += heat[s];
         spinSum += spin[s]; bindSum += bind[s];
-        if (kind[s] > maxKind) maxKind = kind[s];
+        if (kind[s] <= KIND.STAR && kind[s] > maxKind) maxKind = kind[s];
+        if (flags[s] & FLAG_GAS) gasMass += m;
+        if (kind[s] === KIND.BLACK_HOLE && !(flags[s] & FLAG_AGGREGATE)) anyHole = true;
         if (m > bestM) { bestM = m; survivor = g[k]; }
       }
       if (M <= 0 || survivor < 0) continue;
@@ -1739,7 +1865,34 @@ export function createSim(opts = {}) {
       ax[ss] = max / M; ay[ss] = may / M;
       pop[ss] = population;
       spin[ss] = L;
-      if (!wasAgg && kind[ss] < maxKind && maxKind < AGG_FIRST) kind[ss] = maxKind;
+      if (!wasAgg) {
+        // WHAT THE MERGED BODY IS. Gas and solid meeting: whichever there is
+        // more of wins. A rock falling into a cloud is a rock inside a cloud,
+        // still a cloud; a cloud falling onto a world is captured by it. On
+        // the ladder the highest rung present wins, and the mass then earns
+        // whatever sits above it. Past the ladder the survivor keeps what it
+        // was - a star that swallows a white dwarf is still a star - with one
+        // exception: a black hole in the group eats the rest from the inside,
+        // so the result is a black hole whichever body was heavier.
+        if (gasMass > M - gasMass) {
+          flags[ss] |= FLAG_GAS;
+          if (kind[ss] <= KIND.STAR) kind[ss] = KIND.DUST;
+        } else {
+          flags[ss] &= ~FLAG_GAS;
+          fate[ss] = FATE.NONE;
+        }
+        if (anyHole && kind[ss] !== KIND.BLACK_HOLE) {
+          if (stage[ss] !== STAGE.NONE) deathRec.delete(survivor);
+          kind[ss] = KIND.BLACK_HOLE; stage[ss] = STAGE.NONE; fate[ss] = FATE.NONE;
+          burn[ss] = 0; rscale[ss] = 1;
+          flags[ss] &= ~(FLAG_GAS | FLAG_EJECTED);
+          pushEvent({ type: EVENT.COLLAPSE, id: survivor, kind: KIND.BLACK_HOLE, step: stepCount });
+        } else if (!(flags[ss] & FLAG_GAS) && kind[ss] <= KIND.STAR && kind[ss] < maxKind) {
+          kind[ss] = maxKind;
+        }
+        // Gas that has gathered enough to ignite does so in evolve(), once it
+        // is old enough to have cooled; a merge only decides what this is now.
+      }
       flags[ss] |= FLAG_ALWAYS_ACTIVE;
 
       if (wasAgg) {
@@ -1793,6 +1946,227 @@ export function createSim(opts = {}) {
     }
     for (let k = 0; k < doomed.length; k++) removeById(doomed[k]);
     mergeLen = 0;
+  }
+
+  /* ====================================================================== *
+   * 5.10b Stellar evolution
+   *
+   * A star's mass decides its colour, its brightness and how long it lives;
+   * running out of fuel is what turns it into a giant, and its mass at death
+   * decides what it leaves behind. None of that is on the mass ladder, so it
+   * lives here, driven by the clock: one fixed step is one sixtieth of a
+   * second of play, and every lifetime in stellar.js is in seconds of play.
+   *
+   * The sequence for one star: STAR (burn climbs to 1 over its lifetime) ->
+   * GIANT_STAR (swells over the first third of the phase, burn climbs to 1
+   * again) -> a death stage chosen by mass (burn is now progress through the
+   * sequence; the shell is thrown at the stage's ejection point and the body
+   * shrinks toward its remnant) -> the remnant kind, or removal if nothing
+   * is left. A white dwarf fed past the Chandrasekhar mass detonates; a
+   * neutron star fed past its limit collapses quietly. Black holes only grow.
+   * ====================================================================== */
+
+  const SECONDS_PER_STEP = 1 / 60;
+  const TAU = 6.283185307179586;
+
+  /** A body's mass in solar masses, read through the ledger. */
+  function solarOf(i) {
+    return Stellar.solar(Math.log2(Math.max(mass[i], MASS_FLOOR)) + expMass);
+  }
+
+  function evolve() {
+    for (let i = 0; i < count; i++) {
+      const f = flags[i];
+      if (f & FLAG_AGGREGATE) continue;
+      if (f & FLAG_GAS) {
+        // Gas ages and cools. A cloud that is old enough to have cooled and
+        // heavy enough to ignite stops being gas and climbs the ladder - a
+        // second-generation star. A freshly thrown supernova shell is neither
+        // cold nor bound, however heavy its pieces, so it stays what it is.
+        burn[i] += SECONDS_PER_STEP;
+        if (burn[i] >= stellarP.gasCoolSeconds &&
+            Math.log2(Math.max(mass[i], MASS_FLOOR)) + expMass >= IGNITE_LOG2) {
+          flags[i] &= ~FLAG_GAS;
+          burn[i] = 0;
+          refreshDerived(i);
+          applyLadder(i);
+        } else if (burn[i] >= stellarP.gasLifeSeconds) {
+          // Gas that nothing has gathered thins into the void. The mass is
+          // accounted for on its own ledger - it is not lost, it has left.
+          dispersed += mass[i];
+          pushEvent({ type: EVENT.DISPERSE, id: idOfSlot[i], mass: magFromCode(mass[i], expMass), step: stepCount });
+          removeById(idOfSlot[i]);
+          i--;
+        }
+        continue;
+      }
+      const k = kind[i];
+      if (k < KIND.STAR) continue;
+      if (stage[i] !== STAGE.NONE) {
+        if (advanceDeath(i)) i--;   // the slot was vacated; whatever moved in needs its turn
+        continue;
+      }
+      if (k === KIND.STAR) {
+        burn[i] += SECONDS_PER_STEP / Stellar.lifeSeconds(solarOf(i), stellarP);
+        if (burn[i] >= 1) {
+          burn[i] = 0;
+          kind[i] = KIND.GIANT_STAR;
+          pushEvent({ type: EVENT.KIND_CHANGE, id: idOfSlot[i], from: KIND.STAR, kind: KIND.GIANT_STAR, step: stepCount });
+        }
+      } else if (k === KIND.GIANT_STAR) {
+        const M = solarOf(i);
+        burn[i] += SECONDS_PER_STEP / Stellar.giantSeconds(M, stellarP);
+        // Swell over the first third of the phase, then hold.
+        const u = Math.min(1, burn[i] * 3);
+        const e = u * u * (3 - 2 * u);
+        rscale[i] = 1 + (Stellar.swell(M, stellarP) - 1) * e;
+        refreshDerived(i);
+        if (burn[i] >= 1) beginDeath(i, FATE_OF_NAME[Stellar.fate(M, stellarP)]);
+      } else if (k === KIND.WHITE_DWARF) {
+        burn[i] += SECONDS_PER_STEP;
+        if (solarOf(i) > stellarP.chandrasekhar) beginDeath(i, FATE.DETONATION);
+      } else if (k === KIND.NEUTRON_STAR) {
+        burn[i] += SECONDS_PER_STEP;
+        if (solarOf(i) > stellarP.tov) beginDeath(i, FATE.QUIET);
+      } else if (k === KIND.BLACK_HOLE) {
+        burn[i] += SECONDS_PER_STEP;
+      }
+    }
+  }
+
+  /** What a body would keep of itself, as a share, if it died now by fate f. */
+  function keepShare(i, f) {
+    if (f === FATE.PAIR || f === FATE.DETONATION) return 0;
+    if (f === FATE.QUIET) return 1;
+    return Stellar.remnant(solarOf(i), FATE_NAME[f], stellarP).fraction;
+  }
+
+  function beginDeath(i, f) {
+    const id = idOfSlot[i];
+    stage[i] = STAGE_FOR_FATE[f];
+    fate[i] = f;
+    burn[i] = 0;
+    flags[i] &= ~FLAG_EJECTED;
+    // The radius this body starts from and the one it ends at, so the shrink
+    // is geometric between two facts rather than a guess.
+    const rk = REMNANT_OF_FATE[f];
+    const keep = Math.max(mass[i] * keepShare(i, f), MASS_FLOOR);
+    const r1 = rk < 0 ? RADIUS_FLOOR : codeRadius(keep, rk);
+    deathRec.set(id, { r0: radius[i], r1 });
+    pushEvent({
+      type: EVENT.DEATH, id, fate: f, stage: stage[i], kind: kind[i],
+      mass: magFromCode(mass[i], expMass), step: stepCount,
+    });
+  }
+
+  /**
+   * One step of a death sequence. Returns true when the body was removed
+   * (nothing left of it), so the caller can re-run the slot that moved in.
+   */
+  function advanceDeath(i) {
+    const st = stage[i];
+    const name = STAGE_NAME[st];
+    burn[i] += SECONDS_PER_STEP / Stellar.deathSeconds(name, stellarP);
+    const u = burn[i];
+    const id = idOfSlot[i];
+
+    if (!(flags[i] & FLAG_EJECTED) && u >= Stellar.ejectionAt(name)) {
+      flags[i] |= FLAG_EJECTED;
+      eject(i);
+    }
+
+    // Shrink toward the remnant, geometrically, once the sequence has reached
+    // its shrink point - the radii differ by orders of magnitude.
+    const from = SHRINK_FROM[st];
+    const rec = deathRec.get(id);
+    if (rec && u > from) {
+      const e = Math.min(1, (u - from) / Math.max(1e-6, 1 - from));
+      const ee = e * e * (3 - 2 * e);
+      const r = rec.r0 * Math.pow(Math.max(rec.r1, RADIUS_FLOOR) / Math.max(rec.r0, RADIUS_FLOOR), ee);
+      const base = codeRadius(mass[i], kind[i]);
+      rscale[i] = base > 0 ? r / base : 1;
+      refreshDerived(i);
+    }
+
+    if (u < 1) return false;
+    return finishDeath(i);
+  }
+
+  /** Throw the shell: the mass a dying star will not keep becomes gas. */
+  function eject(i) {
+    const f = fate[i];
+    const st = stage[i];
+    const n = EJECTA_COUNT[st];
+    const total = mass[i];
+    const thrown = total * (1 - keepShare(i, f));
+    if (n <= 0 || !(thrown > 0)) return;
+    const each = thrown / n;
+    const id = idOfSlot[i];
+    const R = radius[i];
+    const rEach = codeRadius(each, KIND.DUST) * GAS_PUFF;
+    // Outside the body, and on a ring wide enough that the pieces clear each
+    // other - otherwise the shell merges back into one lump on its first step.
+    const ring = Math.max(R * 1.08 + rEach, (n * 4.2 * rEach) / TAU);
+    // Escape speed at the surface (G = 1 in code units), scaled by how
+    // violently this kind of death throws its shell.
+    const vEsc = Math.sqrt(2 * total / Math.max(R, RADIUS_FLOOR));
+    const speed = vEsc * Stellar.ejectionSpeed(STAGE_NAME[st]);
+    const cx = px[i], cy = py[i], VX = vx[i], VY = vy[i];
+    const seed = hash2(id, stepCount);
+    const phase0 = unit(seed) * TAU;
+    // Not a necklace. Each piece leaves from its own spot on the ring, at
+    // its own radius and its own speed, so the shell is ragged the way a
+    // real one is; the spacing above is what keeps the ragged pieces from
+    // touching at birth.
+    for (let k = 0; k < n; k++) {
+      const a = phase0 + (k / n) * TAU + (unit(hash2(seed, k)) - 0.5) * (TAU / n) * 0.4;
+      const rr = ring * (0.92 + 0.55 * unit(hash2(seed ^ 0x27d4eb2f, k)));
+      const sp = speed * (0.7 + 0.6 * unit(hash2(seed ^ 0x5bd1e995, k)));
+      addBody({
+        x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr,
+        vx: VX + Math.cos(a) * sp, vy: VY + Math.sin(a) * sp,
+        mass: each, kind: KIND.DUST, gas: true, origin: st, protect: false,
+      });
+    }
+    // addBody may have grown the pool; `i` is a slot and stays valid.
+    mass[i] = Math.max(total - thrown, MASS_FLOOR);
+    // Keep the radius where it was at this instant; the shrink runs from here.
+    const base = codeRadius(mass[i], kind[i]);
+    rscale[i] = base > 0 ? R / base : 1;
+    refreshDerived(i);
+    bind[i] = selfBind(mass[i], radius[i]);
+    pushEvent({
+      type: EVENT.EJECT, id, fate: f, stage: st, n,
+      thrown: magFromCode(thrown, expMass), step: stepCount,
+    });
+  }
+
+  /** The sequence is over: become the remnant, or be gone. Returns true if removed. */
+  function finishDeath(i) {
+    const id = idOfSlot[i];
+    const f = fate[i];
+    const rk = REMNANT_OF_FATE[f];
+    deathRec.delete(id);
+    if (rk < 0) {
+      pushEvent({ type: EVENT.REMNANT, id, fate: f, kind: -1, step: stepCount });
+      // Whatever mass the floor kept is not worth a body.
+      removeById(id);
+      return true;
+    }
+    kind[i] = rk;
+    stage[i] = STAGE.NONE;
+    fate[i] = FATE.NONE;
+    burn[i] = 0;
+    rscale[i] = 1;
+    flags[i] &= ~FLAG_EJECTED;
+    flags[i] |= FLAG_ALWAYS_ACTIVE;
+    refreshDerived(i);
+    bind[i] = selfBind(mass[i], radius[i]);
+    pushEvent({ type: EVENT.REMNANT, id, fate: f, kind: rk, step: stepCount });
+    if (rk === KIND.BLACK_HOLE) {
+      pushEvent({ type: EVENT.COLLAPSE, id, kind: rk, fate: f, step: stepCount });
+    }
+    return false;
   }
 
   /* ====================================================================== *
@@ -1933,6 +2307,7 @@ export function createSim(opts = {}) {
     bind[ss] = bindSum + plummerPE(M, aggR[ss]);
     aggSigma[ss] = sigma;
     aggPhase[ss] = 0;
+    burn[ss] = 0; stage[ss] = STAGE.NONE; fate[ss] = FATE.NONE; rscale[ss] = 1;
     aggBorn[ss] = stepCount;
     aggSeed[ss] = hash2(survivorId, 0x51ed270b ^ stepCount);
     aggCensus.set(census, ss * KIND_COUNT);
@@ -2105,6 +2480,7 @@ export function createSim(opts = {}) {
       lastForce[s] = stepCount - (1 << MAX_FTIER);
       protectUntil[s] = 0;
       aggN[s] = 0; aggR[s] = 0; aggSigma[s] = 0; aggPhase[s] = 0;
+      burn[s] = 0; stage[s] = STAGE.NONE; fate[s] = FATE.NONE; rscale[s] = 1;
 
       // Assign a kind from the census.
       let kk = KIND.DUST;
@@ -2283,11 +2659,12 @@ export function createSim(opts = {}) {
     permF(mass); permF(radius); permF(eps2);
     permF(heat); permF(bind); permF(spin); permF(pop);
     permF(aggN); permF(aggR); permF(aggSigma); permF(aggPhase);
+    permF(burn); permF(rscale);
     const permU8 = (arr) => {
       for (let s = 0; s < count; s++) permU8Scratch[s] = arr[order[s]];
       arr.set(permU8Scratch.subarray(0, count));
     };
-    permU8(kind); permU8(flags); permU8(ftier);
+    permU8(kind); permU8(flags); permU8(ftier); permU8(stage); permU8(fate);
     const permI32 = (arr) => {
       for (let s = 0; s < count; s++) permI32Scratch[s] = arr[order[s]];
       arr.set(permI32Scratch.subarray(0, count));
@@ -2323,6 +2700,7 @@ export function createSim(opts = {}) {
     kick(DT * 0.5);
 
     resolveMerges();
+    evolve();
 
     // Level of detail, as a Schmitt trigger. Crossing the ceiling starts
     // condensing and it keeps going until the count is down to CONDENSE_TARGET,
@@ -2384,7 +2762,10 @@ export function createSim(opts = {}) {
     spin[s] = b.spin || 0;
     bind[s] = 0;
     kind[s] = b.kind === undefined ? KIND.DUST : b.kind;
-    flags[s] = FLAG_NONE;
+    flags[s] = b.gas ? FLAG_GAS : FLAG_NONE;
+    // For gas, `fate` records which death threw it - a supernova's shell is
+    // shocked and hot, a shed envelope or a collapse's puff is not.
+    burn[s] = b.burn || 0; stage[s] = STAGE.NONE; fate[s] = b.gas ? (b.origin | 0) : FATE.NONE; rscale[s] = 1;
     ftier[s] = 0;
     lastForce[s] = stepCount - (1 << MAX_FTIER);
     protectUntil[s] = (b.protect === false) ? 0 : stepCount + PROTECT_STEPS;
@@ -2511,6 +2892,10 @@ export function createSim(opts = {}) {
    */
   function getRenderView() {
     renderView.count = count;
+    // The ledger's mass exponent rides along so a consumer can read a body's
+    // absolute mass - and therefore what kind of star it is - without asking
+    // for stats() every frame.
+    renderView.expMass = expMass;
     return renderView;
   }
 
@@ -2554,6 +2939,9 @@ export function createSim(opts = {}) {
       mass: mass[i], massAbs: magFromCode(mass[i], expMass),
       radius: radius[i], kind: kind[i], kindName: KIND_NAME[kind[i]],
       heat: heat[i], spin: spin[i], pop: pop[i],
+      solar: Stellar.solar(Math.log2(Math.max(mass[i], MASS_FLOOR)) + expMass),
+      burn: burn[i], stage: stage[i], fate: fate[i], rscale: rscale[i],
+      isGas: (flags[i] & FLAG_GAS) !== 0,
       isAggregate: (flags[i] & FLAG_AGGREGATE) !== 0,
       population: (flags[i] & FLAG_AGGREGATE) ? aggN[i] : pop[i],
       aggRadius: aggR[i], aggSigma: aggSigma[i],
@@ -2732,6 +3120,7 @@ export function createSim(opts = {}) {
         expAngMom: (3 * expMass + expLen) >> 1,
       },
       simTime: magFromCode(codeTime, expTime),
+      dispersed: magFromCode(dispersed, expMass),
       extent: magFromCode(fieldExtent(), expLen),
       // Budget and health
       perf: {
@@ -2776,7 +3165,7 @@ export function createSim(opts = {}) {
       count, nextId, freeIds: freeIds.slice(),
       rngState: Array.from(rng.state),
       ledger: { expMass, expLen, expTime, codeTime, epochIndex },
-      stepCount, timeDebt, heatRadiated, lostMass, quarantined,
+      stepCount, timeDebt, heatRadiated, lostMass, quarantined, dispersed,
       softCap, theta, budgetMs, forceTiering,
       // The force-refresh schedule is state. Restoring without it produces a
       // simulation that is correct but not identical, and identical is the
@@ -2793,6 +3182,9 @@ export function createSim(opts = {}) {
       aggPhase: slice(aggPhase), aggBorn: slice(aggBorn), aggSeed: slice(aggSeed),
       aggCensus: Array.from(aggCensus.subarray(0, count * KIND_COUNT)),
       protectUntil: slice(protectUntil),
+      burn: slice(burn), stage: slice(stage), fate: slice(fate), rscale: slice(rscale),
+      deaths: Array.from(deathRec.entries()),
+      stellar: Object.assign({}, stellarP),
     };
   }
 
@@ -2807,6 +3199,7 @@ export function createSim(opts = {}) {
     codeTime = s.ledger.codeTime; epochIndex = s.ledger.epochIndex;
     stepCount = s.stepCount; timeDebt = s.timeDebt;
     heatRadiated = s.heatRadiated; lostMass = s.lostMass; quarantined = s.quarantined;
+    dispersed = s.dispersed || 0;
     softCap = s.softCap; theta = s.theta; budgetMs = s.budgetMs;
     forceTiering = s.forceTiering;
     accumulator = s.accumulator || 0;
@@ -2823,6 +3216,15 @@ export function createSim(opts = {}) {
     put(aggPhase, s.aggPhase); put(aggBorn, s.aggBorn); put(aggSeed, s.aggSeed);
     put(protectUntil, s.protectUntil);
     put(ftier, s.ftier); put(lastForce, s.lastForce);
+    // Older saves predate stellar evolution; every star in them simply starts
+    // its clock now.
+    if (s.burn) put(burn, s.burn); else burn.fill(0, 0, s.count);
+    if (s.stage) put(stage, s.stage); else stage.fill(0, 0, s.count);
+    if (s.fate) put(fate, s.fate); else fate.fill(0, 0, s.count);
+    if (s.rscale) put(rscale, s.rscale); else rscale.fill(1, 0, s.count);
+    deathRec.clear();
+    if (Array.isArray(s.deaths)) for (const [id, rec] of s.deaths) deathRec.set(id, rec);
+    if (s.stellar) stellarP = Object.assign({}, Stellar.DEFAULTS, s.stellar);
     for (let i = 0; i < s.count * KIND_COUNT; i++) aggCensus[i] = s.aggCensus[i];
     slotOfId.fill(-1);
     for (let i = 0; i < count; i++) {
@@ -2883,8 +3285,11 @@ export function createSim(opts = {}) {
     codeMassFromAbsolute,
     // Persistence and testing
     serialize, checksum, setOption,
+    // Stellar evolution
+    setStellar(P) { stellarP = Object.assign({}, Stellar.DEFAULTS, P || {}); },
+    getStellar() { return Object.assign({}, stellarP); },
     // Constants, re-exported for convenience at the call site
-    KIND, KIND_NAME, EVENT, EPOCHS, DT,
+    KIND, KIND_NAME, EVENT, EPOCHS, DT, STAGE, FATE, FATE_NAME,
     get count() { return count; },
     get stepCount() { return stepCount; },
   };

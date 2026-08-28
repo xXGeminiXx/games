@@ -226,12 +226,13 @@
  *
  * WHY THERE IS NO AUDIO PATH, AND WHAT REPLACES IT
  * -----------------------------------------------------------------------------
- * Nothing is ever conveyed by sound. Every event that a game would normally
- * punctuate audibly gets a redundant visual pair: a luminance transient AND a
- * geometric transient. A merge is a flash AND an expanding ring. A collapse is
- * a contracting ring AND a brief tonal inversion of the surrounding field. An
- * unlock is a camera pull-back AND the magnitude column scrolling AND the
- * stratum inscription changing. And because an off-screen event would otherwise
+ * Nothing is ever conveyed by sound. Every event that matters gets a visual
+ * that cannot be missed, and events that do not matter get nothing at all:
+ * two rocks touching are silent in every sense, a star swallowing something
+ * flares, a supernova is a flash AND a front that crosses the field, and a
+ * direct collapse is a shadow spreading from the core of the star to its
+ * limb, a halo, and then nothing. An unlock is a camera pull-back AND the
+ * magnitude column scrolling AND the stratum inscription changing. And because an off-screen event would otherwise
  * be silent in every sense, events outside the viewport raise a directional arc
  * on the screen edge that points at them. See Effects.edgePulse.
  */
@@ -239,6 +240,8 @@
 // =============================================================================
 // CONFIG - every tunable, in one place, so the look can be argued with.
 // =============================================================================
+
+import { look as deathLook } from './deaths.js';
 
 export const CONFIG = {
   // --- frame budget and quality -------------------------------------------
@@ -310,7 +313,9 @@ export const CONFIG = {
   exposureTau: 1.35,          // s. slow enough to feel like an eye, not a filter
   exposureMinEv: -6.5,
   exposureMaxEv: 5.5,
-  exposureHighlight: 0.86,    // where the brightest ~1.5% of the FINAL image should sit
+  exposureHighlight: 0.74,    // where the brightest ~1.5% of the FINAL image should sit.
+                              // Was 0.86: with bloom on top, a lone red giant
+                              // clipped to a white disc and lost its colour.
   exposureAverage: 0.075,     // secondary cap on mean frame luminance
 
   // --- vacuum field ---------------------------------------------------------
@@ -655,8 +660,16 @@ class Atlas {
         // rules that make an emitter look like an emitter - a white-hot centre,
         // a bleached limb - are exactly the rules that make lit rock look like
         // a lightbulb when they are applied to it.
-        const emit = emissionAt(bbTemperature(lutIndex));
-        row.push(this.makeStamp(PROFILES[p], bbR[lutIndex], bbG[lutIndex], bbB[lutIndex], emit));
+        const T = bbTemperature(lutIndex);
+        const emit = emissionAt(T);
+        // HOW FAR AN EMITTER BLEACHES TOWARD WHITE depends on how hot it is,
+        // not only on whether it glows. A blue star's core saturates to white
+        // on any display; a red giant does not - it is red across its whole
+        // face, and a giant drawn with a white-hot centre reads as a yellow
+        // star that happens to be large. So the bleach ramps in between
+        // three and eight thousand kelvin and a cool emitter keeps its colour.
+        const bleach = emit * lerp(0.12, 1, smoothstep(3000, 8000, T));
+        row.push(this.makeStamp(PROFILES[p], bbR[lutIndex], bbG[lutIndex], bbB[lutIndex], bleach));
       }
       this.stamps.push(row);
     }
@@ -1493,6 +1506,9 @@ class VacuumField {
 // the whole viewport cannot.
 
 const FX_NONE = 0, FX_FLASH = 1, FX_RING = 2, FX_IMPLODE = 3, FX_CONDENSE = 4, FX_EDGE = 5;
+const FX_SHELL = 6, FX_NEBULA = 7;
+/** Most dying stars whose dark cores can be cut out of the field in one frame. */
+const MAX_PUNCH = 48;
 
 /**
  * A shock front: two concentric strokes, a thin bright edge over a wide dim
@@ -1674,6 +1690,49 @@ class Effects {
           const s = this.atlas.stamp(PROF_HALO, T);
           ctx.globalAlpha = sat(a);
           ctx.drawImage(s, this.x[i] - r, this.y[i] - r, r * 2, r * 2);
+          break;
+        }
+        case FX_SHELL: {
+          // A supernova remnant. The front is thin and it DECELERATES - free
+          // expansion first, then it slows as it sweeps the field up - and
+          // behind it hang filaments in the two colours a remnant glows in:
+          // oxygen teal and hydrogen pink. Ten seconds and it has thinned to
+          // nothing, which is quick, but the field was not going to wait.
+          const r = lerp(this.r0[i], this.r1[i], Math.pow(u, 0.55));
+          const a = this.amp[i] * Math.pow(1 - u, 1.6) * motion;
+          if (a < 0.004 || r < 1) break;
+          strokeFront(ctx, this.x[i], this.y[i], r, a * 0.9, motion);
+          const seed = (this.ang[i] * 1000) | 0;
+          ctx.lineWidth = clamp(1.2 + r * 0.008, 1.2, 4);
+          for (let q = 0; q < 7; q++) {
+            const a0 = TAU * hash3(q, seed, 101);
+            const span = 0.35 + hash3(q, seed, 202) * 0.9;
+            const rr = r * (0.55 + hash3(q, seed, 303) * 0.4);
+            ctx.strokeStyle = hash3(q, seed, 404) > 0.5 ? 'rgba(110,225,205,1)' : 'rgba(255,128,150,1)';
+            ctx.globalAlpha = sat(a * 0.55 * (0.5 + hash3(q, seed, 505) * 0.5));
+            ctx.beginPath(); ctx.arc(this.x[i], this.y[i], rr, a0, a0 + span); ctx.stroke();
+          }
+          break;
+        }
+        case FX_NEBULA: {
+          // A planetary nebula: a thick, soft shell, slow, teal within and
+          // pink at the rim, thinning as it grows. Gentle on purpose - this is
+          // a star's envelope drifting off, not an explosion.
+          const r = lerp(this.r0[i], this.r1[i], Math.pow(u, 0.7));
+          const a = this.amp[i] * Math.pow(1 - u, 1.1) * (0.25 + 0.75 * Math.min(1, u * 6)) * motion;
+          if (a < 0.004 || r < 2) break;
+          const g = ctx.createRadialGradient(this.x[i], this.y[i], r * 0.3, this.x[i], this.y[i], r * 1.15);
+          g.addColorStop(0, `rgba(90,210,190,${(a * 0.25).toFixed(3)})`);
+          g.addColorStop(0.5, `rgba(90,210,190,${(a * 0.7).toFixed(3)})`);
+          g.addColorStop(0.82, `rgba(255,140,170,${(a * 0.65).toFixed(3)})`);
+          g.addColorStop(1, 'rgba(255,140,170,0)');
+          ctx.fillStyle = g;
+          ctx.globalAlpha = 1;
+          ctx.beginPath(); ctx.arc(this.x[i], this.y[i], r * 1.15, 0, TAU); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,150,180,1)';
+          ctx.globalAlpha = sat(a * 0.45);
+          ctx.lineWidth = clamp(r * 0.05, 1, 5);
+          ctx.beginPath(); ctx.arc(this.x[i], this.y[i], r, 0, TAU); ctx.stroke();
           break;
         }
         case FX_EDGE: {
@@ -2300,6 +2359,10 @@ class Renderer {
     this.field = new VacuumField();
     this.fx = new Effects(this.atlas);
     this.holes = new BlackHoles(this.atlas);
+    // The dark cores of dying stars, collected by drawBodies and cut out of
+    // the composite the way black-hole shadows are.
+    this.punchX = new Float32Array(MAX_PUNCH); this.punchY = new Float32Array(MAX_PUNCH);
+    this.punchR = new Float32Array(MAX_PUNCH); this.punchN = 0;
     this.transition = new Transition();
     this.hud = new Hud();
 
@@ -2327,7 +2390,6 @@ class Renderer {
     this.lastLogPPM = null;
     this.lastPanX = 0; this.lastPanY = 0;
     this.motion = 1;            // scaled down under prefers-reduced-motion
-    this.inversion = null;
     this.stats_ = { fps: 0, ms: 0, discs: 0, aggregates: 0, tracers: 0, tier: 0, ev: 0 };
     this.renderedX = new Float32Array(CONFIG.maxDiscs);
     this.renderedY = new Float32Array(CONFIG.maxDiscs);
@@ -2543,29 +2605,61 @@ class Renderer {
         break;
       }
       case 'merge': {
-        const r = clamp((ev.r || 0) * k, 2, 260);
+        // Almost every merge is two cold things touching, and two rocks make
+        // no light when they meet - at most a little debris, and none at all
+        // if the thing is too small to see. A merge that involves a star
+        // releases real energy: a luminous red nova, brief and orange, sized
+        // by how much fell in. That is the only merge that earns a flash.
+        const r = clamp((ev.r || 0) * k, 0, 260);
         const e = clamp(ev.energy === undefined ? 1 : ev.energy, 0.2, 4);
-        this.fx.spawn(FX_FLASH, sx, sy, r * 1.4, r * 5.2, 0.34, ev.T || 9000, 0.95 * e, 0);
-        this.fx.spawn(FX_RING, sx, sy, Math.max(r * 1.2, 4),
-          Math.min(Math.max(r * 16, 90), this.diag * 0.75), 0.95, 0, 0.55 * e, 0);
-        this.fx.ejecta(sx, sy, clamp(Math.round(10 * e), 6, 34), 60 + r * 5, ev.T || 6000);
+        if (ev.hot) {
+          const rr = Math.max(r, 2);
+          this.fx.spawn(FX_FLASH, sx, sy, rr * 1.2, rr * 2.6, 0.55, ev.T || 4200, 0.45 * e, 0);
+          this.fx.ejecta(sx, sy, clamp(Math.round(4 * e), 3, 14), 40 + r * 3, ev.T || 4200);
+        } else if (r >= 2.5) {
+          this.fx.ejecta(sx, sy, clamp(Math.round(3 * e), 2, 8), 24 + r * 2, 1100);
+        }
         break;
       }
-      case 'collapse': {
-        const r0 = clamp((ev.r0 || 0) * k, 3, 400);
-        const r1 = clamp((ev.r1 || 0) * k, 0.5, r0);
-        this.fx.spawn(FX_IMPLODE, sx, sy, r0 * 1.6, r1, 0.55, 0, 0.9, 0);
-        this.fx.spawn(FX_FLASH, sx, sy, r1 * 2, r0 * 3.4, 0.30, 30000, 1.25, 0);
-        this.fx.spawn(FX_RING, sx, sy, r0,
-          Math.min(Math.max(r0 * 22, 220), this.diag * 1.05), 1.5, 0, 0.7, 0);
-        this.fx.ejecta(sx, sy, 28, 130 + r0 * 6, 14000);
-        // Collapse also inverts the surrounding field for a beat. See
-        // drawInversion: it is the loudest thing the renderer can say without
-        // a sound, and it is reserved for the moment a thing stops being made
-        // of matter.
-        this.inversion = { x: sx, y: sy, r: Math.max(r0 * 8, 180), t: 0, life: 0.34 };
+      case 'ignite': {
+        // First light. A soft pulse that reaches a few radii and is gone; the
+        // star's own steady glow is the thing worth looking at after that.
+        const r = clamp((ev.r || 0) * k, 2, 200);
+        this.fx.spawn(FX_FLASH, sx, sy, r * 1.1, r * 3.2, 1.1, ev.T || 4000, 0.5, 0);
         break;
       }
+      case 'supernova': {
+        // The bounce: the one flash in the game that is earned, then a front
+        // thrown hard that decelerates and leaves filaments behind it.
+        const r = clamp((ev.r || 0) * k, 3, 400);
+        this.fx.spawn(FX_FLASH, sx, sy, r * 1.5, r * 5, 0.9, 24000, 1.6, 0);
+        this.fx.spawn(FX_SHELL, sx, sy, r * 1.1,
+          Math.min(Math.max(r * 9, 160), this.diag * 0.42), 9.0, 12000, 0.9, hash3(sx | 0, sy | 0, 17));
+        this.fx.ejecta(sx, sy, 40, 120 + r * 6, 12000);
+        break;
+      }
+      case 'nebula': {
+        // The envelope lifts off: slow, soft, and in the colours a nebula has.
+        const r = clamp((ev.r || 0) * k, 3, 400);
+        this.fx.spawn(FX_NEBULA, sx, sy, r * 1.05,
+          Math.min(Math.max(r * 5, 110), this.diag * 0.3), 14.0, 9000, 0.95, hash3(sx | 0, sy | 0, 29));
+        break;
+      }
+      case 'detonation': {
+        // A white dwarf past its limit: everything, at once, and nothing left.
+        const r = clamp((ev.r || 0) * k, 2, 300);
+        this.fx.spawn(FX_FLASH, sx, sy, r * 2, r * 8, 0.7, 22000, 1.5, 0);
+        this.fx.spawn(FX_SHELL, sx, sy, r * 1.2,
+          Math.min(Math.max(r * 12, 200), this.diag * 0.42), 5.0, 16000, 0.8, hash3(sx | 0, sy | 0, 41));
+        this.fx.ejecta(sx, sy, 30, 150 + r * 6, 16000);
+        break;
+      }
+      case 'collapse':
+        // Nothing, on purpose. A direct collapse is drawn on the body itself
+        // as the shadow spreads from its core (drawBodies and deaths.js); no
+        // ring, no burst, no inversion. All this event earns is the edge cue
+        // below, for a collapse that happens off screen.
+        break;
       case 'shock':
         this.fx.spawn(FX_RING, sx, sy, clamp((ev.r || 1) * k, 2, 200),
           Math.min(Math.max((ev.r || 1) * k * 18, 160), this.diag), 1.2, 0, 0.6, 0);
@@ -2582,7 +2676,9 @@ class Renderer {
     // Off-screen events get an edge arc. Without a sound channel this is the
     // only way a player can learn that something happened where they are not
     // looking, and it is deliberately the same colour as the event itself.
-    if (!onScreen && ev.type !== 'stratum') {
+    const loud = ev.type === 'supernova' || ev.type === 'collapse' || ev.type === 'nebula' ||
+      ev.type === 'detonation' || ev.type === 'ignite' || ev.type === 'birth' || (ev.type === 'merge' && ev.hot);
+    if (!onScreen && loud) {
       const cx = this.w / 2, cy = this.h / 2;
       const ang = Math.atan2(sy - cy, sx - cx);
       const rr = Math.min(this.w, this.h) * 0.47;
@@ -2760,10 +2856,7 @@ class Renderer {
 
     this.fx.step(dt, dPanX, dPanY, zoomRatio, w / 2, h / 2);
     this.transition.step(dt);
-    if (this.inversion) {
-      this.inversion.t += dt;
-      if (this.inversion.t >= this.inversion.life) this.inversion = null;
-    }
+    this.punchN = 0;
 
     // --- 1. vacuum ---------------------------------------------------------
     this.field.draw(ctx, this.cam, w, h, dPanX, dPanY, this.exposure, this.pointer, dt);
@@ -2808,6 +2901,9 @@ class Renderer {
     this.fx.draw(L, this.exposure, this.motion);
     L.globalCompositeOperation = 'source-over';
     L.globalAlpha = 1;
+    // The dark cores of dying stars are cut out of the field behind them
+    // before any light lands, the way a black hole's shadow is.
+    this.punchDying(ctx);
 
     // --- 3. composite ------------------------------------------------------
     ctx.globalCompositeOperation = 'lighter';
@@ -2820,9 +2916,9 @@ class Renderer {
     // the compositor.
     this.exposure.measure(this.light);
     this.holes.sealShadows(ctx);
+    this.sealDying(ctx);
 
     // --- 4. transients over the composite ---------------------------------
-    this.drawInversion(ctx, w, h);
     this.transition.draw(ctx, w, h, this.motion);
     this.drawVignette(ctx, w, h);
 
@@ -3000,6 +3096,9 @@ class Renderer {
       const n = Math.min(bs.length, CONFIG.frameSampleCap);
       for (let i = 0; i < n; i++) {
         const b = bs[i];
+        // Thrown gas is not the subject. A shell flying off does not
+        // drag the frame out after it; the star it left is what matters.
+        if (b.gas) continue;
         const p = this.proj.of(b.frame);
         if (!p) continue;
         const r = (b.r || 0) * CONFIG.frameBodyHaloMul * p.k;
@@ -3376,8 +3475,10 @@ class Renderer {
       // matter gets a thin rim and an emitter keeps its corona, and the same
       // emission share decides both.
       const emitT = emissionAt(b.T || kindTemperature(b.kind));
+      // Gas is a cloud: its light reaches further and has no surface.
+      const isGas = !!b.gas;
       const haloReach = lerp(CONFIG.haloMul, CONFIG.haloResolvedMul, resolved) *
-        lerp(CONFIG.coronaReachCold / CONFIG.haloResolvedMul, 1, emitT);
+        lerp(CONFIG.coronaReachCold / CONFIG.haloResolvedMul, 1, emitT) * (isGas ? 1.7 : 1);
       const halo = Math.max(core * haloReach, CONFIG.haloMinPx);
       if (sx + halo < 0 || sx - halo > w || sy + halo < 0 || sy - halo > h) continue;
 
@@ -3386,9 +3487,16 @@ class Renderer {
       const flux = R < CONFIG.discPx
         ? Math.max(shrink * shrink, CONFIG.pointFloorAlpha)
         : 1;
-      const opacity = (b.a === undefined ? 1 : sat(b.a));
+      let opacity = (b.a === undefined ? 1 : sat(b.a));
       const lumMul = b.lum === undefined ? kindLuminosity(b.kind) : b.lum;
-      const T = b.T || kindTemperature(b.kind);
+      let T = b.T || kindTemperature(b.kind);
+      // A body mid-death is drawn by the choreography in deaths.js: what is
+      // dark, what is rim, and how much of its ordinary light is left.
+      let dying = null, lightMul = 1;
+      if (b.stage) {
+        dying = deathLook(b.stage, b.phase || 0, T);
+        T = dying.T; lightMul = dying.light; opacity *= dying.alpha;
+      }
 
       // HOW MUCH OF THIS THING IS A GLOW, AND HOW MUCH OF IT IS A SURFACE.
       //
@@ -3407,7 +3515,11 @@ class Renderer {
       // The core glow only recedes once the body has an EDGE to read instead.
       // An unresolved cold speck still needs its core stamp or it is a dead
       // pixel, which is the whole reason the stamp exists.
-      const glow = lerp(1, lerp(CONFIG.coreGlowCold, 1, emit), resolved);
+      // A cool emitter - a red giant, a brown dwarf - keeps its colour by
+      // putting less of its light into the additive central glow, which is
+      // what drives a face to white when it stacks on the disc.
+      const hot = smoothstep(3000, 8000, T);
+      const glow = lerp(1, lerp(CONFIG.coreGlowCold, 1, emit), resolved) * lerp(0.28, 1, hot);
       const corona = lerp(CONFIG.coronaCold, 1, emit);
 
       // ONE LIGHT BUDGET, SPLIT THREE WAYS. Every term below is a share of it,
@@ -3417,14 +3529,16 @@ class Renderer {
       // colour the whole change exists to show, and a rock beside a star came
       // out as bright as the star, which erases the one moment in the run where
       // something starts producing its own light.
-      const light = flux * opacity * lumMul * gain;
-      const aCore = sat(light * (wantHalo ? 0.95 : 1.30) * glow);
-      const aHalo = wantHalo ? sat(light * 0.42 * corona) : 0;
+      const light = flux * opacity * lumMul * gain * lightMul;
+      // Gas is all halo: a soft wash of light with no centre and no edge.
+      const aCore = sat(light * (wantHalo ? 0.95 : 1.30) * glow * (isGas ? (wantHalo ? 0.12 : 0.5) : 1));
+      const aHalo = wantHalo ? sat(light * 0.42 * corona * (isGas ? 2.0 : 1)) : 0;
       // The lit sphere. Cold matter puts nearly all of its light here and an
       // emitter puts most of its light in the glow instead, which is the whole
       // difference between a rock and a star drawn with the same three stamps.
-      const aDisc = sat(light * resolved * lerp(CONFIG.surfaceCold, 0.5, emit));
-      if (aCore < 0.006 && aHalo < 0.006 && aDisc < 0.006) continue;
+      // Gas has no sphere to light.
+      const aDisc = isGas ? 0 : sat(light * resolved * lerp(CONFIG.surfaceCold, 0.5, emit));
+      if (aCore < 0.006 && aHalo < 0.006 && aDisc < 0.006 && !dying) continue;
 
       if (drawn >= cap) break;
 
@@ -3481,6 +3595,10 @@ class Renderer {
         }
       }
 
+      // What a death looks like on the body, and what a pulsar looks like.
+      if (dying) this.drawDeath(L, sx, sy, core, dying, gain);
+      if (b.kind === 'neutron' && !dying) this.drawBeams(L, sx, sy, core, b, gain);
+
       // The secondary image. The single most legible tell of a gravity well.
       if (ghostA > 0.02) {
         const gr = core * clamp(ghostA * 2.2, 0.4, 1.6);
@@ -3502,6 +3620,101 @@ class Renderer {
     }
 
     L.globalAlpha = 1;
+  }
+
+  /**
+   * A DYING STAR, on the body itself. deaths.js says what is dark, what is
+   * rim and how bright; this puts it on the light layer. The dark core is cut
+   * OUT of the body's own light here (destination-out on the light layer) and
+   * queued to be cut out of the field behind it at composite time, so the
+   * shadow spreading from the core is a real absence and not a dark paint -
+   * exactly the treatment a black hole's shadow gets, because that is what it
+   * is becoming. The rim is the last light, stroked thin so it reads as a
+   * halo at any size.
+   */
+  drawDeath(L, sx, sy, R, d, gain) {
+    if (d.dark > 0.01) {
+      const rd = R * d.dark;
+      L.globalCompositeOperation = 'destination-out';
+      L.globalAlpha = 1;
+      L.fillStyle = '#000';
+      L.beginPath(); L.arc(sx, sy, rd, 0, TAU); L.fill();
+      L.globalCompositeOperation = 'lighter';
+      if (d.punch && this.punchN < MAX_PUNCH) {
+        const n = this.punchN++;
+        this.punchX[n] = sx; this.punchY[n] = sy; this.punchR[n] = rd;
+      }
+    }
+    if (d.rim > 0 && d.rimAlpha > 0.004) {
+      const rr = Math.max(R * d.rim, 0.8);
+      const lw = Math.max(R * d.rimWidth, 1.2);
+      L.strokeStyle = blackbody(d.rimT, 1);
+      L.lineCap = 'butt';
+      // A soft seat under a hairline: the same three-stroke trick the photon
+      // ring uses, so a bright thin thing has bloom without a filter.
+      L.lineWidth = lw * 3.2;
+      L.globalAlpha = sat(d.rimAlpha * gain * 0.22);
+      L.beginPath(); L.arc(sx, sy, rr, 0, TAU); L.stroke();
+      L.lineWidth = lw;
+      L.globalAlpha = sat(d.rimAlpha * gain);
+      L.beginPath(); L.arc(sx, sy, rr, 0, TAU); L.stroke();
+    }
+    if (d.boost > 0) {
+      const s = this.atlas.stamp(PROF_CORE, Math.max(d.T, 20000));
+      const r = R * (1 + d.boost * 0.6);
+      L.globalAlpha = sat(d.boost * 0.4 * gain);
+      L.drawImage(s, sx - r, sy - r, r * 2, r * 2);
+    }
+    L.globalAlpha = 1;
+  }
+
+  /** A pulsar: two opposite beams sweeping with the spin. Faint, thin, pale. */
+  drawBeams(L, sx, sy, R, b, gain) {
+    const len = clamp(R * 9, 7, 46);
+    const seed = (b.seed === undefined ? 0 : b.seed) | 0;
+    const dir = (b.spin === undefined || b.spin >= 0) ? 1 : -1;
+    const ang = this.tSec * dir * (1.9 + (seed % 7) * 0.35) + (seed % 360) * 0.0175;
+    L.strokeStyle = 'rgba(190,220,255,1)';
+    L.lineWidth = 1.1;
+    L.globalAlpha = sat(0.32 * gain);
+    for (let k = 0; k < 2; k++) {
+      const a = ang + k * Math.PI;
+      L.beginPath(); L.moveTo(sx, sy); L.lineTo(sx + Math.cos(a) * len, sy + Math.sin(a) * len); L.stroke();
+    }
+    L.globalAlpha = 1;
+  }
+
+  /** Cut the dark cores of dying stars out of the field, before any light lands. */
+  punchDying(ctx) {
+    const n = this.punchN;
+    if (!n) return;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000';
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.arc(this.punchX[i], this.punchY[i], this.punchR[i], 0, TAU); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#000';
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.arc(this.punchX[i], this.punchY[i], this.punchR[i], 0, TAU); ctx.fill();
+    }
+  }
+
+  /** Re-blacken them after bloom, which would otherwise bleed light back in. */
+  sealDying(ctx) {
+    const n = this.punchN;
+    if (!n) return;
+    for (let i = 0; i < n; i++) {
+      const r = this.punchR[i];
+      if (r < 1.5) continue;
+      const x = this.punchX[i], y = this.punchY[i];
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 0.97);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.82, 'rgba(0,0,0,1)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * 0.97, 0, TAU); ctx.fill();
+    }
   }
 
   /**
@@ -3608,11 +3821,13 @@ class Renderer {
 
     for (let i = 0; i < n; i++) {
       const bi = bs[i];
+      if (bi.gas) continue;   // a cloud is not a thing to tie a line to
       const pi = this.proj.of(bi.frame);
       if (!pi) continue;
       const mi = bi.m || 1;
       for (let j = i + 1; j < n; j++) {
         const bj = bs[j];
+        if (bj.gas) continue;
         const pj = this.proj.of(bj.frame);
         if (!pj) continue;
         const ax = pi.ox + (bi.x || 0) * pi.k, ay = pi.oy + (bi.y || 0) * pi.k;
@@ -3781,7 +3996,10 @@ class Renderer {
     a.filter = 'none';
     if (this.tier >= 2) return;
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.55;
+    // Bloom is a garnish, not a light source. At 0.55 it was doubling every
+    // emitter's brightness on top of an aperture already driving it near
+    // clipping, which is most of why everything read as a white ball.
+    ctx.globalAlpha = 0.30;
     ctx.drawImage(this.bloomA, 0, 0, w, h);
 
     if (this.tier < 1) {
@@ -3792,36 +4010,10 @@ class Renderer {
       try { b.filter = 'blur(4px)'; } catch (_) { /* fine */ }
       b.drawImage(this.bloomA, 0, 0, bw, bh);
       b.filter = 'none';
-      ctx.globalAlpha = 0.42;
+      ctx.globalAlpha = 0.20;
       ctx.drawImage(this.bloomB, 0, 0, w, h);
     }
     ctx.globalAlpha = 1;
-  }
-
-  /**
-   * The collapse inversion. For about a third of a second after something
-   * collapses, the region around it is composited with `difference`, which
-   * briefly renders the local field as a negative. It is jarring, it is
-   * completely unmistakable, and it is reserved for the one class of event
-   * where the rules of the object changed. With no audio channel available,
-   * this is the loudest thing the renderer can say.
-   */
-  drawInversion(ctx, w, h) {
-    const inv = this.inversion;
-    if (!inv) return;
-    const u = sat(inv.t / inv.life);
-    const a = Math.pow(1 - u, 1.4) * 0.85 * this.motion;
-    if (a < 0.02) return;
-    const r = inv.r * (0.4 + u * 1.5);
-    ctx.save();
-    ctx.globalCompositeOperation = 'difference';
-    const g = ctx.createRadialGradient(inv.x, inv.y, 0, inv.x, inv.y, r);
-    g.addColorStop(0, `rgba(255,255,255,${(a * 0.55).toFixed(3)})`);
-    g.addColorStop(0.65, `rgba(190,214,255,${(a * 0.22).toFixed(3)})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(inv.x - r, inv.y - r, r * 2, r * 2);
-    ctx.restore();
   }
 
   /**
@@ -3860,12 +4052,14 @@ function radiusFromMass(m) {
 // aperture exposes for the brightest thing on screen and a flat table means
 // nothing in the field ever stands out from anything else.
 const KIND_T = {
-  grain: 80, dust: 120, rock: 310, planet: 1250, giant: 900,
-  star: 5800, remnant: 16000, neutron: 40000, blackhole: 22000, node: 4200,
+  grain: 80, dust: 120, rock: 310, planet: 1250, giant: 900, browndwarf: 1500,
+  star: 5800, redgiant: 3700, whitedwarf: 30000, remnant: 16000, neutron: 40000,
+  blackhole: 22000, node: 4200,
 };
 const KIND_L = {
-  grain: 0.05, dust: 0.07, rock: 0.13, planet: 0.22, giant: 0.30,
-  star: 1.0, remnant: 0.95, neutron: 1.25, blackhole: 1.0, node: 0.7,
+  grain: 0.05, dust: 0.07, rock: 0.13, planet: 0.22, giant: 0.30, browndwarf: 0.12,
+  star: 1.0, redgiant: 1.4, whitedwarf: 0.6, remnant: 0.95, neutron: 1.25,
+  blackhole: 1.0, node: 0.7,
 };
 function kindTemperature(kind) { return KIND_T[kind] || 1600; }
 function kindLuminosity(kind) { return KIND_L[kind] === undefined ? 0.55 : KIND_L[kind]; }
@@ -3995,7 +4189,7 @@ export default createRenderer;
 /** Default map from an integer kind code to the kind strings this file draws. */
 const DEFAULT_KIND_MAP = [
   'dust', 'rock', 'rock', 'planet', 'giant',
-  'star', 'star', 'giant', 'remnant', 'neutron',
+  'browndwarf', 'star', 'redgiant', 'whitedwarf', 'neutron',
   'blackhole',
 ];
 /** Default map for kind codes at or above the aggregate threshold. */
@@ -4031,6 +4225,7 @@ export function createSimAdapter(options = {}) {
   const aggMap = options.aggMap || DEFAULT_AGG_MAP;
   const tempOf = options.temperature || null;
   const lumOf = options.luminosity || null;
+  const flagGas = options.flagGas || 0;
 
   const bodyPool = [];
   const aggPool = [];
@@ -4048,6 +4243,8 @@ export function createSimAdapter(options = {}) {
       const rad = view.radius, mass = view.mass, kind = view.kind, flags = view.flags;
       const ids = view.idOfSlot, heat = view.heat, spin = view.spin;
       const vx = view.vx, vy = view.vy;
+      const stageA = view.stage, burnA = view.burn, fateA = view.fate;
+      const expMass = view.expMass || 0;
       const aggN = view.aggN, aggR = view.aggR, aggSig = view.aggSigma, aggPh = view.aggPhase;
 
       for (let s = 0; s < n; s++) {
@@ -4073,7 +4270,8 @@ export function createSimAdapter(options = {}) {
           a.kind = aggMap[k - aggFirst] || 'cluster';
           a.lum = a.n;
           a.seed = (ids ? ids[i] : i) | 0;
-          if (tempOf) a.T = tempOf(heat ? heat[i] : 0, k);
+          a.expMass = expMass;
+          if (tempOf) a.T = tempOf(heat ? heat[i] : 0, k, a);
           else a.T = undefined;
         } else {
           let b = bodyPool[nb];
@@ -4093,9 +4291,16 @@ export function createSimAdapter(options = {}) {
           b.kind = kindMap[k] || 'rock';
           b.spin = spin ? spin[i] : 0;
           b.seed = (ids ? ids[i] : i) | 0;
+          // What stage of its life it is in, for the host's colour and
+          // brightness laws and for the death choreography.
+          b.stage = stageA ? stageA[i] : 0;
+          b.phase = burnA ? burnA[i] : 0;
+          b.fate = fateA ? fateA[i] : 0;
+          b.gas = flagGas ? (((flags ? flags[i] : 0) & flagGas) !== 0) : false;
+          b.expMass = expMass;
           b.a = 1;
-          b.T = tempOf ? tempOf(heat ? heat[i] : 0, k) : undefined;
-          b.lum = lumOf ? lumOf(heat ? heat[i] : 0, k) : undefined;
+          b.T = tempOf ? tempOf(heat ? heat[i] : 0, k, b) : undefined;
+          b.lum = lumOf ? lumOf(heat ? heat[i] : 0, k, b) : undefined;
         }
       }
     }
