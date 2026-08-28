@@ -33,7 +33,7 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   identity: {
     name: 'Barrow',
-    tagline: 'the dead dig. you keep the books.',
+    tagline: 'The dead dig. You keep the books.',
 
     // Prefixes every browser storage key this game writes. Changing it starts
     // every player from a clean slate; keeping it preserves saves across a
@@ -46,59 +46,61 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   text: {
     stats: {
-      coin:   'coin',
-      bones:  'bones',
-      horde:  'horde',
-      depth:  'depth',
-      income: 'coin/s',
-      rem:    'remembered',
+      coin:   'Coin',
+      bones:  'Bones',
+      horde:  'Horde',
+      depth:  'Depth',
+      income: 'Coin/s',
+      rem:    'Remembered',
     },
 
-    dig:        'dig',
-    sell:       'sell',
-    sellLot:    'lot',
-    sellLotTip: 'sell about what the market will take before it buckles',
-    sellAll:    'all',
-    buy:        'buy',
-    buyTip:     'buy back a tenth of what the market holds, at the going price',
-    raise:      'raise',
-    raiseMax:   'max',
+    dig:        'Dig',
+    sell:       'Sell',
+    sellLot:    'Lot',
+    sellLotTip: 'Sell about what the market will take before it buckles',
+    sellAll:    'All',
+    buy:        'Buy',
+    buyTip:     'Buy back a tenth of what the market holds, at the going price',
+    raise:      'Raise',
+    raiseMax:   'Max',
     weightMore: '+',
     weightLess: '-',
-    face:       'the face',
-    faceLine:   'the floor of the deepest cut. dig it through and the next layer opens.',
-    export:     'export',
-    import:     'import',
-    reset:      'start over',
-    resetSure:  'sure? everything goes',
-    bought:     'held',
-    take:       'take it',
-    pass:       'pass',
-    unknownSeam:'unread',
+    face:       'The face',
+    faceLine:   'The floor of the deepest cut. Dig it through and the next layer opens.',
+    export:     'Export',
+    import:     'Import',
+    reset:      'Start over',
+    resetSure:  'Sure? Everything goes',
+    bought:     'Held',
+    take:       'Take it',
+    pass:       'Pass',
+    unknownSeam:'Unread',
 
     panels: {
-      horde:   'the horde',
-      market:  'the market',
-      rites:   'rites',
-      visitor: 'at the gate',
-      chamber: 'a chamber',
-      seal:    'the seal',
-      oaths:   'what you remember',
+      horde:   'The horde',
+      market:  'The market',
+      rites:   'Rites',
+      visitor: 'At the gate',
+      chamber: 'A chamber',
+      seal:    'The seal',
+      oaths:   'What you remember',
     },
 
     columns: {
-      good:   'good',
-      held:   'held',
-      price:  'price',
-      demand: 'demand',
+      good:   'Good',
+      held:   'Held',
+      price:  'Price',
+      demand: 'Demand',
     },
 
-    ledgerBase:  'base {base}',
-    ledgerTakes: '~{absorb} / {t}',
+    ledgerBase:  'Base {base}',
+    ledgerTakes: '{absorb} / {t}',
+    // Appended after a figure and a dash, so these two stay lower case:
+    // "38% - saturated 1.7x" reads right and "38% - Saturated" does not.
     ceilingLine: 'saturated {x}x',
     lesserGoods: '{n} lesser goods',
-    lesserWorth: 'worth about {coin}',
-    fieldHint:   'the surface',
+    lesserWorth: 'Worth about {coin}',
+    fieldHint:   'The surface',
     seamAhead:   'below {seam}',
   },
 
@@ -511,7 +513,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 3,
+    build: 4,
   },
 };
 
@@ -606,9 +608,24 @@ export const appliedOverrides = [];
 /** Namespaced browser storage key. */
 export const storageKey = (slot) => CONFIG.identity.storagePrefix + '.' + slot;
 
-/** Fill {name}-style holes in a line of text. */
+/**
+ * Fill {name}-style holes in a line of text.
+ *
+ * A hole written with a capital - {Name} - is filled with the same value and
+ * then capitalised, which is how a sentence can begin with a word the game
+ * supplies rather than one the writer typed.
+ */
 export function fill(line, values) {
-  return String(line).replace(/\{(\w+)\}/g, (m, k) => (values && k in values ? String(values[k]) : m));
+  return String(line).replace(/\{(\w+)\}/g, (m, k) => {
+    if (!values) return m;
+    if (k in values) return String(values[k]);
+    const lower = k.charAt(0).toLowerCase() + k.slice(1);
+    if (k !== lower && lower in values) {
+      const v = String(values[lower]);
+      return v.charAt(0).toUpperCase() + v.slice(1);
+    }
+    return m;
+  });
 }
 
 

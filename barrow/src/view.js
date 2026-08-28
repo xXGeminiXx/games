@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=3';
-import { distribute, activeFrom } from './horde.js?v=3';
-import * as Lore from './lore.js?v=3';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=4';
+import { distribute, activeFrom } from './horde.js?v=4';
+import * as Lore from './lore.js?v=4';
 
 /** mulberry32 */
 function rng(seed) {
@@ -322,12 +322,12 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       for (const row of L.rows) {
         if (row.k > s.depth) break;
         const layer = layerAt(row.k);
-        ctx.fillText(layer.name, 6, row.y + row.h / 2);
+        ctx.fillText(Lore.label(layer.name), 6, row.y + row.h / 2);
         // The seam, quieter still, so a layer's character reads off the hill
         // as well as off the panel.
         const words = layer.seam ? Lore.seam(layer.seam.id) : null;
         if (words && L.bandH >= 24) {
-          const w = ctx.measureText(layer.name).width;
+          const w = ctx.measureText(Lore.label(layer.name)).width;
           ctx.fillStyle = withAlpha(layer.hue, 0.5);
           ctx.fillText(words.tag, 12 + w, row.y + row.h / 2);
           ctx.fillStyle = withAlpha(palette.ink, 0.42);

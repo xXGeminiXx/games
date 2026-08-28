@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=3';
-import { pick } from './rng.js?v=3';
-import { fill } from '../config.js?v=3';
+import { CONTENT } from '../content.js?v=4';
+import { pick } from './rng.js?v=4';
+import { fill } from '../config.js?v=4';
 
 /**
  * One line from a log pool.
@@ -32,6 +32,19 @@ export function line(seed, key, values, salt) {
 /** True when the writing has something to say for this key. */
 export function has(key) {
   return !!CONTENT.log[key];
+}
+
+/**
+ * A word used as a label rather than as part of a sentence.
+ *
+ * The materials are common nouns and are stored lower case, because that is
+ * how they read inside a sentence: "The floor gives out onto amber." Every
+ * panel that shows one as a value or a heading puts it through here, so the
+ * one rule is: lower case in prose, capitalised everywhere else.
+ */
+export function label(word) {
+  const s = String(word || '');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** The tag and the line for a seam id. */

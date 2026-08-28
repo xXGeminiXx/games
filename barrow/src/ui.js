@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=3';
-import * as Mk from './market.js?v=3';
-import * as H from './horde.js?v=3';
-import * as R from './rites.js?v=3';
-import * as Rb from './rebirth.js?v=3';
-import * as Lore from './lore.js?v=3';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=3';
-import { fill } from '../config.js?v=3';
+import * as Mat from './materials.js?v=4';
+import * as Mk from './market.js?v=4';
+import * as H from './horde.js?v=4';
+import * as R from './rites.js?v=4';
+import * as Rb from './rebirth.js?v=4';
+import * as Lore from './lore.js?v=4';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=4';
+import { fill } from '../config.js?v=4';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -149,7 +149,7 @@ export function createUI(doc, sim, cfg, actions) {
     for (const key of keys) {
       const isFace = key === 'face';
       const layer = isFace ? null : sim.ground.at(key);
-      const name = isFace ? T.face : layer.name;
+      const name = isFace ? T.face : Lore.label(layer.name);
       const hue = isFace ? cfg.palette.face : layer.hue;
       const bar = el('span', { class: 'bar' });
       const meta = el('i');
@@ -228,7 +228,7 @@ export function createUI(doc, sim, cfg, actions) {
     const tag = k >= 0 ? seamTag(k) : '';
     const nameCell = el('td', { class: 'good' },
       el('span', { class: 'swatch', style: 'background:' + good.hue }),
-      el('span', { text: good.name }),
+      el('span', { text: Lore.label(good.name) }),
       tag ? el('small', { class: 'seam', text: tag, title: seamLine(k) }) : null,
       hot);
     nameCell.firstChild.style.background = good.hue;
@@ -479,7 +479,7 @@ export function createUI(doc, sim, cfg, actions) {
     if (st.horde) st.horde.textContent = fmtCount(s.horde);
     if (st.depth) {
       const layer = sim.ground.at(s.depth);
-      st.depth.textContent = String(s.depth + 1) + ' ' + layer.name;
+      st.depth.textContent = String(s.depth + 1) + ' ' + Lore.label(layer.name);
     }
     if (st.rem) st.rem.textContent = fmt(sim.legacy.remembrance);
     show(st.coinBox, s.totals.earned > 0 || s.coin > 0);
@@ -494,7 +494,7 @@ export function createUI(doc, sim, cfg, actions) {
     show(nodes.sell, f.sell && !f.market);
     if (nodes.handline) {
       const soil = s.stock.s0 || 0;
-      nodes.handline.textContent = soil > 0 && !f.market ? fmt(soil) + ' ' + sim.ground.at(0).name : '';
+      nodes.handline.textContent = soil > 0 && !f.market ? fmt(soil) + ' ' + Lore.label(sim.ground.at(0).name) : '';
     }
 
     renderChamber();
