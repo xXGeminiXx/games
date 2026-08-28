@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Barrow</title>
+<style>
+  /* Colours arrive from config.js as custom properties; the values here are
+     only what the page shows before that file has run. */
+  :root{
+    --void:#07080b; --panel:#0d0f14; --rule:#1b1f28; --ink:#d7dbe3; --dim:#6c7482;
+    --quiet:#464c58; --bone:#d9cdb4; --coin:#c9a95a; --hot:#c8553d; --good:#6fb08a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--void);color:var(--ink)}
+  body{
+    font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums; display:flex; flex-direction:column; overflow:hidden;
+  }
+  button{
+    font:inherit; color:var(--ink); background:transparent; border:1px solid var(--rule);
+    padding:3px 9px; cursor:pointer; border-radius:2px; letter-spacing:.02em;
+  }
+  button:hover:not(:disabled){border-color:var(--dim)}
+  button:disabled{opacity:.35;cursor:default}
+  button b{font-weight:500}
+  button i{font-style:normal;color:var(--dim);margin-left:8px;font-size:11px}
+  h2{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--dim);margin:0 0 8px}
+
+  /* The top line. */
+  header{
+    display:flex; align-items:baseline; justify-content:space-between; gap:20px;
+    padding:12px 22px 8px; border-bottom:1px solid var(--rule);
+  }
+  #brand b{font-size:15px;font-weight:600;letter-spacing:.04em}
+  #brand span{color:var(--quiet);margin-left:14px;font-size:11px}
+  #stats{display:flex;gap:26px}
+  #stats .stat b{display:block;font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  #stats .stat span{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+  #stats #coin{color:var(--coin)} #stats #bones{color:var(--bone)}
+
+  /* Two columns: the books on the left, the hill on the right. */
+  main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;min-height:0}
+  #books{overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;border-right:1px solid var(--rule)}
+  #field{display:flex;flex-direction:column;min-height:0}
+  #hill{flex:1;position:relative;min-height:0}
+  #hill canvas{display:block;width:100%;height:100%}
+  #fieldhint{position:absolute;left:14px;top:10px;color:var(--quiet);font-size:11px;pointer-events:none}
+  /* Rites sit under the hill, in two columns. */
+  #rites-panel{border-top:1px solid var(--rule);padding:10px 18px 8px}
+  #rites{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px}
+
+  /* The log: newest on top, fading down, five lines on screen. */
+  #log{margin:0 0 12px;min-height:44px}
+  #log p{margin:0 0 2px;color:var(--ink)}
+  #log p:nth-child(n+2){color:var(--dim)}
+  #log p:nth-child(n+4){color:var(--quiet)}
+  #log p:nth-child(n+6){display:none}
+
+  .panel{border-top:1px solid var(--rule);padding:12px 0 10px}
+  .lbl{color:var(--dim);margin-right:8px;font-size:11px}
+  #hand button{padding:5px 14px}
+  #hand #handline{color:var(--dim);margin-left:12px}
+  #raise{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+  .raise i{margin-left:6px}
+  .wrow{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px}
+  .wrow .name{width:88px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wrow.face .name{color:var(--dim)}
+  .wrow .bar{letter-spacing:1px;color:var(--bone);width:52px;text-align:center}
+  .wrow button.w{padding:0 7px;line-height:17px}
+  .wrow i{font-style:normal;color:var(--dim);font-size:11px;margin-left:4px}
+  .wrow i.hot,.ledger.hot{color:var(--hot)}
+  .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
+
+  /* The market table. */
+  #market-panel{padding-bottom:4px}
+  #market{border-collapse:collapse;width:100%;table-layout:fixed}
+  #market th:nth-child(1){width:88px} #market th:nth-child(2){width:80px}
+  #market th:nth-child(3){width:92px} #market th:nth-child(4){width:100px}
+  #market th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--quiet);text-align:left;padding:0 6px 4px 0}
+  #market td{padding:2px 5px 2px 0;vertical-align:middle;border-top:1px solid var(--rule);font-size:12px;overflow:hidden}
+  #market td.num{text-align:right;white-space:nowrap}
+  #market td.good{white-space:nowrap;text-overflow:ellipsis}
+  #market tr.lesserrow td.good{white-space:normal}
+  #market small{display:block;color:var(--quiet);font-size:10px;line-height:1.2;white-space:nowrap}
+  #market small.sat{color:var(--hot)}
+  #market td.num b{font-weight:500}
+  #market td.num i{font-style:normal;font-size:10px;margin-left:5px;color:var(--quiet)}
+  #market td.num i.up{color:var(--good)} #market td.num i.down{color:var(--hot)}
+  #market td.chart{width:104px}
+  .spark{display:block;width:96px;height:20px}
+  .spark .line{fill:none;stroke:var(--ink);stroke-width:1.2;vector-effect:non-scaling-stroke}
+  .spark .base{stroke:var(--quiet);stroke-width:1;stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
+  .spark .future{fill:none;stroke:var(--dim);stroke-width:1;stroke-dasharray:1.5 2.5;vector-effect:non-scaling-stroke}
+  .demand{display:block;height:2px;background:var(--rule);width:96px;margin-top:3px}
+  .demand span{display:block;height:2px;background:var(--good);width:100%}
+  .demand span.low{background:var(--hot)}
+  #market td.acts{white-space:nowrap;text-align:right}
+  #market td.acts button{padding:1px 5px;font-size:11px;margin-left:2px}
+  #market td.acts button.buy{border-color:var(--quiet);color:var(--coin)}
+  #market tr.lesserrow td{color:var(--dim)}
+
+  /* Rites: one line each. */
+  .rrow{display:grid;grid-template-columns:168px 1fr auto;align-items:center;gap:8px;margin:0 0 3px;min-width:0}
+  .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .line{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .lv{color:var(--quiet);font-size:10px}
+
+  footer{
+    display:flex;gap:10px;align-items:center;padding:6px 22px;border-top:1px solid var(--rule);
+    color:var(--quiet);font-size:11px;
+  }
+  footer button{padding:1px 8px;font-size:11px;color:var(--dim)}
+  footer #saved{margin-left:auto}
+
+  @media (max-width:1200px){
+    .rrow{grid-template-columns:136px 1fr auto}
+  }
+  @media (max-height:700px){
+    #log p:nth-child(n+4){display:none}
+    #log{margin-bottom:8px;min-height:0}
+    .panel{padding:8px 0 6px}
+    .wrow{margin:1px 0}
+    #market td{padding:1px 5px 1px 0}
+    .spark{height:16px}
+    #raise{margin-bottom:5px}
+    h2{margin-bottom:5px}
+  }
+  @media (max-width:760px){
+    body{overflow:auto}
+    main{display:flex;flex-direction:column}
+    #field{order:-1;border-bottom:1px solid var(--rule)}
+    #hill{height:200px;flex:none}
+    #rites-panel{max-height:none}
+    #rites{grid-template-columns:1fr}
+    #books{border-right:0;overflow:visible}
+    header{padding:10px 14px 6px;flex-wrap:wrap}
+    #stats{gap:14px;flex-wrap:wrap}
+    #books{padding:12px 14px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div id="brand"><b id="title">Barrow</b><span id="tagline"></span></div>
+  <div id="stats">
+    <div class="stat" id="st-coin" hidden><b id="coin">0</b><span id="lbl-coin">coin</span></div>
+    <div class="stat" id="st-income" hidden><b id="income">0</b><span id="lbl-income">coin/s</span></div>
+    <div class="stat" id="st-bones" hidden><b id="bones">0</b><span id="lbl-bones">bones</span></div>
+    <div class="stat" id="st-horde" hidden><b id="horde">0</b><span id="lbl-horde">horde</span></div>
+    <div class="stat" id="st-depth" hidden><b id="depth">0</b><span id="lbl-depth">depth</span></div>
+  </div>
+</header>
+<main>
+  <section id="books">
+    <div id="log"></div>
+    <div id="hand" class="panel"><button id="dig">dig</button><button id="sell" hidden>sell</button><span id="handline"></span></div>
+    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">the horde</h2><div id="raise"></div><div id="weights"></div></div>
+    <div id="market-panel" class="panel" hidden><h2 id="p-market">the market</h2><table id="market"></table></div>
+  </section>
+  <section id="field">
+    <div id="hill"><canvas id="v"></canvas><div id="fieldhint">the surface</div></div>
+    <div id="rites-panel" hidden><h2 id="p-rites">rites</h2><div id="rites"></div></div>
+  </section>
+</main>
+<footer>
+  <button id="export">export</button>
+  <button id="import">import</button>
+  <button id="reset">start over</button>
+  <span id="saved"></span>
+</footer>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Barrow. The dead dig; you keep the books.
+//
+// This file only wires the page to the game. Everything the game is lives in
+// src/, and every number and word worth changing lives in config.js.
+// ---------------------------------------------------------------------------
+import { CONFIG, applyIdentity } from './config.js?v=1';
+import { createGame } from './src/game.js?v=1';
+
+applyIdentity(document);
+
+const game = createGame({
+  doc: document,
+  win: window,
+  canvas: document.getElementById('v'),
+  cfg: CONFIG,
+  storage: window.localStorage,
+});
+
+// The footer: a save that can leave, a save that can arrive, and a clean slate.
+document.getElementById('export').addEventListener('click', () => {
+  const str = game.exportSave();
+  const done = (ok) => game.ui.savedNote(ok ? 'save copied' : 'copy this: ' + str.slice(0, 24) + '...');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt('your save', str); done(false); });
+  } else {
+    window.prompt('your save', str);
+    done(false);
+  }
+});
+document.getElementById('import').addEventListener('click', () => {
+  const str = window.prompt('paste a save');
+  if (!str) return;
+  try { game.importSave(str); } catch (e) { game.ui.savedNote(String(e.message || e)); }
+});
+let armed = false;
+document.getElementById('reset').addEventListener('click', () => {
+  const b = document.getElementById('reset');
+  if (!armed) { armed = true; b.textContent = CONFIG.text.resetSure; setTimeout(() => { armed = false; b.textContent = CONFIG.text.reset; }, 4000); return; }
+  game.reset();
+});
+
+game.start();
+window.barrow = game;
+</script>
+</body>
+</html>
