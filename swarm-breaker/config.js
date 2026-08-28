@@ -77,9 +77,10 @@ export const CONFIG = {
     overTitle:   'the swarm is overrun',
     // Shown when a field that fills rather than descends runs out of room.
     overFull:    'the field is sealed',
-    // Shown when the tier runs out of field and the board is clear.
-    winTitle:    'the field is broken',
-    endlessButton: 'go on forever',
+    // Banner over the field the turn a run outlasts everything its tier had
+    // scripted. Nothing stops - this says so, and the run carries on.
+    crossTitle:  'you have outlasted the field',
+    crossNote:   'it comes forever now',
     overAgain:   'again',
     overDepth:   'depth',
     overSwarm:   'swarm',
@@ -372,8 +373,8 @@ export const CONFIG = {
       // The rest of the run.
       { id: 'power-5',   track: 'power',   at: 5,    name: 'sharpened',        note: 'reach 5 damage a hit' },
       { id: 'rich-1000', track: 'essence', at: 1000, name: 'flush',            note: 'hold 1,000 essence in one run' },
-      { id: 'win-1',     track: 'wins',    at: 1,    name: 'the field is broken', note: 'finish a tier' },
-      { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'finish three tiers' },
+      { id: 'win-1',     track: 'wins',    at: 1,    name: 'past the last row',  note: 'outlast every row a tier has' },
+      { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'outlast a tier in three runs' },
       { id: 'modes-3',   track: 'modes',   at: 3,    name: 'every water',      note: 'play all three fields' },
     ],
 
@@ -925,7 +926,6 @@ export function applyIdentity(doc) {
   put('overtitle',   t.overTitle);
   put('again',       t.overAgain);
   put('overmodes',   t.overMenu);
-  put('endless',     t.endlessButton);
   put('over-lbl-depth', t.overDepth);
   put('over-lbl-swarm', t.overSwarm);
 
