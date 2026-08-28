@@ -476,9 +476,12 @@ export const EPOCHS = Object.freeze([
   { log10m: 48, name: 'beyond' },
 ]);
 
-/** Body flags. */
+/** Body flags. FLAG_AGGREGATE is exported because the presentation seam needs
+ *  it: an adapter that cannot test the flag falls back to guessing from kind
+ *  codes, and a guess and a flag can drift apart without anything reporting
+ *  the difference. The others remain internal. */
 const FLAG_NONE = 0;
-const FLAG_AGGREGATE = 1;
+export const FLAG_AGGREGATE = 1;
 const FLAG_NO_CONDENSE = 2;
 const FLAG_ALWAYS_ACTIVE = 4;
 
@@ -790,6 +793,8 @@ export function createSim(opts = {}) {
   let ufStamp = new Int32Array(capacity);
 
   let rootSize = 1;
+  // The largest collision radius in the field, refreshed with the tree.
+  let maxBodyRadius = 0;
   let rootX = 0, rootY = 0;
   let treeValid = false;
 
@@ -832,9 +837,12 @@ export function createSim(opts = {}) {
   const events = [];
   const MAX_EVENTS = 512;
 
+  // vx/vy/spin ride along because the presentation seam reads them when they
+  // exist - motion and rotation are drawable quantities - and falls back to
+  // zero when they do not. Same live buffers, so carrying them costs nothing.
   const renderView = {
-    count: 0, px, py, radius, mass, kind, flags, idOfSlot,
-    aggN, aggR, aggSigma, aggPhase, pop, heat,
+    count: 0, px, py, vx, vy, radius, mass, kind, flags, idOfSlot,
+    aggN, aggR, aggSigma, aggPhase, pop, heat, spin,
   };
 
   /* ====================================================================== *
@@ -874,10 +882,11 @@ export function createSim(opts = {}) {
 
   function bindRenderView() {
     renderView.px = px; renderView.py = py; renderView.radius = radius;
+    renderView.vx = vx; renderView.vy = vy;
     renderView.mass = mass; renderView.kind = kind; renderView.flags = flags;
     renderView.idOfSlot = idOfSlot; renderView.aggN = aggN; renderView.aggR = aggR;
     renderView.aggSigma = aggSigma; renderView.aggPhase = aggPhase;
-    renderView.pop = pop; renderView.heat = heat;
+    renderView.pop = pop; renderView.heat = heat; renderView.spin = spin;
   }
 
   function allocId() {
@@ -967,6 +976,23 @@ export function createSim(opts = {}) {
     return Math.max(Math.pow(2, clamp(log2r, -LOG2_R_CLAMP, LOG2_R_CLAMP)), RADIUS_FLOOR);
   }
 
+  /**
+   * How big a body of this mass would be, in code units.
+   *
+   * A caller that PLACES bodies needs this before it places them. Seeding three
+   * of them inside one another looks like three arrivals and is one: they
+   * overlap, they merge on the first step, and the scatter that was supposed to
+   * make a system instead makes a stack. The radius law depends on the live
+   * ledger, so it cannot be a static export - it has to be asked of the field.
+   *
+   * @param {number} codeMass mass in code units
+   * @param {number} [k] kind code; defaults to dust
+   * @returns {number} radius in code units
+   */
+  function radiusForMass(codeMass, k) {
+    return codeRadius(Math.max(codeMass, MASS_FLOOR), k === undefined ? KIND.DUST : k);
+  }
+
   /** Recompute radius, softening and (for tracked kinds) the promotion ladder. */
   function refreshDerived(i) {
     const k = kind[i];
@@ -986,6 +1012,29 @@ export function createSim(opts = {}) {
     // sees a separation smaller than its own softening. That is the entire
     // stability argument, and it is why no denominator can ever reach zero.
     eps2[i] = Math.max(r * r, EPS2_FLOOR);
+  }
+
+  /**
+   * Convert an absolute mass into the field's current code units.
+   *
+   * The pool stores mass in code units that the ledger re-centres as the run
+   * grows, so a caller that decides how much mass to ADD in absolute terms - a
+   * share of stats().totalMass, a threshold read off the ladder - must convert
+   * through the live ledger before handing the value to addBody. The two unit
+   * systems coincide exactly until the first rebase, which is what makes this
+   * conversion easy to omit and the omission invisible until a run crosses
+   * REBASE_MASS_HI - at which point an unconverted seed arrives 2^expMass too
+   * heavy and every click multiplies the field instead of feeding it. The
+   * factor is an exact power of two, so the conversion itself is lossless.
+   *
+   * Like radiusForMass, this cannot be a static export: it depends on the live
+   * ledger, so it has to be asked of the field.
+   *
+   * @param {number} absMass mass in absolute units (one dot is 1)
+   * @returns {number} the same mass in current code units
+   */
+  function codeMassFromAbsolute(absMass) {
+    return absMass * p2(-expMass);
   }
 
   /**
@@ -1111,6 +1160,12 @@ export function createSim(opts = {}) {
       spin[i] *= fs;
     }
     codeTime *= p2(-((3 * kl - km) >> 1));
+    // The running ledgers rescale with everything else. They accumulate in
+    // code units, so leaving them alone would freeze each contribution in the
+    // era it was recorded in - after one rebase the sum would mix unit systems
+    // and the absolute figures stats() derives from it would be wrong.
+    heatRadiated *= fh;
+    lostMass *= fm;
     expMass += km;
     expLen += kl;
     expTime += (3 * kl - km) >> 1;
@@ -1207,11 +1262,18 @@ export function createSim(opts = {}) {
     // Bounds, squared up with a margin. A minimum size keeps the degenerate
     // single-body and coincident-body cases finite.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    // The largest single body, tracked in the pass that is already walking
+    // every one of them. See fieldExtent below for why the arrangement's
+    // bounding box is not on its own an answer to "how big is this".
+    let biggest = 0;
     for (let i = 0; i < count; i++) {
       const x = px[i], y = py[i];
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
+      const r = radius[i];
+      if (r > biggest) biggest = r;
     }
+    maxBodyRadius = biggest;
     let size = Math.max(maxX - minX, maxY - minY) * 1.05;
     if (!(size > 1e-9)) size = 1e-9;
     const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5;
@@ -1742,6 +1804,32 @@ export function createSim(opts = {}) {
     let k = KIND.CLUSTER;
     for (let t = 0; t < AGG_TIERS.length; t++) if (n >= AGG_TIERS[t].minPop) k = AGG_TIERS[t].kind;
     kind[i] = k;
+  }
+
+  /**
+   * HOW BIG THE FIELD IS, in code units.
+   *
+   * Not `rootSize`, and that distinction is the whole of a bug that made the
+   * game unplayable. `rootSize` is the Morton tree's bounding box - the spread
+   * of the ARRANGEMENT - and it is floored at 1e-9 so that the quantisation
+   * step `65535 / size` cannot divide by zero. That floor is right for the
+   * tree and catastrophic as an answer to the outside world: the moment a run
+   * merges down to a single body there is no arrangement left to bound, so the
+   * field reported itself as one NANOMETRE across. The camera frames on this,
+   * so it dutifully zoomed twenty-five orders of magnitude into the inside of
+   * the last remaining object and stayed there. A degenerate-case guard was
+   * leaking out as the game's idea of the size of its own universe.
+   *
+   * A field holding one sphere of radius R is 2R across. No headroom is added
+   * here - what the camera wants around the subject is the camera's business
+   * and it has its own margin - this only refuses to claim the field is
+   * smaller than the things in it.
+   */
+  function fieldExtent() {
+    const spread = rootSize > 1e-9 ? rootSize : 0;
+    const solid = maxBodyRadius * 2;
+    const e = spread > solid ? spread : solid;
+    return e > 0 ? e : 1e-9;
   }
 
   /** Screen extent, in pixels, of a world-space radius. */
@@ -2644,7 +2732,7 @@ export function createSim(opts = {}) {
         expAngMom: (3 * expMass + expLen) >> 1,
       },
       simTime: magFromCode(codeTime, expTime),
-      extent: magFromCode(rootSize, expLen),
+      extent: magFromCode(fieldExtent(), expLen),
       // Budget and health
       perf: {
         stepMs: lastStepMs,
@@ -2791,7 +2879,8 @@ export function createSim(opts = {}) {
     // Progression
     setKindUnlocked, isKindUnlocked, drawHeat, stats, drainEvents, measureEnergy,
     // Presentation (state only - nothing here draws anything)
-    setView, getRenderView, sampleAggregate, pick, queryRect,
+    setView, getRenderView, sampleAggregate, pick, queryRect, radiusForMass,
+    codeMassFromAbsolute,
     // Persistence and testing
     serialize, checksum, setOption,
     // Constants, re-exported for convenience at the call site

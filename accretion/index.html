@@ -46,47 +46,254 @@
 // ---------------------------------------------------------------------------
 
 import { CONFIG, simOptions, applyIdentity } from './config.js';
-import { createSim, magToString } from './src/sim.js';
-import { createRenderer, createSimAdapter } from './src/render.js';
+import { createSim, magToString, EVENT, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE } from './src/sim.js';
+import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
 applyIdentity(document);
 
 const canvas = document.getElementById('v');
+
+// The renderer keeps its own numbers. The few a player might want to turn live
+// in config.js like everything else, so they are handed over before it starts
+// rather than being edited in two places.
+VIEW.zoomPerWheelNotch   = CONFIG.camera.zoomStep;
+VIEW.wheelPixelsPerNotch = CONFIG.camera.wheelPixelsPerNotch;
+VIEW.frameFill           = CONFIG.camera.frameFill;
+VIEW.zoomTauExpand       = CONFIG.camera.pullBackSeconds;
+VIEW.zoomTauContract     = CONFIG.camera.closeInSeconds;
+VIEW.zoomMaxRate         = CONFIG.camera.maxDecadesPerSecond;
+VIEW.followTau           = CONFIG.camera.followSeconds;
+VIEW.panLimitScreens     = CONFIG.camera.panLimitScreens;
+
+// WHAT MATTER LOOKS LIKE, handed over BEFORE the renderer exists.
+//
+// The colour ramp and every sprite in the atlas are baked from these, so they
+// have to be in place before the first one is built. setSpectrum is the way in
+// for exactly that reason: writing to VIEW alone would change the numbers and
+// leave the baked copies behind, which looks like nothing happening at all.
+setSpectrum({
+  coldestK:        CONFIG.matter.coldest,
+  hottestK:        CONFIG.matter.hottest,
+  glowFromK:       CONFIG.matter.glowFrom,
+  glowFullK:       CONFIG.matter.glowFull,
+  reflectance:     CONFIG.matter.reflectance,
+  coronaCold:      CONFIG.matter.corona,
+  coronaReachCold: CONFIG.matter.coronaReach,
+  coreGlowCold:    CONFIG.matter.coreGlow,
+  surfaceCold:     CONFIG.matter.surface,
+  detailMinPx:     CONFIG.matter.detailMinPx,
+  detailBodies:    CONFIG.matter.detailBodies,
+  detailPatches:   CONFIG.matter.detailPatches,
+  detailAlpha:     CONFIG.matter.detailAlpha,
+});
+
 const sim = createSim(simOptions());
 const view = createRenderer(canvas, {});
-const adapt = createSimAdapter({});
+
+// WHAT COLOUR A THING IS.
+//
+// The renderer paints a body by black-body temperature, and the adapter takes a
+// mapping from the field's own quantities to kelvin. None was supplied, so
+// every object in the universe arrived with no temperature at all and the
+// renderer fell back on a single default - one dull red for dust, for planets,
+// and for stars alike. The field could not appear to change because nothing in
+// it was ever a different colour.
+//
+// Kind sets the band and the body's own heat lifts it within that band, so a
+// violently accreting world runs hotter than a settled one.
+// Kind sets the band and the body's own heat lifts it within that band, so a
+// violently accreting world runs hotter than a settled one. Named rather than
+// inlined because the event bridge needs the same answer for the same body: a
+// merge flash the colour of something else is worse than no flash at all.
+function temperatureOf(heat, kind) {
+  const table = CONFIG.matter.temperature;
+  const base = table[kind] !== undefined ? table[kind] : table[0];
+  const lift = 1 + CONFIG.matter.heatLift *
+    Math.min(1, Math.log10(1 + Math.max(0, heat)) / 12);
+  return base * lift;
+}
+
+const adapt = createSimAdapter({
+  // WHAT AN AGGREGATE IS, by the simulation's own flag and threshold rather
+  // than by the adapter's defaults. With no flag supplied the adapter falls
+  // back to a hardcoded kind threshold that happened to equal the field's -
+  // agreement by coincidence, which would have drifted silently the first time
+  // the kind list changed. Passing both makes the agreement structural.
+  flagAggregate: FLAG_AGGREGATE,
+  aggFirstKind: AGG_FIRST,
+  temperature: temperatureOf,
+  // HOW BRIGHTLY IT SHINES, which is the other half of the same sentence.
+  //
+  // Temperature alone gives every kind its own hue and leaves them all equally
+  // luminous, so a field of cold dust and a field of stars are the same picture
+  // in different colours. The aperture exposes for the brightest thing on
+  // screen, so brightness is what makes ignition an event: the moment one body
+  // starts producing its own light, everything cold around it sinks.
+  luminosity(heat, kind) {
+    const table = CONFIG.matter.luminosity;
+    return table[kind] !== undefined ? table[kind] : table[0];
+  },
+});
+
+// Deterministic scatter. Identical inputs have to produce an identical
+// universe, so nothing here draws a random number - every variation is a hash
+// of which click it was and which body within it.
+function hash2(a, b) {
+  let h = (Math.imul(a | 0, 0x27d4eb2f) ^ Math.imul(b | 0, 0x165667b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2545f491) >>> 0;
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+}
 
 // A click is a seed, not a placement: mass arrives with a little scatter and a
 // little momentum, so two clicks in the same place still make a system rather
 // than a stack.
+//
+// THE SCATTER IS MEASURED IN PIXELS, NOT WORLD UNITS, and that is the whole of
+// a bug worth naming. It used to be a world-space radius that GREW with the
+// number of clicks - so by the fiftieth click mass was arriving a long way from
+// the cursor, and the game was answering somewhere the player had not pointed.
+// It was also wrong at every scale but one: six world units is the whole screen
+// early on and an invisible speck an hour later.
+//
+// A few pixels of scatter converted through the live projection is right at
+// every scale and always lands under the cursor, which is the only thing a
+// click has to promise.
 let clicks = 0;
 function seedAt(sx, sy) {
   const w = view.screenToWorld(sx, sy);
   if (!w) return;
   const seed = CONFIG.seeding;
-  const spread = seed.spreadBase + clicks * seed.spreadGrowth;
+  const vp = view.getViewport();
+  const perUnit = vp && vp.pxPerUnit > 0 ? vp.pxPerUnit : 1;
+
+  // What a click is worth. A share of what is already there, floored at the
+  // base - see seeding.clickShare for why a flat contribution could not work
+  // against an exponential ladder.
+  const st = sim.stats ? sim.stats() : null;
+  const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
+  // Past the top of the ladder the field stops taking on mass. See
+  // seeding.massCeiling: the simulation is sound over the range the arc uses
+  // and starts quarantining its own bodies past it, so a run that kept
+  // compounding would dissolve into infinities while the player watched.
+  if (held >= seed.massCeiling) { note.textContent = CONFIG.text.promptFull; return; }
+  // The share is decided in ABSOLUTE units - the ladder and the ceiling live
+  // there - but addBody takes the field's own CODE units, which the ledger
+  // re-centres as the run grows. The two coincide until the ledger's first
+  // rebase and then diverge by 2^expMass, so an unconverted seed lands about a
+  // million times too heavy and every click multiplies the field instead of
+  // feeding it. The conversion is asked of the field, which owns the ledger.
+  const perAbs = Math.max(seed.massPerBody,
+                          (held * seed.clickShare) / Math.max(1, seed.bodiesPerClick));
+  const per = sim.codeMassFromAbsolute ? sim.codeMassFromAbsolute(perAbs) : perAbs;
+  const floor = sim.codeMassFromAbsolute
+    ? sim.codeMassFromAbsolute(seed.massPerBody * 0.1) : seed.massPerBody * 0.1;
+
+  // Far enough apart to BE apart. A few pixels on screen so the click reads as
+  // a scatter, and never closer than a few radii of whatever is being placed -
+  // otherwise the bodies are born inside one another and merge on the first
+  // step, so every click looks like three arrivals and is one.
+  const bodyR = sim.radiusForMass ? sim.radiusForMass(per) : 0;
+  const spread = Math.min(seed.spreadMaxPixels / perUnit,
+                          Math.max(seed.spreadPixels / perUnit, bodyR * seed.spreadRadii));
+
   const step = 6.2831853 / Math.max(1, seed.bodiesPerClick);
   for (let k = 0; k < seed.bodiesPerClick; k++) {
-    const a = (clicks * 2.3999632 + k * step) % 6.2831853;
+    // The golden angle keeps successive clicks from landing on the same spokes.
+    const jitter = (hash2(clicks, k) - 0.5) * step * seed.angleJitter;
+    const a = (clicks * 2.3999632 + k * step + jitter) % 6.2831853;
+    // How far out along its spoke this one lands. Floored well above zero: the
+    // scatter is sized so that bodies clear each other at full extension, and a
+    // body pulled most of the way back to the centre would be inside its
+    // neighbours again.
+    const near = 0.6 + 0.4 * hash2(clicks ^ 0x9e37, k);
+    // Mass varies about its mean rather than arriving as the same three
+    // identical things every time. A field made of one repeated object never
+    // looks like it grew, it looks like it was stamped.
+    const vary = 1 + (hash2(clicks, k ^ 0x5bf0) - 0.5) * 2 * seed.massJitter;
     sim.addBody({
-      x: w.x + Math.cos(a) * spread,
-      y: w.y + Math.sin(a) * spread,
+      x: w.x + Math.cos(a) * spread * near,
+      y: w.y + Math.sin(a) * spread * near,
       vx: Math.cos(a + 1.5708) * seed.launchSpeed,
       vy: Math.sin(a + 1.5708) * seed.launchSpeed,
-      mass: seed.massPerBody,
+      mass: Math.max(floor, per * vary),
     });
   }
   clicks++;
-  const note = document.getElementById('note');
   if (clicks === 1) note.textContent = CONFIG.text.promptSecond;
   else if (clicks === seed.promptFadesAt) note.textContent = CONFIG.text.promptDone;
 }
 
 canvas.addEventListener('pointerdown', e => seedAt(e.clientX, e.clientY));
 addEventListener('resize', () => view.resize());
-addEventListener('wheel', e => view.nudgeZoom(e.deltaY > 0 ? -CONFIG.camera.zoomStep : CONFIG.camera.zoomStep), { passive: true });
+// NO WHEEL HANDLER HERE. The renderer binds its own, anchored at the cursor,
+// and a second one on the window meant every notch was applied twice - once
+// toward the pointer and once toward the centre of the screen, at two
+// different step sizes. That is most of why the zoom could not be controlled.
+
+// WHAT THE FIELD DID, IN WORDS THE RENDERER KNOWS.
+//
+// TWO VOCABULARIES THAT HAVE NEVER MET. The field reports what happened as
+// integer codes - EVENT.MERGE is 1, EVENT.COLLAPSE is 4 - and the renderer's
+// emit() switches on names: 'merge', 'collapse', 'birth'. No case could ever
+// match, so every flash, every shock ring, every ejecta spray and the field
+// inversion reserved for a collapse have never once played. Nothing threw and
+// nothing warned; the effects layer was simply never reached.
+//
+// The two also disagree about what an event IS. The field names the thing it
+// happened to - an id - because a body is where its own position lives. The
+// renderer needs the position, because it has to draw it somewhere. So this
+// looks the body up and hands over both.
+//
+// Only the three that are worth seeing are translated. A rebase or an epoch
+// advance is bookkeeping, and a promotion already has a voice of its own along
+// the bottom of the screen.
+const SEEN = {
+  [EVENT.MERGE]: 'merge',
+  [EVENT.COLLAPSE]: 'collapse',
+  [EVENT.CONDENSE]: 'birth',
+};
+
+function dress(e) {
+  const name = SEEN[e.type];
+  if (!name) return e;
+  const b = sim.getBody ? sim.getBody(e.id) : null;
+  if (!b) return e;
+  const out = { type: name, x: b.x, y: b.y, r: b.radius, T: temperatureOf(b.heat, b.kind) };
+  if (name === 'merge') {
+    // How hard it landed. One body absorbing a dozen should not look like one
+    // absorbing one, and the renderer scales its flash and its ejecta by this.
+    out.energy = Math.max(0.2, Math.min(4, 1 + (e.absorbed || 0) * 0.35));
+  } else if (name === 'collapse') {
+    // The renderer wants the radius before and after. What a collapse means is
+    // that the two are far apart, and only the after is a fact the field still
+    // holds - the before is reconstructed from the rung it fell from.
+    out.r1 = b.radius;
+    out.r0 = b.radius * (CONFIG.matter.collapseFrom || 12);
+  }
+  return out;
+}
+
+// THE ARC.
+//
+// Every kind above dust is gated in the simulation, and it emits BLOCKED the
+// moment the field has earned a promotion it is not allowed to take. Nothing
+// was listening, so nothing was ever unlocked and a run could only ever be
+// dust - which is the whole reason the field appeared to do nothing however
+// long it was fed. The ladder climbs to a star; none of it was reachable.
+//
+// A blocked promotion IS the discovery: the player has built something the
+// world does not have a name for, so it gets one. The research layer designed
+// in src/progression.js is a richer answer to the same moment and is still
+// unwired; this is the smallest thing that makes the ladder a ladder.
+const note = document.getElementById('note');
+function discover(e) {
+  if (!e || e.type !== EVENT.BLOCKED) return;
+  if (sim.isKindUnlocked && sim.isKindUnlocked(e.kind)) return;
+  sim.setKindUnlocked(e.kind, true);
+  note.textContent = CONFIG.matter.discoveryPrefix + (KIND_NAME[e.kind] || '');
+}
 
 const fmt = document.getElementById('mass');
 let last = 0;
@@ -103,7 +310,7 @@ function frame(now) {
   // Events are how the field tells the view that something happened - a merge,
   // an ignition, a crossing into a new order of magnitude.
   const events = sim.drainEvents ? sim.drainEvents() : [];
-  for (let i = 0; i < events.length; i++) view.emit(events[i]);
+  for (let i = 0; i < events.length; i++) { view.emit(dress(events[i])); discover(events[i]); }
 
   const s = sim.stats ? sim.stats() : null;
 

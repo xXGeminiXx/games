@@ -53,6 +53,11 @@ export const CONFIG = {
     promptFirst:  'click the void',
     promptSecond: 'again',
     promptDone:   '',
+
+    // Shown when the field has reached the top of the ladder and will take no
+    // more. The arc has an authored end designed for it; this is what stands in
+    // for that end until it is built.
+    promptFull:   'the field will take no more',
   },
 
   // -------------------------------------------------------------------------
@@ -65,11 +70,48 @@ export const CONFIG = {
   seeding: {
     bodiesPerClick: 3,
 
-    // Scatter radius in world units: spreadBase + spreadGrowth * clicksSoFar.
-    // Later clicks land wider, so a field being fed keeps finding new orbits
-    // instead of piling onto the one it already has.
-    spreadBase:   6,
-    spreadGrowth: 0.4,
+    // SCATTER RADIUS IN SCREEN PIXELS, converted through the live projection.
+    //
+    // It used to be a world-space radius that grew with the click count, which
+    // was wrong twice over: mass ended up arriving a long way from where the
+    // player had actually pointed, and a fixed number of world units is the
+    // whole screen early in a run and an invisible speck later on. Pixels are
+    // right at every scale and always land under the cursor.
+    spreadPixels: 26,
+
+    // AND AT LEAST THIS MANY BODY-RADII, whichever is larger.
+    //
+    // Pixels alone are not enough, because a seeded body has a SIZE and at a
+    // pulled-back camera a few pixels is smaller than the thing being placed.
+    // Measured before this existed: three bodies arrived 0.74 units apart with
+    // a combined radius of 2.21, so they were born inside one another and
+    // merged on the first step. Every click looked like three arrivals and was
+    // one, and the scatter that is supposed to make a system made a stack.
+    spreadRadii: 3.5,
+
+    // AND NEVER MORE THAN THIS MANY PIXELS FROM THE CURSOR, whatever the
+    // radii ask for.
+    //
+    // The two rules above pull opposite ways and both are right. Bodies must
+    // not be born inside one another, and mass must arrive where the player
+    // pointed. Late in a run a seeded body is large, so the radii floor alone
+    // put mass six hundred pixels from the click - the same defect the pixel
+    // scatter was introduced to fix, arriving from the other direction.
+    //
+    // Where they genuinely conflict, the cursor wins. A body so large that its
+    // own siblings cannot clear it is a body they were going to merge into
+    // immediately anyway, and "the click did something somewhere else" is a
+    // worse failure than "the click made one thing instead of three".
+    spreadMaxPixels: 90,
+
+    // How far each body may swing off its spoke, as a share of the angle
+    // between spokes. Zero puts every click on the same rigid star.
+    angleJitter: 0.55,
+
+    // How much a body's mass may vary from the mean, as a share of it. A field
+    // built from one repeated object does not look like it grew, it looks like
+    // it was stamped.
+    massJitter: 0.45,
 
     // Sideways speed given to each body, across the line from the click centre.
     // Zero drops everything straight in and the field collapses to a point.
@@ -77,8 +119,190 @@ export const CONFIG = {
 
     massPerBody: 1,
 
+    // HOW A CLICK KEEPS UP WITH THE LADDER.
+    //
+    // The kind ladder is exponential - rock begins at 2^12 units of mass,
+    // planetesimal at 2^24, star at 2^64 - and a click used to contribute a
+    // flat three. Reaching the SECOND rung took about fourteen hundred clicks
+    // and every rung above it was unreachable by any amount of clicking at all,
+    // so the field could only ever be dust. Everything else that looked wrong
+    // followed from that: nothing changed colour because nothing ever changed
+    // kind.
+    //
+    // A click now seeds a share of what the field has already become, which is
+    // how accretion actually works - a bigger cloud sweeps up faster - and it
+    // is what makes the ladder something a run can climb. `massPerBody` is the
+    // floor under it, so the opening is unchanged.
+    // Measured: at this share the ladder is climbed over a long session rather
+    // than sprinted. Too generous and the last three rungs land in three
+    // consecutive clicks, which turns the end of the arc into a blur.
+    clickShare: 0.024,
+
+    // WHERE THE FIELD STOPS TAKING MASS.
+    //
+    // The whole ladder fits under this: the black hole rung begins at 2^82 of
+    // absolute mass, about 4.8e24, and in a measured full run the first black
+    // hole formed at a total of 4.8e26 - so this ceiling ends a run just past
+    // the top of the arc rather than four rungs short of it.
+    //
+    // This used to be 1e12, pinned there by a defect, not a decision: seeding
+    // mixed absolute and code units, which broke mass conservation the moment
+    // the unit ledger first rebased (total about 4.9e12) and compounded into
+    // quarantined bodies and infinities. That seam is fixed - docs/BUGS.md has
+    // the full account - and the soundness of the field itself is measured far
+    // beyond this value: a full click-driven arc reached 2.0e27 and a driven
+    // stress run reached 4.2e60, both with zero bodies quarantined and zero
+    // mass lost.
+    //
+    // A real ending is designed in docs/ENDING.md and src/rebirth.js and is not
+    // wired. This is not that: it is the stop that keeps a finished run from
+    // compounding forever. The deepest total a stopped run can touch is about
+    // 1.03e27 - the ceiling plus one final click - and runs were measured
+    // clean to twice that through this exact path.
+    massCeiling: 1e27,
+
     // Clicks after which the prompt goes quiet for good.
     promptFadesAt: 3,
+  },
+
+  // -------------------------------------------------------------------------
+  // MATTER - what each kind of thing looks like, and what it is called
+  //
+  // The simulation gates every kind above dust behind research and emits a
+  // BLOCKED event the moment the field has earned a promotion it cannot take.
+  // That event is the arc: it fires exactly when the player has built something
+  // the world does not have a name for yet.
+  //
+  // TEMPERATURE IS THE WHOLE VISUAL LANGUAGE. The renderer colours a body by
+  // its temperature, and with none supplied every object in the universe came
+  // out at the same dull red - which is why the field never appeared to change
+  // no matter what was built in it. These are the colours of the arc: cold
+  // rock, warming worlds, ignition, and the blue-white things at the end.
+  //
+  // COLD MATTER IS NOT A BLACK BODY, and getting that wrong was the second half
+  // of the same complaint. Below about a thousand kelvin an object emits almost
+  // nothing a human eye can see, so what it looks like is what it REFLECTS -
+  // grey silicate, rust-brown regolith, blue-white ice. Painting that band with
+  // the emission law instead gives every cold thing the same saturated red,
+  // because the low end of the black-body curve has no colour information in
+  // it at all. Reflectance below, emission above, crossfaded between the two,
+  // is both the honest law and the one with an actual arc in it.
+  // -------------------------------------------------------------------------
+  matter: {
+    // Kelvin per kind, indexed by the simulation's own kind codes. Physical
+    // enough to be honest, spaced enough to be legible.
+    //   dust rock planetesimal planet gas-giant protostar star giant-star
+    //   white-dwarf neutron-star black-hole, then the aggregate kinds.
+    //
+    // The first four carry most of a run's playing time - a measured arc
+    // reaches a gas giant around click 1270 and a black hole around 2430 - so
+    // they are spread deliberately wide across the cold band rather than
+    // bunched at the bottom of it. Cold grains, a sunlit asteroid, a body being
+    // hammered by accretion, and a young world still molten. A gas giant sits
+    // BELOW a molten planet on purpose: a giant's visible cloud deck really is
+    // cooler than the surface of a world that has not finished forming.
+    // The last five are aggregates - populations drawn as one object because
+    // there are too many of them to resolve - and their temperature is the
+    // luminosity-weighted mean of what is inside. A condensed group at this
+    // scale is mostly unresolved small bodies, so it is warm rather than
+    // stellar; the larger tiers are dominated by starlight and are given it.
+    temperature: [
+      120, 310, 640, 1250, 900, 2600, 5800, 3400,
+      16000, 40000, 22000, 1600, 4200, 4600, 5000, 5400,
+    ],
+
+    // How brightly each kind shines, relative to a main-sequence star at 1.
+    // Indexed the same way.
+    //
+    // This is what makes ignition an EVENT. The aperture exposes for the
+    // brightest thing on screen, so what matters is never a body's absolute
+    // brightness but its brightness beside its neighbours: a field of cold
+    // dust opens the aperture and reads perfectly well, and the moment one
+    // thing in it starts producing its own light everything else sinks into
+    // the dark around it. Flat values here and nothing ever stands out.
+    luminosity: [
+      0.07, 0.11, 0.15, 0.22, 0.30, 0.62, 1.00, 0.88,
+      1.00, 1.25, 1.00, 0.70, 0.70, 0.70, 0.70, 0.70,
+    ],
+
+    // How much a body's own heat may lift it above its kind's temperature, as
+    // a share. Bounded, because heat is not calibrated against anything - what
+    // is being claimed is only that a violently accreting body runs hotter than
+    // a settled one, which is true at any scale.
+    heatLift: 0.45,
+
+    // THE COLOUR OF MATTER THAT DOES NOT GLOW, as stops of kelvin and hue.
+    //
+    // Read as a reflectance ramp: what a surface at that temperature is made
+    // of, and therefore what colour it comes back as. Ices and shadowed grains
+    // are a cold slate; bare silicate is a neutral warm grey; iron-rich
+    // regolith is dun brown; and the last step before a body starts to glow is
+    // a dark scorched rust. Between the stops the colour is interpolated, so
+    // the cold half of the run is a continuous journey rather than four steps.
+    reflectance: [
+      [40, '#6d7f9c'],     // ice and shadowed dust
+      [260, '#8e8b84'],    // bare silicate
+      [640, '#9c7554'],    // iron-rich regolith
+      [1050, '#7f4327'],   // scorched, about to glow
+    ],
+
+    // Where a body stops being lit and starts being a light. Below glowFrom it
+    // is painted entirely by reflectance; above glowFull entirely by emission;
+    // between them the two crossfade. 850 K is about where a surface begins to
+    // show a visible dull red, and by 2400 K its own light is all there is.
+    glowFrom: 850,
+    glowFull: 2400,
+
+    // The coldest and hottest temperatures the colour ramp resolves. Anything
+    // outside is clamped to the end. The cold floor is well under the coldest
+    // kind so the ramp has room to be a ramp there.
+    coldest: 40,
+    hottest: 46000,
+
+    // HOW MUCH OF A BODY IS GLOW, at the cold end of the ramp. Each is applied
+    // to a cold body and lifted toward 1 as it becomes an emitter, so the same
+    // crossfade that decides a body's colour decides its form.
+    //
+    // These are the numbers that answer "why does everything look like a
+    // glowing ball". Every body was drawn as a bright core inside a halo five
+    // radii wide, which is a fair picture of a star and a completely wrong one
+    // of a rock: an asteroid has no corona, and it has no glowing centre
+    // either. Its light comes off a SURFACE, and the renderer already draws a
+    // limb-darkened sphere for that - it was simply being washed out from
+    // underneath by a glow that should not have been there.
+    corona: 0.14,        // halo strength on cold matter
+    // AND HOW FAR IT REACHES, as a multiple of the body's own radius. The
+    // brightness of the glow and the size of it are separate questions and
+    // only fixing the first leaves a fainter fog around everything. A rock's
+    // light stops at its surface; a star's does not.
+    coronaReach: 1.18,
+    coreGlow: 0.16,      // central glow on a cold body once it has an edge
+    surface: 0.95,       // strength of the lit sphere on cold matter
+
+    // SURFACE DETAIL on bodies large enough to show it.
+    //
+    // A perfectly smooth disc reads as a gradient, not as a place, because a
+    // radial falloff is what a gradient IS - the eye has nothing to catch on
+    // and calls it a glow. Patches of differing albedo, half of them brighter
+    // and half of them darker, break that: the average stays where the aperture
+    // put it and the face acquires terrain. They are placed by the body's own
+    // identity, so a rock has the same face every time it is looked at and
+    // nothing shimmers.
+    //
+    // Bounded hard: only bodies above a real size on screen qualify, and only a
+    // few of them per frame, because this is the one part of the body pass
+    // whose cost is not already fixed. Set patches to 0 to switch it off.
+    detailMinPx: 14,     // screen radius under which a body has no visible terrain
+    detailBodies: 12,    // most bodies given terrain in one frame
+    detailPatches: 9,    // patches on each, about half of them dark
+    // Per patch, and low on purpose: several land on the same face and their
+    // effect ADDS, so a value that looks right for one floods the body with
+    // nine and the terrain becomes the surface instead of a variation in it.
+    detailAlpha: 0.22,   // how far one patch lifts or sinks the surface under it
+
+    // What the field says when it first makes something it has no name for.
+    // The blank prefix keeps the line as quiet as the rest of the game.
+    discoveryPrefix: '',
   },
 
   // -------------------------------------------------------------------------
@@ -128,9 +352,72 @@ export const CONFIG = {
   // CAMERA - how the view moves
   // -------------------------------------------------------------------------
   camera: {
-    // Scroll wheel steps per notch. The camera reads scale as ratio per
-    // second, so this is a multiplier's worth of zoom, not a distance.
-    zoomStep: 1,
+    // DECADES OF ZOOM PER WHEEL NOTCH.
+    //
+    // It was one, which is a factor of TEN per notch, and it was being applied
+    // on top of the renderer's own handler rather than instead of it - so a
+    // single notch moved the view more than a decade and did it twice, toward
+    // two different anchors. The scroll was uncontrollable and this is why.
+    //
+    // At this setting a notch is about forty per cent, which is a step a hand
+    // can aim with, and a decade takes six of them.
+    zoomStep: 0.16,
+
+    // WHAT COUNTS AS ONE NOTCH, IN WHEEL PIXELS.
+    //
+    // A mouse detent reports about a hundred and twenty; a trackpad reports a
+    // few, dozens of times a second. Reading the SIGN of the wheel and calling
+    // it a notch is right for the first and ruinous for the second - a light
+    // two-finger flick delivered thirty events, each worth a full notch, and
+    // moved the view five orders of magnitude. Dividing by this makes a mouse
+    // behave exactly as it did and makes a trackpad proportional to the gesture.
+    wheelPixelsPerNotch: 120,
+
+    // HOW MUCH OF THE SHORT SIDE OF THE SCREEN THE FIELD FILLS.
+    //
+    // Measured: at 0.62 the run sits in frame with a clear margin all the way
+    // round and the light around its edge is inside the glass rather than cut
+    // off by it. Higher crowds the instrumentation in the corners; much lower
+    // and the field reads as a small object being looked at rather than as the
+    // thing the screen is for.
+    frameFill: 0.62,
+
+    // HOW LONG THE FRAME TAKES TO PULL BACK, AND TO CLOSE BACK IN, in seconds.
+    //
+    // Different on purpose, and the asymmetry is the whole trick. An
+    // exponential ease lags a growing target by rate times its time constant,
+    // permanently - so the pull-back constant is literally how far out of frame
+    // the field's growth is allowed to push it, and it is short. Closing in is
+    // long because a field shrinks when it MERGES, and a camera that chased
+    // every merge would dive at the survivor each time two things touched.
+    pullBackSeconds: 0.85,
+    closeInSeconds: 3.2,
+
+    // THE FASTEST THE VIEW MAY CHANGE SCALE, in decades per second.
+    //
+    // A decade every two seconds reads unmistakably as travelling through
+    // scale. Ten times that reads as a cut. Measured before this existed: a
+    // single frame moved the view two hundred and fifty decades per second.
+    maxDecadesPerSecond: 0.5,
+
+    // HOW LONG THE FRAME TAKES TO SLIDE ACROSS TO WHERE THE FIELD IS, seconds.
+    // The field drifts under its own momentum and the frame goes with it; too
+    // quick and the vacuum appears to slide about, too slow and the field sits
+    // against an edge.
+    followSeconds: 0.55,
+
+    // HOW FAR PAST THE FIELD THE PLAYER MAY DRAG, in half-screens.
+    //
+    // There is exactly one thing to look at in this game and it is very easy to
+    // put it behind an edge of the screen and have no way to tell which edge.
+    // The limit is measured from the far side of the field rather than from the
+    // middle of the screen, which makes it a promise that holds at any zoom: at
+    // full drag the near side of the field is still this fraction of the way
+    // from the middle of the screen to its nearest edge. Measured over a run
+    // and a five thousand pixel drag, fifteen of eighteen bodies stay in frame
+    // here; at 0.9 only three do, and what is left is the outer glow.
+    // Escape, Home or 0 returns to the automatic frame from anywhere.
+    panLimitScreens: 0.45,
   },
 
   // -------------------------------------------------------------------------

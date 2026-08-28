@@ -100,7 +100,10 @@
  *     aggregates: Aggregate[],   // statistical populations
  *     events:   Event[],         // visual events since last frame; drained by the renderer
  *     focus:    id | null,       // what the camera should frame
- *     extent:   Number,          // radius in meters of the whole run, if known
+ *     extent:   Number,          // radius in meters of the whole run. FALLBACK
+ *                                // ONLY: the frame is measured from the bodies
+ *                                // and aggregates handed over, and this is
+ *                                // read only when there are none of either.
  *   }
  *
  *   Frame = {
@@ -253,13 +256,26 @@ export const CONFIG = {
 
   // --- camera --------------------------------------------------------------
   zoomTauPlayer: 0.34,        // s. player input must feel immediate
-  zoomTauAuto: 2.6,           // s. world growth must feel geological
-  panTau: 0.22,
+  zoomTauExpand: 0.85,        // s. pulling BACK as the field grows
+  zoomTauContract: 3.2,       // s. closing back in after the field shrinks
+  zoomMaxRate: 0.5,           // decades per second, hard ceiling on auto reframing
+  followTau: 0.55,            // s. how fast the frame slides to keep the field centred
   frameFill: 0.62,            // subject occupies this fraction of the short axis
+  frameLimit: 0.94,           // and is never allowed past this fraction of it
+  frameBodyHaloMul: 3,        // a body's light reaches this multiple of its radius
+  frameAggMul: 2.2,           // an aggregate's visible extent, in rms
+  frameSampleCap: 2048,       // bodies measured per frame when framing
   zoomPerWheelNotch: 0.16,    // decades
+  wheelPixelsPerNotch: 120,   // wheel delta that counts as one full notch
+  wheelLinePx: 40,            // px per line, for browsers reporting deltaMode 1
+  wheelMaxNotches: 1.5,       // most a single wheel event may be worth
+  wheelPinchMul: 3,           // ctrl+wheel is the trackpad pinch, whose deltas are small
   zoomClampDecades: 6.5,      // how far the player may stray from the auto frame
+  panLimitScreens: 0.45,      // how far past the subject the player may drag
   minLogPPM: -46,
   maxLogPPM: 12,
+  stratumHysteresisDecades: 0.15,   // past a boundary before the crossing counts
+  stratumMinIntervalMs: 2600,       // and no two crossings closer together than this
 
   // --- legibility floors ----------------------------------------------------
   discPx: 1.35,               // below this screen radius a body becomes a point source
@@ -267,6 +283,28 @@ export const CONFIG = {
   haloMul: 5.2,               // halo radius multiple for an unresolved point
   haloResolvedMul: 2.0,       // halo radius multiple once a body has an edge
   haloMinPx: 4.5,
+
+  // --- matter: reflectance, emission, and how much of a body is glow --------
+  //
+  // Defaults. A host that has its own view of what matter looks like hands
+  // these over through setSpectrum(), which is the only way to change them:
+  // the colour ramp and the sprite atlas are both baked from them, so writing
+  // to this object alone would leave the baked copies behind.
+  coldestK: 40,               // bottom of the colour ramp
+  hottestK: 46000,            // top of it
+  glowFromK: 850,             // where emission becomes visible at all
+  glowFullK: 2400,            // where it is the only thing you see
+  reflectance: [              // the colour of matter that does not glow
+    [40, '#6d7f9c'], [260, '#8e8b84'], [640, '#9c7554'], [1050, '#7f4327'],
+  ],
+  coronaCold: 0.14,           // halo strength on cold matter, lifted to 1 as it emits
+  coronaReachCold: 1.18,      // and how far it reaches, as a multiple of the radius
+  coreGlowCold: 0.16,         // central glow on a cold body once it has an edge
+  surfaceCold: 0.95,          // strength of the lit sphere on cold matter
+  detailMinPx: 14,            // screen radius under which a body has no visible terrain
+  detailBodies: 12,           // most bodies given terrain in one frame
+  detailPatches: 9,           // patches on each, half of them dark
+  detailAlpha: 0.22,          // how far one patch lifts or sinks the surface
 
   // --- exposure -------------------------------------------------------------
   exposureTau: 1.35,          // s. slow enough to feel like an eye, not a filter
@@ -357,22 +395,74 @@ function hash3(x, y, s) {
 // =============================================================================
 //
 // There is no palette to art-direct, which is the point: the only chromatic
-// decisions available are physical ones. Cold matter is a dim red-brown, a
-// young star is blue-white, an old one is amber, and a whole galaxy is the
-// luminosity-weighted mean of its population. That produces a coherent adult
-// palette for free and it can never drift toward cute. The three colours in the
-// game that are NOT blackbody are the void (true black), the photon ring (near
+// decisions available are physical ones. That produces a coherent adult palette
+// for free and it can never drift toward cute. The three colours in the game
+// that are NOT on this ramp are the void (true black), the photon ring (near
 // white with a hair of blue, because it is beamed light not thermal light), and
 // the HUD (a desaturated ice tone that reads as instrumentation, not matter).
+//
+// TWO LAWS, NOT ONE, and that is the whole of a defect worth naming. Painting
+// everything with the black-body curve is right for anything that produces its
+// own light and badly wrong for anything that does not, because the curve has
+// no colour information below about 1500 K - it is red, then slightly less red,
+// then black. A run that spends its first hour making dust, rock and worlds
+// therefore spends its first hour entirely in one dull red, and no amount of
+// re-spacing the temperatures fixes it, because the temperatures were never the
+// thing that was flat.
+//
+// Cold matter is seen by REFLECTED light, so its colour is its material: slate
+// ice, grey silicate, rust-brown regolith. Hot matter is seen by its own, so
+// its colour is the curve. The ramp below is reflectance at the bottom,
+// emission at the top, and a crossfade across the band where a surface starts
+// to glow visibly - which is the honest law and also the one with an arc in it.
+//
+// It stays a ONE DIMENSIONAL ramp indexed by temperature alone, and that is not
+// a compromise: it keeps the sprite atlas at one row of buckets per profile,
+// which is the reason thousands of glowing things hold 60fps.
 
 const BB_STEPS = 96;
-const BB_MIN_LOGT = Math.log10(420);
-const BB_MAX_LOGT = Math.log10(46000);
+let BB_MIN_LOGT = Math.log10(CONFIG.coldestK);
+let BB_MAX_LOGT = Math.log10(CONFIG.hottestK);
 const bbR = new Uint8Array(BB_STEPS);
 const bbG = new Uint8Array(BB_STEPS);
 const bbB = new Uint8Array(BB_STEPS);
 
-(function buildBlackbodyLUT() {
+/** Parse '#rrggbb' once, at build time. Never called from the draw path. */
+function hexRGB(s) {
+  const h = String(s).replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** The colour a non-glowing surface at T comes back as, from the config stops. */
+function reflectanceAt(T, stops) {
+  if (!stops || !stops.length) return [140, 138, 132];
+  let a = stops[0], b = stops[stops.length - 1];
+  if (T <= a[0]) return hexRGB(a[1]);
+  if (T >= b[0]) return hexRGB(b[1]);
+  for (let i = 1; i < stops.length; i++) {
+    if (T <= stops[i][0]) { a = stops[i - 1]; b = stops[i]; break; }
+  }
+  // Interpolated in log temperature, matching the ramp's own axis, so the
+  // stops sit where they were written no matter how they are spaced.
+  const u = (Math.log10(T) - Math.log10(a[0])) / (Math.log10(b[0]) - Math.log10(a[0]) || 1e-9);
+  const ca = hexRGB(a[1]), cb = hexRGB(b[1]);
+  return [lerp(ca[0], cb[0], u), lerp(ca[1], cb[1], u), lerp(ca[2], cb[2], u)];
+}
+
+/**
+ * How much of what you see at T is the body's OWN light. 0 is a lit rock, 1 is
+ * a star. Used for colour here and, in the body pass, to decide how much of a
+ * body is a glow and how much of it is a surface - which is the same question
+ * asked twice and has to be answered the same way both times.
+ */
+export function emissionAt(T) {
+  return smoothstep(CONFIG.glowFromK, CONFIG.glowFullK, T || 0);
+}
+
+function buildSpectrum() {
+  BB_MIN_LOGT = Math.log10(Math.max(1, CONFIG.coldestK));
+  BB_MAX_LOGT = Math.log10(Math.max(CONFIG.coldestK * 1.1, CONFIG.hottestK));
+  const stops = CONFIG.reflectance;
   for (let i = 0; i < BB_STEPS; i++) {
     const t = Math.pow(10, lerp(BB_MIN_LOGT, BB_MAX_LOGT, i / (BB_STEPS - 1)));
     const k = t / 100;
@@ -384,19 +474,33 @@ const bbB = new Uint8Array(BB_STEPS);
     if (k >= 66) b = 255;
     else if (k <= 19) b = 0;
     else b = clamp(138.5177312231 * Math.log(k - 10) - 305.0447927307, 0, 255);
-    // Lift the deep-red end off pure black. A 500K grain that renders as
-    // (60, 6, 0) is invisible against the field; the eye needs a little
-    // chroma to accept it as an object rather than as compression noise.
-    const lift = smoothstep(1600, 400, t) * 26;
-    bbR[i] = clamp(r + lift * 0.35, 0, 255);
-    bbG[i] = clamp(g + lift * 0.55, 0, 255);
-    bbB[i] = clamp(b + lift, 0, 255);
-  }
-})();
+    // Lift the deep-red end off pure black. A 900 K ember that renders as
+    // (110, 6, 0) is nearly invisible against the field; the eye needs a little
+    // chroma to accept it as an object rather than as compression noise. It is
+    // only ever applied where emission is taking over, so it never tints the
+    // reflectance half of the ramp.
+    const lift = smoothstep(1600, 500, t) * 26;
+    r = clamp(r + lift * 0.35, 0, 255);
+    g = clamp(g + lift * 0.55, 0, 255);
+    b = clamp(b + lift, 0, 255);
 
-/** Index into the blackbody LUT for a temperature in kelvin. */
+    const e = emissionAt(t);
+    const s = reflectanceAt(t, stops);
+    bbR[i] = clamp(Math.round(lerp(s[0], r, e)), 0, 255);
+    bbG[i] = clamp(Math.round(lerp(s[1], g, e)), 0, 255);
+    bbB[i] = clamp(Math.round(lerp(s[2], b, e)), 0, 255);
+  }
+}
+buildSpectrum();
+
+/** The temperature a colour-ramp index stands for. The inverse of bbIndex. */
+function bbTemperature(i) {
+  return Math.pow(10, lerp(BB_MIN_LOGT, BB_MAX_LOGT, i / (BB_STEPS - 1)));
+}
+
+/** Index into the colour ramp for a temperature in kelvin. */
 function bbIndex(T) {
-  const lt = Math.log10(clamp(T || 1200, 420, 46000));
+  const lt = Math.log10(clamp(T || 1200, Math.pow(10, BB_MIN_LOGT), Math.pow(10, BB_MAX_LOGT)));
   return clamp(Math.round(((lt - BB_MIN_LOGT) / (BB_MAX_LOGT - BB_MIN_LOGT)) * (BB_STEPS - 1)), 0, BB_STEPS - 1);
 }
 
@@ -405,6 +509,26 @@ export function blackbody(T, alpha) {
   const i = bbIndex(T);
   if (alpha === undefined) return `rgb(${bbR[i]},${bbG[i]},${bbB[i]})`;
   return `rgba(${bbR[i]},${bbG[i]},${bbB[i]},${alpha})`;
+}
+
+/**
+ * Re-decide what matter looks like.
+ *
+ * The colour ramp and every sprite in the atlas are BAKED from the values in
+ * CONFIG, so assigning to CONFIG on its own changes nothing that is already on
+ * screen. This is the supported way in: it takes the same keys, writes them,
+ * rebuilds the ramp, and re-bakes every atlas that has been built so far.
+ *
+ * @param {object} spec any of coldestK, hottestK, glowFromK, glowFullK,
+ *        reflectance, coronaCold, coreGlowCold, surfaceCold, detail*
+ */
+export function setSpectrum(spec) {
+  if (!spec) return;
+  for (const k of Object.keys(spec)) {
+    if (spec[k] !== undefined && k in CONFIG) CONFIG[k] = spec[k];
+  }
+  buildSpectrum();
+  for (let i = 0; i < ATLASES.length; i++) ATLASES[i].build();
 }
 
 const HUD_RGB = '176,203,222';
@@ -505,24 +629,40 @@ const ATLAS_BUCKETS = 24;
 const STAMP_PX = 96;
 const STAMP_R = STAMP_PX / 2;
 
+/**
+ * Every atlas built so far. setSpectrum re-bakes them: the sprites carry the
+ * colour ramp inside them, so a ramp that changes after an atlas is built would
+ * otherwise leave the old colours on screen with no way to tell.
+ */
+const ATLASES = [];
+
 class Atlas {
   constructor() {
     this.stamps = [];       // [profile][bucket] -> canvas
     this.build();
+    ATLASES.push(this);
   }
 
   build() {
+    // Rebuilt in place, so a re-bake replaces the sprites rather than stacking
+    // a second set of rows behind them.
+    this.stamps.length = 0;
     for (let p = 0; p < PROFILES.length; p++) {
       const row = [];
       for (let b = 0; b < ATLAS_BUCKETS; b++) {
         const lutIndex = Math.round((b / (ATLAS_BUCKETS - 1)) * (BB_STEPS - 1));
-        row.push(this.makeStamp(PROFILES[p], bbR[lutIndex], bbG[lutIndex], bbB[lutIndex]));
+        // How much of this bucket is a body's OWN light. Baked in, because the
+        // rules that make an emitter look like an emitter - a white-hot centre,
+        // a bleached limb - are exactly the rules that make lit rock look like
+        // a lightbulb when they are applied to it.
+        const emit = emissionAt(bbTemperature(lutIndex));
+        row.push(this.makeStamp(PROFILES[p], bbR[lutIndex], bbG[lutIndex], bbB[lutIndex], emit));
       }
       this.stamps.push(row);
     }
   }
 
-  makeStamp(prof, r, g, b) {
+  makeStamp(prof, r, g, b, emit) {
     const c = document.createElement('canvas');
     c.width = c.height = STAMP_PX;
     const x = c.getContext('2d');
@@ -532,12 +672,22 @@ class Atlas {
       // sqrt(1 - (r/R)^2), which is the projection of a uniformly lit sphere,
       // and the alpha holds at one until the very edge so the silhouette is
       // crisp. This is the stamp that makes a planet a planet.
+      //
+      // The exponent on the falloff is a balance between two failures. Too flat
+      // and the face is nearly uniform, which matters because the aperture
+      // drives the brightest few per cent of the picture to just under clipping
+      // - so a uniform face is a face driven entirely to white, with no hue left
+      // in it. Too steep and the body has no edge, only a fade, which is the
+      // gradient that reads as a glow rather than as a thing.
       for (let i = 0; i <= 26; i++) {
         const u = i / 26;
         const q = u / 0.5;
-        const limb = q < 1 ? Math.pow(Math.sqrt(1 - q * q), 0.62) : 0;
+        const limb = q < 1 ? Math.pow(Math.sqrt(1 - q * q), 0.72) : 0;
         const a = u < 0.472 ? 1 : u < 0.5 ? 1 - (u - 0.472) / 0.028 : 0;
-        const w = limb * 0.45;
+        // Bright emitters desaturate toward white; lit rock does not. A grey
+        // body's brightest point is still grey, and washing it out was part of
+        // why every object came back looking like the same white ball.
+        const w = limb * 0.45 * emit;
         const rr = Math.round(lerp(r * limb, 255, w * w));
         const gg = Math.round(lerp(g * limb, 255, w * w));
         const bb = Math.round(lerp(b * limb, 255, w * w));
@@ -555,8 +705,10 @@ class Atlas {
       if (u < prof.inner) a = 1;
       // Hot cores desaturate toward white the way any bright emitter does on a
       // display. Without this, a bright star is a saturated orange disc, which
-      // reads as cartoon rather than as light.
-      const w = Math.pow(1 - u, 6) * 0.72;
+      // reads as cartoon rather than as light. Scaled by how much of this
+      // temperature's colour is emission, so cold matter is not bleached by a
+      // rule that only applies to things producing their own light.
+      const w = Math.pow(1 - u, 6) * 0.72 * emit;
       const rr = Math.round(lerp(r, 255, w));
       const gg = Math.round(lerp(g, 255, w));
       const bb = Math.round(lerp(b, 255, w));
@@ -588,22 +740,41 @@ const PROF_CORE = 0, PROF_HALO = 1, PROF_VEIL = 2, PROF_DISC = 3;
 // the wheel. That property is the entire answer to "the player must never be
 // lost between scales".
 //
-// Two damping constants, and the difference between them is deliberate. Player
-// zoom resolves in about a third of a second because input that lags feels
-// broken. Automatic reframing resolves over two and a half seconds because a
-// view that snaps when the world grows feels like the game took the camera
-// away. The player should be able to feel the world getting larger without ever
-// catching the camera moving.
+// THE CAMERA HAS A POSITION AS WELL AS A SCALE, and forgetting that was worth
+// an entire blank screen. Framing only the SIZE of the field leaves the view
+// pinned at the origin while the field itself drifts off under its own
+// momentum, and the moment a run merges down to one body - small, and a long
+// way from where it started - the camera obediently zooms in on an empty patch
+// of vacuum where the run used to be. So the frame follows the middle of what
+// is actually there, and sizes itself to reach the furthest thing FROM THAT
+// MIDDLE, and the two together are what make "the field is always on screen"
+// something the camera guarantees rather than something it usually manages.
+//
+// Three damping constants, and the differences between them are deliberate.
+// Player zoom resolves in about a third of a second because input that lags
+// feels broken. Pulling back as the world grows takes about a second, which is
+// slow enough not to look like a reaction and quick enough that growth never
+// outruns the frame. Closing back in takes three, because a field that has just
+// shrunk is a field that just merged, and diving at the survivor of every merge
+// would be unbearable. Above all of them sits a ceiling on decades per second,
+// so no single event can move the view faster than the eye reads as motion.
 
 class Camera {
   constructor() {
     this.logPPM = 1.6;        // log10(pixels per meter). the whole zoom state
     this.targetLogPPM = 1.6;
     this.autoLogPPM = 1.6;
+    this.autoSmoothed = undefined;   // set on the first frame that has a subject
+    this.limitLogPPM = undefined;    // the most zoomed-in the auto frame may be
     this.zoomOffset = 0;      // decades. the player's opinion, preserved forever
+    this.offsetApplied = 0;   // how much of that opinion has actually arrived
     this.x = 0; this.y = 0;   // in anchor-frame local units
     this.tx = 0; this.ty = 0;
-    this.panOffX = 0; this.panOffY = 0;   // screen px, player pan, decays slowly
+    this.panOffX = 0; this.panOffY = 0;   // screen px, player pan
+    this.anchorX = 0; this.anchorY = 0;   // screen px from centre, the zoom anchor
+    this.homing = false;      // easing every offset back to the automatic frame
+    this.subjectMeters = 0;   // what the frame is sized against, in meters
+    this.solidMeters = 0;     // and how far the matter in it actually reaches
     this.anchorExp = 0;
     this.anchorFrame = null;
     this.settled = 1;         // 0 while scale is changing. drives HUD brightness
@@ -615,28 +786,118 @@ class Camera {
   get ppm() { return Math.pow(10, this.logPPM); }
 
   /**
-   * Frame the given subject radius (in meters). Called every frame with
-   * whatever the world says its largest coherent extent is.
+   * Frame the given subject radius (in meters), measured about where the camera
+   * is currently looking. Called every frame.
+   *
+   * Two scales come out of it. `autoLogPPM` is where the frame WANTS to be, and
+   * the easing below is free to lag behind it. `limitLogPPM` is where the frame
+   * MUST be by, because past it the subject no longer fits on the screen at
+   * all - so however slow the easing is, it can never be slow enough to let the
+   * field walk out of frame.
    */
-  aim(subjectMeters, shortAxisPx) {
+  aim(subjectMeters, shortAxisPx, solidMeters) {
     if (!(subjectMeters > 0) || !isFinite(subjectMeters)) return;
-    const want = Math.log10((shortAxisPx * CONFIG.frameFill) / (2 * subjectMeters));
-    this.autoLogPPM = want;
+    const across = 2 * subjectMeters;
+    this.subjectMeters = subjectMeters;
+    this.solidMeters = solidMeters > 0 && isFinite(solidMeters) ? solidMeters : subjectMeters;
+    this.autoLogPPM = Math.log10((shortAxisPx * CONFIG.frameFill) / across);
+    this.limitLogPPM = Math.log10((shortAxisPx * CONFIG.frameLimit) / across);
   }
 
-  step(dt) {
+  /** Look at this point, in anchor-frame local units. */
+  follow(x, y) {
+    if (!isFinite(x) || !isFinite(y)) return;
+    this.tx = x; this.ty = y;
+  }
+
+  step(dt, halfW, halfH) {
     this.zoomOffset = clamp(this.zoomOffset, -CONFIG.zoomClampDecades, CONFIG.zoomClampDecades);
     const auto = clamp(this.autoLogPPM, CONFIG.minLogPPM, CONFIG.maxLogPPM);
-    // Auto framing is damped separately and slowly, then the player's offset is
-    // added on top and damped fast. Composing them this way is what lets the
-    // world grow without ever yanking a player who is holding a framing.
-    this.autoSmoothed = damp(this.autoSmoothed === undefined ? auto : this.autoSmoothed,
-      auto, CONFIG.zoomTauAuto, dt);
-    this.targetLogPPM = clamp(this.autoSmoothed + this.zoomOffset, CONFIG.minLogPPM, CONFIG.maxLogPPM);
-    this.logPPM = damp(this.logPPM, this.targetLogPPM, CONFIG.zoomTauPlayer, dt);
+    // No opening transient. The camera starts at whatever framing the first
+    // subject asks for rather than easing to it from a constant in the source.
+    if (this.autoSmoothed === undefined) this.autoSmoothed = auto;
 
-    this.x = damp(this.x, this.tx, CONFIG.panTau, dt);
-    this.y = damp(this.y, this.ty, CONFIG.panTau, dt);
+    // THE AUTO FRAME IS ASYMMETRIC, AND THAT IS THE WHOLE OF IT.
+    //
+    // Pulling BACK is what keeps the run visible, so it is quick. Closing back
+    // IN is a comfort, so it is slow - a merge can halve the field's extent
+    // between one frame and the next, and a camera that chased that would dive
+    // at the survivor every time two things touched.
+    //
+    // An exponential approach lags a moving target by rate * tau, permanently,
+    // and the field grows continuously all run - so the tau chosen here is
+    // exactly how far out of frame the growth is allowed to push things.
+    const tau = auto < this.autoSmoothed ? CONFIG.zoomTauExpand : CONFIG.zoomTauContract;
+    let next = damp(this.autoSmoothed, auto, tau, dt);
+
+    // Scale change is read as a RATIO PER SECOND, because that is what the eye
+    // reads it as: a decade every two seconds is unmistakably motion through
+    // scale, and ten times that is a cut. Capping the rate here rather than
+    // slowing the easing everywhere leaves ordinary growth alone and only
+    // touches the moments that would otherwise snap.
+    const maxStep = CONFIG.zoomMaxRate * dt;
+    if (next - this.autoSmoothed > maxStep) next = this.autoSmoothed + maxStep;
+    else if (next - this.autoSmoothed < -maxStep) next = this.autoSmoothed - maxStep;
+
+    // And the containment floor, which outranks both. Being smooth is worth a
+    // great deal; it is not worth the field leaving the screen.
+    if (this.limitLogPPM !== undefined && next > this.limitLogPPM) next = this.limitLogPPM;
+    this.autoSmoothed = next;
+
+    // The player's offset rides on top with its own fast constant. It is damped
+    // SEPARATELY rather than the sum being damped again, so that the auto frame
+    // arrives already smoothed instead of collecting a second lag on the way -
+    // that second lag was worth almost a full decade of framing error while the
+    // field was growing, which is a factor of ten in how big the run looked.
+    const prevApplied = this.offsetApplied;
+    this.offsetApplied = damp(this.offsetApplied, this.zoomOffset, CONFIG.zoomTauPlayer, dt);
+    // Where the view is heading, and where it has got to. Both are reported
+    // rather than only the second, because a host asking "is the camera still
+    // moving" is asking about the difference between them.
+    this.targetLogPPM = clamp(this.autoSmoothed + this.zoomOffset, CONFIG.minLogPPM, CONFIG.maxLogPPM);
+    this.logPPM = clamp(this.autoSmoothed + this.offsetApplied, CONFIG.minLogPPM, CONFIG.maxLogPPM);
+
+    // Keep the point the player zoomed at underneath the cursor, and keep it
+    // there for the WHOLE of the movement. Applying the correction in one go at
+    // the moment of the notch, while the zoom itself arrives over a third of a
+    // second, threw the anchor away from the cursor and walked it back - which
+    // reads as the view sliding out from under the pointer.
+    //
+    // Not while going home: the anchor exists to preserve a framing the player
+    // chose, and the whole meaning of going home is that they no longer want
+    // it. Unwinding a deep zoom about a held anchor would multiply the drag by
+    // the same factor it is unwinding, which sends the frame further away
+    // before it comes back.
+    const f = this.homing ? 1 : Math.pow(10, this.offsetApplied - prevApplied);
+    if (f !== 1) {
+      this.panOffX = (this.panOffX - this.anchorX) * f + this.anchorX;
+      this.panOffY = (this.panOffY - this.anchorY) * f + this.anchorY;
+    }
+    // Going home is a MOVEMENT, not a cut. The zoom unwinds by itself, because
+    // the offset it is unwinding toward is already zero and the offset the view
+    // is actually using follows it on the player's own constant. The drag has
+    // no such target, so it gets one for as long as it takes to arrive.
+    if (this.homing) {
+      this.panOffX = damp(this.panOffX, 0, CONFIG.zoomTauPlayer, dt);
+      this.panOffY = damp(this.panOffY, 0, CONFIG.zoomTauPlayer, dt);
+      if (Math.abs(this.panOffX) < 0.05 && Math.abs(this.panOffY) < 0.05 &&
+          Math.abs(this.offsetApplied) < 1e-3) {
+        this.panOffX = 0; this.panOffY = 0; this.offsetApplied = 0; this.homing = false;
+      }
+    }
+    this.clampPan(halfW, halfH);
+
+    // The frame slides to keep the field in the middle of it. Gliding is right
+    // for the ordinary case - the field creeping sideways under its own
+    // momentum - and wrong for a discontinuity: if what the camera is meant to
+    // be looking at is further away than the whole screen, everything between
+    // here and there is vacuum, and travelling across it in slow motion shows
+    // the player a long nothing instead of their run.
+    const jump = Math.hypot(this.tx - this.x, this.ty - this.y) *
+      Math.pow(10, this.logPPM + this.anchorExp);
+    if (jump > Math.min(halfW || 0, halfH || 0) * 2) { this.x = this.tx; this.y = this.ty; }
+    this.x = damp(this.x, this.tx, CONFIG.followTau, dt);
+    this.y = damp(this.y, this.ty, CONFIG.followTau, dt);
 
     const d = (this.logPPM - this.lastLogPPM) / Math.max(dt, 1e-4);
     this.velDecades = damp(this.velDecades, d, 0.10, dt);
@@ -649,20 +910,65 @@ class Camera {
     this.settled = damp(this.settled, 1 - activity, CONFIG.hudFadeTau, dt);
   }
 
-  /** Zoom by a number of decades, keeping the point under (sx, sy) fixed. */
-  zoomAt(decades, sx, sy, halfW, halfH) {
-    const before = this.zoomOffset;
-    this.zoomOffset = clamp(this.zoomOffset + decades, -CONFIG.zoomClampDecades, CONFIG.zoomClampDecades);
-    const applied = this.zoomOffset - before;
-    if (applied === 0) return;
-    // Keep the cursor anchored: the offset from centre scales with the zoom.
-    const f = Math.pow(10, applied);
-    this.panOffX = (this.panOffX - (sx - halfW)) * f + (sx - halfW);
-    this.panOffY = (this.panOffY - (sy - halfH)) * f + (sy - halfH);
+  /**
+   * How far the player may drag away from the automatic frame.
+   *
+   * Unbounded panning is a way to lose the entire run behind an edge of a
+   * screen that has nothing else on it to steer back by, in a game whose only
+   * content is the one thing that was just dragged out of sight.
+   *
+   * The bound is stated against the FIELD rather than against the screen, and
+   * that is what makes it mean something at every zoom. The view may be carried
+   * out until the far side of the field is this far past the middle of the
+   * screen - so below one it is a promise that some of the run is always still
+   * in frame - and because the field's own size on screen is the first term, a
+   * player who has zoomed in ten decades can still travel the whole of what
+   * they have magnified.
+   *
+   * MATTER, not the light around it. Framing counts a body out to the reach of
+   * its glow, which is right for deciding how much room to leave and wrong
+   * here: measured against the glow, a deep zoom could be dragged until the
+   * only thing left on screen was the faint outer halo of a body whose surface
+   * was six thousand pixels away, which looks exactly like empty vacuum.
+   */
+  clampPan(halfW, halfH) {
+    if (!(halfW > 0) || !(halfH > 0)) return;
+    const onScreenR = this.solidMeters > 0
+      ? this.solidMeters * Math.pow(10, this.logPPM) : 0;
+    const reach = onScreenR + Math.min(halfW, halfH) * CONFIG.panLimitScreens;
+    const d = Math.hypot(this.panOffX, this.panOffY);
+    if (d > reach && d > 0) {
+      const s = reach / d;
+      this.panOffX *= s; this.panOffY *= s;
+    }
   }
 
-  panBy(dx, dy) { this.panOffX += dx; this.panOffY += dy; }
-  resetOffsets() { this.zoomOffset = 0; this.panOffX = 0; this.panOffY = 0; }
+  /** Zoom by a number of decades, keeping the point under (sx, sy) fixed. */
+  zoomAt(decades, sx, sy, halfW, halfH) {
+    this.homing = false;
+    this.zoomOffset = clamp(this.zoomOffset + decades,
+      -CONFIG.zoomClampDecades, CONFIG.zoomClampDecades);
+    this.anchorX = sx - halfW;
+    this.anchorY = sy - halfH;
+  }
+
+  panBy(dx, dy, halfW, halfH) {
+    this.homing = false;
+    this.panOffX += dx; this.panOffY += dy;
+    this.clampPan(halfW, halfH);
+  }
+
+  /**
+   * Back to the automatic frame from wherever the player has got to. Every
+   * offset is set to unwind on the same constant the player's own input uses,
+   * so this is a movement they can watch rather than a cut that leaves them
+   * working out what just happened to their view.
+   */
+  resetOffsets() {
+    this.zoomOffset = 0;
+    this.anchorX = 0; this.anchorY = 0;
+    this.homing = true;
+  }
 }
 
 // =============================================================================
@@ -2008,7 +2314,9 @@ class Renderer {
     this.bctxB = this.bloomB.getContext('2d');
 
     this.w = 0; this.h = 0; this.dpr = 1; this.diag = 1000;
-    this.pointer = { x: 0, y: 0, inside: false, warm: 0, down: false, lx: 0, ly: 0 };
+    this.pointer = { x: 0, y: 0, inside: false, warm: 0, down: false, lx: 0, ly: 0, seen: false };
+    this.stratumName = null;    // the band the automatic frame was last in
+    this.stratumAt = -1e9;      // when it last changed, ms
     this.tier = 0;              // 0 best .. 3 worst
     this.overFrames = 0; this.underFrames = 0;
     this.bounces = 0; this.sinceTierChange = 0; this.lastChangeWasPromotion = false;
@@ -2027,6 +2335,17 @@ class Renderer {
     this.renderedI = new Int32Array(CONFIG.maxDiscs);
     this.renderedN = 0;
     this.lastBodies = null;
+    // Bodies queued for the surface-detail pass. Preallocated at the ceiling
+    // in CONFIG so the pass allocates nothing per frame, like everything else
+    // in the draw path.
+    const SD = Math.max(1, CONFIG.detailBodies | 0);
+    this.surfX = new Float32Array(SD);
+    this.surfY = new Float32Array(SD);
+    this.surfR = new Float32Array(SD);
+    this.surfT = new Float32Array(SD);
+    this.surfA = new Float32Array(SD);
+    this.surfS = new Int32Array(SD);
+    this.surfN = 0;
     this.tetherA = new Int32Array(CONFIG.tetherMaxLines);
     this.tetherB = new Int32Array(CONFIG.tetherMaxLines);
     this.tetherF = new Float32Array(CONFIG.tetherMaxLines);
@@ -2095,6 +2414,11 @@ class Renderer {
     this.stop();
     removeEventListener('resize', this._onResize);
     if (this._unbind) this._unbind();
+    // The atlas registers itself so setSpectrum can re-bake it. Forgetting to
+    // deregister would keep every renderer a host ever built alive, and make a
+    // later spectrum change re-bake all of them.
+    const at = ATLASES.indexOf(this.atlas);
+    if (at >= 0) ATLASES.splice(at, 1);
   }
 
   // -------------------------------------------------------------------- input
@@ -2105,21 +2429,86 @@ class Renderer {
       const r = c.getBoundingClientRect();
       const nx = (e.clientX - r.left) * this.dpr;
       const ny = (e.clientY - r.top) * this.dpr;
-      if (this.pointer.down) this.cam.panBy(nx - this.pointer.x, ny - this.pointer.y);
-      this.pointer.x = nx; this.pointer.y = ny; this.pointer.inside = true;
+      if (this.pointer.down) {
+        this.cam.panBy(nx - this.pointer.x, ny - this.pointer.y, this.w / 2, this.h / 2);
+      }
+      this.pointer.x = nx; this.pointer.y = ny;
+      this.pointer.inside = true; this.pointer.seen = true;
     };
     const onLeave = () => { this.pointer.inside = false; this.pointer.down = false; };
-    const onDown = (e) => { if (e.button === 1 || e.button === 2 || e.shiftKey) this.pointer.down = true; };
-    const onUp = () => { this.pointer.down = false; };
-    const onWheel = (e) => {
-      e.preventDefault();
-      const d = -Math.sign(e.deltaY) * CONFIG.zoomPerWheelNotch * (e.ctrlKey ? 3 : 1);
-      this.cam.zoomAt(d, this.pointer.x, this.pointer.y, this.w / 2, this.h / 2);
+
+    // A PAN GESTURE IS CLAIMED, not shared.
+    //
+    // The middle button, the right button and shift-drag are the camera's. A
+    // host listening for a press on the same canvas has no way to know one of
+    // those is in progress, so without this every attempt to drag the view also
+    // fires whatever a press means in the game - which in a game where a press
+    // puts matter into the world means the field cannot be inspected without
+    // being changed. Stopping the event here is what makes them separate
+    // gestures rather than one gesture with a side effect.
+    const onDown = (e) => {
+      if (!(e.button === 1 || e.button === 2 || e.shiftKey)) return;
+      this.pointer.down = true;
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      // Keeps the drag alive when the pointer leaves the canvas mid-gesture.
+      if (typeof c.setPointerCapture === 'function' && e.pointerId !== undefined) {
+        try { c.setPointerCapture(e.pointerId); } catch (_) { /* not fatal */ }
+      }
     };
+    const onUp = () => { this.pointer.down = false; };
+
+    // WHEEL DELTAS ARE NORMALISED BEFORE THEY MEAN ANYTHING.
+    //
+    // Treating the sign of a wheel event as one notch is correct for a mouse
+    // and catastrophic for a trackpad: a two-finger flick delivers dozens of
+    // events carrying a few pixels each, every one of which would count as a
+    // full notch, and a gesture meant to move the view a little would move it
+    // several orders of magnitude. Converting to pixels first and dividing by
+    // what one detent is worth makes the mouse behave exactly as before and
+    // makes the trackpad proportional. The cap bounds a single violent event.
+    const onWheel = (e) => {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      const raw = e.deltaY || 0;
+      const px = e.deltaMode === 1 ? raw * CONFIG.wheelLinePx
+        : e.deltaMode === 2 ? raw * this.h
+        : raw;
+      let notches = px / CONFIG.wheelPixelsPerNotch;
+      notches = clamp(notches, -CONFIG.wheelMaxNotches, CONFIG.wheelMaxNotches);
+      if (notches === 0) return;
+      const d = -notches * CONFIG.zoomPerWheelNotch * (e.ctrlKey ? CONFIG.wheelPinchMul : 1);
+      // Anchor on the event itself where it says where it happened, so the very
+      // first notch after a page load is anchored somewhere real rather than at
+      // the corner the pointer has not moved away from yet.
+      let ax = this.pointer.seen ? this.pointer.x : this.w / 2;
+      let ay = this.pointer.seen ? this.pointer.y : this.h / 2;
+      if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+        const r = c.getBoundingClientRect();
+        ax = (e.clientX - r.left) * this.dpr;
+        ay = (e.clientY - r.top) * this.dpr;
+      }
+      this.cam.zoomAt(d, ax, ay, this.w / 2, this.h / 2);
+    };
+
+    // THE WAY BACK. Every offset the player can accumulate is bounded, but a
+    // bound is not the same as a way home, and a wordless game cannot put a
+    // button on screen to offer one. Three keys that every application in the
+    // world already means "back to the start" with, and no modifier, so nothing
+    // the browser or the operating system owns is taken.
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key;
+      if (k === 'Escape' || k === 'Home' || k === '0') {
+        this.recenter();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+      }
+    };
+
     c.addEventListener('pointermove', onMove);
     c.addEventListener('pointerleave', onLeave);
     c.addEventListener('pointerdown', onDown);
     addEventListener('pointerup', onUp);
+    addEventListener('keydown', onKey);
     c.addEventListener('wheel', onWheel, { passive: false });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     this._unbind = () => {
@@ -2127,6 +2516,7 @@ class Renderer {
       c.removeEventListener('pointerleave', onLeave);
       c.removeEventListener('pointerdown', onDown);
       removeEventListener('pointerup', onUp);
+      removeEventListener('keydown', onKey);
       c.removeEventListener('wheel', onWheel);
     };
   }
@@ -2256,8 +2646,26 @@ class Renderer {
    * minResolvableMeters can be represented statistically with no visible loss,
    * which is the contract that lets object count and frame cost stay decoupled.
    */
+  /**
+   * Everything about the current view, INCLUDING what a simulation needs to
+   * know about it.
+   *
+   * The second half of that used to be missing, and it mattered more than it
+   * looks. A simulation that decides what to keep resolving by asking whether
+   * a group is still big enough on screen to be worth resolving needs the
+   * projection in its own units: where the view is centred in world
+   * coordinates, how many pixels a world unit is worth, and how big the frame
+   * is. None of that was reported, so every one of those fields arrived
+   * undefined, the simulation fell back to one pixel per unit at the origin,
+   * and it went on believing it had been told where the camera was.
+   *
+   * `k` is exactly that scale - screenToWorld divides by it - so this reports
+   * it rather than leaving each caller to rediscover it.
+   */
   getViewport() {
     const mpp = Math.pow(10, -this.cam.logPPM);
+    const p = this.proj.rootProj;
+    const centre = this.screenToWorld(this.w / (2 * this.dpr), this.h / (2 * this.dpr));
     return {
       logPPM: this.cam.logPPM,
       metersPerPixel: mpp,
@@ -2266,7 +2674,16 @@ class Renderer {
       minResolvableMeters: mpp * CONFIG.discPx,
       decadesVisible: Math.log10(Math.max(this.w, this.h)),
       stratum: Scale.stratum(Math.log10(Math.max(this.w, this.h) * mpp)),
-      center: this.screenToWorld(this.w / (2 * this.dpr), this.h / (2 * this.dpr)),
+      center: centre,
+
+      // The projection, in the units a field is simulated in. Device pixels
+      // throughout, so w/h and pxPerUnit are in the same space and a half-width
+      // in world units is simply w * 0.5 / pxPerUnit.
+      cx: centre.x,
+      cy: centre.y,
+      pxPerUnit: p && p.k > 0 ? p.k : 0,
+      w: this.w,
+      h: this.h,
     };
   }
 
@@ -2306,20 +2723,32 @@ class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // --- camera -----------------------------------------------------------
-    const subject = this.subjectRadiusMeters(world);
-    this.cam.aim(subject, Math.min(w, h));
+    const content = this.measureContent(world);
+    if (content.n) this.cam.follow(content.cx, content.cy);
+    this.cam.aim(content.radius, Math.min(w, h), content.solid);
     const prevPanX = this.cam.panOffX, prevPanY = this.cam.panOffY;
+    const prevCamX = this.cam.x, prevCamY = this.cam.y;
     const prevLog = this.cam.logPPM;
-    this.cam.step(dt);
+    this.cam.step(dt, w / 2, h / 2);
     const zoomRatio = Math.pow(10, this.cam.logPPM - prevLog);
-    const dPanX = this.cam.panOffX - prevPanX;
-    const dPanY = this.cam.panOffY - prevPanY;
+    // Everything drawn in screen space - the vacuum grain, every effect still
+    // in flight - is advected by however much the world moved under it, and the
+    // frame FOLLOWING the field moves it exactly as surely as the player
+    // dragging does. Reporting only the drag would leave the grain frozen while
+    // the field slid across it, which is the one thing that would make the
+    // vacuum read as a texture on the glass rather than as distance.
+    const kPrev = this.proj.rootProj ? this.proj.rootProj.k : 0;
+    const dPanX = (this.cam.panOffX - prevPanX) - (this.cam.x - prevCamX) * kPrev;
+    const dPanY = (this.cam.panOffY - prevPanY) - (this.cam.y - prevCamY) * kPrev;
 
     this.pointer.warm = damp(this.pointer.warm, this.pointer.inside ? 1 : 0, 0.30, dt);
     this.hud.captionAlpha = damp(this.hud.captionAlpha, this.hud.caption ? 1 : 0, 0.4, dt);
 
     // --- projection --------------------------------------------------------
     this.proj.build(world, this.cam, w / 2, h / 2);
+    // The exponent of the frame the camera lives in, so the camera can convert
+    // its own local units to meters without going back through the projection.
+    this.cam.anchorExp = this.proj.rootProj ? (this.proj.rootProj.exp || 0) : 0;
 
     // --- drain events ------------------------------------------------------
     if (world && world.events && world.events.length) {
@@ -2327,6 +2756,7 @@ class Renderer {
       for (let i = 0; i < evs.length; i++) this.emit(evs[i]);
       evs.length = 0;
     }
+    this.checkStratum(w, h, now);
 
     this.fx.step(dt, dPanX, dPanY, zoomRatio, w / 2, h / 2);
     this.transition.step(dt);
@@ -2369,6 +2799,9 @@ class Renderer {
       nAgg = this.drawAggregates(L, world, gain);
       nTracer = this.lastTracers | 0;
       this.drawBodies(L, world, gain);
+      // Terrain lands after every body, so the pass is one batch rather than a
+      // detour taken in the middle of the body loop.
+      this.drawSurfaces(L);
       this.drawTethers(L, world, gain);
     }
     this.holes.drawLight(L, this.tSec, this.exposure, gain);
@@ -2459,36 +2892,164 @@ class Renderer {
     }
   }
 
-  /** The largest coherent extent in the world, in meters. Drives auto-framing. */
-  subjectRadiusMeters(world) {
-    if (!world) return 1;
-    if (world.extent > 0) return world.extent;
-    let best = 0;
-    const rootExp = (typeof world.exp === 'number') ? world.exp : 0;
-    const expOf = (frameId) => {
-      const p = this.proj.map.get(frameId);
-      return p ? p.exp : rootExp;
-    };
+  /**
+   * THE MOMENT THE RUN OUTGROWS ITS OWN SCALE.
+   *
+   * Crossing a stratum is the one event in the game that deserves the whole
+   * screen, and the transition that marks it - the frame the player was just
+   * looking at, shrinking into the point where their world now sits - was
+   * reachable only through a world event named 'stratum'. Nothing raises one,
+   * so it had never once played. It does not need to be raised: crossing a
+   * stratum is not something that happens in the field, it is something that
+   * happens to the VIEW, and the view is the one thing here that already knows.
+   *
+   * It is measured on the AUTOMATIC frame rather than on the live one, which is
+   * the difference between "the world outgrew this band" and "the player
+   * scrolled". Only the first is worth an animation; the second would fire one
+   * every few notches of the wheel.
+   *
+   * Two guards, and both are needed. A view resting exactly on a boundary would
+   * otherwise re-trigger on the last digit of a damped float, forever, so the
+   * band has to be clear by a margin before a change counts. And a run that
+   * crosses several boundaries in one burst gets one transition, not four
+   * overlapping full-screen blits.
+   */
+  checkStratum(w, h, now) {
+    const cam = this.cam;
+    const base = cam.autoSmoothed === undefined ? cam.logPPM : cam.autoSmoothed;
+    if (!isFinite(base)) return;
+    // The same expression the inscription in the corner is drawn from, so the
+    // animation and the word are always describing the same crossing.
+    const viewLog = -base + Math.log10(Math.max(w, h)) - 0.5;
+    const hyst = CONFIG.stratumHysteresisDecades;
+    const below = Scale.stratum(viewLog - hyst);
+    const above = Scale.stratum(viewLog + hyst);
+    if (below !== above) return;             // straddling a boundary, not across it
+    if (this.stratumName === null) { this.stratumName = below; return; }
+    if (below === this.stratumName) return;
+    this.stratumName = below;
+    if (now - this.stratumAt < CONFIG.stratumMinIntervalMs) return;
+    this.stratumAt = now;
+    // Toward where the world now is, which is the middle of the frame plus
+    // however far the player has dragged it.
+    const ax = clamp((w * 0.5 + cam.panOffX) / Math.max(w, 1), 0.05, 0.95);
+    const ay = clamp((h * 0.5 + cam.panOffY) / Math.max(h, 1), 0.05, 0.95);
+    this.transition.begin(this.canvas, ax, ay, below);
+    cam.settled = 0;
+  }
+
+  /**
+   * WHERE THE FIELD IS AND HOW BIG IT IS, measured rather than declared.
+   *
+   * Returns the middle of everything drawable in anchor-frame units, and the
+   * radius in meters that reaches from that middle to the furthest edge of the
+   * furthest thing. Auto-framing needs exactly this pair and nothing else.
+   *
+   * IT IS MEASURED, and that is the point. A world may hand over a scalar
+   * `extent`, and one number cannot say whether it means the radius of the
+   * arrangement or the width of it - a factor of two, which is the difference
+   * between a field that fills the frame and a field sitting in the middle of
+   * it looking like a bug. Nor can it say WHERE the arrangement is. Both fall
+   * out of one pass over the same objects that are about to be drawn, so the
+   * frame is sized against what will actually appear on screen.
+   *
+   * The pass runs in SCREEN space using the previous frame's projection, which
+   * is what makes it correct across a frame tree: objects in different frames
+   * have different local origins and different units, and the only space they
+   * are all comparable in is the one they are drawn in. The result is converted
+   * back through the anchor, so a frame of staleness costs nothing that the
+   * damping does not absorb anyway.
+   */
+  measureContent(world) {
+    const out = this.content_ ||
+      (this.content_ = { n: 0, cx: 0, cy: 0, radius: 1, solid: 1 });
+    out.n = 0;
+    const p0 = this.proj.rootProj;
+    if (!world || !p0 || !(p0.k > 0)) return out;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    // The same box drawn around the MATTER rather than around the light it
+    // throws. Framing wants the lit one; the pan bound wants this one.
+    let sminX = Infinity, sminY = Infinity, smaxX = -Infinity, smaxY = -Infinity;
+
     const ag = world.aggregates;
     if (ag) for (let i = 0; i < ag.length; i++) {
-      const m = (ag[i].rms || 0) * 2.2 * Math.pow(10, expOf(ag[i].frame));
-      if (m > best) best = m;
+      const a = ag[i];
+      const p = this.proj.of(a.frame);
+      if (!p) continue;
+      const r = (a.rms || 0) * CONFIG.frameAggMul * p.k;
+      const sx = p.ox + (a.x || 0) * p.k, sy = p.oy + (a.y || 0) * p.k;
+      if (!isFinite(sx) || !isFinite(sy) || !isFinite(r)) continue;
+      if (sx - r < minX) minX = sx - r;
+      if (sx + r > maxX) maxX = sx + r;
+      if (sy - r < minY) minY = sy - r;
+      if (sy + r > maxY) maxY = sy + r;
+      const q = (a.rms || 0) * p.k;
+      if (sx - q < sminX) sminX = sx - q;
+      if (sx + q > smaxX) smaxX = sx + q;
+      if (sy - q < sminY) sminY = sy - q;
+      if (sy + q > smaxY) smaxY = sy + q;
+      out.n++;
     }
+
     const bs = world.bodies;
     if (bs) {
-      // Extent, not radius: the framing has to hold the arrangement, not the
-      // largest object. Sampling is capped because this runs every frame.
-      const n = Math.min(bs.length, 2048);
-      let maxD = 0;
+      // Sampling is capped because this runs every frame. A body counts out to
+      // the reach of its own light rather than to its surface, because the
+      // light is what has to fit on the screen.
+      const n = Math.min(bs.length, CONFIG.frameSampleCap);
       for (let i = 0; i < n; i++) {
         const b = bs[i];
-        const s = Math.pow(10, expOf(b.frame));
-        const d = (Math.hypot(b.x || 0, b.y || 0) + (b.r || 0) * 3) * s;
-        if (d > maxD) maxD = d;
+        const p = this.proj.of(b.frame);
+        if (!p) continue;
+        const r = (b.r || 0) * CONFIG.frameBodyHaloMul * p.k;
+        const sx = p.ox + (b.x || 0) * p.k, sy = p.oy + (b.y || 0) * p.k;
+        if (!isFinite(sx) || !isFinite(sy) || !isFinite(r)) continue;
+        if (sx - r < minX) minX = sx - r;
+        if (sx + r > maxX) maxX = sx + r;
+        if (sy - r < minY) minY = sy - r;
+        if (sy + r > maxY) maxY = sy + r;
+        const q = (b.r || 0) * p.k;
+        if (sx - q < sminX) sminX = sx - q;
+        if (sx + q > smaxX) smaxX = sx + q;
+        if (sy - q < sminY) sminY = sy - q;
+        if (sy + q > smaxY) smaxY = sy + q;
+        out.n++;
       }
-      if (maxD > best) best = maxD;
     }
-    return best > 0 ? best : 1;
+
+    if (!out.n) {
+      // Nothing drawable. A producer that only knows a scalar still gets a
+      // frame out of it; a producer that knows nothing gets a metre.
+      out.radius = world.extent > 0 ? world.extent : 1;
+      out.solid = out.radius;
+      return out;
+    }
+
+    // The frame is a rectangle and the subject is one number, so the number has
+    // to be the half-extent that is TIGHTEST against the frame. Reducing each
+    // axis by that axis' share of the short one lets a wide field spend the
+    // width it has been given instead of being framed as though the screen were
+    // square, which would waste a third of it on any ordinary display.
+    const mx = (minX + maxX) * 0.5, my = (minY + maxY) * 0.5;
+    const s = Math.min(this.w, this.h);
+    const rx = (maxX - minX) * 0.5 * (s / Math.max(this.w, 1));
+    const ry = (maxY - minY) * 0.5 * (s / Math.max(this.h, 1));
+    const anchorExp = typeof p0.exp === 'number' ? p0.exp : 0;
+    out.cx = (mx - p0.ox) / p0.k;
+    out.cy = (my - p0.oy) / p0.k;
+    out.radius = (Math.max(rx, ry) / p0.k) * Math.pow(10, anchorExp);
+    // Drawable, but with no size: point bodies carrying no radius, or every one
+    // of them at the same coordinate. There is nothing to measure, so the
+    // declared extent is the better answer than a made-up one.
+    if (!(out.radius > 0) || !isFinite(out.radius)) {
+      out.radius = world.extent > 0 ? world.extent : 1;
+    }
+    const sx2 = (smaxX - sminX) * 0.5 * (s / Math.max(this.w, 1));
+    const sy2 = (smaxY - sminY) * 0.5 * (s / Math.max(this.h, 1));
+    out.solid = (Math.max(sx2, sy2) / p0.k) * Math.pow(10, anchorExp);
+    if (!(out.solid > 0) || !isFinite(out.solid)) out.solid = out.radius;
+    return out;
   }
 
   // ------------------------------------------------------- statistical pass
@@ -2764,6 +3325,7 @@ class Renderer {
   drawBodies(L, world, gain) {
     const bs = world.bodies;
     this.renderedN = 0;
+    this.surfN = 0;
     this.lastBodies = bs || null;
     if (!bs || !bs.length) return;
 
@@ -2807,8 +3369,16 @@ class Renderer {
       const core = Math.max(R, CONFIG.discPx);
       // resolved: 0 while the body is a point source, 1 once it has an edge.
       const resolved = smoothstep(CONFIG.discPx * 1.3, CONFIG.discPx * 3.0, R);
-      const halo = Math.max(core * lerp(CONFIG.haloMul, CONFIG.haloResolvedMul, resolved),
-        CONFIG.haloMinPx);
+      // HOW FAR THE GLOW REACHES, which is a separate question from how bright
+      // it is and was the other half of the fog. Dimming a wash that still
+      // extends two radii past the limb only makes a fainter fog: what makes a
+      // rock look like a rock is that its light STOPS at its surface. So cold
+      // matter gets a thin rim and an emitter keeps its corona, and the same
+      // emission share decides both.
+      const emitT = emissionAt(b.T || kindTemperature(b.kind));
+      const haloReach = lerp(CONFIG.haloMul, CONFIG.haloResolvedMul, resolved) *
+        lerp(CONFIG.coronaReachCold / CONFIG.haloResolvedMul, 1, emitT);
+      const halo = Math.max(core * haloReach, CONFIG.haloMinPx);
       if (sx + halo < 0 || sx - halo > w || sy + halo < 0 || sy - halo > h) continue;
 
       // Point-source dimming below the resolution floor.
@@ -2819,16 +3389,59 @@ class Renderer {
       const opacity = (b.a === undefined ? 1 : sat(b.a));
       const lumMul = b.lum === undefined ? kindLuminosity(b.kind) : b.lum;
       const T = b.T || kindTemperature(b.kind);
-      let aCore = sat(flux * opacity * lumMul * gain * (wantHalo ? 0.95 : 1.30));
-      let aHalo = wantHalo ? sat(flux * opacity * lumMul * gain * 0.42) : 0;
-      if (aCore < 0.006 && aHalo < 0.006) continue;
+
+      // HOW MUCH OF THIS THING IS A GLOW, AND HOW MUCH OF IT IS A SURFACE.
+      //
+      // This one number is most of the answer to why every object used to read
+      // as a flat glowing ball. A body was drawn as a bright soft core inside a
+      // halo five radii wide, which is a fair picture of a star and a wrong one
+      // of a rock: an asteroid has no corona and it has no glowing centre. Its
+      // light comes off a lit sphere, and the disc stamp already draws exactly
+      // that - it was being washed out from underneath by a glow that had no
+      // business being there, and the eye reads the sum as a gradient.
+      //
+      // So the same crossfade that decides a body's COLOUR decides its FORM.
+      // Below the glow point it is a surface with a faint rim; above it, the
+      // star it actually is. Nothing switches; both move together with T.
+      const emit = emitT;
+      // The core glow only recedes once the body has an EDGE to read instead.
+      // An unresolved cold speck still needs its core stamp or it is a dead
+      // pixel, which is the whole reason the stamp exists.
+      const glow = lerp(1, lerp(CONFIG.coreGlowCold, 1, emit), resolved);
+      const corona = lerp(CONFIG.coronaCold, 1, emit);
+
+      // ONE LIGHT BUDGET, SPLIT THREE WAYS. Every term below is a share of it,
+      // so the aperture still governs the brightest thing on screen no matter
+      // how the split falls. Exempting the surface from the aperture was tried
+      // and is wrong twice: a lone cold body clipped to white and lost the
+      // colour the whole change exists to show, and a rock beside a star came
+      // out as bright as the star, which erases the one moment in the run where
+      // something starts producing its own light.
+      const light = flux * opacity * lumMul * gain;
+      const aCore = sat(light * (wantHalo ? 0.95 : 1.30) * glow);
+      const aHalo = wantHalo ? sat(light * 0.42 * corona) : 0;
+      // The lit sphere. Cold matter puts nearly all of its light here and an
+      // emitter puts most of its light in the glow instead, which is the whole
+      // difference between a rock and a star drawn with the same three stamps.
+      const aDisc = sat(light * resolved * lerp(CONFIG.surfaceCold, 0.5, emit));
+      if (aCore < 0.006 && aHalo < 0.006 && aDisc < 0.006) continue;
 
       if (drawn >= cap) break;
 
       const sc = this.atlas.stamp(PROF_CORE, T);
       const sh = this.atlas.stamp(PROF_HALO, T);
       const sd = resolved > 0.01 ? this.atlas.stamp(PROF_DISC, T) : null;
-      const aDisc = sat(opacity * resolved * clamp(gain * 0.5, 0.25, 1));
+
+      // Big enough to have terrain on it? Queued rather than drawn here, so
+      // the detail pass is one batch at the end instead of a composite change
+      // per body. See drawSurfaces.
+      if (sd && core >= CONFIG.detailMinPx && this.surfN < CONFIG.detailBodies &&
+          emit < 0.55 && aDisc > 0.05) {
+        const s = this.surfN++;
+        this.surfX[s] = sx; this.surfY[s] = sy; this.surfR[s] = core;
+        this.surfT[s] = T; this.surfA[s] = aDisc;
+        this.surfS[s] = (b.seed === undefined ? i : b.seed) | 0;
+      }
 
       if (stretch > 1.06) {
         // Lensed: stretch tangentially about the hole. This is what turns
@@ -2888,6 +3501,88 @@ class Renderer {
       drawn++;
     }
 
+    L.globalAlpha = 1;
+  }
+
+  /**
+   * TERRAIN. What turns a disc into a place.
+   *
+   * A perfectly smooth sphere reads as a gradient no matter how well it is
+   * shaded, because a radial falloff is exactly what a gradient IS - the eye
+   * has nothing to catch on and calls it a glow. A handful of brighter patches
+   * scattered over the lit face is enough to break that, and once broken the
+   * limb darkening underneath finally reads as curvature instead of as blur.
+   *
+   * Placement is a hash of the body's own id, so terrain belongs to the body
+   * rather than to the frame: it does not crawl, it does not shimmer, and the
+   * same rock has the same face every time it is looked at. Patches are pulled
+   * toward the centre of the disc by a square root, which is what puts them on
+   * a SPHERE rather than on a circle - a uniform scatter would bunch at the rim
+   * and read as a ring.
+   *
+   * Bounded twice over: only bodies past a real size on screen are queued at
+   * all, and only CONFIG.detailBodies of them per frame. In practice that is
+   * one to six objects, because a body this large fills a good share of the
+   * viewport and there is no room for many.
+   */
+  drawSurfaces(L) {
+    const n = this.surfN;
+    if (!n || CONFIG.detailPatches <= 0) return;
+    const per = CONFIG.detailPatches | 0;
+
+    // TWO BATCHES, BRIGHT THEN DARK, and the dark one is the half that matters.
+    //
+    // Adding light alone cannot make a body look like rock, because a disc that
+    // only ever gets brighter in patches still has its lowest value at the rim
+    // and its highest in the middle - which is a radial gradient, which is
+    // exactly what the eye calls a glow. Taking light AWAY in patches is what
+    // breaks that: the mean stays where the aperture put it and the variance
+    // goes up, so the face acquires places instead of a falloff.
+    //
+    // Subtracting is legal here because a patch never leaves the disc it
+    // belongs to, so the only thing underneath it is the body itself. The
+    // composite mode is changed twice for the whole frame rather than twice per
+    // body: switching it inside a transformed draw is what makes a rasteriser
+    // allocate a layer per call, and that is measured elsewhere in this file at
+    // seventy milliseconds in one frame.
+    for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1) L.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < n; i++) {
+        const sx = this.surfX[i], sy = this.surfY[i], R = this.surfR[i];
+        const seed = this.surfS[i];
+        // The HALO profile, not the core one. A patch drawn with the core
+        // falloff is a hard little pinprick and reads as a light switched on
+        // rather than as ground; the broader falloff reads as an albedo change,
+        // which is what terrain on an unlit body actually is.
+        const stamp = this.atlas.stamp(PROF_HALO, this.surfT[i]);
+        // Patches sit at a share of the body's own brightness, so terrain on a
+        // dim body is dim. A fixed alpha would make every small cold rock look
+        // like it had been lit from inside.
+        const base = this.surfA[i] * CONFIG.detailAlpha;
+        for (let p = 0; p < per; p++) {
+          // Which way this patch goes. Split by hash so a body's terrain is
+          // its own and never changes between frames.
+          const dark = hash3(seed, p, 2683) < 0.5;
+          if (dark !== (pass === 1)) continue;
+          const a = hash3(seed, p, 6421) * TAU;
+          // sqrt puts a uniform scatter over the DISC; the extra power crowds
+          // it gently inward, which is what foreshortening does on a sphere.
+          const rr = Math.pow(hash3(seed, p, 1187), 0.62) * R * 0.70;
+          // Sized to STAY INSIDE THE LIMB. A patch that spills past the edge
+          // softens the silhouette, and the silhouette is the one thing making
+          // the body read as solid rather than as a glow.
+          const room = Math.max(0, R - rr) * 0.85;
+          const size = Math.min(R * (0.16 + hash3(seed, p, 9311) * 0.26), room);
+          if (size < 1) continue;
+          const alpha = base * (0.35 + hash3(seed, p, 5077) * 1.1);
+          if (alpha < 0.004) continue;
+          const px = sx + Math.cos(a) * rr, py = sy + Math.sin(a) * rr;
+          L.globalAlpha = sat(alpha);
+          L.drawImage(stamp, px - size, py - size, size * 2, size * 2);
+        }
+      }
+    }
+    L.globalCompositeOperation = 'lighter';
     L.globalAlpha = 1;
   }
 
@@ -3158,13 +3853,19 @@ function radiusFromMass(m) {
   return Math.pow(m, 1 / 3) * 0.5;
 }
 
+// What a body looks like when the producer has not said. These sit on the same
+// ramp as everything else: cold kinds land in the reflectance half and read as
+// lit matter, hot ones land in the emission half and read as light. The
+// luminosities are spread hard rather than kept close together, because the
+// aperture exposes for the brightest thing on screen and a flat table means
+// nothing in the field ever stands out from anything else.
 const KIND_T = {
-  grain: 60, dust: 90, rock: 300, planet: 700, giant: 1400,
-  star: 5600, remnant: 12000, neutron: 900000, blackhole: 20000, node: 3000,
+  grain: 80, dust: 120, rock: 310, planet: 1250, giant: 900,
+  star: 5800, remnant: 16000, neutron: 40000, blackhole: 22000, node: 4200,
 };
 const KIND_L = {
-  grain: 0.20, dust: 0.26, rock: 0.34, planet: 0.42, giant: 0.62,
-  star: 1.0, remnant: 0.85, neutron: 1.25, blackhole: 1.0, node: 0.7,
+  grain: 0.05, dust: 0.07, rock: 0.13, planet: 0.22, giant: 0.30,
+  star: 1.0, remnant: 0.95, neutron: 1.25, blackhole: 1.0, node: 0.7,
 };
 function kindTemperature(kind) { return KIND_T[kind] || 1600; }
 function kindLuminosity(kind) { return KIND_L[kind] === undefined ? 0.55 : KIND_L[kind]; }
@@ -3314,6 +4015,12 @@ const DEFAULT_AGG_MAP = ['cluster', 'galaxy', 'group', 'web', 'field'];
  * @param {function(number, number):number} [options.temperature] (heat, kind)
  *        to kelvin. Omit and the renderer falls back to a per-kind default,
  *        which is the right answer until the producer defines a heat scale.
+ * @param {function(number, number):number} [options.luminosity] (heat, kind)
+ *        to relative brightness, a star being 1. Omit and the renderer falls
+ *        back to a per-kind default. Supplied alongside temperature, because
+ *        colour and brightness together are what tell one kind from another -
+ *        a table where dust and stars differ only in hue reads as one material
+ *        painted two ways.
  * @param {number[]} [options.order] optional significance-ordered slot indices.
  * @returns {function(object, object=): object} adapt(view, extra) -> world
  */
@@ -3323,6 +4030,7 @@ export function createSimAdapter(options = {}) {
   const kindMap = options.kindMap || DEFAULT_KIND_MAP;
   const aggMap = options.aggMap || DEFAULT_AGG_MAP;
   const tempOf = options.temperature || null;
+  const lumOf = options.luminosity || null;
 
   const bodyPool = [];
   const aggPool = [];
@@ -3387,7 +4095,7 @@ export function createSimAdapter(options = {}) {
           b.seed = (ids ? ids[i] : i) | 0;
           b.a = 1;
           b.T = tempOf ? tempOf(heat ? heat[i] : 0, k) : undefined;
-          b.lum = undefined;
+          b.lum = lumOf ? lumOf(heat ? heat[i] : 0, k) : undefined;
         }
       }
     }
