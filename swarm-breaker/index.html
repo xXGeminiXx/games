@@ -99,16 +99,25 @@
   #endless:hover{border-color:var(--pickup); background:var(--pickup); color:var(--bg)}
 
   /* the mode screen */
+  /* CENTRED WHEN IT FITS, SCROLLABLE FROM THE TOP WHEN IT DOES NOT.
+     align-items:center on a scrolling flex container is a trap: once the card
+     is taller than the window the centring pushes its top ABOVE the scroll
+     origin, and no amount of scrolling up will reach it - the title, the
+     difficulty and the first mode simply cannot be got at. margin:auto on the
+     child centres it the same way when there is room and refuses to overflow
+     past the start edge when there is not. */
   #menu{
     position:fixed; inset:0; background:rgba(8,9,12,.96); display:none;
-    align-items:center; justify-content:center; padding:20px; overflow:auto;
+    align-items:flex-start; justify-content:center; padding:20px;
+    overflow-y:auto; overscroll-behavior:contain;
   }
   #menu.on{display:flex}
   .card{
-    width:100%; max-width:460px; display:flex; flex-direction:column; gap:16px;
+    width:100%; max-width:460px; display:flex; flex-direction:column; gap:14px;
+    margin:auto;
   }
   .card h1{
-    font-size:26px; margin:0; font-weight:600; letter-spacing:-0.03em;
+    font-size:22px; margin:0; font-weight:600; letter-spacing:-0.03em;
   }
   .card .tag{margin:0; color:var(--dim); font-size:12px}
   .setting{display:flex; align-items:center; gap:10px}
@@ -118,9 +127,9 @@
   .setting select{max-width:none; flex:1}
   #modelist{display:flex; flex-direction:column; gap:8px}
   .mode{
-    display:block; width:100%; text-align:left; padding:11px 13px;
+    display:block; width:100%; text-align:left; padding:9px 12px;
     border:1px solid var(--line); background:var(--panel); cursor:pointer;
-    line-height:1.45;
+    line-height:1.35;
   }
   .mode:hover{border-color:var(--swarm)}
   .mode .head{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
@@ -130,7 +139,7 @@
     color:var(--pickup); font-size:11px; font-variant-numeric:tabular-nums;
     white-space:nowrap;
   }
-  .mode .blurb{color:var(--dim); font-size:11px; margin-top:5px}
+  .mode .blurb{color:var(--dim); font-size:10.5px; margin-top:4px}
   .mode.playing{border-color:var(--swarm)}
   .mode.playing .nm{color:var(--swarm)}
   #menufoot{
@@ -141,16 +150,16 @@
   #resume.on{display:block}
 
   /* awards */
-  #awards{border-top:1px solid var(--line); padding-top:12px}
+  #awards{border-top:1px solid var(--line); padding-top:10px}
   .awhead{
     display:flex; justify-content:space-between; align-items:baseline;
     font-size:10px; color:var(--dim); text-transform:uppercase;
     letter-spacing:.09em; margin-bottom:8px;
   }
   #awcount{color:var(--pickup); font-variant-numeric:tabular-nums}
-  #awlist{display:grid; grid-template-columns:1fr 1fr; gap:5px 12px}
-  .aw{font-size:11px; line-height:1.35; color:#4a505c}
-  .aw b{display:block; font-weight:600; font-size:12px; letter-spacing:-0.01em}
+  #awlist{display:grid; grid-template-columns:1fr 1fr; gap:3px 12px}
+  .aw{font-size:10px; line-height:1.3; color:#4a505c}
+  .aw b{display:block; font-weight:600; font-size:11.5px; letter-spacing:-0.01em}
   .aw.won{color:var(--dim)}
   .aw.won b{color:var(--trade)}
   .aw .bar{
@@ -248,17 +257,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=2';
-import { createJuice } from './src/juice.js?v=2';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=2';
-import { createBlockKinds } from './src/blocks.js?v=2';
-import { safeRows } from './src/arrival.js?v=2';
-import { createAwards } from './src/awards.js?v=2';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=2';
-import { createLeaderboard } from './src/leaderboard.js?v=2';
-import * as Tiers from './src/tiers.js?v=2';
-import { createOnboarding } from './src/onboarding.js?v=2';
-import { createVisual } from './src/visual.js?v=2';
+         storageKey, offerCost, applyIdentity } from './config.js?v=3';
+import { createJuice } from './src/juice.js?v=3';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=3';
+import { createBlockKinds } from './src/blocks.js?v=3';
+import { safeRows } from './src/arrival.js?v=3';
+import { createAwards } from './src/awards.js?v=3';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=3';
+import { createLeaderboard } from './src/leaderboard.js?v=3';
+import * as Tiers from './src/tiers.js?v=3';
+import { createOnboarding } from './src/onboarding.js?v=3';
+import { createVisual } from './src/visual.js?v=3';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -317,6 +326,8 @@ const FONT = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
 const MAX_STEPS = Math.max(60, CONFIG.swarm.maxSteps | 0);
 const SKIM = Math.max(0, Math.min(1, Number(CONFIG.swarm.skim)));
 const SKIM_FLOOR = Math.max(0.01, Math.min(0.9, Number(CONFIG.swarm.skimFloor)));
+// The flattest a sprayed body may be thrown. See spray().
+const BURST_RISE = Math.max(0, Math.min(0.9, Number(CONFIG.swarm.burstRise) || 0));
 // Below this a body is far enough down the field to have a fresh run at the
 // ceiling, whatever it hit on the way here.
 const CLEAN_LINE = TOP + (FLOOR - TOP) * 0.6;
@@ -1041,13 +1052,32 @@ function splinter(src, spec){
 function spray(x, y, spec){
   const n = Math.max(1, spec.count | 0);
   const sp = SPEED * (spec.speed > 0 ? spec.speed : 1);
-  const life = Math.max(1, spec.life | 0) || 150;
+  // A kind MAY ask for a fuse. The burst does not, and nothing else does
+  // either - see the note on burst in config.js for why one is a bad way to end
+  // a spray. Kept because a genuinely brief effect is a reasonable thing to
+  // want, and it costs one line.
+  const life = spec.life > 0 ? Math.max(1, spec.life | 0) : undefined;
   for (let i = 0; i < n; i++){
-    const a = (i + 0.5) / n * Math.PI * 2;
-    S.live.push({
+    let a = (i + 0.5) / n * Math.PI * 2;
+    // EVERY BODY IS THROWN WITH A REAL VERTICAL COMPONENT.
+    //
+    // Evenly around the circle puts some of them almost exactly flat, and a
+    // flat body crosses the field sideways for as long as it is allowed to,
+    // because a bounce preserves its speed exactly. Pushed off the horizontal
+    // they all come home on their own, which is what lets a burst run to
+    // completion instead of being cut off by a clock.
+    const rise = Math.sin(a);
+    if (Math.abs(rise) < BURST_RISE){
+      const up = rise < 0 || (rise === 0 && (i & 1) === 0) ? -1 : 1;
+      const side = Math.cos(a) < 0 ? Math.PI : 0;
+      a = side + up * Math.asin(BURST_RISE) * (side ? -1 : 1);
+    }
+    const b = {
       x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      temp: true, life, size: 0.68, clean: false,
-    });
+      temp: true, size: 0.68, clean: false,
+    };
+    if (life !== undefined) b.life = life;
+    S.live.push(b);
   }
   juice.destroy(x, y, CONFIG.palette.hot, 0, -1);
 }

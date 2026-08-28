@@ -260,7 +260,19 @@ export const CONFIG = {
       {
         id: 'burst', name: 'burst', weight: 1.0, from: 6, tint: 'force',
         // Bodies in every direction, for this turn only.
-        effect: { burst: { count: 26, speed: 0.78, life: 150 } },
+        //
+        // NO FUSE. It used to carry life: 150, and that fuse KILLED ROUGHLY A
+        // THIRD OF THEM IN MID AIR - measured, 8 of 26 - so the best block in
+        // the game half went off. The fuse existed for one reason, which was to
+        // guarantee that a body thrown flat could not bounce between the walls
+        // forever and hang the turn. Every body now carries a step budget that
+        // guarantees exactly that no matter what it is doing, so the fuse was
+        // buying nothing and costing the thing the block is for.
+        //
+        // The turn already waits for every body before it closes, so with the
+        // fuse gone a burst plays out in full: they break what they can reach
+        // and then come home, and the turn ends when the last of them does.
+        effect: { burst: { count: 26, speed: 0.78 } },
       },
       {
         id: 'vault', name: 'vault', weight: 0.9, from: 8, tint: 'essence',
@@ -490,6 +502,20 @@ export const CONFIG = {
     // body turn ever measured is about 1,540 steps, so this is roughly twice
     // the worst real turn and should never be reached in play.
     maxSteps: 3000,
+
+    // THE SMALLEST VERTICAL SHARE A SPRAYED BODY MAY BE THROWN AT.
+    //
+    // A spray goes out evenly around the circle, which means some of it goes
+    // out very nearly flat - and a flat body crosses the field sideways
+    // forever, because a bounce preserves its speed exactly. That is what the
+    // fuse used to be for, and the fuse was a bad answer: it killed every body
+    // at the same moment whether it was stuck or not.
+    //
+    // Nudging the flat ones off the horizontal is the answer that costs
+    // nothing. Every body is thrown with a real vertical component, so every
+    // body comes home on its own, so the turn ends because the burst FINISHED
+    // rather than because a clock ran out.
+    burstRise: 0.3,
 
     // THE CEILING SKIM. Share of vertical speed a body keeps when it bounces
     // off the ceiling; the rest is turned into horizontal speed, so the total
