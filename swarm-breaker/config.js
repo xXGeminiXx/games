@@ -63,6 +63,13 @@ export const CONFIG = {
     hintIdle:    'drag to aim · release to fire',
     hintFiring:  'the swarm is working',
 
+    // The banner over a cleared board.
+    clearTitle:  'field cleared',
+    clearNote:   '+',
+
+    // Shown on the aim line when a drag is flatter than the launcher will take.
+    aimLimit:    'limit',
+
     difficultyLabel: 'difficulty',
     resetButton:     'reset',
 
@@ -194,23 +201,48 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   // BLOCKS - what a block can be besides a number
   //
-  // Special blocks are rare on purpose. A player has to trust the ordinary
-  // rule before breaking it means anything, so nothing here can appear in the
-  // opening minute, and after that a few blocks in a hundred are something
-  // else. Which ones is decided from the run's seed, so a seed always produces
-  // the same field including its surprises.
+  // Every block on the field is a cell with health. A KIND is what else it is.
   //
-  // A kind is data. `effect` is the shared vocabulary the game applies:
+  // Special blocks are rare on purpose. A player has to trust the ordinary rule
+  // before breaking it means anything, so nothing appears in the opening
+  // minute, and after that a few blocks in a hundred are something else. Which
+  // ones is decided from the run's seed and the block's own position, so a seed
+  // always produces the same field including its surprises.
   //
-  //   burst   {count, speed, life}  bodies thrown out in every direction. They
-  //                                 break blocks and collect markers like any
-  //                                 other body, and then they are gone - a
-  //                                 burst is a good turn, never a permanent
-  //                                 gain, which is what keeps it from becoming
-  //                                 the only thing worth aiming at.
-  //   essence n                     paid on top of what the block was worth
-  //   balls   n                     added to the swarm permanently
-  //   clearRow                      destroy the lowest row outright
+  // COLOUR IS NOT DECORATION AND THERE IS NO NEW VOCABULARY TO LEARN.
+  //
+  // Every tint below is one of the five palette colours the game already uses
+  // everywhere else, with the meaning it already has. A player who has seen the
+  // readout knows what a bracket colour is promising before they break it:
+  //
+  //   swarm   cyan    it makes you bigger
+  //   essence gold    it pays
+  //   force   violet  it moves the field
+  //   trade   green   it improves you, permanently
+  //   hot     red     it is a problem
+  //
+  // Ten kinds sharing five meanings is a thing you can read at a glance. Ten
+  // kinds with ten colours is a legend nobody reads.
+  //
+  // `from` is the depth a kind first appears at, so the vocabulary arrives a
+  // piece at a time rather than all at once. `hp` multiplies the health the
+  // tier asked for, for the kinds that are obstacles rather than payouts.
+  //
+  // THE EFFECT VERBS, all applied in one place in index.html:
+  //
+  //   burst {count,speed,life}  bodies thrown out in every direction. They break
+  //                             blocks and collect markers like anything else,
+  //                             and then they are gone - a burst is a good turn,
+  //                             never a permanent gain.
+  //   essence n                 paid on top of what the block was worth
+  //   balls   n                 added to the swarm permanently
+  //   power   n                 damage per hit, permanently
+  //   clearRow                  destroy the lowest row outright
+  //   column                    destroy everything in this block's column
+  //   chain                     destroy every block touching this one
+  //   lift    n                 push the whole field back up n rows
+  //   collect                   every marker on the board is collected at once
+  //   splinter {count,hp}       leaves smaller blocks behind instead of nothing
   //
   // Adding a kind means adding an entry here. It needs code only if it wants a
   // verb this list does not have.
@@ -218,33 +250,127 @@ export const CONFIG = {
   blocks: {
     // Share of blocks that carry a kind at all. Rare enough that seeing one is
     // an event and not a mechanic to plan around.
-    share: 0.045,
+    share: 0.055,
 
-    // Nothing special until the field has been ordinary for a while.
-    firstDepth: 8,
+    // Nothing special until the field has been ordinary for a while. A kind's
+    // own `from` can push it later, never earlier.
+    firstDepth: 6,
 
     kinds: [
       {
-        id: 'burst',
-        name: 'burst',
-        weight: 1,
-        // Marks the block before it breaks, so a player can choose to save it.
-        tint: '#ff8a3c',
-        effect: {
-          burst: {
-            // Bodies thrown out, evenly around the circle.
-            count: 26,
-            // Share of normal body speed. Slower reads as a spray rather than
-            // as a second volley, and keeps them on screen long enough to see.
-            speed: 0.78,
-            // Frames they last. They also die on the floor like anything else;
-            // this is what guarantees a turn ends even for a body thrown flat
-            // enough that it would otherwise bounce between the walls forever.
-            life: 150,
-          },
-        },
+        id: 'burst', name: 'burst', weight: 1.0, from: 6, tint: 'force',
+        // Bodies in every direction, for this turn only.
+        effect: { burst: { count: 26, speed: 0.78, life: 150 } },
+      },
+      {
+        id: 'vault', name: 'vault', weight: 0.9, from: 8, tint: 'essence',
+        // Pays. The number is small on purpose - the windfall marker is the big
+        // payout and it has to be reached; this one only has to be hit.
+        effect: { essence: 40 },
+      },
+      {
+        id: 'conscript', name: 'conscript', weight: 0.55, from: 10, tint: 'swarm',
+        // The best block in the game, and the one worth changing an angle for.
+        effect: { balls: 2 },
+      },
+      {
+        id: 'lance', name: 'lance', weight: 0.7, from: 12, tint: 'force',
+        // Its whole column, top to bottom. Worth setting up a shot for.
+        effect: { column: true },
+      },
+      {
+        id: 'chain', name: 'chain', weight: 0.7, from: 14, tint: 'force',
+        // Everything touching it. Pays for breaking into the MIDDLE of a clump
+        // rather than nibbling its edge, which is the skill the growing field
+        // asks for anyway.
+        effect: { chain: true },
+      },
+      {
+        id: 'splinter', name: 'splinter', weight: 0.8, from: 16, tint: 'hot',
+        // A trap. Breaking it leaves two smaller blocks where one used to be,
+        // so the field gets wider rather than emptier and a careless clear can
+        // cost more than it gained.
+        effect: { splinter: { count: 2, hp: 0.45 } },
+      },
+      {
+        id: 'lift', name: 'lift', weight: 0.45, from: 18, tint: 'force',
+        // A rescue. The whole field goes back up a row, which is a turn of
+        // headroom handed back at exactly the moment it is worth most.
+        effect: { lift: 1 },
+      },
+      {
+        id: 'anchor', name: 'anchor', weight: 0.9, from: 20, tint: 'hot',
+        // Not a payout at all - an obstacle. Several times the health of its
+        // neighbours, so it survives the pass that cleared everything around it
+        // and stands there as the thing still in the way.
+        hp: 3.5,
+        effect: { essence: 12 },
+      },
+      {
+        id: 'lodestone', name: 'lodestone', weight: 0.5, from: 22, tint: 'essence',
+        // Every marker on the board at once. In a field where markers strand
+        // out of reach this is the answer to a board that has gone wrong.
+        effect: { collect: true },
+      },
+      {
+        id: 'temper', name: 'temper', weight: 0.35, from: 26, tint: 'trade',
+        // Permanent damage. The rarest thing in the game and the only kind that
+        // changes every future turn.
+        effect: { power: 1 },
       },
     ],
+  },
+
+  // -------------------------------------------------------------------------
+  // AWARDS - the only thing that survives a run
+  //
+  // A run ends and takes everything with it, which is what makes the next one a
+  // decision rather than a continuation. These are the exception, and they are
+  // deliberately the smallest exception possible: a list of things that have
+  // happened once. None of them changes how the game plays.
+  //
+  // Every one is a THRESHOLD on a number that only goes up, so nothing here can
+  // be missed, nothing has to be remembered, and nothing is a task. They are
+  // the things that happen on the way to playing well - deeper, bigger,
+  // cleaner - never a detour taken on purpose. See src/awards.js for what each
+  // track measures.
+  // -------------------------------------------------------------------------
+  awards: {
+    list: [
+      // Depth. The spine of the whole thing.
+      { id: 'depth-15',  track: 'depth',   at: 15,   name: 'the shelf',        note: 'reach depth 15' },
+      { id: 'depth-30',  track: 'depth',   at: 30,   name: 'the drop',         note: 'reach depth 30' },
+      { id: 'depth-60',  track: 'depth',   at: 60,   name: 'past the light',   note: 'reach depth 60' },
+      { id: 'depth-100', track: 'depth',   at: 100,  name: 'the trench',       note: 'reach depth 100' },
+
+      // The swarm. The number the whole game is about.
+      { id: 'swarm-25',  track: 'swarm',   at: 25,   name: 'a crowd',          note: 'a swarm of 25' },
+      { id: 'swarm-100', track: 'swarm',   at: 100,  name: 'a legion',         note: 'a swarm of 100' },
+      { id: 'swarm-500', track: 'swarm',   at: 500,  name: 'uncountable',      note: 'a swarm of 500' },
+
+      // Clearing. The skill the game rewards most and teaches least.
+      { id: 'clear-1',   track: 'clears',  at: 1,    name: 'nothing left',     note: 'clear a board to nothing' },
+      { id: 'clear-15',  track: 'clears',  at: 15,   name: 'housekeeping',     note: 'clear 15 boards' },
+      { id: 'streak-3',  track: 'streak',  at: 3,    name: 'no purchase',      note: 'clear three boards in a row' },
+
+      // The vocabulary. Breaking a kind is how you find out what it does.
+      { id: 'kinds-4',   track: 'kinds',   at: 4,    name: 'field notes',      note: 'break 4 kinds of special block' },
+      { id: 'kinds-10',  track: 'kinds',   at: 10,   name: 'the whole bestiary', note: 'break every kind of special block' },
+
+      // The rest of the run.
+      { id: 'power-5',   track: 'power',   at: 5,    name: 'sharpened',        note: 'reach 5 damage a hit' },
+      { id: 'rich-1000', track: 'essence', at: 1000, name: 'flush',            note: 'hold 1,000 essence in one run' },
+      { id: 'win-1',     track: 'wins',    at: 1,    name: 'the field is broken', note: 'finish a tier' },
+      { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'finish three tiers' },
+      { id: 'modes-3',   track: 'modes',   at: 3,    name: 'every water',      note: 'play all three fields' },
+    ],
+
+    // The banner over the field when one is won.
+    wonTitle: 'award',
+
+    // The menu heading, and what it says with none won yet.
+    heading:  'awards',
+    none:     'nothing yet',
   },
 
   // -------------------------------------------------------------------------
@@ -297,8 +423,22 @@ export const CONFIG = {
     // enough not to snap, short enough to finish inside one turn.
     viewEase: 0.9,
 
-    // Pixels of headroom at the top of the canvas, under the readout.
+    // Pixels of headroom at the top of the canvas, under the readout. This is
+    // the CEILING - the line a body bounces off.
     topGap: 40,
+
+    // THE LANE. Pixels between the ceiling and the first row of blocks.
+    //
+    // Blocks used to start at the ceiling, so the best a shot could do was
+    // strike the top row from below and come straight back. A body that gets
+    // ABOVE the field instead rakes the whole top row from above, over and over,
+    // and that is the best thing that can happen to a shot in a game like this.
+    // It could not happen at all while there was nowhere to be.
+    //
+    // A little wider than a body, so one can actually travel in it rather than
+    // merely fit. Wider than this and it stops being a reward for a good angle
+    // and becomes somewhere shots end up by accident.
+    ceilingGap: 20,
 
     // Pixels from the bottom of the canvas to the swarm line. A block crossing
     // that line ends the run.
@@ -316,9 +456,79 @@ export const CONFIG = {
     // can pass through a block; raise it and the cost per body climbs.
     substeps: 3,
 
-    // Shots below this angle above the horizontal are refused, because a flat
-    // shot rattles along the floor and returns nothing.
-    minAngleDeg: 15,
+    // THE FLATTEST SHOT THE LAUNCHER WILL TAKE, in degrees above horizontal.
+    //
+    // It is NOT a safety rule and it never really was one worth fifteen
+    // degrees. Turns are guaranteed to end by `maxSteps` below, which bounds
+    // every body no matter what the physics does; this number only exists
+    // because a shot flat enough to rattle along the floor spends a whole turn
+    // and returns nothing, and the launcher should not let a player throw a
+    // turn away by dragging slightly too low.
+    //
+    // Eight rather than fifteen: low enough that the flat cross-field angles
+    // are all available, high enough that the genuinely wasted ones are not.
+    //
+    // AND IT IS NEVER A REFUSAL. Dragging below it slides the aim along the
+    // limit and the shot still fires - see fire() and the aim drawing. The old
+    // behaviour was to blank the line and silently do nothing, which told the
+    // player neither that there was a rule nor what it was.
+    minAngleDeg: 8,
+
+    // HOW A TURN IS GUARANTEED TO END: every body is retired after this many
+    // simulation steps, whatever it is doing.
+    //
+    // This is the whole termination argument now, and it is deliberately a
+    // construction rather than an inference. The old argument was geometric -
+    // a minimum launch angle put a floor under |vy|, bounces preserved it
+    // exactly, so every body reached the floor in bounded time. It was true,
+    // and it was fragile in the worst way: it rested on a property of the
+    // COLLISION CODE, so any future change to how a body bounces could silently
+    // remove the guarantee without touching anything that looked like it was
+    // about the guarantee. The ceiling skim below is exactly such a change.
+    //
+    // A budget cannot be undone by a physics change. The worst legal single
+    // body turn ever measured is about 1,540 steps, so this is roughly twice
+    // the worst real turn and should never be reached in play.
+    maxSteps: 3000,
+
+    // THE CEILING SKIM. Share of vertical speed a body keeps when it bounces
+    // off the ceiling; the rest is turned into horizontal speed, so the total
+    // speed is exactly unchanged.
+    //
+    // A perfect mirror is what stops a body ever STAYING in the lane above the
+    // field: it arrives, reverses, and leaves the way it came. Flattening it
+    // instead means a body that reaches the lane skims along it, raking the top
+    // row from above for as long as it can hold the line. That is the best
+    // outcome a shot has, and it is earned by finding a gap.
+    skim: 0.5,
+
+    // FLOOR UNDER THE VERTICAL SHARE after skimming.
+    //
+    // This is the dial that decides how long a skimming body can stay up, and
+    // it matters more than it looks. At 0.12 a body crosses the field
+    // vertically at a tenth of its speed, and the sweep found single-body turns
+    // running the full three thousand step budget - the guarantee held, but a
+    // guarantee is not a pace. At 0.22 the body is still shallow enough to rake
+    // several blocks a pass and still comes down on its own.
+    skimFloor: 0.22,
+
+    // HOW FAST A TURN RUNS - see turnSteps() in index.html.
+    //
+    // Nothing in this game is allowed to be waiting; anything tedious is
+    // something essence buys past. A turn with three hundred bodies breaks that
+    // rule on its own, because every one of them has to leave the field before
+    // the turn can close.
+    //
+    // So the SIMULATION runs faster, never the bodies. Speed, radius, substeps
+    // and every collision are untouched and a turn plays out exactly as it
+    // would have - there are simply more of its steps inside each frame. That
+    // keeps replays honest and keeps fast bodies from tunnelling, which raising
+    // the speed would not.
+    hasteFrom:  24,     // bodies before any speed-up at all
+    hasteSwarm: 16,     // bodies per extra step after that
+    hasteAfter: 180,    // steps a turn may take before time alone speeds it up
+    hasteRamp:  70,     // steps per extra step after that
+    hasteMax:   20,     // ceiling on steps per frame
 
     // Frames between bodies leaving the launcher, before the crowding term.
     // A larger swarm fires tighter: gap = max(1, round(baseGap - swarm/crowd)).
@@ -380,6 +590,18 @@ export const CONFIG = {
     // An essence pickup collected at depth d pays windfallBase + d.
     windfallBase: 5,
 
+    // A BOARD CLEARED TO NOTHING.
+    //
+    // The field refills every turn, so an empty board is not a state the game
+    // ever rests in - it is a single instant between the last block breaking
+    // and the next one arriving, and it only happens when a shot did everything
+    // it could have. That deserves paying for, and it deserves being SEEN,
+    // which is what the banner is for.
+    //
+    // Priced like an offer - base + perDepth * depth - so it keeps pace with
+    // what it could buy instead of turning into pocket change by depth forty.
+    clearBonus: { base: 30, perDepth: 7 },
+
     offers: [
       { id: 'ball',  name: 'conscript', desc: '+1 to the swarm',        base: 12, perDepth: 4,  amount: 1 },
       { id: 'power', name: 'sharpen',   desc: '+1 damage per hit',      base: 25, perDepth: 10, amount: 1 },
@@ -404,6 +626,26 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   difficulty: {
     defaultTier: 'swell',
+
+    // EVERY TIER'S BLOCK HEALTH, SCALED TOGETHER.
+    //
+    // The ladder's own note says health is the casual dial and nothing more:
+    // moved over its whole range it swung a beginner's finish rate and left
+    // strong play exactly where it was, because the run was decided by the
+    // supply line long before health mattered.
+    //
+    // That was measured against a field where a body struck the top row once
+    // from below and left. It is no longer that field - there is a lane above
+    // it now, and a threaded shot rakes the whole row from above - so damage
+    // per shot varies far more between a good angle and a careless one than it
+    // used to, and health has become the thing that decides whether a careless
+    // one accomplishes anything at all. It separates the two now, which is
+    // exactly what a difficulty dial is supposed to do.
+    //
+    // Kept as one number over the whole ladder so each tier keeps the shape it
+    // was authored with and only the overall weight moves.
+    healthScale: 1,
+
 
     // Tiers are designed to open one at a time. While true, every rung is
     // selectable from the start.
@@ -460,6 +702,11 @@ export const CONFIG = {
     // where blocks are placed rather than slid in from the top edge. 0 removes
     // the flash; a block then simply exists where it did not before.
     arrivalFlash: 0.38,
+
+    // Seconds a banner stays on screen when something happens worth seeing -
+    // a board cleared to nothing, an award earned. Long enough to read, short
+    // enough that it is gone before the next shot.
+    momentLife: 1.6,
 
     // Draws the wordless opening lesson for a player who has never fired.
     onboarding: true,
@@ -584,7 +831,13 @@ export const latticeAt = (n) => LADDER[Math.min(Math.max(0, n | 0), LADDER.lengt
  *  of the starting field, so widening opens negative columns on one side and
  *  columns past the start width on the other, symmetrically. */
 export const leftEdgeAt = (cols) => -Math.floor((cols - CONFIG.board.cols) / 2);
-export const TOP = CONFIG.board.topGap;
+/** The ceiling: the line a body bounces off at the top of the field. */
+export const CEIL = CONFIG.board.topGap;
+
+/** The field top: where row zero of the blocks begins. The gap between this
+ *  and the ceiling is the LANE - see board.ceilingGap. */
+export const TOP = CONFIG.board.topGap + Math.max(0, CONFIG.board.ceilingGap | 0);
+
 export const FLOOR = CONFIG.board.height - CONFIG.board.floorGap;
 
 /** Minimum vertical component of a legal shot, as a unit vector term. */

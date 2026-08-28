@@ -1342,15 +1342,26 @@ export function createVisual(opts) {
    * @param {ctx} ctx
    * @param {boolean[][]} [rows] future rows, nearest first
    */
-  function horizon(ctx, rows) {
+  /**
+   * The strip above the field, and the rows still to come drawn into it.
+   *
+   * @param {Array<boolean[]>} rows  the next rows, nearest first. NOT the live
+   *        blocks - this wants the field's own answer about what is coming, and
+   *        being handed the block list instead is why this drew nothing at all
+   *        for as long as it existed.
+   * @param {number} [lo] the leftmost WORLD column, so a field that has widened
+   *        draws its preview over the columns it will actually land on.
+   */
+  function horizon(ctx, rows, lo) {
     if (!ctx) return;
     const h = TOP;
+    const left = Number.isFinite(lo) ? lo : 0;
 
     // Distance is darker, not lighter. Nothing up there is resolved yet.
     ctx.fillStyle = PALETTE.void;
     ctx.fillRect(0, 0, W, h);
 
-    if (rows && rows.length) {
+    if (rows && rows.length && Array.isArray(rows[0])) {
       const n = Math.min(3, rows.length);
       const off = sliding ? (ease(slide) - 1) : 0;
       for (let i = n - 1; i >= 0; i--) {
@@ -1365,9 +1376,9 @@ export function createVisual(opts) {
         const row = rows[i];
         const inset = (CELL * (1 - scale)) * 0.5 + LOOK.inset;
         ctx.fillStyle = tone.a(hslHex(hue, 26, 58), a);
-        for (let c = 0; c < COLS && c < row.length; c++) {
+        for (let c = 0; c < row.length; c++) {
           if (!row[c]) continue;
-          ctx.fillRect(ORIGIN + c * CELL + inset, y, CELL - inset * 2, rh);
+          ctx.fillRect(ORIGIN + (left + c) * CELL + inset, y, CELL - inset * 2, rh);
         }
       }
     }
@@ -2034,18 +2045,56 @@ export function createVisual(opts) {
    * @param {number} dy unit direction y
    * @param {number} [len=520] ray length
    */
-  function aim(ctx, ox, oy, dx, dy, len) {
+  /**
+   * The aim ray.
+   *
+   * @param {object} [opts]
+   * @param {boolean} [opts.clamped] the drag was flatter than the launcher will
+   *        take and has been slid along the limit. Drawn in a different colour
+   *        and labelled, because the alternative - which is what this used to do
+   *        - was to draw nothing at all, which told the player neither that a
+   *        rule existed nor what it was.
+   * @param {number} [opts.limit] the flattest legal shot as a vertical unit, so
+   *        the two limit rays can be shown as the aim approaches them. The rule
+   *        reveals itself exactly when it starts to matter and stays invisible
+   *        the rest of the time.
+   */
+  function aim(ctx, ox, oy, dx, dy, len, opts) {
     if (!ctx) return;
     const L = len > 0 ? len : Math.max(W, H);
     const n = Math.hypot(dx, dy) || 1;
     const ux = dx / n, uy = dy / n;
+    const o = opts || {};
+    const hue = o.clamped ? PALETTE.essence : PALETTE.swarm;
+
+    // The forbidden wedge, shown as the aim comes near it. Both sides, because
+    // the limit is symmetric and seeing only the near one reads as an edge
+    // rather than as a rule.
+    if (o.limit > 0) {
+      const near = (-uy) - o.limit;
+      const show = o.clamped ? 1 : Math.max(0, 1 - near / 0.16);
+      if (show > 0.02) {
+        const lx = Math.sqrt(Math.max(0, 1 - o.limit * o.limit));
+        ctx.save();
+        ctx.setLineDash([3, 5]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = tone.a(PALETTE.essence, 0.30 * show);
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(ox + side * lx * L * 1.15, oy - o.limit * L * 1.15);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
 
     ctx.save();
     ctx.lineWidth = 1;
     // The ray, in four segments that each fade a little further.
     for (let s = 0; s < 4; s++) {
       const a0 = s / 4, a1 = (s + 1) / 4;
-      ctx.strokeStyle = tone.a(PALETTE.swarm, 0.42 * (1 - a0));
+      ctx.strokeStyle = tone.a(hue, 0.42 * (1 - a0));
       ctx.beginPath();
       ctx.moveTo(ox + ux * L * a0, oy + uy * L * a0);
       ctx.lineTo(ox + ux * L * a1, oy + uy * L * a1);
@@ -2059,15 +2108,19 @@ export function createVisual(opts) {
       ctx.moveTo(px - uy * 3, py + ux * 3);
       ctx.lineTo(px + uy * 3, py - ux * 3);
     }
-    ctx.strokeStyle = tone.a(PALETTE.swarm, 0.28);
+    ctx.strokeStyle = tone.a(hue, 0.28);
     ctx.stroke();
 
     const deg = Math.round(Math.atan2(-uy, ux) * 180 / Math.PI);
     ctx.font = '600 10px ' + FONT;
     ctx.textAlign = ux > 0 ? 'right' : 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillStyle = tone.a(PALETTE.swarm, 0.8);
-    ctx.fillText(deg + '°', ox + (ux > 0 ? -10 : 10), oy - 8);
+    ctx.fillStyle = tone.a(hue, 0.85);
+    // The angle, and - when the drag has been slid along the limit - the fact
+    // that it has been. A player who drags too low sees the line stop moving
+    // AND is told why, in the same glance.
+    ctx.fillText(deg + '\u00b0' + (o.clamped ? '  ' + (o.label || 'limit') : ''),
+                 ox + (ux > 0 ? -10 : 10), oy - 8);
     ctx.restore();
   }
 

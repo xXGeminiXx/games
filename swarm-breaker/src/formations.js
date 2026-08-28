@@ -342,6 +342,15 @@ export function createFormationSource(seed, opts = {}) {
     /** Whether the figure being dealt has finished arriving. */
     settled() { return queue.length === 0; },
 
+    /** The next rows, without consuming them. Fewer than asked for when the
+     *  figure being dealt is nearly finished - building the next one early to
+     *  fill the answer would change which figure is dealt when, so a short
+     *  answer is the honest one. */
+    upcoming(n) {
+      ensure();
+      return queue.slice(0, Math.max(0, n | 0)).map(r => r.slice());
+    },
+
     /** The whole of a figure as it will appear, top row first, backstop
      *  included. Does not disturb the sequence being dealt. */
     peek(n) {

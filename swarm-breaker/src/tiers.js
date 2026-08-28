@@ -346,11 +346,20 @@ const LADDER = [
   {
     id: 'maelstrom',
     name: 'maelstrom',
-    blurb: 'nothing is given. one pickup in five rows, from the first one.',
-    tell: 'no opening grace, and resupply never rises',
+    blurb: 'almost nothing is given. one pickup in five rows.',
+    tell: 'two turns of grace, and resupply never rises after them',
     requires: 'undertow',
     finish: 75,
-    supply: { start: 1, grace: 0, floor: 0.22, windfall: 1 / 3 },
+    // OPENED UP, MEASURED 2026-08-28. It shipped at start 1 / grace 0, and on
+    // the field as it now plays that is not a hard tier, it is a closed door: a
+    // single body against a row of three blocks cannot out-damage the row that
+    // arrives behind it, so every run ended between depth 9 and 11 and a player
+    // paying close attention got no further than one firing at random. A tier
+    // nobody can move inside is not difficulty, it is a wall with a number on
+    // it. The ladder's own finding is that the opening is a supply problem and
+    // not a health one, so the opening is what moved and the starved resupply
+    // that actually defines this tier did not.
+    supply: { start: 3, grace: 2, floor: 0.22, windfall: 1 / 3 },
     field: { densityBias: 0, rowsPerTurn: 1 },
     swarm: { soft: 24, drag: 1 },
     dials: {
@@ -364,11 +373,14 @@ const LADDER = [
   {
     id: 'abyss',
     name: 'abyss',
-    blurb: 'one ball, one pickup in six rows. every angle is the only angle.',
+    blurb: 'two balls, one pickup in six rows. every angle is the only angle.',
     tell: 'the field feeds you almost nothing, and never relents',
     requires: 'maelstrom',
     finish: 90,
-    supply: { start: 1, grace: 0, floor: 0.18, windfall: 1 / 3 },
+    // Same correction as maelstrom above, one rung meaner: enough of an opening
+    // to have a run at all, and the thinnest resupply on the ladder kept
+    // exactly as it was.
+    supply: { start: 2, grace: 1, floor: 0.18, windfall: 1 / 3 },
     field: { densityBias: 0, rowsPerTurn: 1 },
     swarm: { soft: 24, drag: 1 },
     dials: {
@@ -636,7 +648,28 @@ export function overflowEssence(which, depth, overflow, mode) {
 // keeps its shape at every tier.
 // ---------------------------------------------------------------------------
 
-/** Bias to add to the field generator's per-regime density bias. */
+/**
+ * Bias to add to the field generator's per-regime density bias.
+ *
+ * MEASURED 2026-08-28, AND WORTH KNOWING BEFORE TRUSTING THE LADDER TABLE:
+ * NOTHING IN THE DESCENDING MODES READS THIS. src/patterns.js is built from a
+ * seed alone and has its own per-regime bias; the only paths that ever consult
+ * a tier's density are shapeRow() and densityDeltaAt() below, and neither is
+ * called by the game. The growing field is the one mode that does read it, via
+ * the board view.
+ *
+ * So the ladder table's line that "density stops moving at undertow" describes
+ * the simulator it was measured on rather than the field a player meets, and a
+ * tier's field.densityBias currently changes nothing about the main game.
+ * Confirmed by shifting it across the whole ladder and measuring zero change in
+ * either player's median depth at any setting.
+ *
+ * It is left connected rather than deleted because the growing field does use
+ * it and because wiring it into the others is a live option - but the ladder's
+ * own finding argues against doing so: every second source of pressure stacked
+ * on top of a starved supply line flattened the tiers back into the single
+ * tipping point they were built to replace.
+ */
 export function densityBiasAt(which, depth, mode) {
   const t = need(which);
   const d = Math.max(1, Math.floor(depth) || 1);
@@ -746,7 +779,11 @@ export function healthAt(which, depth, mode) {
   const t = need(which);
   const d = Math.max(1, Math.floor(depth) || 1);
   const dl = t.dials;
-  let hp = mag(1 + dl.hpBase * d);
+  // One number over the whole ladder, so a tier keeps the shape it was authored
+  // with and only the overall weight moves. See difficulty.healthScale.
+  const scale = (CONFIG && CONFIG.difficulty && Number(CONFIG.difficulty.healthScale) > 0)
+    ? Number(CONFIG.difficulty.healthScale) : 1;
+  let hp = mag((1 + dl.hpBase * d) * scale);
   if (d > dl.hpRamp) hp = mmul(hp, mpow(dl.hpGrowth, d - dl.hpRamp));
   if (dl.endlessFrom != null && d > dl.endlessFrom && mode === 'endless') {
     hp = mmul(hp, mpow(dl.endlessGrowth, d - dl.endlessFrom));

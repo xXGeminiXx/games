@@ -12,11 +12,25 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
+  /* THE WHOLE GAME FITS THE WINDOW.
+     The shop is where a turn is spent, so having to scroll to reach it means
+     the loop has a scrollbar in the middle of it. The readout, the field, the
+     shop and the footer are all fixed-height rows and the FIELD takes whatever
+     is left, scaling down to fit rather than pushing anything off screen. */
   body{
     background:var(--bg); color:var(--ink);
     font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     display:flex; flex-direction:column; align-items:center;
     -webkit-user-select:none; user-select:none;
+    height:100vh; height:100dvh; overflow:hidden;
+  }
+  header,#shop,footer{flex:0 0 auto}
+  /* The field's own row. min-height:0 is what lets a flex child actually
+     shrink; without it the canvas keeps its intrinsic height and the rows
+     below it go off the bottom of the window, which is the whole bug. */
+  #stage{
+    flex:1 1 auto; min-height:0; width:100%; max-width:520px;
+    display:flex; align-items:center; justify-content:center; padding:2px 0;
   }
   header{
     width:100%; max-width:520px; display:flex; gap:0;
@@ -32,7 +46,10 @@
   .swarmv{color:var(--swarm)}
   .hotv{color:var(--hot)}
   .goldv{color:var(--pickup)}
-  canvas{display:block; touch-action:none}
+  /* Scaled to fit its row, aspect ratio preserved by the intrinsic size. Input
+     coordinates are already scaled by the measured rect, so this needs no
+     matching change in the game. */
+  canvas{display:block; touch-action:none; max-width:100%; max-height:100%}
   footer{
     width:100%; max-width:520px; padding:8px 12px 14px;
     color:var(--dim); font-size:11px; display:flex; justify-content:space-between;
@@ -51,12 +68,25 @@
   select:hover{color:var(--ink); border-color:var(--swarm)}
   footer{gap:8px}
   #shop{
-    width:100%; max-width:520px; display:none; gap:6px; padding:8px 12px;
-    border-top:1px solid var(--line); flex-wrap:wrap;
+    width:100%; max-width:520px; display:none; gap:5px; padding:7px 12px;
+    border-top:1px solid var(--line);
   }
   #shop.on{display:flex}
-  .buy{flex:1 1 150px; text-align:left; line-height:1.3}
-  .buy small{display:block; color:var(--dim); font-size:10px}
+  /* One row, always. flex-basis 0 with min-width 0 is what stops the longest
+     description deciding the width of everything and wrapping the fourth
+     button onto a second line. */
+  .buy{
+    flex:1 1 0; min-width:0; text-align:left; line-height:1.25;
+    padding:4px 7px; font-size:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .buy small{
+    display:block; color:var(--dim); font-size:9.5px; letter-spacing:-0.01em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* The price is the number the decision turns on, so it is the one thing in
+     the offer that is never dimmed and never clipped. */
+  .buy small b{color:var(--pickup); font-weight:600; font-size:11px}
   #over{
     position:fixed; inset:0; background:rgba(8,9,12,.93); display:none;
     flex-direction:column; align-items:center; justify-content:center; gap:14px;
@@ -109,6 +139,26 @@
   #menuhint{color:var(--dim); font-size:10.5px}
   #resume{display:none}
   #resume.on{display:block}
+
+  /* awards */
+  #awards{border-top:1px solid var(--line); padding-top:12px}
+  .awhead{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:10px; color:var(--dim); text-transform:uppercase;
+    letter-spacing:.09em; margin-bottom:8px;
+  }
+  #awcount{color:var(--pickup); font-variant-numeric:tabular-nums}
+  #awlist{display:grid; grid-template-columns:1fr 1fr; gap:5px 12px}
+  .aw{font-size:11px; line-height:1.35; color:#4a505c}
+  .aw b{display:block; font-weight:600; font-size:12px; letter-spacing:-0.01em}
+  .aw.won{color:var(--dim)}
+  .aw.won b{color:var(--trade)}
+  .aw .bar{
+    display:block; height:2px; margin-top:3px; background:var(--line);
+    position:relative; overflow:hidden;
+  }
+  .aw .bar i{position:absolute; inset:0 auto 0 0; background:var(--dim)}
+  .aw.won .bar i{background:var(--trade)}
 </style>
 </head>
 <body>
@@ -120,7 +170,7 @@
   <div class="stat"><b id="rule" style="font-size:15px">drift</b><span id="lbl-pattern">pattern</span></div>
 </header>
 
-<canvas id="c" width="520" height="620"></canvas>
+<div id="stage"><canvas id="c" width="520" height="620"></canvas></div>
 
 <div id="shop"></div>
 
@@ -156,6 +206,11 @@
 
     <div id="modelist"></div>
 
+    <div id="awards">
+      <div class="awhead"><span id="awtitle">awards</span><span id="awcount"></span></div>
+      <div id="awlist"></div>
+    </div>
+
     <div id="menufoot">
       <button id="resume">resume run</button>
       <span id="menuhint"></span>
@@ -174,16 +229,36 @@
 // no audio - all state is legible on screen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js';
-import { createJuice } from './src/juice.js';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js';
-import { createBlockKinds } from './src/blocks.js';
-import { createSave, fieldFingerprint } from './src/save.js';
-import { createLeaderboard } from './src/leaderboard.js';
-import * as Tiers from './src/tiers.js';
-import { createOnboarding } from './src/onboarding.js';
-import { createVisual } from './src/visual.js';
+// EVERY IMPORT CARRIES A BUILD TAG, AND THEY ALL HAVE TO MATCH.
+//
+// A browser caches modules, and it caches them independently of the page that
+// asked for them. Without this, a player who has the game open when a new build
+// lands - or who returns while an old copy is still fresh in their cache - can
+// end up running the new index.html against modules from the old one. That is
+// not a broken feature, it is a broken game: the loop calls something the
+// module it actually loaded has never heard of, and the field stops drawing.
+//
+// Observed, not theorised: a stale src/formations.js against a newer
+// src/modes.js threw `src.upcoming is not a function` every frame.
+//
+// The tag makes each release a different URL, so a stale copy is never the one
+// that answers. Bump it whenever anything under src/ changes shape. Nothing
+// enforces that but a test checks they all match each other, which is the half
+// that actually goes wrong.
+//
+// A build step would do this automatically. There is no build step, on purpose.
+import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
+         storageKey, offerCost, applyIdentity } from './config.js?v=2';
+import { createJuice } from './src/juice.js?v=2';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=2';
+import { createBlockKinds } from './src/blocks.js?v=2';
+import { safeRows } from './src/arrival.js?v=2';
+import { createAwards } from './src/awards.js?v=2';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=2';
+import { createLeaderboard } from './src/leaderboard.js?v=2';
+import * as Tiers from './src/tiers.js?v=2';
+import { createOnboarding } from './src/onboarding.js?v=2';
+import { createVisual } from './src/visual.js?v=2';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -232,6 +307,19 @@ function easeView(dt){
 }
 // Seconds a newly placed block spends announcing itself. See markArrivals.
 const ARRIVAL_FLASH = Math.max(0, Number(CONFIG.feel.arrivalFlash) || 0);
+
+// Seconds a moment stays on screen. See moment().
+const MOMENT_LIFE = Math.max(0.4, Number(CONFIG.feel.momentLife) || 1.6);
+const FONT = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+
+// Steps a body may live for, whatever it is doing. This is the whole reason a
+// turn is guaranteed to end - see config.swarm.maxSteps.
+const MAX_STEPS = Math.max(60, CONFIG.swarm.maxSteps | 0);
+const SKIM = Math.max(0, Math.min(1, Number(CONFIG.swarm.skim)));
+const SKIM_FLOOR = Math.max(0.01, Math.min(0.9, Number(CONFIG.swarm.skimFloor)));
+// Below this a body is far enough down the field to have a fresh run at the
+// ceiling, whatever it hit on the way here.
+const CLEAN_LINE = TOP + (FLOOR - TOP) * 0.6;
 
 // How many times a turn will re-ask a field that answered with nothing while
 // the board was also empty. Bounded rather than a while loop, because a field
@@ -283,6 +371,10 @@ function fresh(){
   S = {
     depth: 1, balls: Tiers.tierOf(TIER).supply.start, gold: 0, tier: TIER,
     endless: false, won: false,
+    clears: 0, streak: 0, turnKills: 0, kindsSeen: [],
+    // Where the history stood when this run began, so a mid-run check adds
+    // this run's totals to it rather than to itself.
+    clearsBefore: awards.profile.clears, winsBefore: awards.profile.wins,
     rows: [],            // {c, r, hp, max} in grid coords
     drops: [],           // {c, r, kind}
     owed: { ball: 0, gold: 0 },   // markers the field still has to find room for
@@ -362,7 +454,11 @@ function addRow(){
   // came in the loop, so a field is the same field every time it is built.
   for (const cell of blocks){
     const k = S.kinds.rollFor(d, cell.c);
-    const b = { c: cell.c, r: cell.r, hp, max: hp };
+    // Most kinds are payouts and carry the health the tier asked for. The ones
+    // that are obstacles rather than rewards say so, and stand there after the
+    // pass that cleared everything around them.
+    const bhp = k ? Math.max(1, Math.round(hp * S.kinds.healthScale(k))) : hp;
+    const b = { c: cell.c, r: cell.r, hp: bhp, max: bhp };
     if (k) b.k = k;
     // A block that arrives at the top edge announces itself by sliding in from
     // it. One that appears in the middle of the board has no motion to be
@@ -488,19 +584,54 @@ const cyOf = r => TOP + r * CELL + CELL / 2;
 
 // --- turn cycle -------------------------------------------------------------
 
-function fire(){
-  if (S.firing || S.dead) return;
+// THE DIRECTION A DRAG ACTUALLY FIRES IN.
+//
+// A drag flatter than the launcher will take is CLAMPED to the limit, not
+// refused. The old behaviour blanked the aim line and silently did nothing,
+// which told the player neither that a rule existed nor what it was: the line
+// vanished, the shot did not happen, and there was no way to find out why.
+// Clamped, the line stays on screen, slides along the limit, and fires.
+//
+// Returns null only for a drag too short to carry a direction at all.
+function aimDir(){
   const dx = S.aim.x - S.origin, dy = S.aim.y - (FLOOR - R);
   const len = Math.hypot(dx, dy);
-  if (len < 12 || -dy / len < MIN_AIM_Y) return;   // shots flatter than the configured angle are refused
-  S.dir = { x: dx / len, y: dy / len };
+  if (len < 12) return null;
+  let ux = dx / len, uy = dy / len;
+  const clamped = -uy < MIN_AIM_Y;
+  if (clamped){
+    // Slide along the limit on the side the player is pointing, so the shot
+    // stays as close to what they asked for as the rule allows.
+    uy = -MIN_AIM_Y;
+    ux = (ux < 0 ? -1 : 1) * Math.sqrt(Math.max(0, 1 - MIN_AIM_Y * MIN_AIM_Y));
+  }
+  return { x: ux, y: uy, len, clamped };
+}
+
+function fire(){
+  if (S.firing || S.dead) return;
+  const a = aimDir();
+  if (!a) return;
+  S.dir = { x: a.x, y: a.y };
   S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
+  S.turnKills = 0;
   store.mark();
   juice.launch(S.origin, FLOOR - R, S.dir.x, S.dir.y);
 }
 
 function endTurn(){
   S.firing = false;
+  // A BOARD CLEARED TO NOTHING, before the next one arrives.
+  //
+  // The field refills every turn, so an empty board is never a state the game
+  // rests in - it is one instant between the last block breaking and the next
+  // arriving, and it only happens when a shot did everything it could have.
+  // Checked here, before addRow(), because a moment later there is no evidence
+  // it ever happened.
+  //
+  // It has to have been EARNED this turn. A board that was already empty when
+  // the shot was taken is not a clear, it is a turn with nothing in it.
+  if (S.rows.length === 0 && S.turnKills > 0 && !pastFinish()) perfectClear();
   // Belt and braces. The fuse and the floor already account for every sprayed
   // body; this makes "only for that turn" true by construction rather than by
   // two other things happening to work.
@@ -512,6 +643,10 @@ function endTurn(){
   // Lose when the field has reached the player. WHAT that means belongs to
   // the arrival: a field that descends reaches them by crossing the swarm
   // line, a field that fills reaches them by running out of room.
+  if (S.rows.length > 0) S.streak = 0;
+  // Depth and swarm cross their thresholds during a turn, not at the end of a
+  // run, so they are checked where they change.
+  checkAwards();
   if (S.field.arrival.lost(view())) return die();
   // The tier has run out of field and the board is clear. Nothing is coming and
   // nothing is left, so the run is over and it was won. Without this the game
@@ -522,10 +657,24 @@ function endTurn(){
   paintShop();
 }
 
+/** Every block on the board, gone, in one turn. */
+function perfectClear(){
+  const c = CONFIG.economy.clearBonus;
+  const bonus = Math.max(1, Math.round(c.base + c.perDepth * S.depth));
+  S.gold += bonus;
+  S.clears = (S.clears || 0) + 1;
+  S.streak = (S.streak || 0) + 1;
+  moment(CONFIG.text.clearTitle, CONFIG.text.clearNote + bonus, CONFIG.palette.essence);
+  look.resolve();
+  juice.destroy(W / 2, (TOP + FLOOR) / 2, CONFIG.palette.essence, 0, -1);
+  checkAwards();
+}
+
 /** The field is spent and the board is clear. */
 function win(){
   S.dead = true;
   S.won = true;
+  checkAwards();
   recordBest();
   store.mark();
   board.finish({
@@ -551,6 +700,7 @@ function endingWord(){
 
 function die(){
   S.dead = true;
+  checkAwards();
   document.getElementById('overtitle').textContent = endingWord();
   document.getElementById('endless').classList.remove('on');
   recordBest();
@@ -571,7 +721,7 @@ function sim(){
     S.fireT++;
     const gap = Math.max(1, Math.round(CONFIG.swarm.launchGap - S.balls / CONFIG.swarm.launchCrowd));
     if (S.queue > 0 && S.fireT % gap === 0){
-      S.live.push({ x: S.origin, y: FLOOR - R, vx: S.dir.x * SPEED, vy: S.dir.y * SPEED });
+      S.live.push({ x: S.origin, y: FLOOR - R, vx: S.dir.x * SPEED, vy: S.dir.y * SPEED, clean: true });
       S.queue--;
     }
   }
@@ -585,29 +735,32 @@ function sim(){
       S.live.splice(i, 1);
       continue;
     }
+    // AND EVERY body carries a budget. This is what makes a turn end - not the
+    // launch angle, not the collision code, and nothing else that a later
+    // change to the physics could quietly take away. It should never be reached
+    // in play: the worst legal single body turn measured is about half of it.
+    b.age = (b.age || 0) + 1;
+    if (b.age > MAX_STEPS){
+      look.splash(b.x, 0.5);
+      S.live.splice(i, 1);
+      continue;
+    }
     juice.trail(b.x, b.y, b.vx, b.vy);
     // substep so fast balls cannot tunnel through a block
     for (let s = 0; s < SUBSTEPS; s++){
       b.x += b.vx / SUBSTEPS; b.y += b.vy / SUBSTEPS;
       if (b.x < R){ b.x = R; b.vx = Math.abs(b.vx); }
       if (b.x > W - R){ b.x = W - R; b.vx = -Math.abs(b.vx); }
-      if (b.y < TOP + R){ b.y = TOP + R; b.vy = Math.abs(b.vy); }
+      if (b.y < CEIL + R){ b.y = CEIL + R; b.vy = Math.abs(b.vy); skimOff(b); }
+      // A body low in the field has a fresh run at the ceiling ahead of it, so
+      // whatever it touched on the way down stops counting against it.
+      if (b.y > CLEAN_LINE) b.clean = true;
       hitBlocks(b);
     }
     // pickups
     for (let j = S.drops.length - 1; j >= 0; j--){
       const p = S.drops[j];
-      if (Math.hypot(b.x - cx(p.c), b.y - cyOf(p.r)) < CELL * 0.32){
-        if (p.kind === 'ball'){
-          S.balls += 1;
-          juice.pickup(cx(p.c), cyOf(p.r), 'ball', 1);
-        } else {
-          const n = CONFIG.economy.windfallBase + S.depth;
-          S.gold += n;
-          juice.pickup(cx(p.c), cyOf(p.r), 'gold', n);
-        }
-        S.drops.splice(j, 1);
-      }
+      if (Math.hypot(b.x - cx(p.c), b.y - cyOf(p.r)) < CELL * 0.32) takeMarker(j);
     }
     if (b.y > FLOOR - R){
       // Where the next shot starts is decided by the swarm, never by a spray.
@@ -620,6 +773,56 @@ function sim(){
   }
 
   if (S.firing && S.queue === 0 && S.live.length === 0) endTurn();
+}
+
+// A body that reaches the lane above the field FLATTENS rather than mirroring
+// straight back down, so it can travel along the lane and rake the top row from
+// above instead of arriving and leaving the way it came.
+//
+// IT HAS TO BE EARNED, AND THAT IS THE WHOLE DESIGN OF IT.
+//
+// Only a body that reached the ceiling WITHOUT TOUCHING ANYTHING gets it - a
+// shot threaded through a gap in the field. Measured, handing it to every body
+// that happens to touch the ceiling is worth far more to a player firing at
+// random than to one aiming: it took the gap between the two from three times
+// the depth down to under two, because a lucky shot got the best outcome in the
+// game without doing anything to deserve it. Earned, it stays what it is
+// supposed to be, which is the payoff for finding the hole.
+//
+// A body that has been raking blocks can earn it again by falling back down the
+// field and making a fresh clean run at the ceiling. See `clean`.
+//
+// Speed is preserved EXACTLY - only the direction turns - so nothing here can
+// make a body outrun its own collision substeps. The vertical share is never
+// allowed below swarm.skimFloor, so a body still comes home under its own steam
+// rather than leaning on the step budget to end the turn.
+function skimOff(b){
+  if (SKIM >= 1 || !b.clean) return;
+  // A shot fired straight up is a column drill and a real choice. Leave it
+  // vertical; there is no side for it to flatten toward.
+  if (Math.abs(b.vx) < 1e-6) return;
+  const sp = Math.hypot(b.vx, b.vy);
+  if (!(sp > 0)) return;
+  const vy = Math.max(SKIM_FLOOR * sp, Math.abs(b.vy) * SKIM);
+  b.vy = vy;                                    // leaving the ceiling, so down
+  b.vx = (b.vx < 0 ? -1 : 1) * Math.sqrt(Math.max(0, sp * sp - vy * vy));
+}
+
+// Collecting one marker. Factored out so a lodestone pays a marker exactly what
+// running into it pays, rather than a second opinion about what a marker is
+// worth that can drift away from the first.
+function takeMarker(j){
+  const p = S.drops[j];
+  if (!p) return;
+  if (p.kind === 'ball'){
+    S.balls += 1;
+    juice.pickup(cx(p.c), cyOf(p.r), 'ball', 1);
+  } else {
+    const n = CONFIG.economy.windfallBase + S.depth;
+    S.gold += n;
+    juice.pickup(cx(p.c), cyOf(p.r), 'gold', n);
+  }
+  S.drops.splice(j, 1);
 }
 
 function hitBlocks(b){
@@ -657,6 +860,8 @@ function hitBlocks(b){
     if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
     else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
 
+    // It touched something, so its run at the ceiling is no longer clean.
+    b.clean = false;
     const nx = b.vx, ny = b.vy;
     const m = look.materialFor(bl.max).mat;
     const shade = `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
@@ -666,7 +871,13 @@ function hitBlocks(b){
       juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
       S.rows.splice(i, 1);
       S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
-      if (bl.k) applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2);
+      S.turnKills = (S.turnKills || 0) + 1;
+      if (bl.k){
+        // Breaking one is how a player finds out what it does, so breaking one
+        // is what the record is of.
+        if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
+        applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2, bl);
+      }
     }
     return;
   }
@@ -731,14 +942,92 @@ function markArrivals(X){
 // The verbs are shared. A kind names one; this is the only place that knows how
 // to carry it out, so a new kind is usually a config entry and no code at all.
 
-function applyBlockEffect(e, x, y){
+function applyBlockEffect(e, x, y, src){
   if (!e) return;
   if (e.burst) spray(x, y, e.burst);
   if (e.essence) S.gold += e.essence;
   if (e.balls) S.balls += e.balls;
+  if (e.power) S.power += e.power;
+
   if (e.clearRow){
     let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
-    S.rows = S.rows.filter(b => b.r !== lo);
+    sweep(S.rows.filter(b => b.r === lo));
+  }
+
+  // Its whole column, top to bottom.
+  if (e.column && src) sweep(S.rows.filter(b => b.c === src.c));
+
+  // Everything touching it, corners included. This is what pays for breaking
+  // into the MIDDLE of a clump rather than nibbling its edge.
+  if (e.chain && src) {
+    sweep(S.rows.filter(b => Math.abs(b.c - src.c) <= 1 && Math.abs(b.r - src.r) <= 1));
+  }
+
+  // A row of headroom handed back. Nothing is destroyed - the field simply
+  // stands further from the line than it did, which is worth most at exactly
+  // the moment it is hardest to earn.
+  if (e.lift > 0) {
+    const n = e.lift | 0;
+    for (const b of S.rows) b.r = Math.max(0, b.r - n);
+    for (const p of S.drops) p.r = Math.max(0, p.r - n);
+    juice.destroy(W / 2, TOP + CELL, CONFIG.palette.force, 0, -1);
+  }
+
+  // Every marker on the board at once - the answer to a board where the supply
+  // has stranded somewhere the swarm cannot reach.
+  if (e.collect) {
+    for (let j = S.drops.length - 1; j >= 0; j--) takeMarker(j);
+  }
+
+  // A TRAP. Breaking it leaves smaller blocks where one used to be, so a
+  // careless clear widens the field instead of emptying it.
+  if (e.splinter && src) splinter(src, e.splinter);
+}
+
+// Destroy a set of blocks that something else broke.
+//
+// They pay what they were worth and they do NOT set off their own kinds. A
+// chain that triggers a chain is an unbounded reaction on a board the player
+// cannot see the end of, and the one thing this game guarantees is that a turn
+// ends. One level deep, stated rather than discovered.
+function sweep(list){
+  if (!list || !list.length) return;
+  const gone = new Set(list);
+  for (const bl of gone){
+    const m = look.materialFor(bl.max).mat;
+    juice.destroy(cx(bl.c), cyOf(bl.r), `hsl(${m.h} ${m.s}% ${m.l + 14}%)`, 0, -1);
+    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    S.turnKills = (S.turnKills || 0) + 1;
+  }
+  S.rows = S.rows.filter(b => !gone.has(b));
+}
+
+// What a splinter leaves behind. The pieces go in free cells beside where the
+// block stood, never out of the field and never in the row that would end the
+// run - a block that kills you the instant it appears is not a trap, it is a
+// coin flip.
+function splinter(src, spec){
+  const n = Math.max(1, spec.count | 0);
+  const share = spec.hp > 0 ? spec.hp : 0.5;
+  const hp = Math.max(1, Math.round(src.max * share));
+  const v = view();
+  const rows = safeRows(v);
+  const taken = new Set(S.rows.map(b => b.c + ',' + b.r));
+  for (const p of S.drops) taken.add(p.c + ',' + p.r);
+  // Sideways first, then up: a piece pushed further from the line is a smaller
+  // punishment than one pushed toward it.
+  const around = [[-1, 0], [1, 0], [0, -1], [-1, -1], [1, -1], [0, 1]];
+  let placed = 0;
+  for (const [dc, dr] of around){
+    if (placed >= n) break;
+    const c = src.c + dc, r = src.r + dr;
+    if (r < 0 || r >= rows) continue;
+    if (c < v.lo || c >= v.lo + v.cols) continue;
+    const key = c + ',' + r;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    S.rows.push({ c, r, hp, max: hp, pop: S.field.arrival.moves ? undefined : 1 });
+    placed++;
   }
 }
 
@@ -757,7 +1046,7 @@ function spray(x, y, spec){
     const a = (i + 0.5) / n * Math.PI * 2;
     S.live.push({
       x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      temp: true, life, size: 0.68,
+      temp: true, life, size: 0.68, clean: false,
     });
   }
   juice.destroy(x, y, CONFIG.palette.hot, 0, -1);
@@ -778,15 +1067,26 @@ function draw(){
   juice.begin(X);
 
   look.background(X);
-  look.horizon(X, S.rows);
+  // WHAT IS COMING, not what is here. This used to be handed S.rows - a flat
+  // list of block objects where it wanted an array of boolean rows - so it
+  // indexed row[c] on an object, found undefined every time, and drew nothing
+  // at all for as long as it existed. Every mode answers for itself now, and
+  // the one that genuinely cannot know says so.
+  const ahead = S.field.preview ? S.field.preview(S.depth, 3) : null;
+  look.horizon(X, ahead && ahead.rows, ahead && ahead.lo);
+  drawLane(X);
   look.blocks(X, S.rows);
   markSpecials(X);
   markArrivals(X);
   look.pickups(X, S.drops);
 
+  // The aim line is ALWAYS drawn while aiming. Below the flattest legal angle
+  // it slides along the limit and says so, rather than vanishing and leaving
+  // the player to work out that a rule exists.
   if (S.aiming && !S.firing && !S.dead){
-    const dx = S.aim.x - S.origin, dy = S.aim.y - (FLOOR - R), len = Math.hypot(dx, dy);
-    if (len > 12 && -dy / len >= MIN_AIM_Y) look.aim(X, S.origin, FLOOR - R, dx / len, dy / len, len);
+    const a = aimDir();
+    if (a) look.aim(X, S.origin, FLOOR - R, a.x, a.y, a.len,
+                    { clamped: a.clamped, limit: MIN_AIM_Y, label: CONFIG.text.aimLimit });
   }
 
   look.bodies(X, S.live, R);
@@ -798,7 +1098,98 @@ function draw(){
   juice.end(X);
 
   look.foreground(X);
+  drawMoments(X);
   if (CONFIG.feel.onboarding) teach.draw(X);
+}
+
+// THE LANE, drawn.
+//
+// The ceiling is where a body bounces; the field begins lower down, and the gap
+// between them is the best place a shot can reach - a body up there rakes the
+// whole top row from above instead of striking it once from below. It has to be
+// somewhere the player can SEE, or the best move in the game is invisible.
+function drawLane(X){
+  const h = TOP - CEIL;
+  if (h < 2) return;
+  X.save();
+  X.fillStyle = CONFIG.palette.panel;
+  X.globalAlpha = 0.5;
+  X.fillRect(0, CEIL, W, h);
+  X.globalAlpha = 1;
+  X.strokeStyle = CONFIG.palette.rule;
+  X.lineWidth = 1;
+  X.beginPath(); X.moveTo(0, CEIL + 0.5); X.lineTo(W, CEIL + 0.5); X.stroke();
+  X.restore();
+}
+
+// --- moments ----------------------------------------------------------------
+//
+// Something happened that the player should not be able to miss. Not a message
+// and not a prompt - nothing here can be dismissed, nothing waits for input,
+// and the game never stops. A moment is a word, a number, and a ring going out
+// across the field, and then it is gone.
+//
+// Everything that has to announce itself uses this: a board cleared to nothing,
+// an award earned. One place, so they cannot end up shouting over each other in
+// different styles.
+
+const moments = [];
+
+/**
+ * Announce something.
+ * @param {string} title  the thing that happened
+ * @param {string} note   a number or a short qualifier, drawn under it
+ * @param {string} colour palette colour carrying the meaning
+ */
+function moment(title, note, colour){
+  // A pile of banners is noise. The newest one is the one that matters, and
+  // anything still on screen is pushed along rather than fought with.
+  if (moments.length >= 3) moments.shift();
+  moments.push({ title, note: note || '', colour: colour || CONFIG.palette.ink, t: 0 });
+}
+
+function updateMoments(dt){
+  for (let i = moments.length - 1; i >= 0; i--){
+    moments[i].t += dt;
+    if (moments[i].t > MOMENT_LIFE) moments.splice(i, 1);
+  }
+}
+
+function drawMoments(X){
+  for (let i = 0; i < moments.length; i++){
+    const m = moments[i];
+    const k = Math.min(1, m.t / MOMENT_LIFE);
+    // In fast, out slow, so it reads as an event rather than a fade.
+    const inK = Math.min(1, m.t / (MOMENT_LIFE * 0.12));
+    const alpha = inK * (1 - Math.pow(k, 3));
+    if (alpha <= 0.01) continue;
+    // Spaced by more than a title and its note together, or the note of one
+    // lands on the title of the next - which happens for real, because a board
+    // cleared to nothing is exactly the turn most likely to win an award too.
+    const y = TOP + (FLOOR - TOP) * 0.36 - i * 52;
+
+    X.save();
+    // The ring: one expanding circle, thinning as it goes, which is what makes
+    // the whole field feel like it moved rather than the text alone.
+    const rr = (FLOOR - TOP) * 0.12 + k * (FLOOR - TOP) * 0.9;
+    X.globalAlpha = alpha * 0.5 * (1 - k);
+    X.strokeStyle = m.colour;
+    X.lineWidth = 3 * (1 - k) + 0.5;
+    X.beginPath(); X.arc(W / 2, y, rr, 0, Math.PI * 2); X.stroke();
+
+    X.globalAlpha = alpha;
+    X.textAlign = 'center';
+    X.textBaseline = 'middle';
+    X.fillStyle = m.colour;
+    X.font = '600 ' + Math.round(21 + 5 * (1 - inK)) + 'px ' + FONT;
+    X.fillText(m.title, W / 2, y);
+    if (m.note){
+      X.font = '600 14px ' + FONT;
+      X.globalAlpha = alpha * 0.85;
+      X.fillText(m.note, W / 2, y + 22);
+    }
+    X.restore();
+  }
 }
 
 // --- shop -------------------------------------------------------------------
@@ -844,7 +1235,12 @@ function paintShop(){
     const c = o.cost(S.depth);
     const b = document.createElement('button');
     b.className = 'buy';
-    b.innerHTML = `${o.name} &middot; ${c}<small>${o.desc}</small>`;
+    // The PRICE goes on the second line with the description, not beside the
+    // name. Four offers share one row, so the top line is about fifteen
+    // characters wide - "conscript" and a three digit price do not both fit,
+    // and what got clipped was the price, which is the half a player is
+    // actually reading.
+    b.innerHTML = `${o.name}<small><b>${c}</b> &middot; ${o.desc}</small>`;
     b.disabled = S.gold < c || S.firing;
     b.onclick = () => { if (S.gold >= c){ S.gold -= c; o.buy(); store.mark(); paintShop(); } };
     el.appendChild(b);
@@ -852,8 +1248,69 @@ function paintShop(){
 }
 
 // --- persistence ------------------------------------------------------------
+//
+// A SAVE WRITTEN BY AN OLDER BUILD OF THE GAME.
+//
+// The shape of a run changes as the game does, and a player who has one in
+// progress when a new build lands should not be handed a half-understood
+// version of it. There are two halves to that and they are separate.
+//
+// The first is that a change we KNOW about is migrated, not discarded, so an
+// in-progress run survives an update. Each step below says what the shape
+// gained and fills it in; unknown fields are carried through untouched, so a
+// save can round-trip through an older build without losing what that build
+// never heard of.
+//
+// The second is that a change we do NOT know about - a save from a build newer
+// than this one, or one no chain of steps can bring up to date - is refused
+// rather than half-loaded. See restore().
+//
+// AND NOTHING ELSE THE PLAYER HAS IS TOUCHED EITHER WAY. Awards, deepest runs,
+// the chosen field and the chosen difficulty are all in their own storage keys
+// and none of them is versioned with the run, so the worst an update can ever
+// cost is the run that happened to be open.
+
+// Schema 2: a marker in a field that does not descend carries how many turns it
+// has left, and a run counts the boards it has cleared to nothing.
+registerMigration(1, 2, (data) => {
+  if (!data || typeof data !== 'object') return data;
+  const drops = Array.isArray(data.drops)
+    ? data.drops.map(p => (p && p.t === undefined ? { ...p, t: CONFIG.bloom.markerTurns } : p))
+    : data.drops;
+  return {
+    ...data,
+    drops,
+    clears: data.clears | 0,
+    streak: data.streak | 0,
+  };
+});
 
 const board = createLeaderboard({ defaultTier: CONFIG.difficulty.defaultTier });
+
+// The one thing that survives a run. Nothing in here changes how the game
+// plays - see src/awards.js for why that is the point.
+const awards = createAwards({ key: storageKey('awards') });
+
+/** What this run has done, in the shape the award tracks read. */
+function runStats(){
+  return {
+    depth: S.depth, swarm: S.balls, essence: S.gold, power: S.power,
+    streak: S.streak || 0, clears: S.clears || 0, clearsBefore: S.clearsBefore || 0,
+    winsBefore: S.winsBefore || 0, won: !!S.won,
+    kinds: S.kindsSeen || [], mode: S.mode,
+  };
+}
+
+/** An award, announced the same way everything else is: once, over the field,
+ *  gone in a second and a half. Never a dialog and never a thing to dismiss. */
+function earned(a){
+  moment(a.name, CONFIG.awards.wonTitle, CONFIG.palette.trade);
+}
+
+/** Fold the run in and announce anything new. Safe to call at any moment: the
+ *  history only ever takes maximums and unions, so checking twice cannot double
+ *  count and checking early cannot lose anything. */
+function checkAwards(){ awards.check(runStats(), earned); }
 
 const store = createSave({
   key: storageKey('run'),
@@ -866,6 +1323,7 @@ const store = createSave({
     seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold, dealt: S.dealt,
     owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
+    clears: S.clears | 0, streak: S.streak | 0, kindsSeen: (S.kindsSeen || []).slice(),
     rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind, t: p.t })),
     // A sprayed body belongs to the turn it was thrown in, and a save is taken
@@ -873,8 +1331,15 @@ const store = createSave({
     live: S.live.filter(b => !b.temp).map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
     firing: S.firing, queue: S.queue, dir: S.dir || null,
   }),
-  restore: (v) => {
+  restore: (v, report) => {
     if (!v || typeof v !== 'object') return;
+    // A save this build cannot bring fully up to date is not loaded. The bytes
+    // are already set aside by the loader, so a build that does understand them
+    // can still have them; what this refuses to do is restore a run out of a
+    // shape it only half recognises. Merely DAMAGED saves are still loaded - a
+    // slightly wrong run beats no run - which is why this asks about the
+    // version rather than about `degraded`.
+    if (report && (report.future || report.version !== currentSchema())) return;
     // A saved run is played on the field it was started on, whatever the menu
     // happens to be pointing at now.
     MODE = normaliseMode(v.mode);
@@ -898,6 +1363,8 @@ const store = createSave({
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
     S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
     S.drops = Array.isArray(v.drops) ? v.drops.slice() : [];
+    S.clears = v.clears | 0; S.streak = v.streak | 0;
+    S.kindsSeen = Array.isArray(v.kindsSeen) ? v.kindsSeen.slice() : [];
     S.live = Array.isArray(v.live) ? v.live.slice() : [];
     S.firing = !!v.firing; S.queue = v.queue | 0; S.dir = v.dir || null;
     S.dead = !!v.dead;
@@ -991,6 +1458,32 @@ function paintMenu(){
   // Only offer to go back to a run there is something to go back to.
   const live = !!S && !S.dead && S.depth > 1;
   document.getElementById('resume').classList.toggle('on', live);
+  paintAwards();
+}
+
+// The only thing that survives a run, shown where a player is already deciding
+// what to do next. Everything is listed, won or not, because a list that hides
+// what has not been done yet is a list that cannot be aimed at - and each
+// unearned one carries how far along it is, so it reads as a distance rather
+// than as a locked door.
+function paintAwards(){
+  const el = document.getElementById('awlist');
+  if (!el) return;
+  const rows = awards.report();
+  const won = rows.filter(r => r.won).length;
+  const count = document.getElementById('awcount');
+  if (count) count.textContent = won ? won + ' / ' + rows.length : CONFIG.awards.none;
+  const title = document.getElementById('awtitle');
+  if (title) title.textContent = CONFIG.awards.heading;
+  el.innerHTML = '';
+  for (const a of rows){
+    const d = document.createElement('div');
+    d.className = 'aw' + (a.won ? ' won' : '');
+    const pct = Math.round(a.progress * 100);
+    d.innerHTML = '<b>' + a.name + '</b>' + a.note
+      + '<span class="bar"><i style="width:' + pct + '%"></i></span>';
+    el.appendChild(d);
+  }
 }
 
 /** Begin a run on a given field. Remembered, so a reload comes back here. */
@@ -1057,18 +1550,50 @@ function hud(){
     : CONFIG.text.hintIdle;
 }
 
+// HOW MANY SIMULATION STEPS THIS FRAME.
+//
+// Nothing in this game is allowed to be waiting. A turn with three hundred
+// bodies in it breaks that rule on its own: every one of them has to leave the
+// field before the turn can close, and at one step a frame that is most of a
+// minute spent watching a result that was decided in the first second.
+//
+// So the simulation runs faster and the bodies never do. Speed, radius,
+// substeps and every collision are untouched, and a turn plays out exactly as
+// it would have - there are simply more of its steps inside each frame. Raising
+// the speed instead would change every bounce and let fast bodies tunnel.
+//
+// It ramps on two things. A large swarm earns it immediately, because the wait
+// is proportional to the count. And ANY turn that has run long earns it
+// whatever the reason, which is what catches the last body rattling in a corner
+// while the player waits on it.
+function turnSteps(){
+  if (!S.firing) return 1;
+  const c = CONFIG.swarm;
+  const bySwarm = Math.max(0, S.balls - c.hasteFrom) / Math.max(1, c.hasteSwarm);
+  const byTime  = Math.max(0, S.fireT - c.hasteAfter) / Math.max(1, c.hasteRamp);
+  return Math.max(1, Math.min(Math.max(1, c.hasteMax | 0), Math.round(1 + bySwarm + byTime)));
+}
+
 let shopT = 0, last = 0;
 function tick(now){
   const dt = last ? (now - last) / 1000 : 1 / 60;
   last = now;
   juice.update(dt);
   easeView(dt);
+  updateMoments(dt);
   // Presentation only, so it burns down on wall time and keeps going while the
   // menu is open rather than freezing half drawn.
   if (ARRIVAL_FLASH > 0){
     for (const b of S.rows) if (b.pop) b.pop = Math.max(0, b.pop - dt / ARRIVAL_FLASH);
   }
-  if (!S.dead && !paused){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
+  if (!S.dead && !paused){
+    // A turn runs at more than one simulation step a frame once it has earned
+    // it. Same physics, same result, less of the player's life spent watching
+    // an outcome that was decided in the first second. See turnSteps().
+    const n = turnSteps();
+    for (let k = 0; k < n; k++){ sim(); if (!S.firing) break; }
+    if (CONFIG.feel.onboarding) teach.update(dt, S);
+  }
   draw(); hud();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
   requestAnimationFrame(tick);

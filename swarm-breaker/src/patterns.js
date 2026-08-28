@@ -742,16 +742,43 @@ function rawCount(depth, seed, bias) {
 }
 
 /**
+ * The density bias in force at a depth, handover included.
+ *
+ * Extracted so that the row being built and the guard that compares it against
+ * the row below ask the same question the same way. They used to not, and that
+ * was a real defect - see targetCount.
+ */
+function biasAt(depth, regimeOf) {
+  const slot = regimeSlot(depth);
+  const here = regimeOf(slot.index);
+  const untilEnd = slot.start + slot.span - depth;
+  if (untilEnd >= HANDOVER) return here.bias;
+  const next = regimeOf(slot.index + 1);
+  return here.bias + (next.bias - here.bias) * ((HANDOVER - untilEnd) / HANDOVER);
+}
+
+/**
  * Final block count for a row, with a hard limit on how much harder a row may
  * be than the one below it. Everything upstream is smooth already; this exists
  * so that a gate landing on top of an unusually light row still arrives as a
  * step rather than a cliff. Rows are free to get easier as fast as they like.
+ *
+ * THE PREVIOUS ROW'S COUNT HAS TO BE ASKED FOR WITH THE PREVIOUS ROW'S BIAS.
+ *
+ * It was not, and the guard quietly stopped guarding. During a handover the
+ * bias slides a little every row, so the row below was built with a bias a few
+ * hundredths from this one's. rawCount dithers its fractional target against a
+ * hashed roll, and a few hundredths is enough to flip that roll - so the guard
+ * believed the row below had three blocks where the player had been shown two,
+ * allowed a cap of six instead of five, and a gate row landed as a four block
+ * jump. 1.8% of seeds over depths 1..600, every one of them inside a handover.
  */
-function targetCount(depth, seed, bias) {
+function targetCount(depth, seed, bias, prevBias) {
   const b = Number.isFinite(bias) ? bias : 0;
   const count = rawCount(depth, seed, b);
   if (depth <= 1) return count;
-  return Math.min(count, rawCount(depth - 1, seed, b) + 3);
+  const pb = Number.isFinite(prevBias) ? prevBias : b;
+  return Math.min(count, rawCount(depth - 1, seed, pb) + 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -762,7 +789,6 @@ function buildRow(depth, seed, regimeOf) {
   const slot = regimeSlot(depth);
   const here = regimeOf(slot.index);
   const w = here.field(depth, seed);
-  let bias = here.bias;
 
   // Handover: over the last few rows of a regime, columns switch across to the
   // incoming one a few at a time, decided by a stable hash. Because a column
@@ -777,10 +803,10 @@ function buildRow(depth, seed, regimeOf) {
     for (let c = 0; c < COLS; c++) {
       if (unit(seed, slot.index + 1, c + 400) < progress) w[c] = nw[c];
     }
-    bias = here.bias + (next.bias - here.bias) * progress;
   }
 
-  const count = targetCount(depth, seed, bias);
+  const bias = biasAt(depth, regimeOf);
+  const count = targetCount(depth, seed, bias, depth > 1 ? biasAt(depth - 1, regimeOf) : bias);
   const open = openColumns(depth, seed);
 
   // Rank the columns the corridor has not claimed, and fill the strongest.

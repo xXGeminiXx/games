@@ -42,6 +42,21 @@ const roll = (a, b, c) => mix(a, b, c) / 4294967296;
 const DEFAULTS = { share: 0, firstDepth: 1, kinds: [] };
 
 /**
+ * A kind's colour, resolved from the palette by MEANING.
+ *
+ * A kind names one of the palette's own colours - swarm, essence, force, trade,
+ * hot - rather than carrying a hex of its own, so the bracket around a special
+ * block promises exactly what that colour promises everywhere else in the game.
+ * Anything unrecognised is taken as a literal colour, so a one-off is still
+ * possible without touching this.
+ */
+function tintOf(name) {
+  if (!name) return null;
+  const p = CONFIG.palette || {};
+  return p[name] || name;
+}
+
+/**
  * Build the kind roller for a run.
  *
  * @param {number} seed  the run's field seed
@@ -58,14 +73,26 @@ export function createBlockKinds(seed, opts) {
   // A kind with no weight, no effect or an impossible depth is not an error;
   // it is a kind that has been switched off, and it simply never rolls.
   const kinds = (Array.isArray(cfg.kinds) ? cfg.kinds : [])
-    .filter(k => k && k.id && k.effect && (k.weight || 0) > 0);
+    .filter(k => k && k.id && k.effect && (k.weight || 0) > 0)
+    .map(k => Object.assign({}, k, { tint: tintOf(k.tint) }));
 
   const share = Math.max(0, Math.min(1, Number(cfg.share) || 0));
   const firstDepth = Math.max(1, cfg.firstDepth | 0);
 
+  /** The kinds a given depth is allowed to produce.
+   *
+   *  Each kind names its own first depth, so the vocabulary arrives a piece at
+   *  a time instead of landing whole on a player who has just learned that a
+   *  block is a number. A kind can push itself later than the global floor and
+   *  never earlier. */
+  function poolAt(d) {
+    return kinds.filter(k => d >= Math.max(firstDepth, k.from | 0 || firstDepth));
+  }
+
   return {
     share,
     list: kinds.slice(),
+    poolAt,
 
     /** The kind for a block, or null for an ordinary one. */
     rollFor(depth, col) {
@@ -74,15 +101,29 @@ export function createBlockKinds(seed, opts) {
       if (d < firstDepth) return null;
       if (roll(s, d, col | 0) >= share) return null;
 
+      const pool = poolAt(d);
+      if (!pool.length) return null;
+
       // A second, independent draw picks WHICH kind, so changing one kind's
-      // weight does not shuffle which blocks are special at all.
+      // weight does not shuffle which blocks are special at all. The pool is a
+      // function of the depth alone, so the same seed still gives the same
+      // field down to which of its blocks will surprise you.
       let pick = roll(s ^ 0x5bf03635, d, col | 0)
-        * kinds.reduce((t, k) => t + k.weight, 0);
-      for (const k of kinds) {
+        * pool.reduce((t, k) => t + k.weight, 0);
+      for (const k of pool) {
         pick -= k.weight;
         if (pick < 0) return k.id;
       }
-      return kinds[kinds.length - 1].id;
+      return pool[pool.length - 1].id;
+    },
+
+    /** How much health a kind's block carries, as a multiple of what the tier
+     *  asked for. Most kinds are payouts and leave it alone; the ones that are
+     *  obstacles rather than rewards say so here. */
+    healthScale(id) {
+      const k = this.byId(id);
+      const m = k && Number(k.hp);
+      return Number.isFinite(m) && m > 0 ? m : 1;
     },
 
     /** A kind by id, or null. */

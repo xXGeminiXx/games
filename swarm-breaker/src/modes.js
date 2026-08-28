@@ -109,6 +109,13 @@ const BUILDERS = {
         return cells;
       },
       arrive(depth) { return rowArrival(this.nextRow(depth), cols); },
+      // This field can be asked for any depth, so what is coming is simply the
+      // next few rows.
+      preview(depth, n) {
+        const out = [];
+        for (let i = 1; i <= Math.max(0, n | 0); i++) out.push(src.rowFor(depth + i));
+        return { rows: out, lo: leftEdgeAt(cols) };
+      },
       label(depth) { return src.nameFor(depth); },
       signature(depth) {
         const r = typeof src.regimeAt === 'function' ? src.regimeAt(depth) : null;
@@ -132,6 +139,11 @@ const BUILDERS = {
       arrive() {
         const width = src.figure().width;
         return rowArrival(src.nextRow(), width);
+      },
+      // A figure is built whole before any of it is dealt, so the rows still to
+      // come are already decided and can simply be looked at.
+      preview(depth, n) {
+        return { rows: src.upcoming(n), lo: leftEdgeAt(src.figure().width) };
       },
       label() { return src.figure().name; },
       signature() {
@@ -171,6 +183,12 @@ const BUILDERS = {
         const open = src.openCells(depth, view).filter(p => !taken.has(p.c + ',' + p.r));
         return { blocks: grown, open };
       },
+
+      // NOTHING CAN BE PREVIEWED HERE, and that is a property of the mode
+      // rather than a gap. What arrives next is decided by what is on the board
+      // when the turn ends, and the turn has not been taken yet - the player's
+      // own shot is the input. Saying so is better than guessing.
+      preview() { return null; },
 
       label() { return src.name; },
       // Growth on screen, growth behind it. The backdrop's branching signature
