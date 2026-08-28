@@ -17,17 +17,17 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=4';
-import * as Mat from './materials.js?v=4';
-import * as Mk from './market.js?v=4';
-import * as H from './horde.js?v=4';
-import * as R from './rites.js?v=4';
-import * as Rv from './reveal.js?v=4';
-import * as Ch from './chambers.js?v=4';
-import * as Vi from './visitors.js?v=4';
-import * as Rb from './rebirth.js?v=4';
-import * as Lore from './lore.js?v=4';
-import { createGround } from './ground.js?v=4';
+import { CONFIG as DEFAULT } from '../config.js?v=5';
+import * as Mat from './materials.js?v=5';
+import * as Mk from './market.js?v=5';
+import * as H from './horde.js?v=5';
+import * as R from './rites.js?v=5';
+import * as Rv from './reveal.js?v=5';
+import * as Ch from './chambers.js?v=5';
+import * as Vi from './visitors.js?v=5';
+import * as Rb from './rebirth.js?v=5';
+import * as Lore from './lore.js?v=5';
+import { createGround } from './ground.js?v=5';
 
 export const SAVE_VERSION = 2;
 
@@ -474,7 +474,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     fire(events, 'firstSale', 'firstSale');
     if (Mk.demandOf(m) < cfg.market.buckleBelow) {
       const k = Mat.strataOf(id);
-      const name = k >= 0 ? ground.at(k).name : cfg.text.stats.bones;
+      const name = k >= 0 ? ground.at(k).name : Lore.inline(cfg.text.stats.bones);
       if (!state.fired.buckled) state.totals.buckled += 1;
       fire(events, 'buckled', 'buckled', { name });
     }

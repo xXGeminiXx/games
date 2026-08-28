@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=4';
-import { createSim, restoreSim, openedState } from './sim.js?v=4';
-import * as Save from './save.js?v=4';
-import * as Rb from './rebirth.js?v=4';
-import * as Lore from './lore.js?v=4';
-import { hash } from './rng.js?v=4';
-import { createUI } from './ui.js?v=4';
-import { createView } from './view.js?v=4';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=4';
-import * as Mat from './materials.js?v=4';
+import { storageKey, fill } from '../config.js?v=5';
+import { createSim, restoreSim, openedState } from './sim.js?v=5';
+import * as Save from './save.js?v=5';
+import * as Rb from './rebirth.js?v=5';
+import * as Lore from './lore.js?v=5';
+import { hash } from './rng.js?v=5';
+import { createUI } from './ui.js?v=5';
+import { createView } from './view.js?v=5';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=5';
+import * as Mat from './materials.js?v=5';
 
 /**
  * @param {object} o
@@ -99,10 +99,12 @@ export function createGame(o) {
     const r = sim.advance(seconds);
     tell(r.events);
     if (r.away && r.elapsed > 30) {
+      // The stat labels are stored the way a label reads, so they come back
+      // down to lower case before going into a sentence.
       const parts = [];
-      if (r.gained.coin > 0.005) parts.push(fmtCoin(r.gained.coin) + ' ' + cfg.text.stats.coin);
+      if (r.gained.coin > 0.005) parts.push(fmtCoin(r.gained.coin) + ' ' + Lore.inline(cfg.text.stats.coin));
       if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more of them');
-      if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + cfg.text.stats.bones);
+      if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + Lore.inline(cfg.text.stats.bones));
       if (r.gained.strata > 0) parts.push(r.gained.strata + (r.gained.strata === 1 ? ' layer' : ' layers'));
       let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(r.elapsed) }, String(Math.floor(sim.state.t)));
       if (parts.length) line += ' ' + parts.join(', ') + '.';

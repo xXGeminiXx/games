@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=4';
-import { pick } from './rng.js?v=4';
-import { fill } from '../config.js?v=4';
+import { CONTENT } from '../content.js?v=5';
+import { pick } from './rng.js?v=5';
+import { fill } from '../config.js?v=5';
 
 /**
  * One line from a log pool.
@@ -45,6 +45,18 @@ export function has(key) {
 export function label(word) {
   const s = String(word || '');
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * The other direction: a label used inside a sentence.
+ *
+ * The panels store their words capitalised because that is how a label reads.
+ * A sentence that borrows one - "you were gone an hour, 1.1B coin" - needs it
+ * back in lower case.
+ */
+export function inline(word) {
+  const s = String(word || '');
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 /** The tag and the line for a seam id. */
