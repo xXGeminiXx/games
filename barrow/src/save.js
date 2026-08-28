@@ -9,9 +9,31 @@
 // browsers by paste.
 // ---------------------------------------------------------------------------
 
-import { SAVE_VERSION } from './sim.js?v=1';
+import { SAVE_VERSION } from './sim.js?v=2';
 
 const migrations = new Map();
+
+// A barrow saved before seams, chambers, visitors and the seal existed. The
+// figures carry across unchanged; everything the new run needs is filled in
+// by the fresh state it is laid on top of, and the ground it is standing in
+// is re-rolled from the same seed, so the layers are the same names with
+// characters they did not have before.
+registerMigration(1, (snap) => {
+  const state = Object.assign({}, snap.state, {
+    v: 2,
+    boons: {},
+    read: {},
+    chamber: null,
+    chamberQueue: [],
+    chambersDone: {},
+    visitor: null,
+    visitNext: null,
+    visitCount: 0,
+    visitorsSeen: 0, visitorsTaken: 0, visitorsMissed: 0,
+    remBonus: 0,
+  });
+  return Object.assign({}, snap, { state });
+});
 
 /** Register how to carry a save from version `from` to `from + 1`. */
 export function registerMigration(from, fn) {

@@ -7,15 +7,23 @@
 // hidden, the machine slept, the page was closed) is handed to the simulation
 // as time away and caught up in coarse chunks, then reported in the log. The
 // save carries the wall clock so a reload knows how long that was.
+//
+// It also owns the one thing that outlives a run. Sealing a barrow does not
+// edit the state in place: it writes the next barrow's opening state, with
+// the oaths already applied and the closing lines already in its log, and
+// reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=1';
-import { createSim, restoreSim } from './sim.js?v=1';
-import * as Save from './save.js?v=1';
-import { createUI } from './ui.js?v=1';
-import { createView } from './view.js?v=1';
-import { fmtTime, fmt, fmtCoin } from './numbers.js?v=1';
-import * as Mat from './materials.js?v=1';
+import { storageKey, fill } from '../config.js?v=2';
+import { createSim, restoreSim, openedState } from './sim.js?v=2';
+import * as Save from './save.js?v=2';
+import * as Rb from './rebirth.js?v=2';
+import * as Lore from './lore.js?v=2';
+import { hash } from './rng.js?v=2';
+import { createUI } from './ui.js?v=2';
+import { createView } from './view.js?v=2';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=2';
+import * as Mat from './materials.js?v=2';
 
 /**
  * @param {object} o
@@ -38,7 +46,7 @@ export function createGame(o) {
   const resumed = !!sim;
   if (!sim) sim = createSim(cfg, { seed: o.seed });
 
-  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc);
+  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground);
 
   const actions = {};
   const ui = createUI(doc, sim, cfg, actions);
@@ -57,7 +65,7 @@ export function createGame(o) {
   actions.sellLot = wrap((id) => sim.sellLot(id));
   actions.sellLesser = wrap(() => {
     const events = [];
-    const from = Math.max(0, sim.state.depth - cfg.horde.activeStrata + 1);
+    const from = sim.activeFrom();
     for (const id of sim.goods()) {
       const k = Mat.strataOf(id);
       if (k >= 0 && k < from) for (const e of sim.sellShare(id, 1).events) events.push(e);
@@ -68,6 +76,15 @@ export function createGame(o) {
   actions.raise = wrap((count) => { const r = sim.raise(count); save(); return r; });
   actions.setWeight = wrap((key, delta) => { sim.setWeight(key, delta); return []; });
   actions.buyRite = wrap((id) => { const r = sim.buyRite(id); save(); return r; });
+  actions.takeOffer = wrap((i) => { const r = sim.takeOffer(i); save(); return r; });
+  actions.acceptVisitor = wrap(() => { const r = sim.acceptVisitor(); save(); return r; });
+  actions.declineVisitor = wrap(() => { const r = sim.declineVisitor(); save(); return r; });
+  actions.buyOath = wrap((id) => {
+    const level = Rb.buyOath(sim.legacy, id, cfg);
+    if (level > 0) save();
+    return [];
+  });
+  actions.seal = () => seal();
 
   // -- the clock -------------------------------------------------------------
 
@@ -76,7 +93,7 @@ export function createGame(o) {
   let sinceSave = 0;
   let sinceRender = 0;
   let running = false;
-  let disposed = false;     // after a reset or an import: never write the old run again
+  let disposed = false;     // after a reset, an import or a seal: never write the old run again
 
   const away = (seconds) => {
     const r = sim.advance(seconds);
@@ -84,10 +101,12 @@ export function createGame(o) {
     if (r.away && r.elapsed > 30) {
       const parts = [];
       if (r.gained.coin > 0.005) parts.push(fmtCoin(r.gained.coin) + ' ' + cfg.text.stats.coin);
+      if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more of them');
       if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + cfg.text.stats.bones);
-      if (r.gained.strata > 0) parts.push(r.gained.strata + ' strata');
-      let line = fill(cfg.text.log.away, { t: fmtTime(r.elapsed) });
+      if (r.gained.strata > 0) parts.push(r.gained.strata + (r.gained.strata === 1 ? ' layer' : ' layers'));
+      let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(r.elapsed) }, String(Math.floor(sim.state.t)));
       if (parts.length) line += ' ' + parts.join(', ') + '.';
+      if (r.gained.visits > 0) line += ' ' + (r.gained.visits === 1 ? 'somebody called at the gate.' : r.gained.visits + ' called at the gate.');
       if (r.capped) line += ' they stopped after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }
@@ -114,7 +133,7 @@ export function createGame(o) {
 
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
-    view.draw(sim.state, sim.state.effort, dt);
+    view.draw(sim.state, sim.state.effort, dt, sim.mods().activeStrata);
 
     sinceSave += dt;
     if (sinceSave >= cfg.time.autosaveSeconds) { save(); sinceSave = 0; }
@@ -131,11 +150,35 @@ export function createGame(o) {
     return ok;
   };
 
+  const reload = () => {
+    if (typeof win.location !== 'undefined' && win.location && typeof win.location.reload === 'function') {
+      win.location.reload();
+    }
+  };
+
   const reset = () => {
     disposed = true;
     running = false;
     if (storage) Save.clear(storage, KEY);
-    if (typeof win.location !== 'undefined' && win.location && typeof win.location.reload === 'function') win.location.reload();
+    reload();
+  };
+
+  /**
+   * Close this barrow and open the next one. What the run paid is folded into
+   * the legacy, the closing lines go to the top of the new run's log, and the
+   * page comes back on ground it has never seen.
+   */
+  const seal = () => {
+    if (!sim.canSeal()) return null;
+    const result = Rb.seal(sim.state, cfg, sim.legacy);
+    const seed = hash(sim.state.seed, 'next-barrow:' + sim.legacy.seals);
+    const state = openedState(cfg, sim.legacy, seed, result.lines.slice().reverse());
+    const snap = { state, markets: [], legacy: JSON.parse(JSON.stringify(sim.legacy)) };
+    disposed = true;
+    running = false;
+    if (storage) Save.write(storage, KEY, snap, now());
+    reload();
+    return result;
   };
 
   const exportSave = () => Save.exportString(sim.snapshot(), now());
@@ -145,7 +188,7 @@ export function createGame(o) {
     disposed = true;
     running = false;
     if (storage) Save.write(storage, KEY, r.snap, r.wall || now());
-    if (typeof win.location !== 'undefined' && win.location && typeof win.location.reload === 'function') win.location.reload();
+    reload();
     return true;
   };
 
@@ -164,7 +207,7 @@ export function createGame(o) {
       const gap = (now() - saved.wall) / 1000;
       if (gap > cfg.time.catchUpAfter) away(gap);
     }
-    if (!resumed) ui.log(cfg.text.log.start);
+    if (!resumed && !sim.state.log.length) ui.log(Lore.line(sim.state.seed, 'start'));
     else ui.restore();
     ui.render();
     running = true;
@@ -187,7 +230,7 @@ export function createGame(o) {
   }
 
   const game = {
-    sim, view, ui, actions, start, stop, frame, save, reset, exportSave, importSave, fit,
+    sim, view, ui, actions, cfg, start, stop, frame, save, reset, seal, exportSave, importSave, fit,
     get resumed() { return resumed; },
     get key() { return KEY; },
   };

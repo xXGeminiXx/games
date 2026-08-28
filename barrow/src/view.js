@@ -14,8 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, hardnessAt, capUnits } from './materials.js?v=1';
-import { distribute, activeFrom } from './horde.js?v=1';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=2';
+import { distribute, activeFrom } from './horde.js?v=2';
+import * as Lore from './lore.js?v=2';
 
 /** mulberry32 */
 function rng(seed) {
@@ -100,8 +101,14 @@ function withAlpha(h, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
+export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, ground) {
   const d = doc || (typeof document !== 'undefined' ? document : null);
+  // The view is happy without a run's ground: it falls back to the plain
+  // ladder, which is what the drawing looked like before seams existed.
+  const layerAt = ground ? (k) => ground.at(k) : (k) => {
+    const g = goodAt(k, strataCfg);
+    return { name: g.name, hue: g.hue, seam: null, cap: capUnits(Math.max(0, k - 1), strataCfg) };
+  };
   let width = 300, height = 200, dpr = 1;
   let ctx = canvas.getContext('2d');
   const segCache = new Map();   // k -> segments
@@ -173,7 +180,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
     // Glints of each band's good, so the colour of what is down there shows.
     for (const row of L.rows) {
       if (row.k > s.depth + 1) continue;
-      const g = goodAt(row.k, strataCfg);
+      const g = layerAt(row.k);
       const r = rng((seed ^ (row.k * 7919)) >>> 0);
       const n = row.k <= s.depth ? cfg.glintCount : Math.ceil(cfg.glintCount / 3);
       c.fillStyle = withAlpha(g.hue, row.k <= s.depth ? 0.55 : 0.25);
@@ -209,10 +216,10 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
   };
 
   /** Keep the dot population in step with the horde and the weights. */
-  const populate = (L, s) => {
+  const populate = (L, s, active) => {
     const want = Math.min(cfg.particleCap, Math.floor(s.horde));
     while (particles.length > want) particles.pop();
-    const from = activeFrom(s.depth, hordeCfg);
+    const from = activeFrom(s.depth, hordeCfg, active);
     const split = distribute(s.weights, s.faceWeight, from);
     const pickBand = (r) => {
       let acc = 0;
@@ -244,7 +251,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
 
   const drawDots = (L, s, dt) => {
     const faceRow = L.rows[s.depth + 1];
-    const cap = capUnits(s.depth, strataCfg);
+    const cap = layerAt(s.depth + 1).cap;
     const bite = Math.min(1, cap > 0 ? s.capProgress / cap : 0);
     const biteDepth = 4 + bite * (faceRow.h - 6);
 
@@ -291,8 +298,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
     }
   };
 
-  /** Draw one frame. `effort` is digger-seconds spent per stratum. */
-  const draw = (s, effort, dt) => {
+  /** Draw one frame. `effort` is digger-seconds spent per layer. */
+  const draw = (s, effort, dt, active) => {
     seed = s.seed;
     const L = layout(width, height, s.depth, cfg);
     drawGround(L, s, effort);
@@ -303,17 +310,28 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc) {
       ctx.drawImage(carve.canvas, 0, 0);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    populate(L, s);
+    populate(L, s, active);
     drawDots(L, s, Math.min(0.1, dt || 0.016));
 
-    // Band names, quietly, on the left.
-    if (L.bandH >= 13) {
+    // Band names, quietly, on the left. Deep in a run the bands are only a
+    // few pixels tall and a label on every one is noise, so they stop.
+    if (L.bandH >= 17) {
       ctx.fillStyle = withAlpha(palette.ink, 0.42);
       ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
       ctx.textBaseline = 'middle';
       for (const row of L.rows) {
         if (row.k > s.depth) break;
-        ctx.fillText(goodAt(row.k, strataCfg).name, 6, row.y + row.h / 2);
+        const layer = layerAt(row.k);
+        ctx.fillText(layer.name, 6, row.y + row.h / 2);
+        // The seam, quieter still, so a layer's character reads off the hill
+        // as well as off the panel.
+        const words = layer.seam ? Lore.seam(layer.seam.id) : null;
+        if (words && L.bandH >= 24) {
+          const w = ctx.measureText(layer.name).width;
+          ctx.fillStyle = withAlpha(layer.hue, 0.5);
+          ctx.fillText(words.tag, 12 + w, row.y + row.h / 2);
+          ctx.fillStyle = withAlpha(palette.ink, 0.42);
+        }
       }
     }
     return L;

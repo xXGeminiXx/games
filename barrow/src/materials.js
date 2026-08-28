@@ -7,7 +7,7 @@
 // reach it. Nothing here is stored, so a save is just k.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=1';
+import { CONFIG } from '../config.js?v=2';
 
 const ROMAN = ['', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
@@ -28,19 +28,29 @@ export function goodAt(k, cfg = CONFIG.strata) {
   return { id: 's' + k, k, name: prefix + ' ' + base.name + suffix, hue: base.hue };
 }
 
+/**
+ * The exponent a layer climbs with. Past the horizon it stops climbing, so
+ * every number derived from a layer stays a number a double can hold.
+ */
+export function rung(k, cfg = CONFIG.strata) {
+  const n = Math.max(0, k | 0);
+  const cap = cfg.horizon > 0 ? cfg.horizon : n;
+  return Math.min(n, cap);
+}
+
 /** Coin per unit of the stratum's good at a calm market. */
 export function valueAt(k, cfg = CONFIG.strata) {
-  return cfg.soilValue * Math.pow(cfg.valueGrowth, Math.max(0, k | 0));
+  return cfg.soilValue * Math.pow(cfg.valueGrowth, rung(k, cfg));
 }
 
 /** How many times harder than the surface the stratum is to dig. */
 export function hardnessAt(k, cfg = CONFIG.strata) {
-  return Math.pow(cfg.hardnessGrowth, Math.max(0, k | 0));
+  return Math.pow(cfg.hardnessGrowth, rung(k, cfg));
 }
 
 /** Units that must be dug, at stratum k+1's hardness, to open stratum k+1. */
 export function capUnits(k, cfg = CONFIG.strata) {
-  return cfg.capBase * Math.pow(cfg.capGrowth, Math.max(0, k | 0));
+  return cfg.capBase * Math.pow(cfg.capGrowth, rung(k, cfg));
 }
 
 /**

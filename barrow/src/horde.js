@@ -3,16 +3,19 @@
 //
 // Raising costs bones. The n-th digger costs base * (1 + n / soft) bones, so
 // the first few dozen are cheap and after that the horde grows about linearly
-// in the bones it is fed. Every digger turns up bones at the same rate
-// wherever it stands and however fast it digs; only the grave rite changes
-// how far a bone goes.
+// in the bones it is fed.
 //
-// Diggers are split across the open strata and the face by weights. The face
-// is the cap under the deepest open stratum; digging it through opens the
-// next one.
+// Where a digger stands decides how many bones it turns up: deep ground holds
+// far more of the dead than the topsoil does, and a bonefield seam holds more
+// again. How FAST a digger works never changes that, so coin can never buy
+// growth and speed can never buy growth. That one rule is what keeps the
+// curve from folding in on itself.
+//
+// Diggers are split across the open layers and the face by weights. The face
+// is the floor under the deepest open layer; digging it through opens the
+// next one, and the dead working it turn up the bones of the layer they are
+// breaking into.
 // ---------------------------------------------------------------------------
-
-import { hardnessAt, capUnits, mixAt } from './materials.js?v=1';
 
 /** Bones for the digger numbered n (the first is n = 0). */
 export function raiseCost(n, cfg, softMult) {
@@ -44,14 +47,15 @@ export function maxRaisable(bones, n, cfg, softMult) {
   return lo;
 }
 
-/** The shallowest stratum the horde will still dig. */
-export function activeFrom(depth, cfg) {
-  return Math.max(0, depth - cfg.activeStrata + 1);
+/** The shallowest layer the horde will still work. */
+export function activeFrom(depth, cfg, active) {
+  const keep = active || cfg.activeStrata;
+  return Math.max(0, depth - keep + 1);
 }
 
 /**
  * Split N diggers by weight. `weights` is an array indexed by stratum plus a
- * `face` weight; strata above `from` are abandoned and count for nothing.
+ * `face` weight; layers above `from` are abandoned and count for nothing.
  * Returns { strata: [share...], face: share } summing to one, or all zeros
  * when nothing has weight.
  */
@@ -68,44 +72,50 @@ export function distribute(weights, faceWeight, from = 0) {
 /**
  * dt seconds of digging.
  *
- * @param {object} s      the horde's part of the state (mutated):
- *                        horde, depth, weights[], faceWeight, capProgress,
- *                        stock{}, bones, totals{dug, raised}
+ * @param {object} s      the state (mutated)
  * @param {number} dt
- * @param {object} cfg    { horde, strata }
- * @param {object} mods   { digMult }
- * @returns {number[]}    strata opened during this step, in order
+ * @param {object} cfg    the whole config
+ * @param {object} mods   every multiplier, from rites.modsOf
+ * @param {object} ground this run's layers, from ground.createGround
+ * @returns {number[]}    layers opened during this step, in order
  */
-export function dig(s, dt, cfg, mods) {
+export function dig(s, dt, cfg, mods, ground) {
   const opened = [];
   if (!(dt > 0) || !(s.horde > 0)) return opened;
 
-  const rate = s.horde * cfg.horde.digRate * ((mods && mods.digMult) || 1) * dt;
-  const split = distribute(s.weights, s.faceWeight, activeFrom(s.depth, cfg.horde));
+  const digMult = (mods && mods.digMult) || 1;
+  const boneMult = (mods && mods.boneMult) || 1;
+  const faceMult = (mods && mods.faceMult) || 1;
+  const from = activeFrom(s.depth, cfg.horde, mods && mods.activeStrata);
+  const split = distribute(s.weights, s.faceWeight, from);
+  const diggerSeconds = s.horde * cfg.horde.digRate * dt;
+  const rate = diggerSeconds * digMult;
 
-  // Bones come up at the same rate for every digger wherever it stands, and
-  // faster hands do not find more of them: the horde grows with its size and
-  // the grave rite, and with nothing else.
-  s.bones += s.horde * cfg.horde.digRate * cfg.horde.boneShare * dt;
-
-  for (let k = activeFrom(s.depth, cfg.horde); k <= s.depth; k++) {
+  for (let k = from; k <= s.depth; k++) {
     const share = split.strata[k] || 0;
     if (share <= 0) continue;
-    const units = rate * share / hardnessAt(k, cfg.strata);
-    yieldUnits(s, k, units, cfg);
+    const layer = ground.at(k);
+    yieldUnits(s, k, rate * share / layer.hardness, cfg, ground);
+    // Bones are counted per digger-second, not per unit, so faster hands
+    // never find more of them: only deeper ground does.
+    s.bones += diggerSeconds * share * layer.bones * boneMult;
   }
 
   if (split.face > 0) {
-    // Progress is kept in units of the cap currently being dug.
-    let progress = s.capProgress + rate * split.face / hardnessAt(s.depth + 1, cfg.strata);
-    let cap = capUnits(s.depth, cfg.strata);
-    while (progress >= cap) {
-      progress -= cap;
+    let target = ground.at(s.depth + 1);
+    // The dead on the face are still in the ground of the layer they are
+    // breaking into, so they turn up its bones as they go.
+    s.bones += diggerSeconds * split.face * target.bones * boneMult;
+    let progress = s.capProgress + rate * split.face * faceMult / target.hardness;
+    while (progress >= target.cap) {
+      progress -= target.cap;
       s.depth += 1;
       opened.push(s.depth);
-      // Leftover effort was spent at the old hardness; the next cap is harder.
-      progress /= cfg.strata.hardnessGrowth;
-      cap = capUnits(s.depth, cfg.strata);
+      const next = ground.at(s.depth + 1);
+      // Effort left over was spent against the old floor; the next one is a
+      // different hardness, so it does not carry across one for one.
+      progress *= target.hardness / next.hardness;
+      target = next;
       while (s.weights.length <= s.depth) s.weights.push(0);
       s.weights[s.depth] = cfg.horde.weightNew;
       if (opened.length > 64) break; // a step cannot open the whole earth
@@ -116,33 +126,51 @@ export function dig(s, dt, cfg, mods) {
 }
 
 /**
- * Add `units` dug at stratum k to the stock, split by the stratum's mix.
- * `pure` skips the mix and yields only the stratum's own good - what a hand
+ * Add `units` dug at layer k to the stock, split by the layer's mix.
+ * `pure` skips the mix and yields only the layer's own good - what a hand
  * turns up, which is never a trace of the ground below.
  */
-export function yieldUnits(s, k, units, cfg, pure) {
+export function yieldUnits(s, k, units, cfg, ground, pure) {
   if (!(units > 0)) return;
   if (pure) {
     s.stock['s' + k] = (s.stock['s' + k] || 0) + units;
   } else {
-    for (const part of mixAt(k, cfg.strata)) {
+    for (const part of ground.mixAt(k)) {
       const id = 's' + part.k;
       s.stock[id] = (s.stock[id] || 0) + units * part.share;
     }
   }
   s.totals.dug += units;
-  if (s.effort) s.effort[k] = (s.effort[k] || 0) + units * hardnessAt(k, cfg.strata);
+  if (s.effort) s.effort[k] = (s.effort[k] || 0) + units * ground.at(k).hardness;
 }
 
-/** Raise `count` diggers if the bones are there. Returns how many were. */
+/**
+ * Raise up to `count` diggers. If the bones will not stretch to all of them
+ * it raises as many as they will: a button that is lit never does nothing,
+ * which matters because the horde is spending bones the whole time you are
+ * deciding. Returns how many stood up.
+ */
 export function raise(s, count, cfg, softMult) {
   if (count === 'max') count = maxRaisable(s.bones, s.horde, cfg, softMult);
   count = Math.floor(count);
   if (!(count > 0)) return 0;
-  const cost = raiseCostBulk(s.horde, count, cfg, softMult);
-  if (cost > s.bones + 1e-9) return 0;
+  let cost = raiseCostBulk(s.horde, count, cfg, softMult);
+  if (cost > s.bones + 1e-9) {
+    count = maxRaisable(s.bones, s.horde, cfg, softMult);
+    if (!(count > 0)) return 0;
+    cost = raiseCostBulk(s.horde, count, cfg, softMult);
+  }
   s.bones -= cost;
   if (s.bones < 0) s.bones = 0;
+  s.horde += count;
+  s.totals.raised += count;
+  return count;
+}
+
+/** Raise diggers that cost nothing: a gang at the gate, a chamber emptied. */
+export function raiseFree(s, count) {
+  count = Math.floor(count);
+  if (!(count > 0)) return 0;
   s.horde += count;
   s.totals.raised += count;
   return count;

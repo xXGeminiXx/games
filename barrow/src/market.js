@@ -23,30 +23,12 @@
 //     across many goods.
 // ---------------------------------------------------------------------------
 
+import { hash, stream } from './rng.js?v=2';
+
 const TAU = Math.PI * 2;
 
-/** mulberry32, so every market's swell is the same on every machine. */
-function rng(seed) {
-  let a = (seed >>> 0) || 0x9e3779b9;
-  return function () {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** A small integer hash of a string, for seeding one market from a run seed. */
-export function hashId(seed, id) {
-  let h = (seed >>> 0) ^ 0x811c9dc5;
-  const s = String(id);
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
+export const hashId = hash;
 
 /**
  * @param {object} o
@@ -56,16 +38,19 @@ export function hashId(seed, id) {
  * @param {number} o.seed      run seed, mixed with the id
  * @param {string} o.id
  * @param {object} o.cycle     { amplitude, periodMin, periodMax }
+ * @param {number} [o.amp]     swell for this market, overriding the default;
+ *                             a salted seam swings hard, a still one barely
+ *                             moves at all
  */
 export function createMarket(o) {
-  const r = rng(hashId(o.seed, o.id));
+  const r = stream(hash(o.seed, o.id));
   const span = o.cycle.periodMax - o.cycle.periodMin;
   const m = {
     id: o.id,
     base: o.base,
     absorb: o.absorb,
     recovery: o.recovery,
-    amp: o.cycle.amplitude,
+    amp: Number.isFinite(o.amp) ? o.amp : o.cycle.amplitude,
     p1: o.cycle.periodMin + r() * span,
     f1: r() * TAU,
     p2: (o.cycle.periodMin + r() * span) * 0.37,
