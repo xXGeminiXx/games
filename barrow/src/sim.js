@@ -17,17 +17,17 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=2';
-import * as Mat from './materials.js?v=2';
-import * as Mk from './market.js?v=2';
-import * as H from './horde.js?v=2';
-import * as R from './rites.js?v=2';
-import * as Rv from './reveal.js?v=2';
-import * as Ch from './chambers.js?v=2';
-import * as Vi from './visitors.js?v=2';
-import * as Rb from './rebirth.js?v=2';
-import * as Lore from './lore.js?v=2';
-import { createGround } from './ground.js?v=2';
+import { CONFIG as DEFAULT } from '../config.js?v=3';
+import * as Mat from './materials.js?v=3';
+import * as Mk from './market.js?v=3';
+import * as H from './horde.js?v=3';
+import * as R from './rites.js?v=3';
+import * as Rv from './reveal.js?v=3';
+import * as Ch from './chambers.js?v=3';
+import * as Vi from './visitors.js?v=3';
+import * as Rb from './rebirth.js?v=3';
+import * as Lore from './lore.js?v=3';
+import { createGround } from './ground.js?v=3';
 
 export const SAVE_VERSION = 2;
 

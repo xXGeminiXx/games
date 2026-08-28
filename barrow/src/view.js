@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=2';
-import { distribute, activeFrom } from './horde.js?v=2';
-import * as Lore from './lore.js?v=2';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=3';
+import { distribute, activeFrom } from './horde.js?v=3';
+import * as Lore from './lore.js?v=3';
 
 /** mulberry32 */
 function rng(seed) {
