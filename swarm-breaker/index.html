@@ -174,7 +174,7 @@
 // no audio - all state is legible on screen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, latticeAt, leftEdgeAt,
+import { CONFIG, CELL0, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
          storageKey, offerCost, applyIdentity } from './config.js';
 import { createJuice } from './src/juice.js';
 import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js';
@@ -230,6 +230,14 @@ function easeView(dt){
   if (Math.abs(cellT - CELL) < 0.01) CELL = cellT;
   if (Math.abs(originT - ORIGIN) < 0.01) ORIGIN = originT;
 }
+// Seconds a newly placed block spends announcing itself. See markArrivals.
+const ARRIVAL_FLASH = Math.max(0, Number(CONFIG.feel.arrivalFlash) || 0);
+
+// How many times a turn will re-ask a field that answered with nothing while
+// the board was also empty. Bounded rather than a while loop, because a field
+// that can only answer with nothing has to end the turn rather than the tab.
+const EMPTY_TURN_RETRIES = 8;
+
 const R = CONFIG.swarm.radius;
 const SPEED = CONFIG.swarm.speed;
 const SUBSTEPS = CONFIG.swarm.substeps;
@@ -309,22 +317,41 @@ function addRow(){
   const d = S.depth;
   if (!Tiers.spawnsRowAt(S.tier, d, tmode())) return;
 
-  // The width is known before the row is, which is how the view learns it has
+  // The width is known before the field is, which is how the view learns it has
   // to pull back. A field that never widens answers the same number forever,
   // and a field that deals whole figures never changes width part way through
   // one.
   const width = S.field.width();
   if (width !== COLS) retarget(width);
-  const lo = leftEdgeAt(width);
 
-  const cells = S.field.nextRow(d);
-  S.dealt++;
+  // WHERE THE FIELD PUTS THINGS IS THE MODE'S BUSINESS, NOT THIS LOOP'S.
+  // A field that descends answers with a row along the top edge and the holes
+  // in it; a field that grows answers with cells anywhere on the board and
+  // whatever is still free after them. Both come back the same shape.
+  //
+  // A GENERATOR IS ALLOWED TO PRODUCE NOTHING. A TURN IS NOT.
+  //
+  // The figure field answers with an empty row often and correctly - the holes
+  // in a gasket are what make it a gasket, and the fallback that used to invent
+  // a block to avoid one destroyed every figure it touched. But an empty answer
+  // on an already empty BOARD is a turn with nothing on screen: the angle
+  // decides nothing, the shot returns, and the player has been asked for a
+  // decision that could not be made. So the field is asked again, and only
+  // then, which deals a figure straight through its own empty stretch and
+  // leaves the shape it draws untouched.
+  let blocks, open;
+  for (let attempt = 0; ; attempt++) {
+    ({ blocks, open } = S.field.arrive(d, view()));
+    S.dealt++;
+    if (blocks.length || S.rows.length || attempt >= EMPTY_TURN_RETRIES) break;
+  }
 
-  // Where a row's health number goes. A field that deals a whole figure puts a
+  // Where the health number goes. A field that deals a whole figure puts a
   // varying number of blocks in a row, so the number describes the ROW and is
-  // shared among them - see economy.rowBlocks. A field that draws one row at a
-  // time gives it to each block, because that is what it was tuned against.
-  const n = cells.reduce((k, on) => k + (on ? 1 : 0), 0);
+  // shared among them - see economy.rowBlocks. A field that places one block at
+  // a time gives the whole number to each of them, because that is what the
+  // ladder was tuned against.
+  const n = blocks.length;
   const share = (S.field.sharesHealth && n > 0)
     ? Math.min(CONFIG.economy.rowShareMax,
         Math.max(CONFIG.economy.rowShareMin, CONFIG.economy.rowBlocks / n))
@@ -333,51 +360,96 @@ function addRow(){
   // A few blocks in a hundred are something other than a number. Which ones is
   // decided from the seed and the block's own position, never from where it
   // came in the loop, so a field is the same field every time it is built.
-  cells.forEach((on, j) => {
-    if (!on) return;
-    const c = lo + j;
-    const k = S.kinds.rollFor(d, c);
-    const b = { c, r: 0, hp, max: hp };
+  for (const cell of blocks){
+    const k = S.kinds.rollFor(d, cell.c);
+    const b = { c: cell.c, r: cell.r, hp, max: hp };
     if (k) b.k = k;
+    // A block that arrives at the top edge announces itself by sliding in from
+    // it. One that appears in the middle of the board has no motion to be
+    // noticed by, so it is given a flash instead - see markArrivals.
+    if (!S.field.arrival.moves) b.pop = 1;
     S.rows.push(b);
-  });
+  }
 
   // The resupply line is the difficulty. Starve it and the angle has to choose
   // between damage and collection; keep it full and it never has to.
   if (Tiers.spawnsPickupAt(S.tier, d, tmode())) S.owed.ball++;
   if (Tiers.spawnsWindfallAt(S.tier, d)) S.owed.gold++;
-  placeDrops(cells, lo, d);
+  placeDrops(open, d);
 }
 
-// A marker goes in a HOLE in the row, never on top of a block. Both are drawn
-// in the same cell, and a ring laid over a health number leaves neither one
-// readable. A row can be solid all the way across - a gate row is - so a marker
-// that finds no room is owed, and lands in the first row that has some.
-function placeDrops(cells, lo, d){
-  const open = [];
-  cells.forEach((on, j) => { if (!on) open.push(lo + j); });
+// A marker goes in a FREE CELL, never on top of a block. Both are drawn in the
+// same cell, and a ring laid over a health number leaves neither one readable.
+// A descending row can be solid all the way across - a gate row is - so a
+// marker that finds no room is owed, and lands in the first row that has some.
+//
+// `open` arrives already ordered by the field: a descending field offers the
+// holes in the row it just dealt, left to right, and a growing field offers the
+// cells furthest from the mass first.
+function placeDrops(open, d){
   if (!open.length) return;
+  // A field that never moves never carries a marker off the bottom of the
+  // screen, so an uncollected one stays forever. Left uncapped, a patient
+  // player could stand a wall of them across the board and grow nothing.
+  const cap = S.field.arrival.markerLimit(view());
+  // Turns it waits before it is gone. A descending field answers Infinity,
+  // because the descent already carries a marker off the bottom of the screen.
+  const life = S.field.arrival.markerLife();
   const take = (kind, k) => {
+    if (S.drops.length >= cap || !open.length) return false;
     const i = ((d * k) % open.length + open.length) % open.length;
-    S.drops.push({ c: open.splice(i, 1)[0], r: 0, kind });
+    const cell = open.splice(i, 1)[0];
+    const p = { c: cell.c, r: cell.r, kind };
+    if (Number.isFinite(life)) p.t = life;
+    S.drops.push(p);
+    return true;
   };
-  while (S.owed.ball > 0 && open.length){ S.owed.ball--; take('ball', 5); }
-  while (S.owed.gold > 0 && open.length){ S.owed.gold--; take('gold', 2); }
+  while (S.owed.ball > 0 && take('ball', 5)) S.owed.ball--;
+  while (S.owed.gold > 0 && take('gold', 2)) S.owed.gold--;
 }
 
 function step(){
   if (!Tiers.fieldDescends(S.tier, S.depth, tmode())) return;
-  look.descend(S.rows);
-  S.rows.forEach(b => b.r++);
-  S.drops.forEach(p => p.r++);
-  // A marker that reaches the line is gone. Without this they descend past the
-  // canvas forever and the list grows for the whole run.
-  S.drops = S.drops.filter(p => cyOf(p.r) < FLOOR + CELL);
+  // Whether anything moves at all is the arrival's answer. A descending field
+  // steps the whole board down a row; a field that fills leaves it exactly
+  // where it is, and the slide animation is not run for a slide that did not
+  // happen.
+  if (S.field.arrival.advance(view())) look.descend(S.rows);
+}
+
+// WHAT THE FIELD IS SHOWN OF ITSELF.
+//
+// Rows rather than pixels, so nothing downstream has to know the size of a
+// cell: `rowsTall` is how many rows fit between the top of the field and the
+// swarm line, and it is fractional because the field is not a whole number of
+// cells tall. The eased cell size is the right one to measure with - it is the
+// geometry currently on screen, and it never moves while a shot is in flight.
+function view(){
+  return {
+    blocks: S.rows,
+    drops: S.drops,
+    cols: COLS,
+    lo: leftEdgeAt(COLS),
+    rowsTall: (FLOOR - TOP) / CELL,
+    bias: fieldBias(),
+  };
+}
+
+// HOW DENSE THE DIFFICULTY WANTS THE FIELD THIS TURN.
+//
+// A tier expresses density as a BIAS on whatever the generator would have done
+// on its own, never as a block count, so every generator keeps its own shape at
+// every tier. The two descending ones apply it inside themselves; the growing
+// one is handed it here, and turns it into blocks with its own budget. Read
+// from the same tier, at the same depth, in the same mode as the health number
+// two dozen lines above.
+function fieldBias(){
+  return Tiers.densityBiasAt(S.tier, S.depth, tmode());
 }
 
 // A figure spans the visible field, so it is as tall as the field can show.
 const FORM_OPTS = {
-  ladder: CONFIG.board.ladder,
+  ladder: LADDER,
   // A figure is as tall as the field can show at its own width, so it grows in
   // both directions at once and always arrives as a whole shape.
   heightFor: (cols) => Math.max(3, Math.round((FLOOR - TOP) / (W / cols))),
@@ -437,8 +509,10 @@ function endTurn(){
   step();
   S.depth++;
   addRow();
-  // lose when a block crosses the swarm line
-  if (S.rows.some(b => cyOf(b.r) + CELL / 2 >= FLOOR)) return die();
+  // Lose when the field has reached the player. WHAT that means belongs to
+  // the arrival: a field that descends reaches them by crossing the swarm
+  // line, a field that fills reaches them by running out of room.
+  if (S.field.arrival.lost(view())) return die();
   // The tier has run out of field and the board is clear. Nothing is coming and
   // nothing is left, so the run is over and it was won. Without this the game
   // becomes an empty screen that cannot be lost, cannot be finished, and gives
@@ -458,8 +532,8 @@ function win(){
     tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold,
     doctrine: 'none', endless: !!S.endless,
   });
-  const t = CONFIG.text;
-  document.getElementById('overtitle').textContent = S.endless ? t.overTitle : t.winTitle;
+  document.getElementById('overtitle').textContent =
+    S.endless ? endingWord() : CONFIG.text.winTitle;
   document.getElementById('overdepth').textContent = S.depth;
   document.getElementById('overballs').textContent = S.balls;
   // Endless has no further gear to change into, so the offer is only made once.
@@ -467,9 +541,17 @@ function win(){
   document.getElementById('over').classList.add('on');
 }
 
+// What losing is CALLED. The two arrivals end a run for different reasons and
+// saying the same words for both would describe one of them wrongly: a field
+// that closes on the swarm overruns it, a field that fills seals it in.
+function endingWord(){
+  return (S.field && !S.field.arrival.moves)
+    ? CONFIG.text.overFull : CONFIG.text.overTitle;
+}
+
 function die(){
   S.dead = true;
-  document.getElementById('overtitle').textContent = CONFIG.text.overTitle;
+  document.getElementById('overtitle').textContent = endingWord();
   document.getElementById('endless').classList.remove('on');
   recordBest();
   store.mark();
@@ -619,6 +701,31 @@ function markSpecials(X){
   X.restore();
 }
 
+// A block that APPEARS rather than arriving has to announce itself. In a field
+// that descends, a row slides in from the top edge and the motion IS the
+// announcement. A field that grows puts blocks down in the middle of the board,
+// where a player watching the swarm would otherwise look up and simply find the
+// field different. So a new block lands inside a square that contracts onto it
+// and fades - at the cell edge, never across the middle, because the middle is
+// the health number.
+function markArrivals(X){
+  const off = look.slideOffset || 0;
+  X.save();
+  X.lineWidth = 1.5;
+  X.strokeStyle = CONFIG.palette.ink;
+  for (let i = 0; i < S.rows.length; i++){
+    const bl = S.rows[i];
+    if (!bl.pop) continue;
+    const e = bl.pop * bl.pop;                       // fast out, then gone
+    const half = CELL / 2 + CELL * 0.6 * e;
+    const x = xOf(bl.c) + CELL / 2;
+    const y = TOP + bl.r * CELL + CELL / 2 + off;
+    X.globalAlpha = 0.8 * e;
+    X.strokeRect(x - half, y - half, half * 2, half * 2);
+  }
+  X.restore();
+}
+
 // --- what a special block does when it breaks -------------------------------
 //
 // The verbs are shared. A kind names one; this is the only place that knows how
@@ -664,6 +771,9 @@ function draw(){
   look.setDepth(S.depth);
   look.setSwarm(S.balls);
   look.setRegime(S.field.signature(S.depth));
+  // A field that closes on the line is judged block by block; one that fills is
+  // judged as a board. See setPressure.
+  look.setPressure(S.field.arrival.moves ? null : S.field.arrival.pressure(view()));
 
   juice.begin(X);
 
@@ -671,6 +781,7 @@ function draw(){
   look.horizon(X, S.rows);
   look.blocks(X, S.rows);
   markSpecials(X);
+  markArrivals(X);
   look.pickups(X, S.drops);
 
   if (S.aiming && !S.firing && !S.dead){
@@ -756,7 +867,7 @@ const store = createSave({
     owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
     rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k })),
-    drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind })),
+    drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind, t: p.t })),
     // A sprayed body belongs to the turn it was thrown in, and a save is taken
     // between turns, so only the swarm is worth writing down.
     live: S.live.filter(b => !b.temp).map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
@@ -923,11 +1034,24 @@ function restart(){ document.getElementById('over').classList.remove('on'); clos
 
 // --- loop -------------------------------------------------------------------
 
+// The fourth figure across the top belongs to the FIELD, and each one says
+// whichever thing about itself decides the run. A descending field names the
+// generator drawing it, because what is coming next is the only open question.
+// A field that fills already shows what is coming; how much room is left is
+// what a player cannot see at a glance, so it says that instead, and turns hot
+// as the board closes.
 function hud(){
   document.getElementById('lvl').textContent = S.depth;
   document.getElementById('balls').textContent = S.balls;
   document.getElementById('gold').textContent = S.gold;
-  document.getElementById('rule').textContent = figureName();
+
+  const say = S.field.arrival.readout(view());
+  const rule = document.getElementById('rule');
+  rule.textContent = say ? say.value : figureName();
+  rule.className = (say && say.pressure >= CONFIG.bloom.warnAt) ? 'hotv' : '';
+  const lbl = document.getElementById('lbl-pattern');
+  if (lbl) lbl.textContent = say ? CONFIG.text.stats.fill : CONFIG.text.stats.pattern;
+
   document.getElementById('hint').textContent = S.firing
     ? CONFIG.text.hintFiring
     : CONFIG.text.hintIdle;
@@ -939,6 +1063,11 @@ function tick(now){
   last = now;
   juice.update(dt);
   easeView(dt);
+  // Presentation only, so it burns down on wall time and keeps going while the
+  // menu is open rather than freezing half drawn.
+  if (ARRIVAL_FLASH > 0){
+    for (const b of S.rows) if (b.pop) b.pop = Math.max(0, b.pop - dt / ARRIVAL_FLASH);
+  }
   if (!S.dead && !paused){ sim(); if (CONFIG.feel.onboarding) teach.update(dt, S); }
   draw(); hud();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync

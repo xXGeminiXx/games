@@ -48,12 +48,16 @@ export const CONFIG = {
   // shown.
   // -------------------------------------------------------------------------
   text: {
-    // The four figures across the top of the screen.
+    // The four figures across the top of the screen. The fourth one belongs to
+    // the field, and says whichever of these the field it is drawing has to
+    // say: a descending field names its generator, a field that fills says how
+    // full it is.
     stats: {
       depth:   'depth',      // how far the field has descended
       swarm:   'swarm',      // how many bodies fire each turn
       essence: 'essence',    // the currency
       pattern: 'pattern',    // which generator is drawing the field
+      fill:    'field',      // how much of the board is standing
     },
 
     hintIdle:    'drag to aim · release to fire',
@@ -64,6 +68,8 @@ export const CONFIG = {
 
     // Shown when a block reaches the swarm line.
     overTitle:   'the swarm is overrun',
+    // Shown when a field that fills rather than descends runs out of room.
+    overFull:    'the field is sealed',
     // Shown when the tier runs out of field and the board is clear.
     winTitle:    'the field is broken',
     endlessButton: 'go on forever',
@@ -85,9 +91,10 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   // MODES - the fields a run can be played on
   //
-  // A mode changes what descends and nothing else. The swarm, the angle, the
-  // economy and the difficulty ladder are the same in all of them, so a mode
-  // is safe to add: give it an id here, give it a row source in src/modes.js,
+  // A mode is a recipe: how the field ARRIVES (src/arrival.js), what decides
+  // its LAYOUT, and how wide it is. The swarm, the angle, the economy, the
+  // block kinds and the difficulty ladder are the same in all of them, so a
+  // mode is safe to add: give it an id here, give it a recipe in src/modes.js,
   // and the menu picks it up.
   // -------------------------------------------------------------------------
   modes: {
@@ -111,7 +118,77 @@ export const CONFIG = {
              + 'it falls. The field widens to give the figures room. Rougher, '
              + 'and still being worked on.',
       },
+      {
+        id: 'bloom',
+        name: 'bloom',
+        tell: 'it grows where you leave it',
+        blurb: 'Nothing descends. Blocks accrete onto whatever is still '
+             + 'standing and stay where they land, so a clump you left is the '
+             + 'seed the next one grows from. The run ends when the board is '
+             + 'full, not when something reaches you.',
+      },
     ],
+  },
+
+  // -------------------------------------------------------------------------
+  // BLOOM - the growing field
+  //
+  // The mode has no sequence of its own. What arrives next is decided entirely
+  // by what is on the board when the turn ends, so these numbers shape a
+  // process rather than a pattern, and the only way to read them is to play it.
+  // -------------------------------------------------------------------------
+  bloom: {
+    // Share of the playable field the board may hold before the run is over.
+    // A growing field never seals itself - growth needs somewhere to grow - so
+    // a limit at the last cell is a limit that never arrives. At this setting
+    // the board crossing it is something a player watches coming for several
+    // turns.
+    fillShare: 0.58,
+
+    // Blocks grown per turn when the difficulty has nothing to say. In play the
+    // tier's number is used instead; this is the floor under it.
+    budget: 3,
+
+    // Blocks placed when the board is completely clear. A perfect turn should
+    // buy a quiet one, not a free one.
+    seedCells: 3,
+
+    // Extra weight a candidate cell gets for sitting directly BELOW the mass.
+    // This is what makes the field creep toward the swarm line as it thickens,
+    // so the board filling up is something to watch rather than a number to
+    // read.
+    hang: 0.55,
+
+    // How much of a candidate's score is the hash of its own position. Zero
+    // makes a symmetric board grow the same handful of cells every turn; too
+    // much drowns the structure and the growth stops reading as growth.
+    jitter: 0.5,
+
+    // Mild preference for lower rows over higher ones, independent of where
+    // the mass is. Keeps a cluster that has drifted upward from sitting out of
+    // reach at the top of the field forever.
+    climb: 0.14,
+
+    // Turns a marker waits to be collected before it is gone.
+    //
+    // A marker in a descending field is already a limited offer - it enters at
+    // the top and rides off the bottom in about eight turns - and the supply
+    // line is the difficulty ladder's only working dial, so a field that kept
+    // its markers forever would be a field the ladder no longer grips. Eight
+    // is that same window, stated rather than inherited from the geometry.
+    markerTurns: 8,
+
+    // Markers on the board at once. A BACKSTOP, NOT A DIAL: the lifetime above
+    // is what bounds the count in play, and this only stops a very long
+    // lifetime ending in a board of markers with nowhere left to grow. Set low
+    // enough to bind it throttles the supply line and the tiers converge, which
+    // is measured and is why it is not four.
+    maxMarkers: 12,
+
+    // How full the board has to be before the readout turns hot. Early enough
+    // that it is a warning rather than an announcement of something the player
+    // has already lost.
+    warnAt: 0.72,
   },
 
   // -------------------------------------------------------------------------
@@ -186,23 +263,34 @@ export const CONFIG = {
 
     // THE VIEW PULLS BACK AS A RUN GOES ON.
     //
-    // One width per figure, and the last entry repeats forever. Each step
-    // shrinks the blocks a little and fits more of them, which is the only way
-    // the fractal constructions get room to be themselves: eight columns holds
-    // three levels of recursion and no exact Cantor set at all. Nine and
-    // twenty seven are on the ladder because the base three figures - dust,
-    // cross, carpet - are exact only at a power of three, and sixteen and
-    // twenty four because the bisecting one is exact only at a multiple of
-    // eight.
+    // The rungs the field widens through, in order; the last one repeats
+    // forever. Each step shrinks the blocks a little and fits more of them,
+    // which is the only way the fractal constructions get room to be
+    // themselves: eight columns holds three levels of recursion and no exact
+    // Cantor set at all. Nine is on the ladder because the base three figures -
+    // dust, cross, carpet - are exact only at a power of three, and sixteen
+    // because the bisecting one is exact only at a multiple of eight.
     //
-    // Keep the steps small. A figure is dealt one row per turn that the
-    // difficulty tier lets a row descend, which on the middle tiers is about
-    // every other turn, so a figure lasts roughly twice its height in turns and
-    // a widening lands about every twenty. Each step should read as the field
-    // having a little more room, never as the camera moving. The far rungs are
-    // deliberately out of reach of a short run: a twenty seven wide carpet is
-    // something to play toward.
-    ladder: [8, 9, 10, 12, 14, 16, 18, 21, 24, 27],
+    // WHERE IT STOPS, AND WHY IT STOPS THERE. The ladder used to run to twenty
+    // seven, which is a nineteen pixel cell: less than a third of the starting
+    // size, too small to read a health number in, and small enough that the
+    // first thing anyone said about the field was that the blocks were
+    // shrinking. Sixteen is half the starting cell and still legible, so that
+    // is the end of it. Losing twenty seven costs the base three figures their
+    // second exact width and nothing else - they still land at nine.
+    ladder: [8, 9, 10, 12, 14, 16],
+
+    // Figures dealt at each rung before the field steps to the next one.
+    //
+    // ONE, BECAUSE THE LADDER IS CONTENT AND A RUN HAS TO REACH THE END OF IT.
+    // A figure is as tall as the field can show, so it takes nine rows at eight
+    // columns and sixteen at the widest, and the whole ladder is about sixty
+    // eight rows. A tier feeds one row a turn and finishes between sixty and
+    // ninety, so at one figure a rung a run walks the entire ladder exactly
+    // once and the widest field is something the longer tiers get to. At two it
+    // never passes twelve columns and the last three rungs are rungs no player
+    // ever stands on.
+    ladderHold: 1,
 
     // Seconds the view takes to settle after a widening. The lattice changes
     // between figures in one step; what the player sees is this ease. Long
@@ -269,7 +357,20 @@ export const CONFIG = {
     // among whatever blocks the figure put in it. A dense row is many soft
     // blocks, a sparse row is a few hard ones, and the material colouring makes
     // which is which readable at a glance.
-    rowBlocks: 3,
+    //
+    // ONLY THE FIGURE FIELD READS THIS. The other two give every block the
+    // whole of the tier's number, so this is the one dial that moves the
+    // fractal mode and nothing else.
+    //
+    // FOUR, MEASURED. It was three while the field widened at half the pace it
+    // does now; capping the ladder so a run walks all of it made every row
+    // wider, and a wider row is more blocks the swarm sweeps in one pass, which
+    // took the fractal mode's swell median from 20 to 40 - twice as forgiving
+    // as the field it sits beside. Four puts it back at 21. Five is not a
+    // harder setting, it is a cliff: the shallows median falls from 67 to 9,
+    // which is the opening becoming unsurvivable rather than the run becoming
+    // harder. Measured over 32 runs a tier with tools/mode-sim.js.
+    rowBlocks: 4,
 
     // Bounds on that sharing, so a one block row is not an unbreakable pillar
     // and a solid row is not free.
@@ -341,9 +442,24 @@ export const CONFIG = {
     shake:     1,       // screen shake multiplier; 0 turns it off
     particles: 1,       // particle density, 0 to 1
 
+    // HOW LOUD THE SCENERY IS. The backdrop draws a signature geometry per
+    // regime, and the fractal field points each figure at the signature that
+    // echoes its construction. When the backdrop is drawn at full strength that
+    // agreement turns into competition: the huge shape behind the field reads
+    // as the game and the blocks read as scatter in front of it. This scales
+    // every signature at once, so it is the one dial to turn when the scenery
+    // is shouting over the field. 0 removes the backdrop geometry entirely and
+    // leaves the wash behind it.
+    backdrop: 0.6,
+
     // null follows the operating system's reduced motion setting. true or
     // false overrides it.
     reducedMotion: null,
+
+    // Seconds a block that APPEARS spends announcing itself, for the fields
+    // where blocks are placed rather than slid in from the top edge. 0 removes
+    // the flash; a block then simply exists where it did not before.
+    arrivalFlash: 0.38,
 
     // Draws the wordless opening lesson for a player who has never fired.
     onboarding: true,
@@ -447,11 +563,22 @@ export const appliedOverrides = [];
  *  and is owned by the game, not by this file. */
 export const CELL0 = CONFIG.board.width / CONFIG.board.cols;
 
+/**
+ * The ladder as one width per FIGURE, with each rung repeated `ladderHold`
+ * times. Kept apart from `board.ladder` so that file stays a readable list of
+ * the widths the field visits rather than a list with its own pacing baked in.
+ */
+export const LADDER = Object.freeze((() => {
+  const hold = Math.max(1, CONFIG.board.ladderHold | 0);
+  const out = [];
+  for (const w of CONFIG.board.ladder) {
+    for (let i = 0; i < hold; i++) out.push(Math.max(4, w | 0));
+  }
+  return out.length ? out : [CONFIG.board.cols];
+})());
+
 /** Width the figure numbered n is dealt at. The last rung repeats. */
-export const latticeAt = (n) => {
-  const L = CONFIG.board.ladder;
-  return L[Math.min(Math.max(0, n | 0), L.length - 1)];
-};
+export const latticeAt = (n) => LADDER[Math.min(Math.max(0, n | 0), LADDER.length - 1)];
 
 /** Leftmost WORLD column at a given width. World column zero is the left edge
  *  of the starting field, so widening opens negative columns on one side and

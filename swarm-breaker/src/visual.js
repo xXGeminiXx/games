@@ -256,7 +256,33 @@ export const REGIME_HUES = {
  * is meant to look like almost nothing at all - it is the first thing anyone
  * ever sees, and it should read in a second with nothing to decode.
  */
-const SIG_WEIGHT = { opening: 0.42, chaos: 0.7, static: 0.7, lattice: 0.8, weave: 0.85 };
+// HOW LOUD EACH SIGNATURE IS ALLOWED TO BE.
+//
+// The signatures are not equally busy. A drifting field is a few slow strokes;
+// a Sierpinski triangle drawn across the whole backdrop is a wall of geometry
+// with more edges in it than the field in front of it has blocks. Drawn at the
+// same strength the loud ones stop being scenery: the shape behind the field
+// reads as the game, and the blocks read as scatter sitting on top of it.
+//
+// So every signature carries its own weight, and anything not listed is drawn
+// at full. `feel.backdrop` scales all of them together, which is the dial to
+// turn when the whole backdrop is too present rather than one signature.
+const SIG_WEIGHT = {
+  opening: 0.42, sierpinski: 0.45, growth: 0.55, cantor: 0.6,
+  chaos: 0.7, static: 0.7, lattice: 0.8, weave: 0.85,
+};
+
+/** Every signature scaled together. Clamped, because a backdrop drawn at ten
+ *  times strength is a white screen with a game somewhere behind it. An
+ *  unconfigured build draws them at full, which is what they did before the
+ *  dial existed. */
+const BACKDROP = (() => {
+  const v = Number(CONFIG.feel && CONFIG.feel.backdrop);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 1;
+})();
+
+/** The strength one signature is painted at. */
+const sigWeight = (key) => (SIG_WEIGHT[key] === undefined ? 1 : SIG_WEIGHT[key]) * BACKDROP;
 
 /** Signature per scripted regime. Names index the SIGNATURES table below. */
 const REGIME_SIGS = {
@@ -718,6 +744,11 @@ export function createVisual(opts) {
   let resolveT = 0;           // milestone strobe: the mass briefly resolves
 
   let regimeKey = 'opening', regimeName = 'drift', regimeNext = '';
+
+  // How close the run is to ending, when that is not something a COLUMN can be
+  // close to. null means every block is judged by its own distance from the
+  // line, which is what a descending field means by threat.
+  let pressure = null;
   let regimeIndex = -1, handover = 0;
   let hue = REGIME_HUES.opening, hueTo = hue;
   let prevSigs = null, curSigs = sigsFor('opening');
@@ -1112,7 +1143,7 @@ export function createVisual(opts) {
   /** Identity of the current backdrop. Changes only when its inputs do. */
   function backdropKey() {
     return 'bd|' + curSigs[0] + '|' + curSigs[1] + '|' + Math.round(hue / 15)
-      + '|' + Math.round(quality * 4) + '|' + (SIG_WEIGHT[regimeKey] || 1)
+      + '|' + Math.round(quality * 4) + '|' + sigWeight(regimeKey)
       + '|' + (W | 0) + 'x' + (H | 0)
       + '|' + (TOP | 0) + '|' + (FLOOR | 0) + '|' + COLS + '|' + Math.round(CELL);
   }
@@ -1138,7 +1169,8 @@ export function createVisual(opts) {
     if (!sigs) return;
     const w = W, h = FLOOR - TOP;
     const base = hslHex(hue, 40, 62);
-    const strength = (0.44 + 0.14 * quality) * (SIG_WEIGHT[regimeKey] || 1);
+    const strength = (0.44 + 0.14 * quality) * sigWeight(regimeKey);
+    if (strength <= 0) return;
     const two = sigs[1] ? 0.66 : 1;
     lc.save();
     lc.beginPath(); lc.rect(0, TOP, w, h); lc.clip();
@@ -1172,7 +1204,7 @@ export function createVisual(opts) {
           const wipeY = TOP + h * (1 - ease(1 - transitT));
           ctx.beginPath(); ctx.rect(0, wipeY, W, FLOOR - wipeY); ctx.clip();
         }
-        paintSignature(ctx, prevSigs, (0.44 + 0.14 * quality) * fade);
+        paintSignature(ctx, prevSigs, (0.44 + 0.14 * quality) * fade * BACKDROP);
         ctx.restore();
       }
     }
@@ -1467,8 +1499,16 @@ export function createVisual(opts) {
       by[idx] = y - (1 - born) * CELL * 0.5;
       bAl[idx] = born;
 
-      const nearness = clamp(1 - (rowsToFloor - 1 - rec.r) / LOOK.threatRows, 0, 1);
-      bThreat[idx] = nearness;
+      // A descending field threatens BY COLUMN: the block one row off the line
+      // is the one about to end the run, and the shadow it casts says which
+      // one. A field that fills threatens as a whole - no block on it is nearer
+      // to the ending than any other, and judging by distance would light the
+      // lowest ones for the entire run, because the bottom of the board is
+      // simply where the mass lives. Lit for the whole run, the one colour that
+      // means the run is about to end would stop meaning anything.
+      bThreat[idx] = pressure === null
+        ? clamp(1 - (rowsToFloor - 1 - rec.r) / LOOK.threatRows, 0, 1)
+        : pressure;
 
       if (rec.r >= 0 && rec.r < OCC_ROWS && rec.c >= 0 && rec.c < COLS) {
         occ[rec.r * COLS + rec.c] = frameId;
@@ -2529,6 +2569,17 @@ export function createVisual(opts) {
   }
   function setAutoQuality(on) { autoQuality = !!on; }
 
+  /**
+   * How close the run is to ending, 0 to 1, for a field where that is a
+   * property of the BOARD rather than of any one block. Pass null - which is
+   * the default - for a field that closes on the swarm line, where a block's
+   * own distance from it is the better answer and says which column as well as
+   * how close.
+   */
+  function setPressure(p) {
+    pressure = (p === null || p === undefined) ? null : clamp(Number(p) || 0, 0, 1);
+  }
+
   /** Motion damping. Ambient drift stops; nothing that carries state stops. */
   function setReducedMotion(on) { reduced = !!on; }
 
@@ -2549,7 +2600,7 @@ export function createVisual(opts) {
     // readout primitives
     readout, glyph, caption,
     // signals
-    setDepth, setSwarm, setRegime, setFlight, splash, descend, resolve,
+    setDepth, setSwarm, setRegime, setFlight, setPressure, splash, descend, resolve,
     // control
     clear, resize, setLattice, setQuality, setAutoQuality, setReducedMotion, stats,
     // helpers, exposed so a caller never has to reimplement them
