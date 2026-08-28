@@ -312,6 +312,31 @@ function seedWorld(wx, wy, opts) {
   }
 }
 
+/**
+ * A whole cloud at a world point: the star-formation law's arrival. Each body
+ * carries a share of the field's mass, as a click would, and a share of its
+ * REPRESENTED population, so what the field stands for compounds the way
+ * what it weighs does. It arrives as gas: it cools, and it ignites.
+ */
+function seedCloud(wx, wy, n, pop) {
+  if (game.closing) return;
+  const seed = CONFIG.seeding;
+  const st = sim.stats();
+  const held = st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
+  if (held >= seed.massCeiling) return;
+  const perAbs = Math.max(seed.massPerBody, (held * seed.clickShare) / Math.max(1, n));
+  const per = sim.codeMassFromAbsolute(perAbs);
+  const ext = st.extent ? st.extent.m * Math.pow(10, st.extent.e) : 0;
+  const extCode = ext / Math.pow(2, st.ledger.expLen);
+  const radius = Math.max(sim.radiusForMass(per) * 6 * Math.sqrt(n), extCode * CONFIG.game.cloudRadius);
+  sim.addCloud({
+    n, x: wx, y: wy, radius, mass: per, spin: 0.7, sigma: 0,
+    kind: KIND.DUST, gas: true, pop: Math.max(1, pop), seed: (clicks * 2654435761) >>> 0,
+  });
+  clicks++;
+  game.noteSeed();
+}
+
 canvas.addEventListener('pointerdown', e => seedAt(e.clientX, e.clientY));
 addEventListener('resize', () => view.resize());
 // NO WHEEL HANDLER HERE. The renderer binds its own, anchored at the cursor,
@@ -406,7 +431,7 @@ function witness(e) {
 const game = createGame({
   CONFIG, KIND, KIND_NAME, EVENT, STAGE,
   getSim: () => sim,
-  seedWorld, say, discover,
+  seedWorld, seedCloud, say, discover,
   doc: document,
   storage: (typeof localStorage !== 'undefined') ? localStorage : null,
   storageKey,
@@ -417,6 +442,20 @@ const game = createGame({
     clicks = 0;
     seen.clear();
     say(CONFIG.text.promptFirst, 0);
+  },
+  onClose() {
+    // The universe becomes one point and is gone. The renderer already has
+    // this move - it is what plays when the run crosses an order of magnitude
+    // - and here it plays once more over everything, and then the field is
+    // emptied behind it.
+    const vp = view.getViewport();
+    view.emit({ type: 'stratum', x: vp ? vp.cx : 0, y: vp ? vp.cy : 0, name: '' });
+    setTimeout(() => {
+      const rv = sim.getRenderView();
+      const ids = [];
+      for (let i = 0; i < rv.count; i++) ids.push(rv.idOfSlot[i]);
+      for (const id of ids) sim.removeBody(id);
+    }, CONFIG.game.closeSeconds * 1000);
   },
 });
 

@@ -121,6 +121,21 @@ export const CONFIG = {
     // Autosave to browser storage this often, and on every purchase.
     autosave: true,
     saveEverySeconds: 12,
+
+    // STAR FORMATION, the last law. Infall then arrives as whole clouds: this
+    // many bodies at the dial's top (a fifth of it at the bottom), each
+    // standing for a share of everything the field already represents - the
+    // same compounding the click uses for mass, applied to population. That
+    // is what carries a field past a galaxy: the ladder from cluster to
+    // galaxy to the web to a universe is counted in what is represented, not
+    // in what is tracked, and it climbs by doubling.
+    cloudBodies: 90,
+    popShare: 0.024,
+    // A cloud's radius, as a share of the field's extent.
+    cloudRadius: 0.05,
+
+    // THE CLOSE. How long the universe takes to become one point and go.
+    closeSeconds: 2.2,
   },
 
   // -------------------------------------------------------------------------

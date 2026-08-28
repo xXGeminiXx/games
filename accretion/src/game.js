@@ -36,7 +36,7 @@ const SAVE_VERSION = 2;
  * @param {function} o.onNewRun    () => void: the host rebuilds the field for a new universe
  */
 export function createGame(o) {
-  const { CONFIG, KIND, KIND_NAME, EVENT, STAGE, getSim, seedWorld, say, discover, doc, storage, storageKey, onNewRun } = o;
+  const { CONFIG, KIND, KIND_NAME, EVENT, STAGE, getSim, seedWorld, seedCloud, say, discover, doc, storage, storageKey, onNewRun, onClose } = o;
   const G = CONFIG.game;
   const T = CONFIG.text;
 
@@ -184,8 +184,15 @@ export function createGame(o) {
       const h = hash(seeds * 7919 + 13);
       const a = h * 6.2831853;
       const r = (0.25 + 0.7 * hash(seeds * 104729 + 7)) * Math.max(extCode * 0.5, 1e-6);
-      const clouds = R.hasLaw(research, 'formation') ? 1 + Math.round(3 * R.dial(research, 'formation')) : 1;
-      for (let c = 0; c < clouds; c++) {
+      if (R.hasLaw(research, 'formation') && typeof seedCloud === 'function') {
+        // Star formation: a whole cloud, each body standing for a share of
+        // everything the field already represents.
+        const d = R.dial(research, 'formation');
+        const nBodies = Math.max(6, Math.round(G.cloudBodies * (0.2 + 0.8 * d)));
+        const p = stats && stats.population ? stats.population.m * Math.pow(10, stats.population.e) : 0;
+        const pop = Math.max(1, Math.floor((p * G.popShare) / nBodies));
+        seedCloud(cx + Math.cos(a) * r, cy + Math.sin(a) * r, nBodies, pop);
+      } else {
         seedWorld(cx + Math.cos(a) * r, cy + Math.sin(a) * r, { fell: true });
       }
     }
@@ -319,6 +326,7 @@ export function createGame(o) {
     closing = { at: elapsed, name: r.closure ? r.closure.classification.name.toLowerCase() : '' };
     if (boardEl && boardEl.style) boardEl.style.display = 'none';
     say('', 0);
+    if (typeof onClose === 'function') onClose();
     if (endingEl) {
       clear(endingEl);
       endingEl.appendChild(make('div', 'title', T.endingTitle || 'the universe closes'));

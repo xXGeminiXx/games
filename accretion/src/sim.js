@@ -2828,7 +2828,9 @@ export function createSim(opts = {}) {
         x: cx + dx, y: cy + dy,
         vx: (o.vx || 0) - dy / rr * vc + g1 * sg,
         vy: (o.vy || 0) + dx / rr * vc + g2 * sg,
-        mass: m, kind: o.kind, protect: false,
+        mass: m, kind: o.kind, protect: o.protect === true,
+        // A cloud may stand for far more than it tracks, and may arrive as gas.
+        pop: o.pop, gas: !!o.gas, origin: o.origin,
       }));
     }
     return ids;
