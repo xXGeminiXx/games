@@ -628,14 +628,17 @@ export const CONFIG = {
     // what it could buy instead of turning into pocket change by depth forty.
     clearBonus: { base: 30, perDepth: 7 },
 
+    // `desc` is the second line of the offer and shares it with the price,
+    // in a button about fifteen characters wide - so it is terse. `long` is
+    // the full sentence, shown on hover.
     offers: [
-      { id: 'ball',  name: 'conscript', desc: '+1 to the swarm',        base: 12, perDepth: 4,  amount: 1 },
-      { id: 'power', name: 'sharpen',   desc: '+1 damage per hit',      base: 25, perDepth: 10, amount: 1 },
-      { id: 'gain',  name: 'harvest',   desc: '+2 essence per block',   base: 30, perDepth: 8,  amount: 2 },
+      { id: 'ball',  name: 'conscript', desc: '+1 swarm',     long: 'one more body in the swarm, for good', base: 12, perDepth: 4,  amount: 1 },
+      { id: 'power', name: 'sharpen',   desc: '+1 damage',    long: 'every hit does one more damage',        base: 25, perDepth: 10, amount: 1 },
+      { id: 'gain',  name: 'harvest',   desc: '+2 per block', long: 'every block broken pays two more essence', base: 30, perDepth: 8,  amount: 2 },
 
       // Priced by how much it actually removes, so clearing a wide row costs
       // more than clearing a thin one.
-      { id: 'clear', name: 'purge row', desc: 'destroy the lowest row', base: 25, perDepth: 6,  amount: 1 },
+      { id: 'clear', name: 'purge row', desc: 'lowest row',   long: 'destroy the lowest row on the board', base: 25, perDepth: 6,  amount: 1 },
     ],
   },
 

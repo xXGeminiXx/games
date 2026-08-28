@@ -257,17 +257,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=3';
-import { createJuice } from './src/juice.js?v=3';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=3';
-import { createBlockKinds } from './src/blocks.js?v=3';
-import { safeRows } from './src/arrival.js?v=3';
-import { createAwards } from './src/awards.js?v=3';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=3';
-import { createLeaderboard } from './src/leaderboard.js?v=3';
-import * as Tiers from './src/tiers.js?v=3';
-import { createOnboarding } from './src/onboarding.js?v=3';
-import { createVisual } from './src/visual.js?v=3';
+         storageKey, offerCost, applyIdentity } from './config.js?v=4';
+import { createJuice } from './src/juice.js?v=4';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=4';
+import { createBlockKinds } from './src/blocks.js?v=4';
+import { safeRows } from './src/arrival.js?v=4';
+import { createAwards } from './src/awards.js?v=4';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=4';
+import { createLeaderboard } from './src/leaderboard.js?v=4';
+import * as Tiers from './src/tiers.js?v=4';
+import { createOnboarding } from './src/onboarding.js?v=4';
+import { createVisual } from './src/visual.js?v=4';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1252,7 +1252,7 @@ const PRICING = {
 const OFFERS = CONFIG.economy.offers
   .filter(o => EFFECTS[o.id])
   .map(o => ({
-    id: o.id, name: o.name, desc: o.desc,
+    id: o.id, name: o.name, desc: o.desc, long: o.long || o.desc,
     cost: d => (PRICING[o.id] ? PRICING[o.id](o, d) : offerCost(o, d)),
     buy: () => EFFECTS[o.id](o),
   }));
@@ -1271,6 +1271,9 @@ function paintShop(){
     // and what got clipped was the price, which is the half a player is
     // actually reading.
     b.innerHTML = `${o.name}<small><b>${c}</b> &middot; ${o.desc}</small>`;
+    // The whole sentence, for anyone who hovers. The second line is terse
+    // because it shares fifteen characters with the price.
+    b.title = `${o.name}: ${o.long} (${c})`;
     b.disabled = S.gold < c || S.firing;
     b.onclick = () => { if (S.gold >= c){ S.gold -= c; o.buy(); store.mark(); paintShop(); } };
     el.appendChild(b);
