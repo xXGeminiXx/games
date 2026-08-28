@@ -95,7 +95,7 @@ export const CONFIG = {
 
     ledgerBase:  'base {base}',
     ledgerTakes: '~{absorb} / {t}',
-    ceilingLine: 'saturated {pct}%',
+    ceilingLine: 'saturated {x}x',
     lesserGoods: '{n} lesser goods',
     lesserWorth: 'worth about {coin}',
     fieldHint:   'the surface',
@@ -134,7 +134,9 @@ export const CONFIG = {
     maxWeight: 5,        // weight notches per row
     activeStrata: 5,     // layers kept open behind the face; the wider workings
                          // rite adds to this
-    weightNew: 3,        // weight a newly opened stratum starts on
+    weightNew: 5,        // weight a newly opened layer starts on: the newest
+                         // layer is always the richest, so a player who never
+                         // touches the panel still leans the right way
     weightFace: 2,       // weight the face starts on
   },
 

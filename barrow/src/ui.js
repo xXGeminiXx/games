@@ -93,6 +93,13 @@ export function createUI(doc, sim, cfg, actions) {
     if (e.text) log(e.text);
   };
 
+  /**
+   * How far past its ceiling a market is, as a multiple. A layer worked far
+   * past what its market can pay reads in the hundreds as a percentage, which
+   * is five digits of noise; what the player needs is how many times over.
+   */
+  const overBy = (sat) => (sat < 10 ? sat.toFixed(1) : fmt(Math.round(sat)));
+
   /** The tag a layer's seam shows, or nothing at all for plain ground. */
   const seamTag = (k) => {
     const layer = sim.ground.at(k);
@@ -314,7 +321,7 @@ export function createUI(doc, sim, cfg, actions) {
         // Bones are raised, not sold by the ton, so their thin market is not
         // flagged as choking.
         const choking = sat > 1 && id !== Mat.BONES;
-        row.hot.textContent = choking ? fill(T.ceilingLine, { pct: Math.round(sat * 100) }) : '';
+        row.hot.textContent = choking ? fill(T.ceilingLine, { x: overBy(sat) }) : '';
         show(row.hot, choking);
       }
       show(row.base, md.ledger);
@@ -530,7 +537,7 @@ export function createUI(doc, sim, cfg, actions) {
           }
         } else if (md.ledger) {
           const sat = Mk.saturation(sim.marketFor('s' + key), sim.flowOf('s' + key), md);
-          if (sat > 1) { meta += ' - ' + fill(T.ceilingLine, { pct: Math.round(sat * 100) }); hot = true; }
+          if (sat > 1) { meta += ' - ' + fill(T.ceilingLine, { x: overBy(sat) }); hot = true; }
         }
         r.meta.textContent = meta;
         r.meta.className = hot ? 'hot' : '';
