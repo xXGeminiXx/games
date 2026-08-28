@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=5';
-import * as Mk from './market.js?v=5';
-import * as Lore from './lore.js?v=5';
-import { fill } from '../config.js?v=5';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=5';
+import { hash, unit, range, pick } from './rng.js?v=6';
+import * as Mk from './market.js?v=6';
+import * as Lore from './lore.js?v=6';
+import { fill } from '../config.js?v=6';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=6';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -46,13 +46,27 @@ function noteTaken(state, kind) {
   state.visitorsBought[kind] = takenOf(state, kind) + 1;
 }
 
-/** The kind at the gate: the seed's choice, or the next one still with stock. */
+/** Whether the ground the surveyor would read has already been read. */
+function groundIsRead(state, cfg) {
+  for (let i = 1; i <= cfg.visitors.surveyor.reads; i++) {
+    if (!state.read[state.depth + i]) return false;
+  }
+  return true;
+}
+
+/**
+ * The kind at the gate: the seed's choice, or the next one still worth
+ * hearing. A caller is skipped when there is nothing left for them to sell -
+ * the two who deal in permanent multipliers run out of stock, and a surveyor
+ * has nothing to say about ground that has already been read.
+ */
 function kindFor(state, cfg, i) {
   const start = hash(state.seed, 'visit-kind:' + i) % KINDS.length;
   for (let n = 0; n < KINDS.length; n++) {
     const kind = KINDS[(start + n) % KINDS.length];
     const limit = LIMITS[kind];
     if (limit && takenOf(state, kind) >= cfg.visitors[kind][limit]) continue;
+    if (kind === 'surveyor' && groundIsRead(state, cfg)) continue;
     return kind;
   }
   return KINDS[start];
