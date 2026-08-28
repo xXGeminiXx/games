@@ -20,15 +20,46 @@
   }
   #hud b{display:block;font-size:22px;font-weight:600;letter-spacing:-.01em;color:var(--figure)}
   #hud span{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--label)}
+  #hud #fluxrow{margin-top:10px}
+  #hud #fluxrow b{font-size:16px;display:inline-block;margin-right:8px}
+  #hud #fluxrow i{font-style:normal;font-size:10px;color:var(--quiet);margin-left:8px}
   #note{
     position:fixed; left:30px; bottom:30px; color:var(--quiet); font-size:11px;
     pointer-events:none;
   }
+  /* The research window: at most six rows, in the same gutter as the mass. */
+  #board{position:fixed; left:30px; top:178px; width:280px; font-size:11px; line-height:1.35}
+  #board #era{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--label);margin-bottom:8px}
+  #board .node,#board .law{padding:5px 8px 6px;margin:0 0 4px -8px;border-left:1px solid transparent;opacity:.55}
+  #board .node.can{opacity:1;cursor:pointer;border-left-color:var(--label)}
+  #board .node.can:hover{background:rgba(200,206,222,.06)}
+  #board .node.wanted{border-left-color:var(--figure)}
+  #board .node.wanted .name{color:var(--figure)}
+  #board .node.shut{opacity:.3}
+  #board .law{opacity:.85}
+  #board .head{display:flex;justify-content:space-between;gap:12px}
+  #board .name{color:var(--ink)}
+  #board .cost{color:var(--label);font-variant-numeric:tabular-nums}
+  #board .line{color:var(--quiet);font-size:10px;margin-top:1px}
+  #board input[type=range]{width:100%;margin:4px 0 0;accent-color:var(--label);height:12px}
+  /* The ending. Centred, quiet, and it waits. */
+  #ending{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    flex-direction:column; text-align:center; color:var(--ink); background:rgba(4,5,10,.55);
+    font-size:12px; line-height:1.9;
+  }
+  #ending .title{font-size:18px;letter-spacing:.08em;color:var(--figure);margin-bottom:14px}
+  #ending .line{color:var(--label)}
+  #ending .again{margin-top:26px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--label);padding-bottom:2px}
+  #ending .again:hover{color:var(--figure)}
 </style>
 </head>
 <body>
 <canvas id="v"></canvas>
-<div id="hud"><b id="mass">0</b><span id="masslabel">bound mass</span></div>
+<div id="hud"><b id="mass">0</b><span id="masslabel">bound mass</span>
+  <div id="fluxrow"><b id="flux">0</b><span id="fluxlabel">flux</span><i id="fluxrate"></i></div></div>
+<div id="board"><div id="era"></div><div id="nodes"></div><div id="laws"></div></div>
+<div id="ending"></div>
 <div id="note">click the void</div>
 
 <script type="module">
@@ -44,10 +75,11 @@
 // the view can draw, and names things the first time they happen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, simOptions, applyIdentity } from './config.js';
-import { createSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js';
+import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js';
+import { createSim, restoreSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js';
 import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js';
 import * as Stellar from './src/stellar.js';
+import { createGame } from './src/game.js';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
@@ -89,7 +121,9 @@ setSpectrum({
   detailAlpha:     CONFIG.matter.detailAlpha,
 });
 
-const sim = createSim(simOptions());
+// The field. `let`, because closing a universe and beginning again builds a
+// new one, and so does taking a saved run on at boot.
+let sim = createSim(simOptions());
 const view = createRenderer(canvas, {});
 
 // WHAT COLOUR A THING IS, AND HOW BRIGHT.
@@ -191,6 +225,16 @@ let clicks = 0;
 function seedAt(sx, sy) {
   const w = view.screenToWorld(sx, sy);
   if (!w) return;
+  seedWorld(w.x, w.y, { clicked: true });
+}
+
+/**
+ * A click's worth of matter at a world point. The click and the infall law
+ * both come through here, so what falls in on its own is exactly what a
+ * click would have put there.
+ */
+function seedWorld(wx, wy, opts) {
+  if (game.closing) return;
   const seed = CONFIG.seeding;
   const vp = view.getViewport();
   const perUnit = vp && vp.pxPerUnit > 0 ? vp.pxPerUnit : 1;
@@ -224,6 +268,25 @@ function seedAt(sx, sy) {
   // a late field filling with instant stars three at a time.
   const asCloud = Math.log2(perAbs) >= Stellar.IGNITION_LOG2;
 
+  // THE ORBIT LAW. Matter that arrives with sideways motion about the
+  // heaviest thing near it makes a system instead of a pile. The share is
+  // the player's dial; without the law it is zero and seeds fall straight in.
+  const share = game.orbitShare();
+  let ovx = 0, ovy = 0;
+  if (share > 0) {
+    const rv = sim.getRenderView();
+    let bi = -1, bm = -1;
+    for (let i = 0; i < rv.count; i++) if (rv.mass[i] > bm && !(rv.flags[i] & FLAG_GAS)) { bm = rv.mass[i]; bi = i; }
+    if (bi >= 0) {
+      const dx = wx - rv.px[bi], dy = wy - rv.py[bi];
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > rv.radius[bi] * 1.5) {
+        const v = Math.sqrt(bm / d) * share;    // circular speed, G = 1
+        ovx = rv.vx[bi] - dy / d * v; ovy = rv.vy[bi] + dx / d * v;
+      }
+    }
+  }
+
   const step = 6.2831853 / Math.max(1, seed.bodiesPerClick);
   for (let k = 0; k < seed.bodiesPerClick; k++) {
     // The golden angle keeps successive clicks from landing on the same spokes.
@@ -232,18 +295,21 @@ function seedAt(sx, sy) {
     const near = 0.6 + 0.4 * hash2(clicks ^ 0x9e37, k);
     const vary = 1 + (hash2(clicks, k ^ 0x5bf0) - 0.5) * 2 * seed.massJitter;
     sim.addBody({
-      x: w.x + Math.cos(a) * spread * near,
-      y: w.y + Math.sin(a) * spread * near,
-      vx: Math.cos(a + 1.5708) * seed.launchSpeed,
-      vy: Math.sin(a + 1.5708) * seed.launchSpeed,
+      x: wx + Math.cos(a) * spread * near,
+      y: wy + Math.sin(a) * spread * near,
+      vx: ovx + Math.cos(a + 1.5708) * seed.launchSpeed,
+      vy: ovy + Math.sin(a + 1.5708) * seed.launchSpeed,
       mass: Math.max(floor, per * vary),
       kind: asCloud ? KIND.DUST : undefined,
       gas: asCloud,
     });
   }
   clicks++;
-  if (clicks === 1) say(CONFIG.text.promptSecond, 0);
-  else if (clicks === seed.promptFadesAt) say(CONFIG.text.promptDone, 0);
+  game.noteSeed();
+  if (opts && opts.clicked) {
+    if (clicks === 1) say(CONFIG.text.promptSecond, 0);
+    else if (clicks === seed.promptFadesAt) say(CONFIG.text.promptDone, 0);
+  }
 }
 
 canvas.addEventListener('pointerdown', e => seedAt(e.clientX, e.clientY));
@@ -304,16 +370,12 @@ function dress(e) {
 
 // NAMING THINGS. Every first happening is said once along the bottom: each
 // rung of the ladder, first light, the swelling, each way of dying and each
-// thing left behind. Kinds above dust are gated in the simulation and it
-// emits BLOCKED when the field has earned one it may not take; the smallest
-// thing that makes the ladder a ladder is to grant it and say its name.
+// thing left behind.
 function witness(e) {
   switch (e.type) {
     case EVENT.BLOCKED:
-      if (!sim.isKindUnlocked(e.kind)) {
-        sim.setKindUnlocked(e.kind, true);
-        discover(KIND_NAME[e.kind]);
-      }
+      // The field has earned a kind it may not take. That is the game's
+      // business: the node lights on the board, and buying it is the unlock.
       break;
     case EVENT.KIND_CHANGE: {
       if (e.kind === KIND.STAR) {
@@ -340,6 +402,39 @@ function witness(e) {
   }
 }
 
+// THE GAME AROUND THE FIELD: flux, the board, the laws, the ending, the save.
+const game = createGame({
+  CONFIG, KIND, KIND_NAME, EVENT, STAGE,
+  getSim: () => sim,
+  seedWorld, say, discover,
+  doc: document,
+  storage: (typeof localStorage !== 'undefined') ? localStorage : null,
+  storageKey,
+  onNewRun() {
+    // A new universe: a fresh field under the same laws of physics. What was
+    // learned is kept by the game; nothing else crosses.
+    sim = createSim(simOptions());
+    clicks = 0;
+    seen.clear();
+    say(CONFIG.text.promptFirst, 0);
+  },
+});
+
+// A saved run is taken on before the first frame, so a reload is a resume.
+{
+  const rec = game.load();
+  if (rec) {
+    try {
+      sim = restoreSim(rec.sim, simOptions());
+      clicks = rec.seeds | 0;
+      game.adopt(rec);
+      say('', 0);
+    } catch (e) {
+      sim = createSim(simOptions());
+    }
+  }
+}
+
 const fmt = document.getElementById('mass');
 let last = 0;
 
@@ -355,9 +450,10 @@ function frame(now) {
   // Events are how the field tells the view that something happened - a merge,
   // an ignition, a death, a crossing into a new order of magnitude.
   const events = sim.drainEvents();
-  for (let i = 0; i < events.length; i++) { view.emit(dress(events[i])); witness(events[i]); }
+  for (let i = 0; i < events.length; i++) { view.emit(dress(events[i])); witness(events[i]); game.onEvent(events[i]); }
 
   const s = sim.stats();
+  game.tick(dt, now, s);
 
   // The renderer frames on the extent of the field. It arrives as a magnitude
   // pair, and without it the camera has nothing to size itself against.
@@ -382,7 +478,13 @@ function frame(now) {
 
 // The live objects, for tuning from the console the way the config layer
 // allows from the address bar. Nothing in the game reads this.
-if (typeof window !== 'undefined') window.accretion = { sim, view, adapt, seedAt, Stellar, KIND, STAGE, FATE, CONFIG };
+if (typeof window !== 'undefined') {
+  window.accretion = {
+    get sim() { return sim; }, view, adapt, seedAt, seedWorld, game, Stellar, KIND, STAGE, FATE, CONFIG,
+    // Forget the saved run and start over: accretion.reset() in the console.
+    reset() { game.forget(); location.reload(); },
+  };
+}
 
 // The renderer can drive itself, but the field has to step first, so frames
 // are driven from here. Calling start() as well would paint twice per frame,

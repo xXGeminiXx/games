@@ -82,6 +82,45 @@ export const CONFIG = {
     },
     // How long a discovery line stays before the bottom goes quiet again.
     captionSeconds: 7,
+
+    // THE BOARD. The figure beside the mass, the word for a node already
+    // known from an earlier universe, the prefix on a node that is waiting on
+    // another, and what is said when the board first appears and when an
+    // era turns.
+    fluxLabel: 'flux',
+    known: 'known',
+    needs: 'after ',
+    boardAppears: 'something happened. the board is open',
+    eraPrefix: 'the era of ',
+
+    // THE ENDING. Said once, by the player's own hand.
+    endingTitle: 'the universe closes',
+    endingClass: 'it was',
+    endingSeeds: 'seeds',
+    endingMinutes: 'minutes',
+    endingStars: 'stars',
+    endingDeaths: 'deaths',
+    endingRemnants: 'left behind',
+    endingFlux: 'flux, all of it spent on knowing',
+    endingAgain: 'again, knowing what you know',
+  },
+
+  // -------------------------------------------------------------------------
+  // GAME - the research window and the laws
+  //
+  // What each thing pays and what each node costs live in src/research.js
+  // beside the nodes themselves; these are the dials of the layer around it.
+  // -------------------------------------------------------------------------
+  game: {
+    // Seeds per second at full infall. Each is a click's worth of matter
+    // falling in on its own, once the infall law is held.
+    infallPerSecond: 1.2,
+    // How often the figures on the page are refreshed. Text costs layout;
+    // the field does not need it every frame.
+    hudEveryMs: 200,
+    // Autosave to browser storage this often, and on every purchase.
+    autosave: true,
+    saveEverySeconds: 12,
   },
 
   // -------------------------------------------------------------------------

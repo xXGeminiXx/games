@@ -1874,12 +1874,16 @@ export function createSim(opts = {}) {
         // was - a star that swallows a white dwarf is still a star - with one
         // exception: a black hole in the group eats the rest from the inside,
         // so the result is a black hole whichever body was heavier.
+        const wasGas = (flags[ss] & FLAG_GAS) !== 0;
         if (gasMass > M - gasMass) {
           flags[ss] |= FLAG_GAS;
           if (kind[ss] <= KIND.STAR) kind[ss] = KIND.DUST;
         } else {
           flags[ss] &= ~FLAG_GAS;
-          fate[ss] = FATE.NONE;
+          // For gas, `fate` only records which death threw it; a cloud that
+          // has just been captured drops the marker. A dying star that
+          // swallows something keeps its fate - it is still dying that way.
+          if (wasGas) fate[ss] = FATE.NONE;
         }
         if (anyHole && kind[ss] !== KIND.BLACK_HOLE) {
           if (stage[ss] !== STAGE.NONE) deathRec.delete(survivor);
