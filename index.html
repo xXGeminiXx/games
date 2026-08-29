@@ -20,7 +20,28 @@
   main{width:100%; max-width:1040px}
   h1{
     font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:.22em;
-    color:var(--dim); margin:0 0 26px;
+    color:var(--dim); margin:0;
+  }
+  /* The filter earns its place once the list outgrows a glance; it is hidden
+     below that count rather than sitting there asking to be used. */
+  #head{display:flex; align-items:center; gap:16px; margin:0 0 26px}
+  #find{
+    margin-left:auto; width:150px; padding:5px 9px;
+    background:transparent; color:var(--ink);
+    border:1px solid var(--rule); border-radius:0;
+    font:inherit; font-size:12px;
+  }
+  #find:focus{outline:none; border-color:var(--accent)}
+  #find::placeholder{color:var(--dim)}
+  #find[hidden]{display:none}
+  #none{color:var(--dim); font-size:13px}
+
+  /* A game added since the reader was last here is worth pointing at, and the
+     page knows because the browser remembers what it had already shown. */
+  .new{
+    display:inline-block; margin-left:8px; vertical-align:middle;
+    font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--void); background:var(--accent); padding:2px 6px;
   }
 
   /* One column on a phone, two from a tablet up, three on a wide screen. */
@@ -36,6 +57,9 @@
     border:1px solid var(--rule); background:var(--panel);
     transition:border-color .14s linear, transform .14s ease-out;
   }
+  /* display:flex above beats the hidden attribute's own display:none, so a
+     filtered-out tile has to be told again. */
+  a.tile[hidden]{display:none}
   a.tile:hover, a.tile:focus-visible{border-color:var(--accent); transform:translateY(-2px)}
   a.tile:focus-visible{outline:1px solid var(--accent); outline-offset:2px}
 
@@ -57,11 +81,60 @@
   footer{margin-top:30px; color:var(--dim); font-size:11px; line-height:1.7}
   footer code{color:var(--ink)}
 </style>
+<!-- build-watch:start -->
+<meta name="build" content="bcb17103b419">
+<script>
+(function () {
+  var meta = document.querySelector('meta[name="build"]');
+  var mine = meta && meta.getAttribute('content');
+  if (!mine || !window.fetch) return;
+  var every = 300000;          // re-ask every five minutes while the tab is open
+  var checking = false;
+
+  function reload(to) {
+    // A plain reload can be answered from cache, so the new build is asked for
+    // by a URL the cache has not seen. Whatever the player already had on the
+    // address bar is kept; only a previous build stamp is replaced.
+    var q = new URLSearchParams(location.search);
+    q.set('b', to);
+    location.replace(location.pathname + '?' + q.toString() + location.hash);
+  }
+
+  function check() {
+    if (checking || document.hidden) return;
+    checking = true;
+    fetch('build.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        checking = false;
+        if (!j || !j.build || j.build === mine) return;
+        // One reload per build. If the page comes back still stamped with the
+        // old id the files were not really replaced, and reloading again would
+        // only spin.
+        try {
+          if (sessionStorage.getItem('build-watch') === j.build) return;
+          sessionStorage.setItem('build-watch', j.build);
+        } catch (e) { /* private mode: fall through and reload once */ }
+        reload(j.build);
+      })
+      .catch(function () { checking = false; });
+  }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  setInterval(check, every);
+  setTimeout(check, 15000);
+})();
+</script>
+<!-- build-watch:end -->
 </head>
 <body>
 <main>
-  <h1>Games</h1>
+  <div id="head">
+    <h1>Games</h1>
+    <input id="find" type="search" placeholder="filter" aria-label="Filter the games" autocomplete="off" spellcheck="false">
+  </div>
   <div id="grid"></div>
+  <p id="none" hidden>Nothing matches that.</p>
   <footer>
     No game here sends anything anywhere, and none of them load an image while you play -
     every one of them draws itself. The pictures on this page are screenshots of them running.
@@ -135,7 +208,18 @@ const GAMES = [
 ];
 
 const grid = document.getElementById('grid');
-for (const g of GAMES) {
+const find = document.getElementById('find');
+const none = document.getElementById('none');
+
+// A game is "new" to whoever is reading until they have seen it once. The list
+// of what they have seen lives in their own browser, so the marker fades by
+// itself and means the same thing however long they were away.
+let seen = [];
+try { seen = JSON.parse(localStorage.getItem('seen') || '[]'); } catch (e) { seen = []; }
+const first = seen.length === 0;              // never been here: nothing is new, it is all new
+const isNew = (g) => !first && seen.indexOf(g.dir || g.href) < 0;
+
+const tiles = GAMES.map((g) => {
   const a = document.createElement('a');
   a.className = 'tile';
   a.href = g.href || (g.dir + '/');
@@ -153,6 +237,12 @@ for (const g of GAMES) {
   body.className = 'body';
   const b = document.createElement('b');
   b.textContent = g.name;
+  if (isNew(g)) {
+    const tag = document.createElement('span');
+    tag.className = 'new';
+    tag.textContent = 'new';
+    b.appendChild(tag);
+  }
   const p = document.createElement('p');
   p.textContent = g.line;
   body.append(b, p);
@@ -165,7 +255,25 @@ for (const g of GAMES) {
 
   a.append(img, body);
   grid.appendChild(a);
-}
+  return { el: a, hay: (g.name + ' ' + g.line).toLowerCase() };
+});
+
+// Remember what was on the page, so the next visit can mark what was added.
+try { localStorage.setItem('seen', JSON.stringify(GAMES.map((g) => g.dir || g.href))); } catch (e) { /* no store, no markers */ }
+
+// The filter appears only once there are enough games that reading them all
+// is a chore. Below that it would be furniture.
+if (GAMES.length < 8) find.hidden = true;
+find.addEventListener('input', () => {
+  const q = find.value.trim().toLowerCase();
+  let shown = 0;
+  for (const t of tiles) {
+    const hit = !q || t.hay.indexOf(q) >= 0;
+    t.el.hidden = !hit;
+    if (hit) shown++;
+  }
+  none.hidden = shown > 0;
+});
 </script>
 </body>
 </html>
