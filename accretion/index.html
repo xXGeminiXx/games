@@ -54,7 +54,7 @@
   #ending .again:hover{color:var(--figure)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="141327e6c930">
+<meta name="build" content="af1ba41da992">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -503,6 +503,18 @@ const game = createGame({
     }, CONFIG.game.closeSeconds * 1000);
   },
 });
+
+// A run is written to storage every few seconds, which loses whatever
+// happened since the last one if the page goes away in between. Write it once
+// more whenever the page is being put aside - closed, navigated away from, or
+// hidden by switching tabs - so what is on screen is what comes back.
+// pagehide is the one that fires reliably when a phone browser discards a
+// backgrounded tab; the others cover the ordinary cases.
+function saveNow() { try { game.save(true); } catch (e) { /* a blocked store is not worth an error here */ } }
+window.addEventListener('pagehide', saveNow);
+window.addEventListener('beforeunload', saveNow);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+
 
 // A saved run is taken on before the first frame, so a reload is a resume.
 {
