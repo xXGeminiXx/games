@@ -64,7 +64,7 @@
   #ending .again:hover{color:var(--figure)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="3ea68848005c">
+<meta name="build" content="bfc5ba2131ff">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -301,6 +301,13 @@ function seedWorld(wx, wy, opts) {
   const st = sim.stats ? sim.stats() : null;
   const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
   if (held >= seed.massCeiling) { say(CONFIG.text.promptFull, CONFIG.text.captionSeconds); return; }
+  // Said once, the first time a run comes within reach of its ceiling. The
+  // field keeps taking clicks after this; the line only exists so the wall is
+  // not the first anyone hears of it.
+  if (!saidNearFull && held >= seed.massCeiling * seed.ceilingWarnAt) {
+    saidNearFull = true;
+    say(CONFIG.text.promptNearFull, CONFIG.text.captionSeconds);
+  }
   // The share is decided in ABSOLUTE units - the ladder and the ceiling live
   // there - but addBody takes the field's own CODE units, which the ledger
   // re-centres as the run grows. The conversion is asked of the field, which
@@ -407,6 +414,10 @@ function say(text, seconds) {
   noteUntil = seconds > 0 ? performance.now() + seconds * 1000 : 0;
 }
 const seen = new Set();
+// Said once per run, not once per click: the ceiling is approached over many
+// of them, and a warning repeated every time would bury the line that says
+// what the field just did.
+let saidNearFull = false;
 function discover(key, fallback) {
   if (seen.has(key)) return;
   seen.add(key);

@@ -61,6 +61,7 @@ export const CONFIG = {
     // pointing at a place on the screen, because a direction goes stale the
     // moment anything moves.
     promptFull:   'the field will take no more - it holds all the mass a run can carry. start over to begin a new one.',
+    promptNearFull: 'the field is nearly as full as a run can be. what is here will keep working; nothing more can be put in.',
     // Starting over is not the ending: the ending keeps what was learned and
     // this throws it away, so the question has to say so.
     confirmAgain: 'Start over? This run and everything learned in it are thrown away.',
@@ -252,6 +253,12 @@ export const CONFIG = {
     // 1.03e27 - the ceiling plus one final click - and runs were measured
     // clean to twice that through this exact path.
     massCeiling: 1e45,
+    // A run that reaches the ceiling cannot be clicked again, and until this
+    // there was nothing on screen to say it was coming - the figure in the
+    // corner climbs with no number beside it to be measured against. Rather
+    // than print a limit nobody would read for an hour, the field says so once
+    // when it is nearly there, in the same line every other event uses.
+    ceilingWarnAt: 0.9,
 
     // Clicks after which the prompt goes quiet for good.
     promptFadesAt: 3,
