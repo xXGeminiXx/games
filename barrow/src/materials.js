@@ -7,11 +7,11 @@
 // reach it. Nothing here is stored, so a save is just k.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=11';
+import { CONFIG } from '../config.js?v=12';
 
 const ROMAN = ['', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
-/** The stratum's good: id, display name and colour. */
+/** The stratum's good: id, display name and color. */
 export function goodAt(k, cfg = CONFIG.strata) {
   k = Math.max(0, k | 0);
   const ladder = cfg.ladder;

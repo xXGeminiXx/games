@@ -17,18 +17,18 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=11';
-import * as Mat from './materials.js?v=11';
-import * as Mk from './market.js?v=11';
-import * as H from './horde.js?v=11';
-import * as R from './rites.js?v=11';
-import * as Rv from './reveal.js?v=11';
-import * as Ch from './chambers.js?v=11';
-import * as Vi from './visitors.js?v=11';
-import * as Rb from './rebirth.js?v=11';
-import * as Lore from './lore.js?v=11';
-import { createGround } from './ground.js?v=11';
-import { fill } from '../config.js?v=11';
+import { CONFIG as DEFAULT } from '../config.js?v=12';
+import * as Mat from './materials.js?v=12';
+import * as Mk from './market.js?v=12';
+import * as H from './horde.js?v=12';
+import * as R from './rites.js?v=12';
+import * as Rv from './reveal.js?v=12';
+import * as Ch from './chambers.js?v=12';
+import * as Vi from './visitors.js?v=12';
+import * as Rb from './rebirth.js?v=12';
+import * as Lore from './lore.js?v=12';
+import { createGround } from './ground.js?v=12';
+import { fill } from '../config.js?v=12';
 
 export const SAVE_VERSION = 2;
 

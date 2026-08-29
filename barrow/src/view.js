@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=11';
-import { distribute, activeFrom } from './horde.js?v=11';
-import * as Lore from './lore.js?v=11';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=12';
+import { distribute, activeFrom } from './horde.js?v=12';
+import * as Lore from './lore.js?v=12';
 
 /** mulberry32 */
 function rng(seed) {
@@ -177,7 +177,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     c.fillStyle = palette.deep;
     c.fillRect(0, L.bottom, width, Math.max(0, height - L.bottom));
 
-    // Glints of each band's good, so the colour of what is down there shows.
+    // Glints of each band's good, so the color of what is down there shows.
     for (const row of L.rows) {
       if (row.k > s.depth + 1) continue;
       const g = layerAt(row.k);

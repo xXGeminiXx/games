@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=11';
-import * as Mk from './market.js?v=11';
-import * as H from './horde.js?v=11';
-import * as R from './rites.js?v=11';
-import * as Rb from './rebirth.js?v=11';
-import * as Lore from './lore.js?v=11';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=11';
-import { fill } from '../config.js?v=11';
+import * as Mat from './materials.js?v=12';
+import * as Mk from './market.js?v=12';
+import * as H from './horde.js?v=12';
+import * as R from './rites.js?v=12';
+import * as Rb from './rebirth.js?v=12';
+import * as Lore from './lore.js?v=12';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=12';
+import { fill } from '../config.js?v=12';
 
 const SVG = 'http://www.w3.org/2000/svg';
 

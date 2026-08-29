@@ -31,9 +31,9 @@ export const CONTENT = {
   // -------------------------------------------------------------------------
   log: {
     start: [
-      'The ground here is soft. It should not be.',
-      'There is a hill in this field that nobody has ever ploughed.',
-      'The map calls this a mound. It does not say whose.',
+      'The ground here is soft. It shouldn\'t be.',
+      'There\'s a hill in this field that nobody has ever plowed.',
+      'The map calls this a mound. It doesn\'t say whose.',
       'You bought the field cheap. The hill came with it.',
     ],
     firstDig: [
@@ -41,7 +41,7 @@ export const CONTENT = {
       'The spade goes in to the shoulder on the first push.',
     ],
     sellShown: [
-      'There is a yard in town that buys fill and asks nothing.',
+      'There\'s a yard in town that buys fill and asks nothing.',
       'The builders in town take clean soil by the cartload.',
     ],
     firstSale: [
@@ -50,54 +50,54 @@ export const CONTENT = {
     ],
     firstBone: [
       'The sixth spadeful comes up holding a hand. The fingers close.',
-      'A hand in the dirt. It is not finished with the work.',
+      'A hand in the dirt, and it isn\'t done working.',
       'Bone, and it moves when the light hits it.',
     ],
     raiseShown: [
-      'It wants to be put to work. You find you know how to ask.',
-      'There is a way to ask it to stand. Nobody taught you that.',
+      'It wants to be put to work. Bones will stand it up.',
+      'Bones raise the dead and the dead dig. Nobody taught you that.',
     ],
     firstRaise: [
       'The first of them climbs out of the hole and starts to dig.',
       'It stands, takes the spade out of your hands, and gets on with it.',
     ],
     faceShown: [
-      'There is harder ground under this. Set some of them against it.',
-      'The floor of the cut rings like stone. That is the way down.',
+      'Harder ground under this. Put some of them on the way down.',
+      'The floor of the cut rings like stone. That\'s the way down.',
     ],
     breakthrough: [
       'The floor gives out onto {name}.',
-      'They are through. {Name} under the whole cut.',
+      'They\'re through. {Name} under the whole cut.',
       '{Name}. The shovels change their sound.',
-      'The last foot comes away wet and there is {name} behind it.',
+      'The last foot comes away wet and there\'s {name} behind it.',
     ],
     newMarket: [
       'Word gets to town. There are buyers for {name}.',
-      'A factor rides out to ask how much {name} you have.',
+      'A man rides out to ask how much {name} you have.',
       '{Name} has a buyer before the first cart is loaded.',
       'The yard sends a boy to ask whether the {name} is for sale.',
     ],
     marketShown: [
-      'Prices move on their own. Learn to read them.',
+      'Every sale pushes that price down, and it climbs back over a minute.',
       'The yard pays less each time you come back the same day.',
     ],
     buckled: [
       'You put more {name} on the market than it wanted. The price sits on the floor until it forgets.',
-      'The {name} buyers have all they can hold. Come back when they are hungry.',
+      'The {name} buyers have all they can hold. Come back when they\'re hungry.',
       'Nobody in the county needs another ounce of {name} today.',
     ],
     ritesShown: [
-      'Coin buys more than shovels, if you know who to ask.',
+      'Coin buys sharper spades, faster picks and a man who sells for you.',
       'There are people who take money to make this go faster. Some of them are alive.',
     ],
     handsDone: [
       'Your hands are done. You keep the books now.',
-      'You have not touched a spade in a week and the hole is deeper than ever.',
+      'You haven\'t touched a spade in a week and the hole is deeper than ever.',
     ],
     away: [
-      'You were gone {t}. They did not stop.',
+      'You were gone {t}. They didn\'t stop.',
       'You come back after {t}. The spoil heap has moved twice.',
-      '{T} away. The hole went on without you, as it does.',
+      '{T} away. The hole went on without you.',
     ],
     seamFound: [
       'The {name} runs {seam} here.',
@@ -108,18 +108,18 @@ export const CONTENT = {
       [1000,   'A thousand. No bird lands in this field any more.'],
       [10000,  'Ten thousand. The ground carries a sound now, low and even.'],
       [100000, 'A hundred thousand. The hill breathes when they change over.'],
-      [1e6,    'A million. It is more hole than hill.'],
+      [1e6,    'A million. It\'s more hole than hill.'],
       [1e8,    'A hundred million. The field is a lid on something.'],
       [1e10,   'Ten billion. More than were ever buried in this country.'],
       [1e13,   'Ten trillion. Whatever is down there, they outnumber it.'],
       [1e16,   'The number stopped meaning anything a while back. They keep digging.'],
     ],
     depthMilestones: [
-      [4,  'Four layers. The topsoil is a rumour.'],
+      [4,  'Four layers. The topsoil is a rumor.'],
       [8,  'Eight. These graves were cut before anyone wrote anything down.'],
       [12, 'Twelve. Nothing here was buried by people who left a name.'],
       [16, 'Sixteen. The walls are cut square. Someone was here first.'],
-      [22, 'Twenty two. You have stopped writing down what they bring up.'],
+      [22, 'Twenty two. You\'ve stopped writing down what they bring up.'],
       [30, 'Thirty. The books are the only proof any of this is happening.'],
       [40, 'Forty. There is no word for ground this old.'],
       [55, 'Fifty five. The shaft goes down past anything that was ever alive.'],
@@ -131,21 +131,22 @@ export const CONTENT = {
   //
   // Every stratum below the surface may carry one of these. It changes one
   // thing about the ground and gives the layer a character the player can
-  // work with or work around. `tag` is what the panels show.
+  // work with or work around. `tag` is the word the panels show beside the
+  // layer; `line` hovers it and carries the multipliers from config.seams.
   // -------------------------------------------------------------------------
   seams: {
-    rich:     { tag: 'rich',     line: 'The seam is fat with it. Every cart comes up loaded.' },
-    dense:    { tag: 'dense',    line: 'Hard going, and worth it. What comes out is worth double.' },
-    brittle:  { tag: 'brittle',  line: 'It comes apart at a touch. The digging is fast and the pay is thin.' },
-    bonefield:{ tag: 'bonefield',line: 'They were tipped in here by the cartload. The ground is more bone than earth.' },
-    thin:     { tag: 'thin',     line: 'Rare enough that a handful moves the price and a cartload ruins it.' },
-    wide:     { tag: 'wide',     line: 'The whole county wants this. Sell as fast as they can dig it.' },
-    salted:   { tag: 'salted',   line: 'The price will not sit still. It swings on rumour.' },
-    still:    { tag: 'still',    line: 'A steady price, year in and out. Nobody gets excited about it.' },
-    hollow:   { tag: 'hollow',   line: 'Half of it is already open. The floor was never solid.' },
-    sealed:   { tag: 'sealed',   line: 'This floor was laid down to keep something on one side of it.' },
-    flooded:  { tag: 'flooded',  line: 'Black water to the knee. The dead do not mind and they find more down here.' },
-    burnt:    { tag: 'burnt',    line: 'The whole layer went up once. What survived is worth carrying.' },
+    rich:     { tag: 'rich',     line: 'Fat with it. Worth 2.2x.' },
+    dense:    { tag: 'dense',    line: 'Hard going. Worth 2.8x, and 1.8x the work to cut.' },
+    brittle:  { tag: 'brittle',  line: 'It falls apart. Digs twice as fast, worth 0.6x.' },
+    bonefield:{ tag: 'bonefield',line: 'Tipped in by the cartload. 3.2x the bones, worth 0.7x.' },
+    thin:     { tag: 'thin',     line: 'Rare. Worth 1.8x, and the market takes 0.4x before the price drops.' },
+    wide:     { tag: 'wide',     line: 'The whole county wants it. The market takes 2.8x.' },
+    salted:   { tag: 'salted',   line: 'The price runs on rumor. It swings 2.8x as far.' },
+    still:    { tag: 'still',    line: 'Nobody gets excited about it. Worth 1.2x, and the price barely moves.' },
+    hollow:   { tag: 'hollow',   line: 'Half of it is already open. 0.35x the floor to cut through.' },
+    sealed:   { tag: 'sealed',   line: 'Laid down to keep something under it. Worth 1.7x, behind 2.6x the floor.' },
+    flooded:  { tag: 'flooded',  line: 'Black water to the knee. 2.2x the bones, worth 1.4x, twice the work.' },
+    burnt:    { tag: 'burnt',    line: 'It all went up once. Worth 1.9x, and the market takes 0.7x.' },
   },
 
   // -------------------------------------------------------------------------
@@ -158,7 +159,7 @@ export const CONTENT = {
   //
   // A boon is one of: dig, bones, absorb, value, face, soft (raise cost),
   // windfall (seconds of the current income, paid at once), diggers (a share
-  // of the horde, raised free), rem (remembrance at the seal).
+  // of the horde, raised free), rem (relics paid when the barrow is filled in).
   // -------------------------------------------------------------------------
   chambers: {
     bands: [
@@ -167,33 +168,33 @@ export const CONTENT = {
         {
           title: 'The builder',
           lines: [
-            'The spades stop. There is a stone box in the middle of the mound, and a man laid out in it with his tools beside him.',
-            'He built this hill over somebody else. He has been lying on top of the work for a very long time.',
+            'The spades stop. There\'s a stone box in the middle of the mound with a man laid out in it, tools beside him.',
+            'He built this hill over somebody else, and he\'s been lying on top of the work a long time.',
           ],
           offers: [
-            { name: 'Take the tools', line: 'Bronze shoes for the spades. Everything cuts faster.', boon: { dig: 1.35 } },
-            { name: 'Raise the builder', line: 'He knows this ground better than you ever will.', boon: { face: 1.6 } },
+            { name: 'Take the tools', line: 'Bronze shoes for every spade.', boon: { dig: 1.35 } },
+            { name: 'Raise the builder', line: 'He knows this ground better than you do.', boon: { face: 1.6 } },
           ],
         },
         {
           title: 'The grain pit',
           lines: [
             'A pit lined with clay, packed to the top with grain that went black a thousand years ago.',
-            'They buried a winter here in case the world ended. The world did not.',
+            'They buried a winter here in case the world ended. It didn\'t.',
           ],
           offers: [
-            { name: 'Sell the lot', line: 'The pottery alone is worth a season of digging.', boon: { windfall: 900 } },
+            { name: 'Sell the lot', line: 'The pottery alone is worth a season.', boon: { windfall: 900 } },
             { name: 'Line the tunnels with it', line: 'Clay walls hold. The cut goes down without shoring.', boon: { face: 1.5 } },
           ],
         },
         {
           title: 'The boundary dead',
           lines: [
-            'A ring of them stood upright in the clay, facing out, spaced a pace apart.',
-            'They were put here to keep something in, or to keep the neighbours out. Nobody left a note.',
+            'A ring of them stood upright in the clay, facing out, a pace apart.',
+            'They were put here to keep something in, or to keep the neighbors out.',
           ],
           offers: [
-            { name: 'Break the ring', line: 'They fall in and join the work. All of them at once.', boon: { diggers: 0.6 } },
+            { name: 'Break the ring', line: 'They fall in and join the work, all at once.', boon: { diggers: 0.6 } },
             { name: 'Leave them standing', line: 'The ones inside dig harder with the ring watching.', boon: { bones: 1.4 } },
           ],
         },
@@ -203,34 +204,34 @@ export const CONTENT = {
         {
           title: 'The long house',
           lines: [
-            'The tunnel opens into a room longer than the field above it, roofed with beams that have not rotted.',
-            'The dead are laid head to foot down both walls, in their hundreds, and every one of them is holding a tool.',
+            'The tunnel opens into a room longer than the field above it, roofed with beams that never rotted.',
+            'The dead are laid head to foot down both walls in their hundreds, every one holding a tool.',
           ],
           offers: [
-            { name: 'Wake the room', line: 'Hundreds of them stand up at once and reach for the wall.', boon: { diggers: 1.1 } },
-            { name: 'Take the roof beams', line: 'Wood that will not rot, sold to men who do not ask.', boon: { windfall: 1800, value: 1.15 } },
+            { name: 'Wake the room', line: 'Hundreds of them stand up and reach for the wall.', boon: { diggers: 1.1 } },
+            { name: 'Take the roof beams', line: 'Wood that won\'t rot, sold to men who don\'t ask.', boon: { windfall: 1800, value: 1.15 } },
           ],
         },
         {
           title: 'The smith',
           lines: [
             'A floor of slag and charcoal, and a hearth still holding its shape.',
-            'Somebody worked metal down here when the hill above was still flat ground.',
+            'Somebody worked metal down here when the hill above was flat ground.',
           ],
           offers: [
-            { name: 'Relight the hearth', line: 'Everything the dead carry up is worth more clean than raw.', boon: { value: 1.4 } },
+            { name: 'Relight the hearth', line: 'Everything comes up clean instead of raw.', boon: { value: 1.4 } },
             { name: 'Take the anvil', line: 'The spades come off it sharper than they went on.', boon: { dig: 1.4 } },
           ],
         },
         {
           title: 'The drowned',
           lines: [
-            'Black water fills the cut to the waist and does not drain.',
-            'There are shapes standing in it, patient, up to their chins. They have been waiting to be asked.',
+            'Black water fills the cut to the waist and won\'t drain.',
+            'There are shapes standing in it up to their chins, waiting to be asked.',
           ],
           offers: [
-            { name: 'Ask them up', line: 'They come out of the water still dripping and go straight to work.', boon: { diggers: 0.8, bones: 1.25 } },
-            { name: 'Drain it into the lower cut', line: 'The water eats the floor for you. The way down opens.', boon: { face: 1.8 } },
+            { name: 'Ask them up', line: 'They come out dripping and go straight to work.', boon: { diggers: 0.8, bones: 1.25 } },
+            { name: 'Drain it into the lower cut', line: 'The water eats the floor for you.', boon: { face: 1.8 } },
           ],
         },
       ],
@@ -239,34 +240,34 @@ export const CONTENT = {
         {
           title: 'The first shaft',
           lines: [
-            'The cut runs into a shaft that is not yours. Square, plumb, tool marks still sharp on the walls.',
-            'Somebody sank this from above, a long way above, and stopped at exactly this depth.',
+            'The cut runs into a shaft that isn\'t yours. Square, plumb, tool marks still sharp on the walls.',
+            'Somebody sank this from a long way above and stopped at exactly this depth.',
           ],
           offers: [
             { name: 'Follow it down', line: 'Their shaft is better than yours. Use it.', boon: { face: 2.0 } },
-            { name: 'Follow it up', line: 'It surfaces two counties over, in a yard that pays well and stays quiet.', boon: { absorb: 1.6 } },
+            { name: 'Follow it up', line: 'It surfaces two counties over, in a quiet yard that pays.', boon: { absorb: 1.6 } },
           ],
         },
         {
           title: 'The tally wall',
           lines: [
-            'One wall of the chamber is covered end to end in marks. Hundreds of thousands of them, cut small and even.',
-            'They are counting something. The count is not finished and the marks go into the floor.',
+            'One wall is covered end to end in marks. Hundreds of thousands of them, cut small and even.',
+            'They\'re counting something. The count isn\'t finished and the marks go into the floor.',
           ],
           offers: [
-            { name: 'Read the wall', line: 'Whatever they were counting, it teaches you the price of everything.', boon: { value: 1.5, absorb: 1.3 } },
-            { name: 'Add your own mark', line: 'The hill notices. More of them come up out of the ground unasked.', boon: { bones: 1.7 } },
+            { name: 'Read the wall', line: 'Whatever they counted, it teaches you the price of everything.', boon: { value: 1.5, absorb: 1.3 } },
+            { name: 'Add your own mark', line: 'The hill notices. More of them come up unasked.', boon: { bones: 1.7 } },
           ],
         },
         {
-          title: 'The ossuary',
+          title: 'The bone room',
           lines: [
-            'The chamber is stacked floor to ceiling with bone, sorted by kind. Skulls in one bay, long bones in another.',
-            'Someone spent a lifetime tidying the dead into order down here.',
+            'Stacked floor to ceiling with bone, sorted by kind. Skulls in one bay, long bones in another.',
+            'Somebody spent a lifetime tidying the dead into order down here.',
           ],
           offers: [
             { name: 'Empty the bays', line: 'A lifetime of sorting, raised in an afternoon.', boon: { diggers: 1.5 } },
-            { name: 'Keep the order', line: 'Work the seams the way they sorted the bones and nothing is wasted.', boon: { bones: 1.9 } },
+            { name: 'Keep the order', line: 'Work the ground the way they sorted the bones and nothing is wasted.', boon: { bones: 1.9 } },
           ],
         },
       ],
@@ -275,55 +276,55 @@ export const CONTENT = {
         {
           title: 'The plug',
           lines: [
-            'The shaft ends in a single stone the width of the cut, dropped in from above and mortared at the edge.',
-            'It was set from the far side. Whoever placed it went down first and stayed there.',
+            'The shaft ends in one stone the width of the cut, dropped in from above and mortared at the edge.',
+            'It was set from the far side. Whoever placed it went down first and stayed.',
           ],
           offers: [
-            { name: 'Break it', line: 'It takes a week and it takes half the horde. The way is open.', boon: { face: 2.6 } },
-            { name: 'Work around it', line: 'The flanking cuts open four seams at once.', boon: { value: 1.6, absorb: 1.5 } },
+            { name: 'Break it', line: 'A week of work and half the horde. Then it\'s open.', boon: { face: 2.6 } },
+            { name: 'Work around it', line: 'The flanking cuts open four layers at once.', boon: { value: 1.6, absorb: 1.5 } },
           ],
         },
         {
           title: 'The register',
           lines: [
-            'A chamber of shelves, and on the shelves, tablets. Every one is a name and a depth.',
-            'The last entries are in a hand you recognise. It is yours, and you have not written them yet.',
+            'A room of shelves, and on the shelves, tablets. Every one is a name and a depth.',
+            'The last entries are in a hand you recognize. It\'s yours, and you haven\'t written them yet.',
           ],
           offers: [
-            { name: 'Read to the end', line: 'You learn what this is worth before you dig it.', boon: { value: 1.8 } },
-            { name: 'Close the book', line: 'You put it back on the shelf and the hill gets on with it, faster.', boon: { dig: 1.8 } },
+            { name: 'Read to the end', line: 'You learn what the ground is worth before you dig it.', boon: { value: 1.8 } },
+            { name: 'Close the book', line: 'You put it back and the hill gets on with it, faster.', boon: { dig: 1.8 } },
           ],
         },
         {
           title: 'The ones who dug down',
           lines: [
-            'A work gang, still in a line, still facing the floor, tools still in their hands.',
-            'They were digging in the same direction you are. They did not stop either.',
+            'A work gang, still in a line, still facing the floor, tools in their hands.',
+            'They were digging the same direction you are. They didn\'t stop either.',
           ],
           offers: [
-            { name: 'Put them back to work', line: 'They take up where they left off without being asked twice.', boon: { diggers: 2.0, dig: 1.2 } },
-            { name: 'Take what they carried', line: 'The packs are full of things from further down than you have been.', boon: { windfall: 5400, value: 1.3 } },
+            { name: 'Put them back to work', line: 'They take up where they left off.', boon: { diggers: 2.0, dig: 1.2 } },
+            { name: 'Take what they carried', line: 'The packs are full of things from further down than you\'ve been.', boon: { windfall: 5400, value: 1.3 } },
           ],
         },
       ],
       // band 4 - past any record. the ground stops being ground
       [
         {
-          title: 'The floor that is not stone',
+          title: 'The floor that isn\'t stone',
           lines: [
-            'The face rings wrong. What is under the last layer is warm, and it gives slightly, and it goes on in every direction.',
-            'The dead will not stand on it. They dig it holding the walls.',
+            'The floor rings wrong. What\'s under the last layer is warm, it gives a little, and it goes on in every direction.',
+            'The dead won\'t stand on it. They dig it holding the walls.',
           ],
           offers: [
-            { name: 'Cut into it', line: 'It closes behind them. It does not seem to mind.', boon: { face: 3.0, bones: 1.5 } },
-            { name: 'Go around', line: 'The long way round opens more ground than the short way ever did.', boon: { value: 2.0, absorb: 1.8 } },
+            { name: 'Cut into it', line: 'It closes behind them and doesn\'t seem to mind.', boon: { face: 3.0, bones: 1.5 } },
+            { name: 'Go around', line: 'The long way round opens more ground than the short way did.', boon: { value: 2.0, absorb: 1.8 } },
           ],
         },
         {
           title: 'The count',
           lines: [
-            'The walls of this one are marked too. Same hand as the tally wall, a mile up and a thousand years earlier.',
-            'The count is nearly finished here. It is counting the dead in your hill, and it is nearly caught up.',
+            'These walls are marked too. Same hand as the tally wall, a mile up and a thousand years earlier.',
+            'The count is nearly finished here. It\'s counting the dead in your hill, and it\'s nearly caught up.',
           ],
           offers: [
             { name: 'Finish the count', line: 'You write the last figure yourself. The books have never been cleaner.', boon: { value: 2.2, rem: 12 } },
@@ -333,8 +334,8 @@ export const CONTENT = {
         {
           title: 'The older barrow',
           lines: [
-            'Below the shaft, below the sealed floor, there is a hill. A mound, buried, with a ditch cut round it.',
-            'Somebody piled this up down here, in the dark, where nothing has ever needed a landmark.',
+            'Below the shaft, below the sealed floor, there\'s a hill. A mound, buried, with a ditch cut round it.',
+            'Somebody piled this up down here, in the dark, where nothing ever needed a landmark.',
           ],
           offers: [
             { name: 'Dig it out', line: 'A whole hill of them, and every one comes up standing.', boon: { diggers: 3.0 } },
@@ -356,50 +357,50 @@ export const CONTENT = {
     buyer: {
       name: 'A buyer',
       lines: [
-        'A man with a good coat and a bad horse wants {name}, and he is paying {mult}x what the yard pays.',
-        'A factor from the coast will take {name} off you at {mult}x the going rate. He does not say who for.',
+        'A man with a good coat and a bad horse wants {name}, and he\'s paying {mult}x what the yard pays.',
+        'A dealer from the coast will take {name} off you at {mult}x the going rate. He doesn\'t say who for.',
         'A woman with two carts and no name wants every ounce of {name} you have, at {mult}x.',
       ],
       take: 'Sell to them',
       pass: 'Send them off',
-      taken: 'The carts go out loaded: {n} {name} for {coin} coin, and no questions on either side.',
+      taken: 'The carts go out loaded: {n} {name} for {coin} coin, and no questions either way.',
       passed: 'They wait an hour at the gate and then they go.',
-      empty: 'They look at the empty yard, and at you, and they go.',
+      empty: 'They look at the empty yard, then at you, and they go.',
     },
     bonecart: {
-      name: 'The bone cart',
+      name: 'A bone cart',
       lines: [
-        'A cart comes up the track full of bone from a churchyard being cleared. The driver wants coin, not talk.',
+        'A cart comes up the track full of bone from a churchyard being cleared. The driver wants coin and no conversation.',
         'A man is selling the contents of a plague pit by weight. He seems glad to be rid of it.',
-        'Two brothers with a wagon have dug up somewhere they should not have. They want it gone tonight.',
+        'Two brothers with a wagon have dug up somewhere they shouldn\'t have. They want it gone tonight.',
       ],
-      offer: 'There are {n} bones on it.',
+      offer: '{N} bones on the cart.',
       take: 'Buy the load',
       pass: 'Turn it away',
-      taken: '{N} bones tipped in the yard. They are standing before the cart is out of the gate.',
+      taken: '{N} bones tipped in the yard. They\'re standing before the cart is out of the gate.',
       passed: 'The cart goes on down the road to whoever else is buying.',
     },
     gang: {
       name: 'A work gang',
       lines: [
-        'A gang of diggers walks up the track looking for work. They are not particular about what kind.',
+        'A gang of diggers walks up the track looking for work. They aren\'t particular about what kind.',
         'A dozen men out of the closed pits at the coast are at your gate, asking.',
-        'Someone has sent you labour. You did not ask for it and nobody says who did.',
+        'Somebody has sent you help. You didn\'t ask for it and nobody says who did.',
       ],
-      offer: 'There are {n} of them, and they want no wage.',
+      offer: '{N} of them, and they work for nothing.',
       take: 'Set them on',
       pass: 'No work here',
-      taken: 'They go down the shaft. They do not come back up, and {n} more of them are digging.',
+      taken: 'They go down the shaft and don\'t come back up. {N} more of them are digging.',
       passed: 'They walk back down the track in the rain.',
     },
     reeve: {
-      name: 'The reeve',
+      name: 'The county man',
       lines: [
-        'The reeve rides out about the noise. He is owed something, and he will say what once he has been paid.',
-        'The county wants a tithe on whatever is coming out of this field.',
+        'A man rides out from the county about the noise. He\'s owed something, and he\'ll say what once he\'s paid.',
+        'The county wants a cut of whatever is coming out of this field.',
         'A clerk with a warrant would like to see the books. He can be talked out of it.',
       ],
-      offer: 'Paid, he opens the roads: every market takes more for the rest of this barrow. Refused, one of them turns cold on you.',
+      offer: 'Pay and every market takes 18% more for the rest of this barrow. Refuse and one market turns cold on you.',
       take: 'Pay him',
       pass: 'Shut the gate',
       taken: 'He takes {coin} and rides off. The roads are open to your carts after that.',
@@ -408,11 +409,11 @@ export const CONTENT = {
     relic: {
       name: 'A peddler',
       lines: [
-        'A peddler has something wrapped in cloth that he will not unwrap until you name a price.',
-        'A thin man is selling a thing he says came out of a hill like this one, three counties over.',
-        'Someone is selling back to you something that came out of your own field last year.',
+        'A peddler has a charm wrapped in cloth. He won\'t unwrap it until you name a price.',
+        'A thin man is selling something he says came out of a hill like this one, three counties over.',
+        'Somebody is selling back to you a thing that came out of your own field last year.',
       ],
-      offer: 'Nobody says what it does until it is bought.',
+      offer: 'You don\'t find out what it does until you\'ve bought it.',
       take: 'Buy it',
       pass: 'Let him keep it',
       taken: 'It goes in the yard and the work changes. {Boon}',
@@ -421,27 +422,27 @@ export const CONTENT = {
     surveyor: {
       name: 'A surveyor',
       lines: [
-        'A surveyor has been walking the field with a rod, and he has worked out what is under it.',
-        'A woman with charts wants to tell you what the next layer down is. For a fee.',
+        'A surveyor has been walking the field with a rod, and he\'s worked out what\'s under it.',
+        'A woman with charts wants to tell you what the next layer down is, for a fee.',
         'A man who used to sink shafts for the crown offers to read the ground for you.',
       ],
-      offer: 'The next {n} layers get read before you break into them.',
-      reading: 'Below the face: {name}.',
+      offer: 'You see the next {n} layers before they break into them.',
+      reading: 'Under the way down: {name}.',
       take: 'Hear the reading',
-      pass: 'You will find out',
+      pass: 'You\'ll find out',
       taken: '{Reading}',
       passed: 'The charts are rolled up and taken back down the track.',
     },
     mourner: {
       name: 'A mourner',
       lines: [
-        'A woman comes up the track and stands at the edge of the cut for a long time without saying anything.',
-        'An old man asks whether you have turned up a name he gives you. You have not.',
+        'A woman comes up the track and stands at the edge of the cut a long time without saying anything.',
+        'An old man asks whether you\'ve turned up a name he gives you. You haven\'t.',
         'Someone leaves flowers on the spoil heap and is gone before anyone gets to the gate.',
       ],
       take: 'Let them look',
       pass: 'Send them home',
-      taken: 'They leave something on the heap on the way out. {Coin} coin, and the field is quiet after.',
+      taken: 'They leave {coin} coin on the heap on the way out, and the field goes quiet.',
       passed: 'They go without arguing, which is worse.',
     },
   },
@@ -454,86 +455,88 @@ export const CONTENT = {
   // is hovered. Nothing important may live only in the long one.
   // -------------------------------------------------------------------------
   rites: {
-    hands:     { name: 'Deeper hands',   line: 'They dig half again as fast.',
-                 long: 'Every level of this makes the dead dig half again as fast as they did.' },
-    grave:     { name: 'Mass grave',     line: 'Bones go half again as far.',
-                 long: 'Every bone raises half again as much of the dead as it did before.' },
-    ledger:    { name: 'The ledger',     line: 'The figures under every price.',
-                 long: 'The base price, what each market takes, how fast it recovers, how choked it is, and the right to buy at those prices as well as sell.' },
-    picks:     { name: 'Grave picks',    line: 'The face gives way faster.',
-                 long: 'The floor under the deepest cut gives way a quarter faster for every level of this.' },
-    broker:    { name: 'A factor',       line: 'Somebody sells for you.',
-                 long: 'A factor sells into the room each market has, for a cut. He never touches bones: the horde is your decision.' },
-    routes:    { name: 'Trade routes',   line: 'Sell more before prices fall.',
-                 long: 'Every market takes half again as much as it did before the price buckles.' },
-    haste:     { name: 'Quick markets',  line: 'Prices recover faster.',
-                 long: 'Every market recovers a quarter faster from whatever you sold into it.' },
-    foresight: { name: 'Foresight',      line: 'The chart is drawn ahead.',
-                 long: 'The swell in every price is drawn ahead of now as well as behind it.' },
-    assay:     { name: 'The assay',      line: 'Read the layer under the face.',
-                 long: 'You know what the ground under the face is, and what it is worth, before you break into it.' },
-    workings:  { name: 'Wider workings', line: 'One more layer stays open.',
-                 long: 'The dead keep one more layer open behind them instead of abandoning it.' },
-    crier:     { name: 'The crier',      line: 'Visitors come sooner.',
-                 long: 'Word gets around. People come up the track sooner, and they pay better when they get there.' },
-    vigil:     { name: 'The long vigil', line: 'They dig longer while away.',
-                 long: 'The dead work twelve hours while you are away, and four hours longer for every level of this.' },
+    hands:     { name: 'Sharper spades', line: 'They dig 50% faster.',
+                 long: 'Every level makes the dead dig 50% faster than they did.' },
+    grave:     { name: 'Mass grave',     line: 'A bone raises 50% more.',
+                 long: 'Every level makes each bone raise 50% more of the dead.' },
+    ledger:    { name: 'Price book',     line: 'The numbers under every price.',
+                 long: 'Shows each market\'s base price, how much it takes, how fast it comes back and how choked it is. It also lets you buy at those prices as well as sell.' },
+    picks:     { name: 'Grave picks',    line: 'The way down gives 25% faster.',
+                 long: 'The floor under the deepest cut gives way 25% faster for every level.' },
+    broker:    { name: 'Hire a seller',  line: 'He sells for you, for a cut.',
+                 long: 'He sells into the room each market has and takes a cut. He never touches bones, so the horde stays your call.' },
+    routes:    { name: 'Trade routes',   line: 'Markets take 50% more.',
+                 long: 'Every market takes 50% more before its price drops.' },
+    haste:     { name: 'Quick buyers',   line: 'Prices come back 25% faster.',
+                 long: 'Every market shrugs off what you sold into it 25% faster.' },
+    foresight: { name: 'Prices ahead',   line: 'See where a price is going.',
+                 long: 'The chart draws the swell in every price ahead of now as well as behind, so you can sell into the top of it.' },
+    assay:     { name: 'Read the floor', line: 'Know the next layer early.',
+                 long: 'You see what the layer under the way down is, and what it\'s worth, before they break into it.' },
+    workings:  { name: 'Keep a layer open', line: 'One more old layer keeps working.',
+                 long: 'The dead keep one more layer behind them working instead of walking away from it.' },
+    crier:     { name: 'Pay a crier',    line: 'Visitors come sooner, pay more.',
+                 long: 'Word gets around. People come up the track 15% sooner per level and pay 25% better when they get there.' },
+    vigil:     { name: 'Night shift',    line: 'They dig 4 hours longer alone.',
+                 long: 'The dead work 12 hours while you\'re away, and 4 hours longer for every level of this.' },
   },
 
   // -------------------------------------------------------------------------
-  // THE SEAL - ending a run and starting the next one
+  // FILLING IT IN - ending a run and starting the next one. The code calls
+  // this the seal; the player fills the hole in and walks away with relics.
   // -------------------------------------------------------------------------
   seal: {
-    title: 'The seal',
-    button: 'Seal the barrow',
-    confirm: 'Seal it. You keep only what you remember',
-    locked: 'Reach {depth} layers down and this barrow can be sealed for remembrance.',
-    ready: 'You know how to close a hole like this. Sealing ends the barrow: the dead, the coin, the goods, the layers and the rites all go back to the dark. What it pays is remembrance, and remembrance buys oaths that hold in every barrow you open after it.',
-    yieldNow: 'Sealing now pays {n} remembrance.',
-    yieldPaid: 'The barrow paid {n} remembrance.',
+    title: 'Fill it in',
+    button: 'Fill in the barrow',
+    confirm: 'Fill it in. You keep the relics and nothing else',
+    locked: 'Get {depth} layers down and you can fill this barrow in for relics.',
+    ready: 'Filling it in ends this barrow. The dead, the coin, the goods, the layers and everything coin bought all go back in the hole. You walk away with relics, and relics buy things you keep in every barrow after this one.',
+    yieldNow: 'Filling it in now pays {n} relics.',
+    yieldPaid: 'The barrow paid {n} relics.',
     doneLines: [
       'You fill it in from the bottom up. It takes a season and it takes all of them.',
-      'The field is a field again by spring. You can still find the ditch if you know.',
+      'The field is a field again by spring. You can still find the ditch if you know where.',
       'The last cart goes out, the shaft goes in, and the grass comes back over it.',
     ],
     openLines: [
-      'There is another hill three valleys over. The ground there is soft too.',
+      'There\'s another hill three valleys over. The ground there is soft too.',
       'The next field is cheaper than the last one. You know why now.',
-      'You start again on ground you have never seen, knowing exactly what is under it.',
+      'You start again on ground you\'ve never seen, knowing exactly what\'s under it.',
     ],
-    statLine: 'Barrow {n} sealed. {depth} layers, {coin} coin, {horde} of them.',
+    statLine: 'Barrow {n} filled in. {depth} layers, {coin} coin, {horde} of them.',
     finaleLines: [
-      'The shaft runs out. Not into rock, into nothing: an edge, and past it the same dark going down.',
-      'The dead stop at the lip and will not go on. Every one of them turns and looks back up the shaft at you.',
-      'You have been digging somebody out. The books say so, and the books have never been wrong.',
-      'You keep the books. You close them. Then you go and find another hill.',
+      'The shaft runs out at an edge, and past it the same dark going down.',
+      'The dead stop at the lip and won\'t go on. Every one of them turns and looks back up the shaft at you.',
+      'You\'ve been digging somebody out. The books say so, and the books have never been wrong.',
+      'You close the books and go find another hill.',
     ],
   },
 
   // -------------------------------------------------------------------------
-  // OATHS - what carries from one barrow to the next. Numbers in config.
+  // OATHS - what relics buy, and what carries from one barrow to the next.
+  // The numbers live in config.oaths.
   // -------------------------------------------------------------------------
   oaths: {
-    dead:    { name: 'The dead remember',    line: 'Open every barrow with a horde.',
-               long: 'Every barrow after this one opens with a horde already on its feet.' },
-    ground:  { name: 'The ground remembers', line: 'Open every barrow with layers cut.',
-               long: 'Every barrow after this one opens with its first layers already cut through.' },
-    books:   { name: 'The books remember',   line: 'Open every barrow holding a rite.',
-               long: 'Every barrow after this one opens with the rites you always buy first already held.' },
-    hands:   { name: 'Old hands',            line: 'They dig faster, forever.',
-               long: 'The dead dig faster in every barrow you will ever open.' },
-    marrow:  { name: 'Deep marrow',          line: 'Bone goes further, forever.',
-               long: 'A bone raises more of the dead in every barrow you will ever open.' },
-    roads:   { name: 'The old roads',        line: 'Markets take more, forever.',
-               long: 'Every market in every barrow takes more before its price buckles.' },
-    purse:   { name: 'A full purse',         line: 'Open every barrow with coin in hand.',
-               long: 'Every barrow after this one opens with coin already counted out.' },
-    night:   { name: 'The long night',       line: 'They dig far longer while away.',
-               long: 'The dead work eight hours longer while you are away, in every barrow you will ever open.' },
-    calling: { name: 'The calling',          line: 'Visitors come sooner and pay more.',
-               long: 'People come up the track sooner and pay better, in every barrow.' },
-    depth:   { name: 'The deep habit',       line: 'The face gives way faster.',
-               long: 'The floor under the deepest cut gives way faster in every barrow.' },
+    dead:    { name: 'Start with a horde',   line: 'Every barrow opens with 8 of them.',
+               long: 'Every barrow after this one opens with a horde already on its feet, 4x bigger for every level.' },
+    ground:  { name: 'Start layers down',    line: 'Every barrow opens 1 layer already cut.',
+               long: 'Every barrow after this one opens with one more layer already cut through for every level.' },
+    books:   { name: 'Start with the books', line: 'Keep the price book, then more.',
+               long: 'Every barrow after this one opens holding what coin bought first: the price book, then prices ahead, then the seller.' },
+    hands:   { name: 'Faster hands',         line: 'They dig 35% faster in every barrow.',
+               long: 'The dead dig 35% faster per level, in every barrow you\'ll ever open.' },
+    marrow:  { name: 'Bones go further',     line: 'A bone raises 40% more, every barrow.',
+               long: 'A bone raises 40% more of the dead per level, in every barrow you\'ll ever open.' },
+    roads:   { name: 'Markets take more',    line: 'Every market takes 35% more, forever.',
+               long: 'Every market in every barrow takes 35% more per level before its price drops.' },
+    purse:   { name: 'Start with coin',      line: 'Every barrow opens with 500 coin.',
+               long: 'Every barrow after this one opens with coin already counted out, 8x more for every level.' },
+    night:   { name: 'They dig longer alone',line: 'They work 8 hours longer while away.',
+               long: 'The dead work 8 hours longer per level while you\'re away, in every barrow.' },
+    calling: { name: 'Visitors come sooner', line: 'Gaps 18% shorter, they pay 25% more.',
+               long: 'People come up the track 18% sooner and pay 25% better per level, in every barrow.' },
+    depth:   { name: 'Dig down faster',      line: 'The way down gives 35% faster.',
+               long: 'The floor under the deepest cut gives way 35% faster per level, in every barrow.' },
   },
 };
 

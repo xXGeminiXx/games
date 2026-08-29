@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=11';
-import * as Mk from './market.js?v=11';
-import * as Lore from './lore.js?v=11';
-import { fill } from '../config.js?v=11';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=11';
+import { hash, unit, range, pick } from './rng.js?v=12';
+import * as Mk from './market.js?v=12';
+import * as Lore from './lore.js?v=12';
+import { fill } from '../config.js?v=12';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=12';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -331,7 +331,7 @@ export function describeBoon(boon) {
     dig: 'they dig faster',
     bones: 'the ground gives up more of them',
     value: 'everything is worth more',
-    face: 'the face gives way faster',
+    face: 'they dig down faster',
     absorb: 'every market takes more',
     soft: 'bones go further',
   };

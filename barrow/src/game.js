@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=11';
-import { createSim, restoreSim, openedState } from './sim.js?v=11';
-import * as Save from './save.js?v=11';
-import * as Rb from './rebirth.js?v=11';
-import * as Lore from './lore.js?v=11';
-import { hash } from './rng.js?v=11';
-import { createUI } from './ui.js?v=11';
-import { createView } from './view.js?v=11';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=11';
-import * as Mat from './materials.js?v=11';
+import { storageKey, fill } from '../config.js?v=12';
+import { createSim, restoreSim, openedState } from './sim.js?v=12';
+import * as Save from './save.js?v=12';
+import * as Rb from './rebirth.js?v=12';
+import * as Lore from './lore.js?v=12';
+import { hash } from './rng.js?v=12';
+import { createUI } from './ui.js?v=12';
+import { createView } from './view.js?v=12';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=12';
+import * as Mat from './materials.js?v=12';
 
 /**
  * @param {object} o
@@ -153,7 +153,7 @@ export function createGame(o) {
   const save = () => {
     if (!storage || disposed) return false;
     const ok = Save.write(storage, KEY, sim.snapshot(), now());
-    if (!ok) ui.savedNote('Could not save');
+    if (!ok) ui.savedNote('Couldn\'t save');
     return ok;
   };
 

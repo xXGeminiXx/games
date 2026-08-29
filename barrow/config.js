@@ -51,30 +51,30 @@ export const CONFIG = {
       horde:  'Horde',
       depth:  'Depth',
       income: 'Coin/s',
-      rem:    'Remembrance',
+      rem:    'Relics',
     },
 
     dig:        'Dig',
     sell:       'Sell',
     sellLot:    'Lot',
-    sellLotTip: 'Sell about what the market will take before it buckles',
+    sellLotTip: 'Sells half of what this market takes, so the price holds',
     sellAll:    'All',
     buy:        'Buy',
-    buyTip:     'Buy back a tenth of what the market holds, at the going price',
+    buyTip:     'Buys back a tenth of what the market holds, at today\'s price',
     raise:      'Raise',
     raiseMax:   'Max',
-    raiseTip:   'Raising costs bones. Each button shows its cost; Max shows how many would stand up',
+    raiseTip:   'Bones raise the dead. Each button shows what it costs; Max is all you can afford',
     weightMore: '+',
     weightLess: '-',
     weightMoreTip: 'Put more of the horde on this layer',
     weightLessTip: 'Take some of the horde off this layer',
-    weightBarTip:  'How hard this layer is worked, and the share of the horde it takes',
-    face:       'The face',
-    faceLine:   'The floor of the deepest cut. Dig it through and the next layer opens.',
+    weightBarTip:  'How hard this layer is worked, and how much of the horde is on it',
+    face:       'The way down',
+    faceLine:   'Put the horde here and they break into the next layer down.',
     export:     'Export',
     import:     'Import',
     reset:      'Start over',
-    resetSure:  'Sure? Even what you remember',
+    resetSure:  'Sure? You lose the relics too',
     bought:     'Held',
     take:       'Take it',
     pass:       'Pass',
@@ -83,16 +83,16 @@ export const CONFIG = {
     panels: {
       horde:   'The horde',
       market:  'The market',
-      rites:   'Rites',
+      rites:   'What coin buys',
       riteBulk: 'Levels at a time',
       visitor: 'At the gate',
-      chamber: 'A chamber',
-      seal:    'The seal',
-      oaths:   'What you remember',
+      chamber: 'A room',
+      seal:    'Fill it in',
+      oaths:   'Kept forever',
     },
 
-    // "Held" is what a rite that has been bought reads, so the units of a good
-    // on hand are stock. One word, one meaning.
+    // "Held" is what a bought row reads, so the units of a good on hand are
+    // stock. One word, one meaning.
     columns: {
       good:   'Good',
       held:   'Stock',
@@ -107,12 +107,12 @@ export const CONFIG = {
       dig:      'Dig speed',
       bones:    'Bones found',
       value:    'Prices',
-      face:     'Face speed',
+      face:     'Digs down',
       absorb:   'Markets take',
       soft:     'Bones raise more',
       windfall: '{Coin} coin now',
       diggers:  '{N} of the dead now',
-      rem:      '{N} remembrance at the seal',
+      rem:      '{N} relics when you fill it in',
     },
 
     ledgerBase:  'Base {base}',
@@ -120,7 +120,7 @@ export const CONFIG = {
     // the flow it pays best for. It sits under the demand column, where a
     // figure about the market's appetite belongs.
     ledgerTakes: '{absorb} / {t}',
-    ledgerTakesTip: 'What this market takes before the price buckles, and how long it needs to recover',
+    ledgerTakesTip: 'How much this market takes before the price drops, and how long it needs to come back',
     // Appended after a figure and a dash, so these three stay lower case:
     // "38% - oversold 1.7x" reads right and "38% - Oversold" does not.
     ceilingLine: 'oversold {x}x',
@@ -129,9 +129,9 @@ export const CONFIG = {
     // oversold there teaches them to ignore the word. It is said once the
     // overshoot is large enough to be costing them something.
     ceilingAt: 1.15,
-    ceilingTip:  'More of this is being dug than the market will buy. The same horde on another layer earns more',
+    ceilingTip:  'More of this is coming up than the market will buy. The same horde on another layer earns more',
     lesserGoods: '{n} older goods',
-    lesserTip:   'Everything still held from layers the dead have moved on from',
+    lesserTip:   'Everything still held from layers the dead have left behind',
     lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
     seamAhead:   'next is {seam}',
@@ -165,14 +165,14 @@ export const CONFIG = {
     boneCostSoft: 25,    // cost climbs as 1 + n / soft: doubles at this many
     bulk: [1, 10, 100],  // the raise buttons, plus max
     hideHandAt: 10,      // the dig button goes when the horde reaches this
-    faceShownAt: 3,      // the face row appears at this many
+    faceShownAt: 3,      // the way-down row appears at this many
     maxWeight: 5,        // weight notches per row
     activeStrata: 5,     // layers kept open behind the face; the wider workings
                          // rite adds to this
     weightNew: 5,        // weight a newly opened layer starts on: the newest
                          // layer is always the richest, so a player who never
                          // touches the panel still leans the right way
-    weightFace: 2,       // weight the face starts on
+    weightFace: 2,       // weight the way down starts on
   },
 
   // -------------------------------------------------------------------------
@@ -429,16 +429,16 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
-  // THE SEAL - closing a barrow, and what carries to the next one
+  // FILLING IT IN - closing a barrow, and what carries to the next one
   //
-  // Sealing ends a run. What it pays is remembrance, and remembrance buys
-  // oaths, which hold across every barrow after it. The formula is meant to
-  // be readable on the panel: so much per layer past the first ones, so much
-  // per order of magnitude of coin ever earned.
+  // Filling a barrow in ends a run and pays relics. Relics buy the permanent
+  // upgrades below, which hold across every barrow after it. The formula is
+  // meant to be readable on the panel: so much per layer past the first ones,
+  // so much per order of magnitude of coin ever earned.
   // -------------------------------------------------------------------------
   seal: {
-    unlockDepth: 14,     // the shaft must reach this before sealing is offered
-    fromDepth: 9,        // layers past this one pay remembrance
+    unlockDepth: 14,     // the shaft must reach this before filling in is offered
+    fromDepth: 9,        // layers past this one pay relics
     perStratum: 3,
     earnFloor: 1e7,      // coin earned past this pays by the decade
     perDecade: 2,
@@ -447,7 +447,7 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
-  // OATHS - permanent, bought with remembrance, kept forever
+  // OATHS - permanent, bought with relics, kept forever
   // -------------------------------------------------------------------------
   oaths: {
     list: [
@@ -513,7 +513,7 @@ export const CONFIG = {
     tunnelSegments: 260,   // carve segments per stratum, revealed as it is dug
     carveScale: 60,        // units dug for the first ~63% of a stratum's carve
     shaftWidth: 3,
-    glintCount: 14,        // mineral glints per band, in the good's colour
+    glintCount: 14,        // mineral glints per band, in the good's color
   },
 
   // -------------------------------------------------------------------------
@@ -665,7 +665,7 @@ export function fill(line, values) {
 // ---------------------------------------------------------------------------
 // APPLYING IDENTITY TO THE PAGE
 //
-// The document carries the game's name and colours in a few places. This puts
+// The document carries the game's name and colors in a few places. This puts
 // them all there from the one source, so the markup never repeats a value that
 // lives above. Every surface touched is optional: the headless test harness
 // supplies just enough of a document to run the game and no more.
@@ -722,7 +722,7 @@ export function applyIdentity(doc) {
   put('fieldhint',  t.fieldHint);
 
   // The tab icon is drawn from the palette rather than shipped as a file, so a
-  // recolour needs no asset and the game still has no binary dependencies.
+  // recolor needs no asset and the game still has no binary dependencies.
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     '<rect width="32" height="32" fill="' + p.void + '"/>' +

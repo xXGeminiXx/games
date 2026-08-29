@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Barrow</title>
 <style>
-  /* Colours arrive from config.js as custom properties; the values here are
+  /* Colors arrive from config.js as custom properties; the values here are
      only what the page shows before that file has run. */
   :root{
     --void:#07080b; --panel:#0d0f14; --rule:#1b1f28; --ink:#d7dbe3; --dim:#6c7482;
@@ -334,7 +334,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="8e455e17527b">
+<meta name="build" content="1e4d74185491">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -388,14 +388,14 @@
     <div class="stat" id="st-bones" hidden><b id="bones">0</b><span id="lbl-bones">bones</span></div>
     <div class="stat" id="st-horde" hidden><b id="horde">0</b><span id="lbl-horde">horde</span></div>
     <div class="stat" id="st-depth" hidden><b id="depth">0</b><span id="lbl-depth">depth</span></div>
-    <div class="stat" id="st-rem" hidden><b id="rem">0</b><span id="lbl-rem">remembered</span></div>
+    <div class="stat" id="st-rem" hidden><b id="rem">0</b><span id="lbl-rem">relics</span></div>
   </div>
 </header>
 <main>
   <section id="books">
     <div id="log"></div>
     <div id="chamber-panel" class="panel" hidden>
-      <h2 id="chamber-title">A chamber</h2>
+      <h2 id="chamber-title">A room</h2>
       <div id="chamber-text"></div>
       <div id="chamber-offers"></div>
     </div>
@@ -408,16 +408,16 @@
     <div id="horde-panel" class="panel" hidden><h2 id="p-horde">The horde</h2><div id="raise"></div><div id="weights"></div></div>
     <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
-      <h2 id="p-seal">The seal</h2>
+      <h2 id="p-seal">Fill it in</h2>
       <p id="seal-note"></p>
       <div id="seal-acts"></div>
-      <h2 id="p-oaths">What you remember</h2>
+      <h2 id="p-oaths">Kept forever</h2>
       <div id="oaths"></div>
     </div>
   </section>
   <section id="field">
     <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
-    <div id="rites-panel" hidden><h2 id="p-rites">Rites</h2><div id="rite-bulk"></div><div id="rites"></div></div>
+    <div id="rites-panel" hidden><h2 id="p-rites">What coin buys</h2><div id="rite-bulk"></div><div id="rites"></div></div>
   </section>
 </main>
 <footer>
@@ -435,8 +435,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=11';
-import { createGame } from './src/game.js?v=11';
+import { CONFIG, applyIdentity } from './config.js?v=12';
+import { createGame } from './src/game.js?v=12';
 
 applyIdentity(document);
 
