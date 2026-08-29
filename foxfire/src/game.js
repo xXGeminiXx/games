@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=4';
-import { createSim, restoreSim, openedState } from './sim.js?v=4';
-import * as Save from './save.js?v=4';
-import * as Sp from './spores.js?v=4';
-import * as Lore from './lore.js?v=4';
-import { hash } from './rng.js?v=4';
-import { createUI } from './ui.js?v=4';
-import { createView } from './view.js?v=4';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=4';
+import { storageKey } from '../config.js?v=5';
+import { createSim, restoreSim, openedState } from './sim.js?v=5';
+import * as Save from './save.js?v=5';
+import * as Sp from './spores.js?v=5';
+import * as Lore from './lore.js?v=5';
+import { hash } from './rng.js?v=5';
+import { createUI } from './ui.js?v=5';
+import { createView } from './view.js?v=5';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=5';
 
 /**
  * @param {object} o
@@ -65,6 +65,8 @@ export function createGame(o) {
   actions.setHarvest = wrap((key, p) => sim.setHarvest(key, p), true);
   actions.toggleNurture = wrap((key) => sim.toggleNurture(key), true);
   actions.buyTrait = wrap((id) => sim.buyTrait(id), true);
+  actions.setInstinct = wrap((key, on) => sim.setInstinct(key, on), true);
+  actions.setReserve = wrap((share) => sim.setReserve(share), true);
   actions.extend = wrap(() => sim.extend(), true);
   actions.beyond = wrap(() => sim.beyond(), true);
   actions.buyPerk = wrap((id) => { Sp.buyPerk(cfg, sim.genome, id); return []; }, true);

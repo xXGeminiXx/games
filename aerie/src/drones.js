@@ -1,7 +1,8 @@
 // The fleet as textures. Each drone is one texel in two textures stepped by
 // one shader; the CPU only uploads a kind table when the fleet's makeup
 // changes and a count when it grows. Drawing is one instanced call.
-import { fullscreen, program, instancedMesh, pingpongMRT, texture } from './gl.js?v=1';
+import { fullscreen, program, instancedMesh, pingpongMRT, texture, buffer } from './gl.js?v=2';
+import { dart } from './dart.js?v=2';
 
 export function createDrones(gl, cfg, S) {
   const W = Math.round(Math.sqrt(cfg.drones.visibleCap));
@@ -14,23 +15,20 @@ export function createDrones(gl, cfg, S) {
   const harvestVao = gl.createVertexArray();
   const drawProg = program(gl, S.DRONE_VS, S.DRONE_FS);
 
-  // a dart: five vertices, six faces
-  const dart = (() => {
-    const P = [0, 0, 1.3, 0.7, 0, -0.5, 0, 0.22, -0.5, -0.7, 0, -0.5, 0, -0.22, -0.5];
-    const tri = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 1, 4, 3, 1, 3, 2];
-    const positions = [], normals = [];
-    for (let i = 0; i < tri.length; i += 3) {
-      const a = P.slice(tri[i] * 3, tri[i] * 3 + 3), b = P.slice(tri[i + 1] * 3, tri[i + 1] * 3 + 3), c = P.slice(tri[i + 2] * 3, tri[i + 2] * 3 + 3);
-      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-      const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-      const l = Math.hypot(...n) || 1;
-      for (const p of [a, b, c]) { positions.push(...p); normals.push(n[0] / l, n[1] / l, n[2] / l); }
-    }
-    const idx = new Uint16Array(positions.length / 3);
-    for (let i = 0; i < idx.length; i++) idx[i] = i;
-    return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: idx };
+  // The body every drone is drawn with. instancedMesh takes positions and
+  // normals; the shade that separates the canopy and the rotors from the
+  // orange body rides along as one more per-vertex attribute.
+  const body = dart();
+  const mesh = instancedMesh(gl, drawProg, body, {}, N);
+  (() => {
+    const loc = drawProg.attribs.a_shade;
+    if (loc === undefined || loc < 0) return;
+    gl.bindVertexArray(mesh.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer(gl, body.shades));
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 1, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
   })();
-  const mesh = instancedMesh(gl, drawProg, dart, {}, N);
 
   let active = 0;
 
@@ -93,5 +91,5 @@ export function createDrones(gl, cfg, S) {
     mesh.draw(active);
   };
 
-  return { W, N, reset, setFleet, step, draw, get active() { return active; } };
+  return { W, N, body, reset, setFleet, step, draw, get active() { return active; } };
 }

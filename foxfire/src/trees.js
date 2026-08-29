@@ -9,13 +9,19 @@
 // less. The marginal price is what the market table shows, because that is
 // the number a player needs to decide where the next mineral should go.
 //
+// Every kind also has a season it pays best in and one it pays least in, on
+// top of the year's own curve, so which kind deserves the minerals changes
+// through the year rather than being settled once.
+//
 // Felling is parasitism: a tree drained loses health and pays while it goes,
 // and when it dies its size becomes dead wood. Feeding is transfer: sugar
-// sent to a kind makes its trees grow faster. Both are traits.
+// sent to a kind makes its trees grow faster. Both are traits. What each is
+// worth is worked out here and shown on the ledger, so the figures a player
+// reads are the ones the simulation pays.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=4';
-import { unit } from './rng.js?v=4';
+import { scale } from './levels.js?v=5';
+import { unit } from './rng.js?v=5';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {
@@ -38,9 +44,38 @@ export function rosterFor(cfg, level) {
       max: base.max,
       wood: base.wood * k,
       weight: base.weight,
+      season: base.season && base.season.length === 4 ? base.season.slice() : [1, 1, 1, 1],
     });
   }
   return out;
+}
+
+/** What this kind pays in a season, relative to what it pays in an average one. */
+export function seasonMult(species, index) {
+  const s = species && species.season;
+  if (!s || !(s.length === 4)) return 1;
+  const v = s[Math.max(0, Math.min(3, index | 0))];
+  return v > 0 ? v : 0;
+}
+
+/** The season a kind pays best in, and the one it pays least in. */
+export function bestSeason(species) {
+  return pickSeason(species, 1);
+}
+
+export function worstSeason(species) {
+  return pickSeason(species, -1);
+}
+
+function pickSeason(species, sign) {
+  const s = (species && species.season) || [];
+  let at = 0;
+  for (let i = 1; i < 4; i++) {
+    const a = s[i] === undefined ? 1 : s[i];
+    const b = s[at] === undefined ? 1 : s[at];
+    if (sign * (a - b) > 0) at = i;
+  }
+  return at;
 }
 
 /** What a pool pays for m minerals a second, and the price of the next one. */
@@ -101,4 +136,77 @@ export function grow(tree, species, dt, mult) {
 
 export function isMature(tree, species, cfg) {
   return tree.s >= cfg.trees.mature * species.max;
+}
+
+// -- what the two standing decisions are worth -------------------------------
+//
+// Felling is judged whole trees at a time, so it is measured against what a
+// tree of that size is actually being paid now: the pool's pay shared out by
+// size. Feeding adds a little size to a pool that already has its minerals,
+// so it is measured against what one more unit of size would fetch, which is
+// less - below saturation the minerals simply move to the trees already
+// standing there. Both figures go on the ledger.
+
+/** Sugar a tree of this size is paid a second, out of what its pool is paid. */
+export function keptRate(got, S, size) {
+  return S > 0 && size > 0 ? got * size / S : 0;
+}
+
+/** Sugar one more unit of a pool's size would be paid a second. */
+export function sizeValue(species, S, m, mult) {
+  if (!(S > 0) || !(species.rate > 0)) return 0;
+  const u = m / (species.need * S);
+  const e = Math.exp(-u);
+  return species.rate * ((1 - e) - u * e) * mult;
+}
+
+/** Sugar a tree of this size is worth felled: the drain, and then the wood. */
+export function fellValue(cfg, species, size, mods) {
+  if (!(size > 0)) return 0;
+  const yieldMod = (mods && mods.yield) || 1;
+  const woodMod = (mods && mods.felledWood) || 1;
+  const drain = species.rate * size * cfg.trees.fell.yield * yieldMod * cfg.trees.fell.seconds;
+  return drain + size * species.wood * woodMod;
+}
+
+/**
+ * How long feeding a pool takes to pay for itself, in seconds, or Infinity.
+ *
+ * Fed, a pool closes on its full size at (1 + boost) times the rate; the sugar
+ * that buys is the difference between the two curves, and the cost is charged
+ * on the size it has while it is growing. Both are integrated, and the answer
+ * is where they cross. Past the horizon it is called no payback at all.
+ */
+export function feedPayback(cfg, species, pool, value, growthMult, k) {
+  const count = pool.count || 0;
+  const size = pool.size || 0;
+  const full = count * species.max;
+  const room = full - size;
+  const a = species.growth * growthMult;
+  const b = a * (1 + cfg.trees.nurture.boost);
+  if (!(room > 0) || !(a > 0) || !(b > a) || !(value > 0)) return Infinity;
+  const cost = cfg.trees.nurture.sugarPerSize * k;
+  const net = (t) => {
+    const ea = Math.exp(-a * t), eb = Math.exp(-b * t);
+    const gained = value * room * ((1 - ea) / a - (1 - eb) / b);
+    const paid = cost * (full * t - room * (1 - eb) / b);
+    return gained - paid;
+  };
+  const horizon = Math.max(1, cfg.trees.nurture.paybackHorizon);
+  // The net rises out of the red and then falls again, since the growth it
+  // buys is bounded and the cost is not, so the crossing is found by walking
+  // out and then closing on it.
+  let lo = 0, hi = 0;
+  const steps = 48;
+  for (let i = 1; i <= steps; i++) {
+    const t = horizon * Math.pow(i / steps, 2);
+    if (net(t) > 0) { hi = t; break; }
+    lo = t;
+  }
+  if (!(hi > 0)) return Infinity;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (net(mid) > 0) hi = mid; else lo = mid;
+  }
+  return hi;
 }

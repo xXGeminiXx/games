@@ -8,19 +8,31 @@
 // everything past it lies under mist. In winter the floor goes to dusk, frost
 // lies on the litter, snow gathers along the logs, and the lace glows.
 //
+// What the world does to the organism is on the floor as well. A wedge that
+// has burned lies under ash and char, its logs husks and its trees black
+// snags with charred heartwood at the foot, all of it fading back toward
+// ordinary ground as the mark ages. Another fungus holds ground of its own in
+// a dark matted lace that is nothing like ours. A drought takes the litter
+// pale and grey, browns the moss off and lightens the damp patches. A log the
+// wind has just brought down shows fresh pale wood until the threads find it.
+//
 // The floor texture is the expensive part of that and it does not change from
 // frame to frame, so it is drawn once into an offscreen canvas - per season,
-// camera scale, canvas size and level - and blitted. A frame after that costs
-// the threads, the nodes and the tips and nothing else.
+// camera scale, canvas size, level, burn and drought - and blitted. A frame
+// after that costs the threads, the nodes and the tips and nothing else. A
+// burn's fade is quantised into a few steps for that key, so ageing ground
+// costs a handful of redraws over the life of the mark rather than one a
+// frame.
 //
 // Nothing here writes to the simulation. Nothing is kept between frames but
 // the eased camera, the floor texture and a short record of when threads
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=4';
-import { noise } from './world.js?v=4';
-import { hash, unit } from './rng.js?v=4';
+import { seasonOf } from './season.js?v=5';
+import { noise } from './world.js?v=5';
+import { hash, unit } from './rng.js?v=5';
+import { angleGap, burntSet } from './events.js?v=5';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -134,6 +146,78 @@ export function createView(canvas, cfg, doc) {
   const paint = gradPool(ctx);
   let texPaint = null;
 
+  /** A colour named under `view`, resolved out of the palette. */
+  const col = (token, fallback) => {
+    const c = P[token];
+    return typeof c === 'string' ? c : (typeof P[fallback] === 'string' ? P[fallback] : '#000000');
+  };
+  const num = (v, fallback) => (ok(v) ? v : fallback);
+
+  // -- what the world has done to the ground --------------------------------
+
+  /**
+   * The burnt wedge in the numbers the picture needs: where it lies, and how
+   * much of the mark is left. The fade is quantised into a few steps so an
+   * ageing burn redraws the floor a handful of times over its life instead of
+   * once a frame.
+   */
+  const burnOf = (state) => {
+    const e = state.events;
+    const b = e && e.burn;
+    if (!b || !Array.isArray(b.nodes) || !b.nodes.length) return null;
+    const fire = (cfg.events && cfg.events.fire) || {};
+    const life = Math.max(1, num(fire.markSeconds, 1));
+    const steps = Math.max(1, Math.round(num(V.burn.fadeSteps, 5)));
+    const left = clamp01((num(b.until, 0) - state.t) / life);
+    const fade = Math.ceil(left * steps) / steps;
+    if (!(fade > 0)) return null;
+    return {
+      angle: num(b.angle, 0),
+      half: Math.max(0, num(b.half, 0)),
+      from: Math.max(0, num(b.from, 0)),
+      to: Math.max(0, state.ring * cfg.world.ringWidth),
+      fade,
+      nodes: burntSet(state),
+    };
+  };
+
+  /**
+   * How scorched a point of ground is, in cells from the origin: 0 outside the
+   * wedge, up to 1 well inside a fresh one. The edges are soft, so the burn
+   * meets the ordinary floor the way a fire's edge does rather than at a line.
+   */
+  const burnAt = (burn, x, y) => {
+    if (!burn) return 0;
+    const gap = angleGap(Math.atan2(y, x), burn.angle);
+    const wide = Math.max(1e-6, num(V.burn.softenAngle, 0.2));
+    const side = clamp01((burn.half - gap) / wide);
+    if (side <= 0) return 0;
+    const soft = Math.max(1e-6, num(V.burn.soften, 1));
+    const r = Math.hypot(x, y);
+    const near = clamp01((r - burn.from) / soft);
+    const far = clamp01((burn.to - r) / soft);
+    return side * Math.min(near, far) * burn.fade;
+  };
+
+  /**
+   * The floor with the rain held off: a share of the litter goes to the dry
+   * colour, the moss browns off and thins, and the damp patches lighten.
+   * Everything else about the season is left alone.
+   */
+  const dryLook = (look) => {
+    const Dr = V.drought;
+    const mix = clamp01(num(Dr.mix, 0.5));
+    const litter = look.litter.slice();
+    const add = Math.round((litter.length * mix) / Math.max(0.05, 1 - mix));
+    for (let k = 0; k < add; k++) litter.push(col(Dr.litter, 'dead'));
+    return Object.assign({}, look, {
+      litter,
+      moss: col(Dr.moss, 'litter'),
+      mossAlpha: look.mossAlpha * (1 - mix),
+      dampAlpha: look.dampAlpha * (1 - mix),
+    });
+  };
+
   // -- the frame the picture is fitted into ---------------------------------
 
   const readInset = (v) => {
@@ -224,9 +308,10 @@ export function createView(canvas, cfg, doc) {
   /**
    * Draw the floor for one season at one camera scale: the ground tone, the
    * moss, the litter, the damp patches where the bare soil is, and, in winter,
-   * frost over all of it.
+   * frost over all of it. Where a fire has been through, the moss is gone, ash
+   * lies over the ground and char takes the place of the leaf litter.
    */
-  const buildFloor = (world, look, qs, cx, cy) => {
+  const buildFloor = (world, look, qs, cx, cy, burn) => {
     if (!D || typeof D.createElement !== 'function') return false;
     if (!tex) {
       tex = D.createElement('canvas');
@@ -282,7 +367,11 @@ export function createView(canvas, cfg, doc) {
       for (let x = -mstep / 2; x < W + mstep; x += mstep) {
         const n = noise(seed + 11, ((x - cx) / qs) / F.mossScale, ((y - cy) / qs) / F.mossScale);
         if (n <= F.mossThreshold) continue;
-        const a = ((n - F.mossThreshold) / Math.max(0.01, 1 - F.mossThreshold)) * look.mossAlpha;
+        // Nothing green is left where the fire went; it comes back as the mark
+        // of the burn fades.
+        const scorch = burnAt(burn, (x - cx) / qs, (y - cy) / qs);
+        const a = ((n - F.mossThreshold) / Math.max(0.01, 1 - F.mossThreshold)) * look.mossAlpha * (1 - scorch);
+        if (!(a > 0.002)) continue;
         blob(g, texPaint, look.moss, x, y, mr, a);
       }
     }
@@ -299,16 +388,20 @@ export function createView(canvas, cfg, doc) {
     const frostPer = look.frostPer;
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
+        // A leaf that fell in the fire is not a leaf any more: the char that
+        // took its place is laid over the ash, further down.
+        const scorch = burnAt(burn, i, j);
         const whole = Math.floor(per);
         const extra = unit(seed, 'le:' + i + ':' + j) < (per - whole) ? 1 : 0;
         for (let k = 0; k < whole + extra; k++) {
+          if (scorch > 0 && unit(seed, 'lb:' + i + ':' + j + ':' + k) < scorch) continue;
           const lx = cx + (i + unit(seed, 'lx:' + i + ':' + j + ':' + k)) * qs;
           const ly = cy + (j + unit(seed, 'ly:' + i + ':' + j + ':' + k)) * qs;
           const a = unit(seed, 'la:' + i + ':' + j + ':' + k) * TAU;
           const c = look.litter[hash(seed, 'lc:' + i + ':' + j + ':' + k) % look.litter.length];
           mark(g, lx, ly, a, len, wide, c, look.litterAlpha);
         }
-        if (frostPer > 0 && unit(seed, 'fr:' + i + ':' + j) < frostPer) {
+        if (frostPer > 0 && scorch < 0.5 && unit(seed, 'fr:' + i + ':' + j) < frostPer) {
           const fx = cx + (i + unit(seed, 'fx:' + i + ':' + j)) * qs;
           const fy = cy + (j + unit(seed, 'fy:' + i + ':' + j)) * qs;
           const fa = unit(seed, 'fa:' + i + ':' + j) * TAU;
@@ -335,6 +428,50 @@ export function createView(canvas, cfg, doc) {
       }
     }
     g.globalAlpha = 1;
+
+    // The burn: ash over everything the fire went through, laid in soft
+    // patches of uneven weight so its edge is as ragged as the fire's was.
+    if (burn) {
+      const B = V.burn;
+      const ash = col(B.ash, 'night');
+      const astep = Math.max(F.grainMin, Math.min(F.grainMax, num(B.ashScale, 1) * qs));
+      const ar = astep * 1.25;
+      const vary = clamp01(num(B.ashVary, 0.4));
+      for (let y = -astep / 2; y < H + astep; y += astep) {
+        for (let x = -astep / 2; x < W + astep; x += astep) {
+          const wx = (x - cx) / qs, wy = (y - cy) / qs;
+          const scorch = burnAt(burn, wx, wy);
+          if (scorch <= 0.01) continue;
+          const n = 1 - vary + noise(seed + 31, wx / 1.6, wy / 1.6) * vary * 2;
+          blob(g, texPaint, ash, x, y, ar, clamp01(scorch * num(B.ashAlpha, 0.7) * n));
+        }
+      }
+
+      // Char where the litter was: splinters of burnt wood on the same lattice
+      // the leaves fall on, lying over the ash rather than under it.
+      const chars = (Array.isArray(B.char) && B.char.length ? B.char : ['night'])
+        .map((token) => col(token, 'damp'));
+      const clen = Math.max(1, num(B.charLen, 0.3) * qs);
+      const cwide = Math.max(0.6, num(B.charWide, 0.08) * qs);
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const scorch = burnAt(burn, i, j);
+          if (scorch <= 0.02) continue;
+          const cper = num(B.charPer, 2) * scorch;
+          const whole = Math.floor(cper);
+          const extra = unit(seed, 'ce:' + i + ':' + j) < (cper - whole) ? 1 : 0;
+          for (let k = 0; k < whole + extra; k++) {
+            const x = cx + (i + unit(seed, 'cx:' + i + ':' + j + ':' + k)) * qs;
+            const y = cy + (j + unit(seed, 'cy:' + i + ':' + j + ':' + k)) * qs;
+            const a = unit(seed, 'ca:' + i + ':' + j + ':' + k) * TAU;
+            const c = chars[hash(seed, 'cc:' + i + ':' + j + ':' + k) % chars.length];
+            mark(g, x, y, a, clen, cwide, c, num(B.charAlpha, 0.7) * scorch);
+          }
+        }
+      }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.globalAlpha = 1;
+    }
     return true;
   };
 
@@ -393,11 +530,26 @@ export function createView(canvas, cfg, doc) {
   };
 
   /**
+   * What the fire leaves of a log: a black husk over the wood, coming back
+   * toward the ordinary colour of it as the mark of the burn fades.
+   */
+  const husk = (g, w, mid, len, wide, burnt) => {
+    if (!(burnt > 0)) return;
+    g.globalAlpha = clamp01(num(V.burn.huskAlpha, 0.8) * burnt);
+    g.fillStyle = col(V.burn.husk, 'damp');
+    capsule(g, w / 2, mid, len, wide);
+    g.fill();
+    g.globalAlpha = 1;
+  };
+
+  /**
    * A fallen log. `full` is how much of it is left to eat, from 1 for a whole
    * log down to 0 for a hollow husk: the face darkens from the middle outward
    * as the organism works through it, and the log shrinks a little with it.
+   * `fresh` is a log the wind has just brought down, still showing pale broken
+   * wood, and `char` how black a log the fire went through still is.
    */
-  const log = (x, y, cells, id, full, detail, look) => {
+  const log = (x, y, cells, id, full, detail, look, fresh, char) => {
     const L = V.log;
     const step = Math.max(1, Math.round(L.stages));
     const bucket = Math.round(clamp01(full) * step) / step;
@@ -410,21 +562,37 @@ export function createView(canvas, cfg, doc) {
     const len = drawn;
     const wide = drawn * (L.width / Math.max(1e-6, L.length));
     if (!(wide > 0.3)) return;
+    const burnt = clamp01(num(char, 0));
+    const raw = fresh ? 1 : 0;
     const pad = Math.max(2, wide * 0.6);
     const w = len + pad, h = wide * 2 + pad;
-    const key = 'log|' + bucket + '|' + drawn.toFixed(3) + '|' + (detail ? 1 : 0) + '|' + look.index;
+    const key = 'log|' + bucket + '|' + drawn.toFixed(3) + '|' + (detail ? 1 : 0) + '|' + look.index
+      + '|' + raw + '|' + burnt.toFixed(2);
     const mid = h / 2;
     const stamp = sprite(key, w, h, (g) => {
-      // Bark, then the paler face inside it.
-      g.fillStyle = P.bark;
+      const Fa = V.fallen;
+      // Bark, then the paler face inside it. A log that has only just come
+      // down is pale all through, broken wood rather than weathered bark.
+      g.fillStyle = fresh ? col(Fa.wood, 'woodPale') : P.bark;
       capsule(g, w / 2, mid, len, wide);
       g.fill();
-      if (!detail) return;
-      g.globalAlpha = bucket > 0.02 ? L.face : 1;
-      g.fillStyle = bucket > 0.02 ? P.woodPale : P.damp;
-      capsule(g, w / 2, mid, len * 0.88, wide * 0.58);
+      if (!detail) { husk(g, w, mid, len, wide, burnt); return; }
+      g.globalAlpha = fresh ? num(Fa.alpha, 1) : (bucket > 0.02 ? L.face : 1);
+      g.fillStyle = fresh ? col(Fa.wood, 'woodPale') : (bucket > 0.02 ? P.woodPale : P.damp);
+      capsule(g, w / 2, mid, len * 0.88, wide * (fresh ? num(Fa.face, 0.9) : 0.58));
       g.fill();
       g.globalAlpha = 1;
+      if (fresh) {
+        // The two ends where it snapped: raw wood, brighter than the face.
+        const end = len * clamp01(num(Fa.breakLen, 0.16));
+        g.globalAlpha = clamp01(num(Fa.breakAlpha, 0.9));
+        g.fillStyle = col(Fa.wood, 'woodPale');
+        capsule(g, w / 2 - (len - end) / 2, mid, end, wide);
+        g.fill();
+        capsule(g, w / 2 + (len - end) / 2, mid, end, wide);
+        g.fill();
+        g.globalAlpha = 1;
+      }
 
       // The grain, and then the rot working outward from the middle.
       if (bucket > 0.02) {
@@ -462,6 +630,7 @@ export function createView(canvas, cfg, doc) {
         g.fill();
         g.globalAlpha = 1;
       }
+      husk(g, w, mid, len, wide, burnt);
     });
     if (!stamp) return;
     const a = unit(id, 'log') * Math.PI;
@@ -505,14 +674,20 @@ export function createView(canvas, cfg, doc) {
     ctx.drawImage(stamp.canvas, x - dw / 2, y - dw / 2, dw, dw);
   };
 
-  /** A dead tree: a grey snag of a few bare branches over a small trunk. */
-  const snag = (x, y, r, id) => {
+  /**
+   * A dead tree: a grey snag of a few bare branches over a small trunk. One the
+   * fire went through is heavier and black rather than grey, with charred
+   * heartwood showing at its foot - the reason to go back into a burn at all.
+   * The one path is stroked twice, so a snag crosses from black to ordinary
+   * grey as the mark of the burn fades.
+   */
+  const snag = (x, y, r, id, char) => {
     if (!ok(x) || !ok(y) || !(r > 0.4)) return;
     const T = V.tree;
+    const B = V.burn;
+    const burnt = clamp01(num(char, 0));
     const n = Math.max(2, Math.round(T.snag));
-    ctx.strokeStyle = P.dead;
-    ctx.globalAlpha = 0.85;
-    ctx.lineWidth = Math.max(0.5, r * 0.16);
+    ctx.lineWidth = Math.max(0.5, r * 0.16 * (1 + (num(B.snagBranch, 1.5) - 1) * burnt));
     ctx.lineCap = 'round';
     ctx.beginPath();
     for (let k = 0; k < n; k++) {
@@ -521,12 +696,26 @@ export function createView(canvas, cfg, doc) {
       ctx.moveTo(x, y);
       ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
     }
-    ctx.stroke();
+    if (burnt < 1) {
+      ctx.strokeStyle = P.dead;
+      ctx.globalAlpha = 0.85 * (1 - burnt);
+      ctx.stroke();
+    }
+    if (burnt > 0) {
+      ctx.strokeStyle = col(B.snag, 'night');
+      ctx.globalAlpha = clamp01(num(B.snagAlpha, 0.95) * burnt);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
     ctx.fillStyle = P.bark;
     ctx.beginPath();
     ctx.arc(x, y, Math.max(0.5, r * 0.22), 0, TAU);
     ctx.fill();
+    if (burnt > 0) {
+      blob(ctx, paint, col(B.ember, 'rust'), x, y,
+        Math.max(0.6, r * clamp01(num(B.emberRadius, 0.5))),
+        clamp01(num(B.emberAlpha, 0.45) * burnt));
+    }
   };
 
   // -- the frame ------------------------------------------------------------
@@ -558,6 +747,12 @@ export function createView(canvas, cfg, doc) {
 
     const season = seasonOf(cfg, state.t);
     const look = seasonLook(cfg, season.index);
+    // What the world has done to this ground: a wedge of it burnt, the rain
+    // held off, logs the wind put down, another fungus holding its own.
+    const ev = state.events || {};
+    const burn = burnOf(state);
+    const dry = !!ev.drought;
+    const fallen = ev.fallen || {};
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalAlpha = 1;
@@ -565,11 +760,17 @@ export function createView(canvas, cfg, doc) {
 
     // The floor, drawn once per season, scale, size and level, then blitted.
     const qs = quantise(s);
+    // A burn and a drought are in the ground itself, so both belong in the key
+    // the texture is held under. The burn's fade is already quantised, which
+    // is what keeps an ageing mark from redrawing the floor every frame.
+    const burnKey = burn
+      ? [burn.fade, burn.angle.toFixed(3), burn.half.toFixed(3), burn.from.toFixed(2), burn.to].join(':')
+      : '';
     const key = [season.index, state.level, world.seed >>> 0, W, H, dpr,
-      Math.round(cx), Math.round(cy), qs.toFixed(5)].join('|');
+      Math.round(cx), Math.round(cy), qs.toFixed(5), burnKey, dry ? 'dry' : ''].join('|');
     if (key !== texKey) {
       texCx = cx; texCy = cy; texScale = qs;
-      texKey = buildFloor(world, look, qs, cx, cy) ? key : '';
+      texKey = buildFloor(world, dry ? dryLook(look) : look, qs, cx, cy, burn) ? key : '';
     }
     if (texKey && tex) {
       const k = ok(s / texScale) && s / texScale > 0 ? s / texScale : 1;
@@ -601,21 +802,26 @@ export function createView(canvas, cfg, doc) {
       const x = cx + n.x * s, y = cy + n.y * s;
       if (!inFrame(x, y)) continue;
       const reached = rt.reached.has(i);
+      // Ground the fire took is not reached any more, but what happened to it
+      // is still standing there and is still in the books.
+      const char = burn && burn.nodes.has(i) ? burn.fade : 0;
 
       if (n.kind === 'wood') {
         let full = 1;
-        if (reached) {
+        if (reached || char > 0) {
           const stock = state.wood[i] || 0;
           const whole = cfg.wood.stockBase * n.stock * scaleNow;
           full = whole > 0 ? clamp01(stock / whole) : 0;
         }
-        log(x, y, s, i, full, detail, look);
+        log(x, y, s, i, full, detail, look, fallen[i] > 0, char);
         continue;
       }
 
       // A living tree, a seedling, or a snag with its wood lying beside it.
       const T = V.tree;
-      const tree = reached ? state.trees[i] : null;
+      // A tree that has been reached is known, and stays known if the fire
+      // takes the ground back off us: it is still standing there, dead.
+      const tree = state.trees[i] || null;
       const sp = tree ? roster[tree.sp] : null;
       const size = tree && sp && sp.max > 0 ? clamp01(tree.s / sp.max) : clamp01(n.s0);
       // No two crowns are the same width, so a stand of one kind does not read
@@ -623,12 +829,12 @@ export function createView(canvas, cfg, doc) {
       const vary = 1 + (unit(i, 'crown') - 0.5) * T.vary;
       const r = Math.max(T.min * s, T.radius * s * (0.35 + 0.65 * size) * vary);
       if (tree && tree.dead) {
-        snag(x, y, r, i);
+        snag(x, y, r, i, char);
         if (tree.wood > 0 && sp) {
           const whole = tree.s * sp.wood;
           const left = whole > 0 ? clamp01(tree.wood / whole) : 1;
           const a = unit(i, 'fallen') * TAU;
-          log(x + Math.cos(a) * r * 1.3, y + Math.sin(a) * r * 1.3, s, i + 7919, left, detail, look);
+          log(x + Math.cos(a) * r * 1.3, y + Math.sin(a) * r * 1.3, s, i + 7919, left, detail, look, false, char);
         }
       } else if (size < T.seedlingBelow) {
         blob(ctx, paint, P.seedling, x, y, Math.max(1, r * 0.7), 0.9);
@@ -645,6 +851,82 @@ export function createView(canvas, cfg, doc) {
       ctx.globalAlpha = look.washAlpha;
       ctx.fillStyle = look.wash;
       ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+
+    // A dry light over the whole floor while the rain holds off, over the
+    // paler litter and the browned moss already in the texture.
+    if (dry && num(V.drought.washAlpha, 0) > 0) {
+      ctx.globalAlpha = clamp01(num(V.drought.washAlpha, 0.1));
+      ctx.fillStyle = col(V.drought.wash, 'dead');
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+
+    // Another fungus, in the ground it has taken. Its threads are not ours to
+    // know, so what is drawn is the ground it holds joined up where two of its
+    // places are close enough to have grown into one another: a dark matted
+    // lace, thicker and straighter than ours, with a tuft on every place. It
+    // shrinks in front of the player as the tips take the ground back.
+    const rival = ev.rival;
+    if (rival && Array.isArray(rival.nodes) && rival.nodes.length) {
+      const R = V.rival;
+      const held = new Set(rival.nodes);
+      const search = num((cfg.events && cfg.events.rival || {}).search, 0);
+      const span = Math.ceil(search);
+      const near = search * search;
+      let drew = 0;
+      ctx.beginPath();
+      for (let k = 0; k < rival.nodes.length; k++) {
+        const id = rival.nodes[k];
+        const a = nodes[id];
+        if (!a) continue;
+        const ax = cx + a.x * s, ay = cy + a.y * s;
+        if (!inFrame(ax, ay)) continue;
+        for (let di = -span; di <= span; di++) {
+          for (let dj = -span; dj <= span; dj++) {
+            const other = world.byCell.get((a.i + di) + ',' + (a.j + dj));
+            if (other === undefined || other <= id || !held.has(other)) continue;
+            const b = nodes[other];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            if (dx * dx + dy * dy > near) continue;
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(cx + b.x * s, cy + b.y * s);
+            drew++;
+          }
+        }
+      }
+      if (drew > 0) {
+        const width = Math.max(0.6, num(R.width, 0.17) * s);
+        ctx.strokeStyle = col(R.mat, 'bark');
+        ctx.lineWidth = width * num(R.matWidth, 3);
+        ctx.globalAlpha = clamp01(num(R.matAlpha, 0.22));
+        ctx.stroke();
+        ctx.strokeStyle = col(R.lace, 'damp');
+        ctx.lineWidth = width;
+        ctx.globalAlpha = clamp01(num(R.laceAlpha, 0.9));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      const tufts = Math.max(1, Math.round(num(R.tufts, 4)));
+      const tlen = Math.max(1, num(R.tuftLen, 0.34) * s);
+      const twide = Math.max(0.6, num(R.tuftWide, 0.1) * s);
+      const spread = num(R.tuftSpread, 0.26) * s;
+      const tuft = col(R.tuft, 'damp');
+      const tuftAlpha = clamp01(num(R.tuftAlpha, 0.85));
+      for (let k = 0; k < rival.nodes.length; k++) {
+        const id = rival.nodes[k];
+        const a = nodes[id];
+        if (!a) continue;
+        const ax = cx + a.x * s, ay = cy + a.y * s;
+        if (!inFrame(ax, ay)) continue;
+        for (let m = 0; m < tufts; m++) {
+          const ang = (m / tufts) * TAU + unit(id, 'tuft') * TAU;
+          mark(ctx, ax + Math.cos(ang) * spread, ay + Math.sin(ang) * spread,
+            ang, tlen, twide, tuft, tuftAlpha);
+        }
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalAlpha = 1;
     }
 

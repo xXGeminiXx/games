@@ -10,12 +10,12 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=4';
-import * as Tr from './traits.js?v=4';
-import * as Sp from './spores.js?v=4';
-import { fill } from '../config.js?v=4';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=4';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=4';
+import * as Lore from './lore.js?v=5';
+import * as Tr from './traits.js?v=5';
+import * as Sp from './spores.js?v=5';
+import { fill } from '../config.js?v=5';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=5';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=5';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -198,10 +198,44 @@ export function createUI(doc, sim, cfg, actions) {
     feed.addEventListener('click', () => actions.toggleNurture(row.key));
     cells.policy.appendChild(pol);
     cells.policy.appendChild(feed);
-    r = { tr, cells, name, note, ticks, pol, feed, row };
+    // -- ledger note: a second line under the figures, in the hand of someone
+    //    who has watched this kind for years - the season it pays best in,
+    //    what one grown tree is worth felled against kept, and what feeding
+    //    buys. The rule that closes the entry belongs to this line.
+    const noteTr = doc.createElement('tr');
+    noteTr.className = 'noteline';
+    const noteTd = doc.createElement('td');
+    noteTd.className = 'note';
+    noteTd.setAttribute('colspan', String(COLUMNS.length));
+    const mark = doc.createElement('em');
+    mark.className = 'mark';
+    const figures = doc.createElement('span');
+    noteTd.appendChild(mark);
+    noteTd.appendChild(figures);
+    noteTr.appendChild(noteTd);
+    tr.className = 'figs';
+    r = { tr, cells, name, note, ticks, pol, feed, row, noteTr, mark, figures };
     treeRows.set(row.key, r);
     el('trees').appendChild(tr);
+    el('trees').appendChild(noteTr);
     return r;
+  };
+
+  // -- the note under a kind ---------------------------------------------------
+
+  const seasonName = (i) => T.seasons[Math.max(0, Math.min(3, i | 0))];
+
+  const noteFigures = (row, m) => {
+    const bits = [];
+    if (m.fell && row.felled > 0) {
+      bits.push(Lore.ui('treeFell', { felled: fmt(row.felled), kept: fmt(row.kept) }));
+    }
+    if (m.nurture && row.count > 0) {
+      bits.push(row.feed > 0
+        ? Lore.ui('treeFeed', { time: fmtTime(row.feed) })
+        : Lore.ui('treeFeedNever'));
+    }
+    return bits.join(' ');
   };
 
   const renderTrees = () => {
@@ -247,9 +281,16 @@ export function createUI(doc, sim, cfg, actions) {
       r.feed.hidden = !m.nurture;
       r.feed.textContent = T.nurture;
       r.feed.className = 'feed' + (state.nurture[row.key] ? ' on' : '');
+      // -- ledger note: the mark first, then the figures behind it.
+      r.noteTr.hidden = false;
+      r.mark.textContent = Lore.ui('treeBest', { season: seasonName(row.best) });
+      r.figures.textContent = noteFigures(row, m);
     }
     for (const [key, r] of treeRows) {
-      if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) r.tr.hidden = true;
+      if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) {
+        r.tr.hidden = true;
+        r.noteTr.hidden = true;
+      }
     }
     text('treesnote', any ? '' : Lore.ui('noTrees'));
   };
@@ -290,6 +331,90 @@ export function createUI(doc, sim, cfg, actions) {
       const capped = t.cost === null;
       priced(r.b, Lore.trait(t.id).name, capped ? T.bought : fmt(t.cost), !capped && state.sugar >= t.cost);
       r.lv.textContent = t.cap > 1 ? t.level + '/' + t.cap : (t.level ? T.bought : '');
+    }
+  };
+
+  // -- instinct -----------------------------------------------------------------
+  //
+  // What the organism has learned to do for itself. One row per habit: a paper
+  // label that switches it, and under it, in faded ink, what it last did and
+  // how long ago. Under the rows, the reserve: four labels for the share of
+  // the sugar instinct is not allowed to touch.
+  //
+  // The first thing a habit ever does is worth one entry in the journal and
+  // nothing after it, so the entry is written here, from the time the
+  // simulation recorded, and marked in the same book of things said once. A
+  // habit that acted while the tab was closed is written up when the notebook
+  // is next opened, which is when it would have been noticed.
+
+  const INSTINCTS = ['extend', 'tips', 'beyond'];
+  const FIRST_LINE = { extend: 'instinctExtend', tips: 'instinctTips', beyond: 'instinctBeyond' };
+
+  const instinctRows = new Map();
+  const instinctRow = (key) => {
+    let r = instinctRows.get(key);
+    if (r) return r;
+    const box = doc.createElement('div');
+    box.className = 'rrow';
+    const b = doc.createElement('button');
+    b.className = 'rite';
+    b.title = T.instinct.hints[key] || '';
+    b.addEventListener('click', () => actions.setInstinct(key));
+    const line = doc.createElement('span');
+    line.className = 'line';
+    box.appendChild(b);
+    box.appendChild(line);
+    el('instinct').appendChild(box);
+    r = { box, b, line };
+    instinctRows.set(key, r);
+    return r;
+  };
+
+  let reserveLabels = null;
+  const reserveRow = () => {
+    if (reserveLabels) return reserveLabels;
+    const host = el('instinct-reserve');
+    if (!host) return null;
+    const name = doc.createElement('span');
+    name.textContent = T.instinct.reserve;
+    host.appendChild(name);
+    const buttons = cfg.instinct.reserves.map((share, i) => {
+      const b = doc.createElement('button');
+      b.textContent = T.instinct.reserves[i] === undefined ? String(share) : T.instinct.reserves[i];
+      b.title = T.instinct.reserveTip;
+      b.addEventListener('click', () => actions.setReserve(share));
+      host.appendChild(b);
+      return b;
+    });
+    reserveLabels = { name, buttons };
+    return reserveLabels;
+  };
+
+  const renderInstinct = () => {
+    if (!state.flags.instinct) return;
+    const learned = sim.mods().instinct;
+    const inst = sim.instinct();
+    for (const key of INSTINCTS) {
+      const r = instinctRow(key);
+      r.box.hidden = !learned[key];
+      if (!learned[key]) continue;
+      const on = !!inst[key];
+      priced(r.b, T.instinct.names[key], on ? T.instinct.on : T.instinct.off, true);
+      r.b.className = 'rite' + (on ? ' on' : '');
+      const at = inst.acted ? inst.acted[key] : undefined;
+      r.line.textContent = at === undefined
+        ? T.instinct.idle
+        : fill(T.instinct.ago, { what: T.instinct.acted[key], t: fmtTime(Math.max(0, state.t - at)) });
+      if (at !== undefined && !state.fired[FIRST_LINE[key]]) {
+        state.fired[FIRST_LINE[key]] = true;
+        log(Lore.ui(FIRST_LINE[key]));
+      }
+    }
+    const res = reserveRow();
+    if (res) {
+      for (let i = 0; i < res.buttons.length; i++) {
+        res.buttons[i].className = Math.abs(cfg.instinct.reserves[i] - inst.reserve) < 1e-9 ? 'on' : '';
+      }
     }
   };
 
@@ -414,6 +539,10 @@ export function createUI(doc, sim, cfg, actions) {
     // Traits.
     show('traits-panel', !!f.traits);
     renderTraits();
+
+    // Instinct.
+    show('instinct-panel', !!f.instinct);
+    renderInstinct();
 
     // Fruiting.
     show('spores-panel', !!f.spores);

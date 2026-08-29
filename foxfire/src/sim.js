@@ -19,21 +19,33 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=4';
-import { buildLevel, nearestOpen } from './world.js?v=4';
-import * as Tips from './tips.js?v=4';
-import * as Trees from './trees.js?v=4';
-import * as Tr from './traits.js?v=4';
-import * as Lv from './levels.js?v=4';
-import * as Sp from './spores.js?v=4';
-import * as Rv from './reveal.js?v=4';
-import * as Ev from './events.js?v=4';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=4';
-import { hash } from './rng.js?v=4';
-import * as Lore from './lore.js?v=4';
-import { fmtArea } from './numbers.js?v=4';
+import { CONFIG as DEFAULT } from '../config.js?v=5';
+import { buildLevel, nearestOpen } from './world.js?v=5';
+import * as Tips from './tips.js?v=5';
+import * as Trees from './trees.js?v=5';
+import * as Tr from './traits.js?v=5';
+import * as Lv from './levels.js?v=5';
+import * as Sp from './spores.js?v=5';
+import * as Rv from './reveal.js?v=5';
+import * as Ev from './events.js?v=5';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=5';
+import { hash } from './rng.js?v=5';
+import * as Lore from './lore.js?v=5';
+import { fmtArea } from './numbers.js?v=5';
 
 export const SAVE_VERSION = 1;
+
+/**
+ * The instinct book: which habits are acted on, the share of the sugar they
+ * are not allowed to touch, when they last decided anything, and when each
+ * one last did something. Going beyond starts switched off even once it is
+ * learned, because it ends a level and that is the player's to end.
+ */
+export function freshInstinct(cfg) {
+  const list = cfg.instinct.reserves;
+  const i = Math.max(0, Math.min(list.length - 1, Math.floor(cfg.instinct.reserveDefault)));
+  return { extend: true, tips: true, beyond: false, reserve: list[i], at: 0, acted: {} };
+}
 
 export function freshState(cfg, seed) {
   return {
@@ -55,6 +67,7 @@ export function freshState(cfg, seed) {
     harvest: {},           // kind -> 0 keep, 1 fell mature, 2 fell all
     nurture: {},           // kind -> true when sugar is being sent
     traits: {},            // id -> level
+    instinct: freshInstinct(cfg),  // the habits, their reserve and their clock
     below: { sugar: 0, minerals: 0 },  // what arrives from the levels folded away
     hand: { presses: 0 },
     opened: false,          // the origin has been laid and the free tips placed
@@ -254,13 +267,19 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const sizes = {};
     const counts = {};
     const mature = {};
+    // -- ledger hook: the size the grown trees of a kind come to, so the
+    //    ledger can say what one of them is worth felled against kept.
+    const matureSize = {};
     for (const id in state.trees) {
       const tree = state.trees[id];
       if (tree.dead) continue;
       const sp = roster[tree.sp];
       sizes[sp.key] = (sizes[sp.key] || 0) + tree.s;
       counts[sp.key] = (counts[sp.key] || 0) + 1;
-      if (Trees.isMature(tree, sp, cfg)) mature[sp.key] = (mature[sp.key] || 0) + 1;
+      if (Trees.isMature(tree, sp, cfg)) {
+        mature[sp.key] = (mature[sp.key] || 0) + 1;
+        matureSize[sp.key] = (matureSize[sp.key] || 0) + tree.s;
+      }
     }
 
     // The trade.
@@ -271,17 +290,43 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       const S = sizes[sp.key] || 0;
       const ms = sent[sp.key] || 0;
       const r = Trees.tradeOf(sp, S, ms);
-      const got = r.got * m.trade * m.yield * tradeMult;
+      // -- ledger hook: a kind has a season it pays best in, over and above
+      //    the year's own curve, so the best kind changes as the year does.
+      //    It is in the price the ledger shows because it is in the trade.
+      const mult = m.trade * m.yield * tradeMult * Trees.seasonMult(sp, season.index);
+      const got = r.got * mult;
       sugar += got * dt;
       income.trade += got * dt;
       state.totals.traded += got * dt;
       state.totals.sentMinerals += ms * dt;
-      market[sp.key] = {
+      const row = {
         key: sp.key, name: sp.name, count: counts[sp.key] || 0, mature: mature[sp.key] || 0,
-        size: S, sent: ms, got, marginal: r.marginal * m.trade * m.yield * tradeMult, sat: r.sat,
+        size: S, sent: ms, got, marginal: r.marginal * mult, sat: r.sat,
         dead: 0, weight: state.weights[sp.key] === undefined ? cfg.trees.weightNew : state.weights[sp.key],
         policy: state.harvest[sp.key] || 0, nurture: !!state.nurture[sp.key], max: sp.max,
+        // -- ledger hook: which season this kind pays best in, and what the
+        //    two standing decisions are worth. Grown size is what is actually
+        //    standing there when any of it is grown, and a plain grown tree
+        //    otherwise. felled and kept are per grown tree: a lump now
+        //    against what trade pays it over one season at this price. feed
+        //    is how long feeding takes to pay for itself, 0 for not at all.
+        best: Trees.bestSeason(sp), worst: Trees.worstSeason(sp),
+        grownSize: 0, felled: 0, kept: 0, feed: 0,
       };
+      const grownSize = mature[sp.key] > 0
+        ? matureSize[sp.key] / mature[sp.key]
+        : cfg.trees.mature * sp.max;
+      row.grownSize = grownSize;
+      if (m.fell) {
+        row.felled = Trees.fellValue(cfg, sp, grownSize, m);
+        row.kept = Trees.keptRate(got, S, grownSize) * season.seasonSeconds;
+      }
+      if (m.nurture && S > 0) {
+        const value = Trees.sizeValue(sp, S, ms, mult);
+        const pay = Trees.feedPayback(cfg, sp, { count: counts[sp.key] || 0, size: S }, value, season.growth, k);
+        row.feed = Number.isFinite(pay) ? pay : 0;
+      }
+      market[sp.key] = row;
       if (got > 0) say('firstTrade', { kind: sp.name }, true);
     }
 
@@ -370,10 +415,105 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     rt.income = { wood: income.wood / dt, trade: income.trade / dt, fell: income.fell / dt, below: income.below / dt };
     state.t += dt;
 
+    // -- instinct hook: the organism doing for itself what the hand has been
+    //    doing. It reads the books that were just closed and presses the same
+    //    buttons a player would, so it belongs after them and before the page
+    //    is told what to show.
+    runInstinct(m);
+
     // What is now on the page, and what is worth saying.
     Rv.update(state, cfg, { tipCost: tipCost(1), rootsReached: rt.roots, genome });
     milestones();
     return drain();
+  };
+
+  // -- instinct --------------------------------------------------------------
+  //
+  // Three habits the organism can learn, each bought as a trait and switched
+  // in the journal. Every one of them calls the same action a press calls and
+  // nothing else, so there is no sum an instinct can reach that a hand could
+  // not: what it saves is attention. Each decision leaves the reserve - the
+  // share of the sugar the player keeps back - untouched, measured against
+  // what is held at the moment the decision is taken.
+  //
+  // They decide on their own coarse clock, so an hour watched and an hour
+  // caught up in five-second chunks take the same decisions at the same
+  // moments.
+
+  /** The instinct book, put on any state that arrives here without one. */
+  const instinctBook = () => {
+    if (!state.instinct) state.instinct = freshInstinct(cfg);
+    return state.instinct;
+  };
+
+  /** Sugar an instinct may spend right now: everything above the reserve. */
+  const aboveReserve = () => {
+    const r = instinctBook().reserve;
+    const keep = Number.isFinite(r) ? Math.max(0, Math.min(1, r)) : 0;
+    return Math.max(0, state.sugar) * (1 - keep);
+  };
+
+  /** The most tips a budget buys, never more than `cap` of them. */
+  const tipsWithin = (budget, cap) => {
+    let lo = 0, hi = Math.max(0, Math.min(Math.floor(cap), cfg.tips.maxBuy));
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (tipCost(mid) <= budget) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  // An action drains the events said so far and hands them back; put them
+  // where the step will find them, so a ring opened by instinct still reads
+  // as a ring opened.
+  const keep = (said) => { for (const e of said) events.push(e); };
+
+  const runInstinct = (m) => {
+    const inst = instinctBook();
+    const every = Math.max(0.1, cfg.instinct.everySeconds);
+    // A hair of slack on the interval: the running clock is a sum of every
+    // step taken, so an hour played a tenth of a second at a time carries a
+    // rounding error an hour caught up in chunks does not. Without the slack
+    // that error swallows a decision now and then, and the same hour would
+    // land in two different places depending on how finely it was stepped.
+    if (state.t - (inst.at || 0) < every - 1e-9) return;
+    inst.at = state.t;
+    const did = (key) => { inst.acted[key] = state.t; };
+
+    // REACH: nothing left to reach inside the open ground, and the next ring
+    // is affordable above the reserve.
+    if (m.instinct.extend && inst.extend && rt.frontier.size === 0 && state.ring < cfg.world.rings) {
+      if (Lv.ringCost(cfg, state.level, state.ring + 1) <= aboveReserve()) {
+        const ring = state.ring;
+        keep(extend());
+        if (state.ring > ring) did('extend');
+      }
+    }
+
+    // FRONT: the ground is giving up more than the tips can carry. Buy enough
+    // to close the gap, within a share of what is above the reserve, so one
+    // decision cannot empty the stores into the front.
+    if (m.instinct.tips && inst.tips) {
+      const c = rt.carry;
+      if (c && c.produced > c.capacity * cfg.instinct.carryShort) {
+        const per = cfg.tips.carry * Math.pow(cfg.tips.carryFactor, state.level) * m.yield;
+        const gap = c.produced - c.capacity;
+        const want = per > 0 ? Math.ceil(gap / per) : 0;
+        const n = tipsWithin(aboveReserve() * cfg.instinct.tipsShare, want);
+        if (n > 0) { keep(buyTips(n)); did('tips'); }
+      }
+    }
+
+    // BEYOND: the level is finished and the fold is affordable above the
+    // reserve. Switched off until the player switches it on, because it is
+    // the one instinct that ends something.
+    if (m.instinct.beyond && inst.beyond && Lv.beyondOffered(cfg, state, world)) {
+      if (Lv.beyondCost(cfg, state.level) <= aboveReserve()) {
+        const level = state.level;
+        keep(beyond());
+        if (state.level > level) did('beyond');
+      }
+    }
   };
 
   const milestones = () => {
@@ -497,6 +637,25 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return drain();
   };
 
+  /** Switch one habit on or off. Passing nothing turns it the other way. */
+  const setInstinct = (key, on) => {
+    const inst = instinctBook();
+    if (key !== 'extend' && key !== 'tips' && key !== 'beyond') return drain();
+    inst[key] = on === undefined ? !inst[key] : !!on;
+    return drain();
+  };
+
+  /** The share of the sugar instinct leaves alone: one of the offered ones. */
+  const setReserve = (share) => {
+    const inst = instinctBook();
+    let best = cfg.instinct.reserves[0];
+    for (const r of cfg.instinct.reserves) {
+      if (Math.abs(r - share) < Math.abs(best - share)) best = r;
+    }
+    inst.reserve = best;
+    return drain();
+  };
+
   const extend = () => {
     if (state.ring >= cfg.world.rings) return drain();
     const cost = Lv.ringCost(cfg, state.level, state.ring + 1);
@@ -561,6 +720,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     step, advance, drain,
     tipCost, tipsAffordable, carryCapacity: () => carryCapacity(mods()),
     reachByHand, buyTips, buyTipsMax, setWeight, setHarvest, toggleNurture, buyTrait, extend, beyond,
+    setInstinct, setReserve, instinct: () => instinctBook(),
     area, canFruit, sporesNow,
     ringCost: () => Lv.ringCost(cfg, state.level, state.ring + 1),
     beyondCost: () => Lv.beyondCost(cfg, state.level),

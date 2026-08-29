@@ -122,6 +122,17 @@
     padding:0 5px;margin:0 0 3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
   }
   #trees td.policy button.on{border-color:var(--rust);color:var(--rust)}
+  /* The note under each kind: when it pays best, what a grown tree is worth
+     felled against kept, what feeding buys. The rule that ends the entry
+     belongs to the note, so the two rows read as one. */
+  #trees tr.figs td{border-bottom:none}
+  #trees td.note{
+    color:var(--faded);font-size:10.5px;line-height:1.35;white-space:normal;
+    padding:0 6px 5px 4px;border-bottom:1px solid var(--rule);
+  }
+  #trees td.note em.mark{
+    font-style:normal;font-variant:small-caps;letter-spacing:.04em;margin-right:.4em;
+  }
   #treesnote{color:var(--faded);font-size:12.5px;margin-top:5px}
 
   /* The year: one ruled line, four marks, and the point we are at. */
@@ -157,6 +168,14 @@
   .rrow .line{grid-area:line;color:var(--faded);font-size:12.5px;line-height:1.35}
   #genome{margin-top:2px}
 
+  /* Instinct: the same rows as the traits, each label switching a habit on or
+     off, and under them the share of the sugar instinct leaves alone. */
+  .rrow button.rite.on{border-color:var(--rust);color:var(--rust)}
+  #instinct-reserve{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin-top:2px}
+  #instinct-reserve span{color:var(--faded);font-size:12.5px}
+  #instinct-reserve button{font-size:11px;font-variant:small-caps;letter-spacing:.03em;padding:0 6px}
+  #instinct-reserve button.on{border-color:var(--rust);color:var(--rust)}
+
   /* Fruiting. */
   #spores-note{color:var(--faded);font-size:12.5px;margin-bottom:7px}
   #spores-held{color:var(--moss);font-size:12.5px;margin-top:7px}
@@ -181,6 +200,51 @@
     .panel{margin-bottom:12px}
   }
 </style>
+<!-- build-watch:start -->
+<meta name="build" content="ab275d2f8b92">
+<script>
+(function () {
+  var meta = document.querySelector('meta[name="build"]');
+  var mine = meta && meta.getAttribute('content');
+  if (!mine || !window.fetch) return;
+  var every = 300000;          // re-ask every five minutes while the tab is open
+  var checking = false;
+
+  function reload(to) {
+    // A plain reload can be answered from cache, so the new build is asked for
+    // by a URL the cache has not seen. Whatever the player already had on the
+    // address bar is kept; only a previous build stamp is replaced.
+    var q = new URLSearchParams(location.search);
+    q.set('b', to);
+    location.replace(location.pathname + '?' + q.toString() + location.hash);
+  }
+
+  function check() {
+    if (checking || document.hidden) return;
+    checking = true;
+    fetch('build.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        checking = false;
+        if (!j || !j.build || j.build === mine) return;
+        // One reload per build. If the page comes back still stamped with the
+        // old id the files were not really replaced, and reloading again would
+        // only spin.
+        try {
+          if (sessionStorage.getItem('build-watch') === j.build) return;
+          sessionStorage.setItem('build-watch', j.build);
+        } catch (e) { /* private mode: fall through and reload once */ }
+        reload(j.build);
+      })
+      .catch(function () { checking = false; });
+  }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  setInterval(check, every);
+  setTimeout(check, 15000);
+})();
+</script>
+<!-- build-watch:end -->
 </head>
 <body>
 <div id="floor">
@@ -234,6 +298,12 @@
     <div id="traits"></div>
   </section>
 
+  <section class="panel" id="instinct-panel" hidden>
+    <h2 id="p-instinct"></h2>
+    <div id="instinct"></div>
+    <div id="instinct-reserve"></div>
+  </section>
+
   <section class="panel" id="spores-panel" hidden>
     <h2 id="p-spores"></h2>
     <p id="spores-note"></p>
@@ -259,8 +329,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=4';
-import { createGame } from './src/game.js?v=4';
+import { CONFIG, applyIdentity } from './config.js?v=5';
+import { createGame } from './src/game.js?v=5';
 
 applyIdentity(document);
 
