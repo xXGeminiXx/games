@@ -1,16 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=1';
-import { fill } from '../content.js?v=1';
-import { makeShaders } from './shaders.js?v=1';
-import { createWorld } from './world.js?v=1';
-import { createDrones } from './drones.js?v=1';
-import { createView } from './view.js?v=1';
-import { createEconomy } from './economy.js?v=1';
-import { createSave } from './save.js?v=1';
-import { createUI } from './ui.js?v=1';
-import { loop, createGL } from './gl.js?v=1';
-import { rng } from './rng.js?v=1';
-import { fmt, duration } from './numbers.js?v=1';
+import { withOverrides, applyIdentity } from '../config.js?v=2';
+import { fill } from '../content.js?v=2';
+import { makeShaders } from './shaders.js?v=2';
+import { createWorld } from './world.js?v=2';
+import { createDrones } from './drones.js?v=2';
+import { createView } from './view.js?v=2';
+import { createEconomy } from './economy.js?v=2';
+import { createSave, createPrefs } from './save.js?v=2';
+import { createUI } from './ui.js?v=2';
+import { createControls } from './controls.js?v=2';
+import { createQuality } from './quality.js?v=2';
+import { createPerfLog } from './perflog.js?v=2';
+import { loop, createGL } from './gl.js?v=2';
+import { rng } from './rng.js?v=2';
+import { fmt, duration } from './numbers.js?v=2';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -18,10 +21,19 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   const S = makeShaders(cfg);
   const eco = createEconomy(cfg);
   const save = createSave(cfg, storage);
+  const prefs = createPrefs(cfg, storage);
+  const perf = createPerfLog(cfg, storage);
   const K = cfg.kindOrder;
 
+  // What the player set about the window last time. A quality preset they
+  // chose is honoured before anything is drawn, so the first frame is already
+  // the one they asked for.
+  const wantQuality = cfg.render.presets[prefs.get('quality', cfg.render.quality)] ? prefs.get('quality', cfg.render.quality) : cfg.render.quality;
+  cfg.render.scale = cfg.render.presets[wantQuality].scale;
+  cfg.render.maxDpr = cfg.render.presets[wantQuality].dpr;
+
   // ---- the picture ----
-  const G = createGL(canvas, { maxDpr: cfg.render.maxDpr });
+  const G = createGL(canvas, { maxDpr: cfg.render.maxDpr, minDpr: cfg.render.minDpr });
   const gl = G.gl;
   const world = createWorld(gl, cfg, S);
   const drones = createDrones(gl, cfg, S);
@@ -80,12 +92,43 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       location.reload();
     },
     reset: () => { if (doc.defaultView && doc.defaultView.confirm && !doc.defaultView.confirm(content.labels.resetConfirm)) return; save.clear(); location.reload(); },
+    // the window's own controls
+    quality: (name) => { if (!quality.choose(name)) return; prefs.set('quality', name); ui.showQuality(quality.preset, quality.scale, quality.rate); },
+    fold: () => { const next = !prefs.get('folded', false); prefs.set('folded', next); ui.showFold(next); },
+    help: () => { ui.showKeys(!ui.keysOpen); },
+    closeHelp: () => ui.showKeys(false),
+    recentre: () => view.control.recentre(),
+    close: () => { ui.showKeys(false); ui.el.saveBox.hidden = true; },
+    exportPerf: () => { ui.el.saveBox.hidden = false; ui.el.saveBox.value = perf.text(); ui.el.saveBox.select(); },
+    upgrade1: () => actions.upgrade(Object.keys(cfg.economy.upgrades)[0]),
+    upgrade2: () => actions.upgrade(Object.keys(cfg.economy.upgrades)[1]),
+    upgrade3: () => actions.upgrade(Object.keys(cfg.economy.upgrades)[2]),
+    upgrade4: () => actions.upgrade(Object.keys(cfg.economy.upgrades)[3]),
   };
+
+  // The quality guard, and the keyboard. Both read their tables from config,
+  // so a change there is the whole change.
+  const quality = createQuality(cfg, {
+    onScale: (s) => view.setScale(s),
+    onDpr: (d) => { G.setMaxDpr(d); view.setScale(cfg.render.scale); },
+  });
   const ui = createUI(doc, cfg, content, eco, actions);
   const flags = eco.state.flags;
+  quality.choose(wantQuality);
+  ui.showQuality(quality.preset, quality.scale, 0);
+  ui.showFold(prefs.get('folded', false));
   ui.reveal(flags);
   ui.log(snap ? content.log.arrive : content.log.start);
   if (offline && offline.seconds > 30) ui.log(fill(content.labels.offline, { time: duration(offline.seconds), funds: fmt(offline.earned) }));
+
+  const controls = createControls(cfg, {
+    fly: (dx, dz) => view.fly(dx, dz),
+    camera: view.control,
+    actions,
+    panel: actions.fold,
+    help: actions.help,
+  });
+  controls.attach(window);
 
   canvas.addEventListener('click', (e) => {
     const p = view.pick(e.clientX, e.clientY);
@@ -119,8 +162,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   // ---- the loop ----
   let summaryT = 0, saveT = 0, uiT = 0;
   const speed = () => eco.droneSpeed();
+  let qualityT = 0, perfT = 0;
   const stop = loop((dt, t) => {
     const h = Math.min(dt, 0.05);
+    // The keys get the real frame, not the simulation's clamped one. That
+    // clamp is there so a long frame cannot make the world jump; applying it
+    // to input instead makes the camera crawl on exactly the machines that
+    // can least afford to feel sluggish. A generous ceiling still stops a
+    // tab returning from the background flinging the carrier across the sea.
+    controls.step(Math.min(dt, 0.25));
     view.update(h);
     drones.step(h, t, world, view.state.carrier, eco.range(), speed());
     world.step(h, view.state.carrier, eco.range());
@@ -133,9 +183,18 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       checkReveal();
       checkPrices();
     }
-    view.draw(t, eco.range());
+    view.draw(t, eco.range(), 0.0009, h);
+    // Watch the frames and let the guard move the resolution if it must.
+    quality.sample(dt * 1000);
+    perfT += dt;
+    if (perfT >= cfg.adapt.logEvery) {
+      perfT = 0;
+      perf.record(quality.window(), { quality: quality.preset, scale: +quality.scale.toFixed(2), buffer: canvas.width + 'x' + canvas.height, dpr: +G.dpr().toFixed(2), drones: eco.state.drones });
+    }
     uiT += dt;
     if (uiT >= 0.25) { uiT = 0; ui.update({ active: drones.active }); }
+    qualityT += dt;
+    if (qualityT >= 1) { qualityT = 0; ui.showQuality(quality.preset, quality.scale, quality.rate); }
     saveT += dt;
     if (saveT >= 10) { saveT = 0; persist(); }
     window.__frame = (window.__frame || 0) + 1;
@@ -144,5 +203,5 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   window.addEventListener('beforeunload', persist);
   ui.update({ active: drones.active });
 
-  return { cfg, eco, world, drones, view, ui, save, stop, persist, snapshot };
+  return { cfg, eco, world, drones, view, ui, save, prefs, perf, quality, controls, stop, persist, snapshot };
 }

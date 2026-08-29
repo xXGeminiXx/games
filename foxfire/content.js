@@ -52,6 +52,9 @@ export const CONTENT = {
     frost:      { name: 'Frost hardiness',  line: 'Cold no longer slows the tips in winter' },
     reserve:    { name: 'Reserves',         line: 'The organism keeps working for more hours while you are away' },
     evergreen:  { name: 'Evergreen trade',  line: 'The trees keep paying a little through the winter' },
+    instinctExtend: { name: 'Instinct: reach',  line: 'The organism opens the next ring itself once the front has nothing left to reach' },
+    instinctTips:   { name: 'Instinct: front',  line: 'The organism grows the front itself when the ground gives up more than the tips carry' },
+    instinctBeyond: { name: 'Instinct: beyond', line: 'The organism folds a finished level itself, if it is let' },
   },
 
   genome: {
@@ -228,9 +231,20 @@ export const CONTENT = {
     sporesHeld: '{n} spores unspent.',
     belowLine: '{sugar} sugar/s and {minerals} minerals/s arrive from below.',
     noTrees: 'No living trees reached.',
+    treeBest: 'best in {season}',
+    treeFell: 'A grown one is worth {felled} felled, {kept} kept a season.',
+    treeFeed: 'Feeding pays for itself in {time}.',
+    treeFeedNever: 'Feeding buys nothing here yet.',
     winter: 'Winter: the trees pay a quarter',
     evergreenWinter: 'Winter: evergreen trade',
     largestNote: 'Larger than the largest living thing on Earth',
+
+    // The one entry an instinct is worth. It is written the first time that
+    // habit does anything and never again, because an organism that reports
+    // every purchase is not worth reading.
+    instinctExtend: 'The stakes were out a ring further this morning and nobody moved them. It does this for itself now.',
+    instinctTips:   'The front thickened overnight where the ground was giving up more than it could carry. We were not here.',
+    instinctBeyond: 'It has folded a finished level on its own. We came back to a map we did not draw.',
   },
 
   // -------------------------------------------------------------------------

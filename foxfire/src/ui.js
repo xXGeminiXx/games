@@ -10,12 +10,12 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=4';
-import * as Tr from './traits.js?v=4';
-import * as Sp from './spores.js?v=4';
-import { fill } from '../config.js?v=4';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=4';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=4';
+import * as Lore from './lore.js?v=6';
+import * as Tr from './traits.js?v=6';
+import * as Sp from './spores.js?v=6';
+import { fill } from '../config.js?v=6';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=6';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=6';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -132,7 +132,10 @@ export function createUI(doc, sim, cfg, actions) {
 
   // -- the trees ledger --------------------------------------------------------
 
-  const COLUMNS = ['kind', 'size', 'sent', 'got', 'rate', 'weight', 'policy'];
+  // The figures on one kind, in the order they are read. Each one carries its
+  // own word, so nothing depends on a heading further up the page and nothing
+  // sits in a column that a narrow window could cut off.
+  const FIGURES = ['size', 'sent', 'got', 'rate'];
 
   // What the player set, read from the state rather than from the market,
   // which is only rebuilt when the simulation steps: a press has to show on
@@ -142,39 +145,51 @@ export function createUI(doc, sim, cfg, actions) {
   const policyOf = (key) => state.harvest[key] || 0;
 
   const treeRows = new Map();
-  const treeHead = () => {
-    const table = el('trees');
-    if (!table || table._head) return;
-    table._head = true;
-    const tr = doc.createElement('tr');
-    for (const key of COLUMNS) {
-      const th = doc.createElement('th');
-      th.textContent = T.columns[key];
-      if (key === 'rate') th.title = T.columns.rateTip;
-      tr.appendChild(th);
-    }
-    table.appendChild(tr);
-  };
 
   const treeRow = (row) => {
     let r = treeRows.get(row.key);
     if (r) return r;
-    const tr = doc.createElement('tr');
-    const cells = {};
-    for (const key of COLUMNS) {
-      const td = doc.createElement('td');
-      td.className = key;
-      cells[key] = td;
-      tr.appendChild(td);
-    }
-    // Kind: the name, and how many of them under it.
+    // One block a kind: the name and the count, the figures, the two standing
+    // decisions, and the note underneath.
+    const box = doc.createElement('div');
+    box.className = 'tree';
+    const head = doc.createElement('div');
+    head.className = 'thead';
     const name = doc.createElement('b');
+    name.className = 'name';
     const note = doc.createElement('small');
-    cells.kind.appendChild(name);
-    cells.kind.appendChild(note);
+    note.className = 'count';
+    head.appendChild(name);
+    head.appendChild(note);
+    box.appendChild(head);
+
+    const figs = doc.createElement('div');
+    figs.className = 'figs';
+    const cells = {};
+    for (const key of FIGURES) {
+      const fig = doc.createElement('span');
+      fig.className = 'fig ' + key;
+      const word = doc.createElement('i');
+      word.textContent = T.columns[key];
+      const value = doc.createElement('b');
+      if (key === 'rate') fig.title = T.columns.rateTip;
+      fig.appendChild(word);
+      fig.appendChild(value);
+      figs.appendChild(fig);
+      cells[key] = { fig, value };
+    }
+    box.appendChild(figs);
+
+    const ctl = doc.createElement('div');
+    ctl.className = 'ctl';
     // Share: one tick per point of weight. Clicking a tick sets the weight to
     // it, and clicking the last filled tick lets the weight back down, so
     // every value from none to all is one press away.
+    const share = doc.createElement('span');
+    share.className = 'share';
+    const shareWord = doc.createElement('i');
+    shareWord.textContent = T.columns.weight;
+    share.appendChild(shareWord);
     const ticks = [];
     for (let i = 1; i <= cfg.trees.weightMax; i++) {
       const tick = doc.createElement('button');
@@ -184,10 +199,13 @@ export function createUI(doc, sim, cfg, actions) {
         const cur = weightOf(row.key);
         actions.setWeight(row.key, (i === cur ? i - 1 : i) - cur);
       });
-      cells.weight.appendChild(tick);
+      share.appendChild(tick);
       ticks.push(tick);
     }
+    ctl.appendChild(share);
     // Policy: what to do with the trees, and whether to feed them.
+    const pols = doc.createElement('span');
+    pols.className = 'pols';
     const pol = doc.createElement('button');
     pol.className = 'pol';
     pol.title = T.harvestTip;
@@ -196,17 +214,48 @@ export function createUI(doc, sim, cfg, actions) {
     feed.className = 'feed';
     feed.title = T.nurtureTip;
     feed.addEventListener('click', () => actions.toggleNurture(row.key));
-    cells.policy.appendChild(pol);
-    cells.policy.appendChild(feed);
-    r = { tr, cells, name, note, ticks, pol, feed, row };
+    pols.appendChild(pol);
+    pols.appendChild(feed);
+    ctl.appendChild(pols);
+    box.appendChild(ctl);
+
+    // The note: a line in the hand of someone who has watched this kind for
+    // years - the season it pays best in, what one grown tree is worth felled
+    // against kept, and what feeding buys.
+    const noteLine = doc.createElement('p');
+    noteLine.className = 'note';
+    const mark = doc.createElement('em');
+    mark.className = 'mark';
+    const figures = doc.createElement('span');
+    noteLine.appendChild(mark);
+    noteLine.appendChild(figures);
+    box.appendChild(noteLine);
+
+    r = { box, cells, name, note, ticks, pol, feed, row, mark, figures };
     treeRows.set(row.key, r);
-    el('trees').appendChild(tr);
+    el('trees').appendChild(box);
     return r;
+  };
+
+  // -- the note under a kind ---------------------------------------------------
+
+  const seasonName = (i) => T.seasons[Math.max(0, Math.min(3, i | 0))];
+
+  const noteFigures = (row, m) => {
+    const bits = [];
+    if (m.fell && row.felled > 0) {
+      bits.push(Lore.ui('treeFell', { felled: fmt(row.felled), kept: fmt(row.kept) }));
+    }
+    if (m.nurture && row.count > 0) {
+      bits.push(row.feed > 0
+        ? Lore.ui('treeFeed', { time: fmtTime(row.feed) })
+        : Lore.ui('treeFeedNever'));
+    }
+    return bits.join(' ');
   };
 
   const renderTrees = () => {
     if (!state.flags.trees) return;
-    treeHead();
     const market = sim.market();
     const m = sim.mods();
     const season = sim.season();
@@ -219,23 +268,22 @@ export function createUI(doc, sim, cfg, actions) {
       any = true;
       const r = treeRow(row);
       r.row = row;
-      r.tr.hidden = false;
+      r.box.hidden = false;
       r.name.textContent = Lore.capital(row.name);
       const bits = [];
       bits.push(row.count === 1 ? T.counts.one : fill(T.counts.many, { n: row.count }));
       if (row.mature > 0) bits.push(fill(T.counts.grown, { n: row.mature }));
       if (row.dead > 0) bits.push(fill(T.counts.dead, { n: row.dead }));
       r.note.textContent = bits.join(', ');
-      r.note.title = r.note.textContent;
       const grown = row.count > 0 ? row.size / (row.count * row.max) : 0;
-      r.cells.size.textContent = fmtPct(grown);
-      r.cells.sent.textContent = fmtRate(row.sent);
-      r.cells.got.textContent = fmtRate(row.got);
-      r.cells.rate.textContent = fmtCoin(row.marginal);
+      r.cells.size.value.textContent = fmtPct(grown);
+      r.cells.sent.value.textContent = fmtRate(row.sent);
+      r.cells.got.value.textContent = fmtRate(row.got);
+      r.cells.rate.value.textContent = fmtCoin(row.marginal);
       // Winter is read off the ledger as well as the floor: the price the
       // trees will pay is dimmed for as long as they are shut down.
-      r.cells.rate.title = winter ? Lore.ui(m.evergreen ? 'evergreenWinter' : 'winter') : '';
-      r.cells.rate.className = 'rate' + (winter ? ' cold' : '');
+      r.cells.rate.fig.title = winter ? Lore.ui(m.evergreen ? 'evergreenWinter' : 'winter') : T.columns.rateTip;
+      r.cells.rate.fig.className = 'fig rate' + (winter ? ' cold' : '');
       const weight = weightOf(row.key);
       for (let i = 0; i < r.ticks.length; i++) {
         r.ticks[i].className = 'tick' + (i < weight ? ' on' : '');
@@ -247,9 +295,12 @@ export function createUI(doc, sim, cfg, actions) {
       r.feed.hidden = !m.nurture;
       r.feed.textContent = T.nurture;
       r.feed.className = 'feed' + (state.nurture[row.key] ? ' on' : '');
+      // The note: the mark first, then the figures behind it.
+      r.mark.textContent = Lore.ui('treeBest', { season: seasonName(row.best) });
+      r.figures.textContent = noteFigures(row, m);
     }
     for (const [key, r] of treeRows) {
-      if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) r.tr.hidden = true;
+      if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) r.box.hidden = true;
     }
     text('treesnote', any ? '' : Lore.ui('noTrees'));
   };
@@ -289,7 +340,93 @@ export function createUI(doc, sim, cfg, actions) {
       r.box.hidden = !seen;
       const capped = t.cost === null;
       priced(r.b, Lore.trait(t.id).name, capped ? T.bought : fmt(t.cost), !capped && state.sugar >= t.cost);
-      r.lv.textContent = t.cap > 1 ? t.level + '/' + t.cap : (t.level ? T.bought : '');
+      // A trait that goes only one deep says so on its own label; saying it
+      // again out at the margin is a word to read for nothing.
+      r.lv.textContent = t.cap > 1 ? t.level + '/' + t.cap : '';
+    }
+  };
+
+  // -- instinct -----------------------------------------------------------------
+  //
+  // What the organism has learned to do for itself. One row per habit: a paper
+  // label that switches it, and under it, in faded ink, what it last did and
+  // how long ago. Under the rows, the reserve: four labels for the share of
+  // the sugar instinct is not allowed to touch.
+  //
+  // The first thing a habit ever does is worth one entry in the journal and
+  // nothing after it, so the entry is written here, from the time the
+  // simulation recorded, and marked in the same book of things said once. A
+  // habit that acted while the tab was closed is written up when the notebook
+  // is next opened, which is when it would have been noticed.
+
+  const INSTINCTS = ['extend', 'tips', 'beyond'];
+  const FIRST_LINE = { extend: 'instinctExtend', tips: 'instinctTips', beyond: 'instinctBeyond' };
+
+  const instinctRows = new Map();
+  const instinctRow = (key) => {
+    let r = instinctRows.get(key);
+    if (r) return r;
+    const box = doc.createElement('div');
+    box.className = 'rrow';
+    const b = doc.createElement('button');
+    b.className = 'rite';
+    b.title = T.instinct.hints[key] || '';
+    b.addEventListener('click', () => actions.setInstinct(key));
+    const line = doc.createElement('span');
+    line.className = 'line';
+    box.appendChild(b);
+    box.appendChild(line);
+    el('instinct').appendChild(box);
+    r = { box, b, line };
+    instinctRows.set(key, r);
+    return r;
+  };
+
+  let reserveLabels = null;
+  const reserveRow = () => {
+    if (reserveLabels) return reserveLabels;
+    const host = el('instinct-reserve');
+    if (!host) return null;
+    const name = doc.createElement('span');
+    name.textContent = T.instinct.reserve;
+    host.appendChild(name);
+    const buttons = cfg.instinct.reserves.map((share, i) => {
+      const b = doc.createElement('button');
+      b.textContent = T.instinct.reserves[i] === undefined ? String(share) : T.instinct.reserves[i];
+      b.title = T.instinct.reserveTip;
+      b.addEventListener('click', () => actions.setReserve(share));
+      host.appendChild(b);
+      return b;
+    });
+    reserveLabels = { name, buttons };
+    return reserveLabels;
+  };
+
+  const renderInstinct = () => {
+    if (!state.flags.instinct) return;
+    const learned = sim.mods().instinct;
+    const inst = sim.instinct();
+    for (const key of INSTINCTS) {
+      const r = instinctRow(key);
+      r.box.hidden = !learned[key];
+      if (!learned[key]) continue;
+      const on = !!inst[key];
+      priced(r.b, T.instinct.names[key], on ? T.instinct.on : T.instinct.off, true);
+      r.b.className = 'rite' + (on ? ' on' : '');
+      const at = inst.acted ? inst.acted[key] : undefined;
+      r.line.textContent = at === undefined
+        ? T.instinct.idle
+        : fill(T.instinct.ago, { what: T.instinct.acted[key], t: fmtTime(Math.max(0, state.t - at)) });
+      if (at !== undefined && !state.fired[FIRST_LINE[key]]) {
+        state.fired[FIRST_LINE[key]] = true;
+        log(Lore.ui(FIRST_LINE[key]));
+      }
+    }
+    const res = reserveRow();
+    if (res) {
+      for (let i = 0; i < res.buttons.length; i++) {
+        res.buttons[i].className = Math.abs(cfg.instinct.reserves[i] - inst.reserve) < 1e-9 ? 'on' : '';
+      }
     }
   };
 
@@ -414,6 +551,10 @@ export function createUI(doc, sim, cfg, actions) {
     // Traits.
     show('traits-panel', !!f.traits);
     renderTraits();
+
+    // Instinct.
+    show('instinct-panel', !!f.instinct);
+    renderInstinct();
 
     // Fruiting.
     show('spores-panel', !!f.spores);

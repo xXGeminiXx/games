@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=1';
+import { oklch } from './src/palette.js?v=2';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 1,             // the ?v= tag every import carries; bump on every src change
+    build: 2,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -116,9 +116,122 @@ export const CONFIG = {
     idleAfter: 5,
   },
 
+  // The picture's resolution, and the only real dial in the game's cost. The
+  // island is raymarched into an offscreen buffer at `scale` of the canvas
+  // and stretched back to fill it, and the canvas is sized at the display's
+  // pixel ratio capped by `maxDpr`. Both multiply the pixels marched, and the
+  // frame cost tracks that count very nearly one for one: quadrupling the
+  // pixels has measured about 2.7x the frame on a desktop GPU and 3.2x in
+  // software rendering, which is close enough that the ratio can be trusted.
+  //
+  // There is no single right default, because the same setting that leaves a
+  // good GPU idle will halve the frame rate on the next machine. So the
+  // shipped setting is `auto`: the game measures its own frames and settles
+  // on the sharpest picture that still holds the budget. A player who picks a
+  // setting instead is never overruled, and the choice is remembered.
   render: {
-    scale: 0.5,           // raymarch resolution as a fraction of the canvas
-    maxDpr: 1.5,
+    scale: 0.7,           // raymarch resolution as a fraction of the canvas
+    maxDpr: 1.5,          // CEILING on the drawing buffer's pixel ratio. It is
+                          // only a cap: on a display reporting less than this
+                          // - browser zoom easily puts it under 1 - raising it
+                          // changes nothing. It is not a sharpness dial.
+    // A FLOOR on the same ratio, and it is deliberately off. Browser zoom
+    // below 100% reports a ratio under 1, which looks like the game is
+    // rendering below native - but that ratio is the number of real display
+    // pixels per page pixel, so matching it IS native. Forcing the buffer up
+    // to 1.0 there would not recover any detail the display can show; it
+    // would march about half again as many rays for a slightly smoother edge,
+    // on machines already measured at 20 to 30 frames a second. Raise it only
+    // if antialiasing is wanted and the frames are there to pay for it.
+    minDpr: 0,            // floor on the drawing buffer's pixel ratio
+    quality: 'auto',      // the preset a new player starts on
+    presets: {
+      auto:   { name: 'auto',   scale: 0.7,  dpr: 1.5, adapt: true,  hint: 'the sharpest picture this machine holds at the frame budget' },
+      low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels, and no more than one a page pixel; for a slow machine' },
+      normal: { name: 'normal', scale: 0.7,  dpr: 1.5, adapt: false, hint: 'about half the cost of high' },
+      high:   { name: 'high',   scale: 1.0,  dpr: 1.5, adapt: false, hint: 'the whole picture marched, one ray a pixel' },
+      extra:  { name: 'extra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'marched above the size of the window and sampled back down, which softens hard edges; costs a great deal and does nothing on a display that reports less than this' },
+    },
+    presetOrder: ['auto', 'low', 'normal', 'high', 'extra'],
+    showRate: true,       // the frame rate beside the quality buttons
+    resizeDelay: 0.25,    // seconds a new window size must hold before the
+                          // picture's buffer is rebuilt for it
+  },
+
+  // The automatic quality guard.
+  //
+  // The budget is 60 frames a second, not as many as the display will take.
+  // Nothing here is played on reflex: the camera drifts, the carrier glides,
+  // and the drones are a stream rather than a thing you aim at. Past 60 the
+  // extra frames buy nothing a player can see, while the same time spent on
+  // resolution buys a sharper island every second they look at it. So the
+  // guard spends headroom on pixels and stops at 60.
+  //
+  // Two measures, because one is not enough. `budgetMs` is what a frame
+  // should usually take; `stutterMs` is how slow the worst twentieth of
+  // frames is allowed to get before the picture is called rough. A run
+  // measured at a median of 30 a second and a worst twentieth of 12 is not
+  // smooth, and a guard watching only the median would have called it fine.
+  adapt: {
+    rungs: [0.4, 0.55, 0.7, 0.85, 1.0],
+    budgetMs: 16.7,       // 60 frames a second, usually
+    stutterMs: 33,        // and no worse than 30 in the roughest twentieth
+    upMargin: 0.86,       // a predicted frame must fit this far inside both
+    window: 45,           // frames in the rolling measurement
+    minSamples: 24,       // enough to judge by; a slow machine would take many
+                          // seconds to fill the whole window, and waiting that
+                          // long to notice trouble is itself the trouble
+    downAfter: 2.5,       // seconds of trouble before stepping down
+    upAfter: 5,           // seconds of headroom before stepping up
+    settle: 2,            // seconds ignored after any change of resolution
+    // Nothing is measured for the first several seconds. A GPU that has been
+    // idle runs at a low clock and takes seconds to boost; the same page has
+    // been measured reporting 24, 45, 68 and 92 frames a second over four
+    // consecutive samples with nothing changed between them. Acting on the
+    // first of those would cost the player the whole run.
+    start: 7,             // seconds ignored at the start, while things warm
+    logEvery: 20,         // seconds between entries in the local performance log
+  },
+
+  // Every key the page listens to, in one table. A key named here does that
+  // one thing and nothing else. Keys match lower-case, and are ignored while a
+  // text box has focus or ctrl / alt / meta is held, so the browser's own
+  // shortcuts still work.
+  keys: {
+    // flying the carrier, relative to the view: forward is always away from
+    // the camera, whichever way it has been turned
+    forward: ['w', 'arrowup'],
+    back: ['s', 'arrowdown'],
+    left: ['a', 'arrowleft'],
+    right: ['d', 'arrowright'],
+    // turning and framing
+    orbitLeft: ['q'],
+    orbitRight: ['e'],
+    pitchUp: ['r'],
+    pitchDown: ['f'],
+    zoomIn: ['=', '+'],
+    zoomOut: ['-', '_'],
+    recentre: ['c'],
+    // the ledger
+    hire: ['h'],
+    wing: ['g'],
+    upgrade1: ['1'], upgrade2: ['2'], upgrade3: ['3'], upgrade4: ['4'],
+    // the page
+    panel: ['p'],
+    help: ['?', '/'],
+    close: ['escape'],
+  },
+
+  // How fast the keyboard flies the carrier and moves the camera.
+  controls: {
+    flySpeed: 52,         // world units per second the anchor is pushed
+    orbitSpeed: 1.5,      // radians per second on the orbit keys
+    pitchSpeed: 1.0,      // radians per second on the pitch keys
+    zoomSpeed: 1.7,       // e-folds of camera distance per second
+    minPitch: -0.2,
+    maxPitch: 1.35,
+    minDistance: 26,
+    maxDistance: 340,
   },
 
   // The look: a cold northern morning with the fog burning off. Slate water,
@@ -152,6 +265,9 @@ export const CONFIG = {
     fog: oklch(0.88, 0.02, 235),
     hull: oklch(0.82, 0.02, 85),
     hullDark: oklch(0.4, 0.02, 80),
+    hullTrim: oklch(0.62, 0.025, 82),   // frames, stringers and panel seams
+    glazing: oklch(0.36, 0.012, 245),   // bridge and gallery glass, seen dark
+    lit: oklch(0.7, 0.15, 50),          // what is lit from inside
     drone: oklch(0.7, 0.19, 45),
     droneLoaded: oklch(0.55, 0.14, 35),
   },

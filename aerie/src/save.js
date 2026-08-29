@@ -34,3 +34,22 @@ export function createSave(cfg, storage) {
 
   return { encode, decode, write, read, clear, key };
 }
+
+// What the player set about the page rather than the game: the quality they
+// chose and whether the chart table is folded away. Kept apart from the save
+// so importing someone else's game does not reach into their window, and so
+// starting over leaves these alone.
+export function createPrefs(cfg, storage) {
+  const key = cfg.identity.storageKey + '.view';
+  const read = () => {
+    try { const s = storage && storage.getItem(key); const o = s ? JSON.parse(s) : null; return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
+  };
+  let cache = read();
+  const get = (k, fallback) => (k in cache ? cache[k] : fallback);
+  const set = (k, v) => {
+    cache[k] = v;
+    try { storage && storage.setItem(key, JSON.stringify(cache)); } catch (e) { /* a full or blocked store just means it is not remembered */ }
+    return v;
+  };
+  return { get, set, key, all: () => ({ ...cache }) };
+}

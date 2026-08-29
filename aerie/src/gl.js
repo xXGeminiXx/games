@@ -26,12 +26,19 @@ export function createGL(canvas, opts = {}) {
   // chemical concentrations). Nearly every device has them; check anyway.
   const floatColor = !!gl.getExtension('EXT_color_buffer_float');
   const floatLinear = !!gl.getExtension('OES_texture_float_linear');
-  const maxDpr = opts.maxDpr ?? 2;
+  let maxDpr = opts.maxDpr ?? 2;
+  // A floor on the drawing buffer as well as a ceiling. Browser zoom can put
+  // devicePixelRatio below 1, and a buffer smaller than the page is resampled
+  // twice on its way to the glass - once by the resolve pass and again by the
+  // browser - which no quality setting can undo. Holding a floor of one
+  // device pixel per page pixel costs pixels; the frame guard is what pays
+  // for it, by easing the raymarch resolution instead.
+  let minDpr = opts.minDpr ?? 1;
 
   // Size the drawing buffer to the element's CSS size times the device pixel
   // ratio, capped, and return whether anything changed.
   const resize = (scale = 1) => {
-    const dpr = Math.min(maxDpr, window.devicePixelRatio || 1) * scale;
+    const dpr = Math.max(minDpr, Math.min(maxDpr, window.devicePixelRatio || 1)) * scale;
     const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
     const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
     if (canvas.width !== w || canvas.height !== h) {
@@ -42,7 +49,16 @@ export function createGL(canvas, opts = {}) {
     return false;
   };
 
-  return { gl, canvas, resize, floatColor, floatLinear };
+  // The pixel-ratio ceiling can move while the game runs, because the player
+  // can change how sharp they want the picture. Nothing is reallocated here;
+  // the next resize() sees the new number and reports the change.
+  // The ceiling can move while the game runs, because the player can say how
+  // much they want spent. It is a cap and only a cap: on a display that
+  // reports a ratio below it, raising it changes nothing at all.
+  const setMaxDpr = (v) => { maxDpr = Math.max(0.5, Number(v) || 1); };
+  const dpr = () => Math.max(minDpr, Math.min(maxDpr, window.devicePixelRatio || 1));
+
+  return { gl, canvas, resize, floatColor, floatLinear, setMaxDpr, dpr, get maxDpr() { return maxDpr; }, get minDpr() { return minDpr; } };
 }
 
 // ---- shaders --------------------------------------------------------------
@@ -178,7 +194,7 @@ export function texture(gl, { width, height, format = 'rgba8', data = null, filt
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, w);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, w);
   if (mipmap) gl.generateMipmap(gl.TEXTURE_2D);
-  return { texture: tex, width, height, format };
+  return { texture: tex, width, height, format, dispose: () => gl.deleteTexture(tex) };
 }
 
 // A framebuffer with one colour attachment (and optionally a depth buffer).
@@ -203,6 +219,15 @@ export function target(gl, opts) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.viewport(0, 0, opts.width, opts.height);
     },
+    // Hand the memory back. A full-screen float target with depth is tens of
+    // megabytes; anything that replaces one because the window changed size
+    // must dispose the old one first, or a single drag of a window edge
+    // orphans hundreds of megabytes for the driver to deal with when it can.
+    dispose: () => {
+      gl.deleteFramebuffer(fbo);
+      color.dispose();
+      if (depth) gl.deleteRenderbuffer(depth);
+    },
   };
 }
 
@@ -215,6 +240,7 @@ export function pingpong(gl, opts) {
     get write() { return b; },
     swap: () => { const t = a; a = b; b = t; },
     width: opts.width, height: opts.height,
+    dispose: () => { a.dispose(); b.dispose(); },
   };
 }
 
@@ -304,6 +330,34 @@ export const shapes = {
     }
     return { positions: new Float32Array(P), normals: new Float32Array(N), indices: new Uint16Array(I) };
   },
+  // A tube along Y, unit height and unit diameter, so it drops into the same
+  // scale-a-unit-box idiom as cube(). `caps` off leaves a ring, which is what
+  // an engine cowl or a hull frame wants.
+  cylinder: (segments = 16, caps = true) => {
+    const P = [], N = [], I = [];
+    const push = (x, y, z, nx, ny, nz) => { P.push(x, y, z); N.push(nx, ny, nz); return P.length / 3 - 1; };
+    for (let i = 0; i < segments; i++) {
+      const a0 = (i / segments) * Math.PI * 2, a1 = ((i + 1) / segments) * Math.PI * 2;
+      const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+      const b = push(c0 * 0.5, -0.5, s0 * 0.5, c0, 0, s0);
+      push(c1 * 0.5, -0.5, s1 * 0.5, c1, 0, s1);
+      push(c1 * 0.5, 0.5, s1 * 0.5, c1, 0, s1);
+      push(c0 * 0.5, 0.5, s0 * 0.5, c0, 0, s0);
+      I.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    }
+    if (caps) {
+      for (const dir of [1, -1]) {
+        const centre = push(0, dir * 0.5, 0, 0, dir, 0);
+        for (let i = 0; i < segments; i++) {
+          const a0 = (i / segments) * Math.PI * 2, a1 = ((i + 1) / segments) * Math.PI * 2;
+          const p0 = push(Math.cos(a0) * 0.5, dir * 0.5, Math.sin(a0) * 0.5, 0, dir, 0);
+          const p1 = push(Math.cos(a1) * 0.5, dir * 0.5, Math.sin(a1) * 0.5, 0, dir, 0);
+          if (dir > 0) I.push(centre, p0, p1); else I.push(centre, p1, p0);
+        }
+      }
+    }
+    return { positions: new Float32Array(P), normals: new Float32Array(N), indices: new Uint16Array(I) };
+  },
 };
 
 // Convenience: a mesh ready to draw instanced. `instances` is an object of
@@ -378,6 +432,7 @@ export function mrt(gl, { width, height, format = 'rgba32f', count = 2, filter =
   return {
     fbo, colors, width, height,
     bind: () => { gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, width, height); },
+    dispose: () => { gl.deleteFramebuffer(fbo); for (const c of colors) c.dispose(); },
   };
 }
 
@@ -388,5 +443,6 @@ export function pingpongMRT(gl, opts) {
     get write() { return b; },
     swap: () => { const t = a; a = b; b = t; },
     width: opts.width, height: opts.height,
+    dispose: () => { a.dispose(); b.dispose(); },
   };
 }

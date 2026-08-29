@@ -142,6 +142,51 @@
   .bcard h2{margin-top:14px}
   .bcard .actions{margin-top:14px;display:flex;gap:8px}
 </style>
+<!-- build-watch:start -->
+<meta name="build" content="a62c6c27b886">
+<script>
+(function () {
+  var meta = document.querySelector('meta[name="build"]');
+  var mine = meta && meta.getAttribute('content');
+  if (!mine || !window.fetch) return;
+  var every = 300000;          // re-ask every five minutes while the tab is open
+  var checking = false;
+
+  function reload(to) {
+    // A plain reload can be answered from cache, so the new build is asked for
+    // by a URL the cache has not seen. Whatever the player already had on the
+    // address bar is kept; only a previous build stamp is replaced.
+    var q = new URLSearchParams(location.search);
+    q.set('b', to);
+    location.replace(location.pathname + '?' + q.toString() + location.hash);
+  }
+
+  function check() {
+    if (checking || document.hidden) return;
+    checking = true;
+    fetch('build.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        checking = false;
+        if (!j || !j.build || j.build === mine) return;
+        // One reload per build. If the page comes back still stamped with the
+        // old id the files were not really replaced, and reloading again would
+        // only spin.
+        try {
+          if (sessionStorage.getItem('build-watch') === j.build) return;
+          sessionStorage.setItem('build-watch', j.build);
+        } catch (e) { /* private mode: fall through and reload once */ }
+        reload(j.build);
+      })
+      .catch(function () { checking = false; });
+  }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  setInterval(check, every);
+  setTimeout(check, 15000);
+})();
+</script>
+<!-- build-watch:end -->
 </head>
 <body>
 <header>
