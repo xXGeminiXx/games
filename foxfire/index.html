@@ -130,11 +130,17 @@
     h2{margin-bottom:5px}
   }
   @media (max-width:760px){
+    /* One column that scrolls as a page: nothing here keeps a fixed height,
+       so a panel can never paint over the one below it. */
+    html,body{height:auto;min-height:100%}
     body{overflow:auto}
-    main{display:flex;flex-direction:column}
-    #field{order:-1;border-bottom:1px solid var(--rule)}
-    #floor{height:240px;flex:none}
-    #traits-panel{max-height:none;overflow:visible}
+    main{display:flex;flex-direction:column;flex:none;min-height:0}
+    /* The picture first, the books under it, the traits last: the field is
+       dissolved so its two children can be ordered around the books. */
+    #field{display:contents}
+    #floor{order:-1;height:240px;flex:none;border-bottom:1px solid var(--rule)}
+    #books{flex:none;overflow:visible;order:0}
+    #traits-panel{order:1;max-height:none;overflow:visible;flex:none}
     #traits{grid-template-columns:1fr}
     #books{border-right:0;overflow:visible;padding:12px 14px}
     header{padding:10px 14px 6px;flex-wrap:wrap}
@@ -220,8 +226,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=1';
-import { createGame } from './src/game.js?v=1';
+import { CONFIG, applyIdentity } from './config.js?v=2';
+import { createGame } from './src/game.js?v=2';
 
 applyIdentity(document);
 

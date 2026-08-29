@@ -11,8 +11,8 @@
 // would. That is what lets time away be caught up in coarse chunks.
 // ---------------------------------------------------------------------------
 
-import { nearestOpen } from './world.js?v=1';
-import { hash } from './rng.js?v=1';
+import { nearestOpen } from './world.js?v=2';
+import { hash } from './rng.js?v=2';
 
 /** A set with O(1) add, delete and random access, for the frontier. */
 export class IndexedSet {

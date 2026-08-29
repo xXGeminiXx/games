@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=1';
-import { createSim, restoreSim, openedState } from './sim.js?v=1';
-import * as Save from './save.js?v=1';
-import * as Sp from './spores.js?v=1';
-import * as Lore from './lore.js?v=1';
-import { hash } from './rng.js?v=1';
-import { createUI } from './ui.js?v=1';
-import { createView } from './view.js?v=1';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=1';
+import { storageKey } from '../config.js?v=2';
+import { createSim, restoreSim, openedState } from './sim.js?v=2';
+import * as Save from './save.js?v=2';
+import * as Sp from './spores.js?v=2';
+import * as Lore from './lore.js?v=2';
+import { hash } from './rng.js?v=2';
+import { createUI } from './ui.js?v=2';
+import { createView } from './view.js?v=2';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=2';
 
 /**
  * @param {object} o

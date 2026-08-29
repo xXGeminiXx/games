@@ -10,7 +10,7 @@
 // frames but the eased camera, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=1';
+import { seasonOf } from './season.js?v=2';
 
 export function createView(canvas, cfg, doc) {
   const ctx = canvas.getContext('2d');

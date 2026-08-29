@@ -11,7 +11,7 @@
 // only has to remember which nodes have been reached.
 // ---------------------------------------------------------------------------
 
-import { hash, unit } from './rng.js?v=1';
+import { hash, unit } from './rng.js?v=2';
 
 /** Number of lattice cells inside a disc of the given radius. */
 export function cellsInDisc(radius) {
