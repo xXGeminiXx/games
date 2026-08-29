@@ -11,7 +11,7 @@
 // a headless test can drive a camera by calling move() directly.
 // ---------------------------------------------------------------------------
 
-import { m4, v3, clamp } from './mat.js?v=16';
+import { m4, v3, clamp } from './mat.js?v=17';
 
 export function flyCamera({ position = [0, 2, 5], yaw = 0, pitch = 0, fov = 60, near = 0.05, far = 500, speed = 6, sensitivity = 0.0025, damping = 8 } = {}) {
   const cam = {

@@ -193,9 +193,17 @@
     .wrow{flex-wrap:wrap}
     .wrow i{white-space:normal;overflow:visible}
   }
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="d66c4b57cb73">
+<meta name="build" content="1f2cd20470ad">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -296,8 +304,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=10';
-import { createGame } from './src/game.js?v=10';
+import { CONFIG, applyIdentity } from './config.js?v=11';
+import { createGame } from './src/game.js?v=11';
 
 applyIdentity(document);
 

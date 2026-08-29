@@ -14,7 +14,7 @@
 // grows the same field.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=7';
+import { hash, unit, range } from './rng.js?v=8';
 
 /** What a cell is. Ground is the only kind that may be changed. */
 export const KIND = { ground: 0, snowline: 1, hearth: 2 };

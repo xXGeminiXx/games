@@ -88,9 +88,17 @@
     #anchor-hint{bottom:auto;top:52px}
     #fold,body.folded #fold{top:12px;right:12px}
   }
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="e1d8e6c3a31a">
+<meta name="build" content="1475e4893757">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -202,9 +210,9 @@
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=16';
-  import { CONTENT } from './content.js?v=16';
-  import { createGame } from './src/game.js?v=16';
+  import { CONFIG } from './config.js?v=17';
+  import { CONTENT } from './content.js?v=17';
+  import { createGame } from './src/game.js?v=17';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

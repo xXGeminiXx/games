@@ -7,10 +7,10 @@
 // surge, awards) lives under its own key and survives a new run.
 // ---------------------------------------------------------------------------
 
-import { createRun, refreshFlow, emptyMeta, logLine } from './run.js?v=7';
-import { serializeMotes, restoreMotes } from './motes.js?v=7';
-import { serializeWorks, restoreWorks } from './works.js?v=7';
-import { surgePlan, ebbPlan, forecast, emptyTelemetry } from './melt.js?v=7';
+import { createRun, refreshFlow, emptyMeta, logLine } from './run.js?v=8';
+import { serializeMotes, restoreMotes } from './motes.js?v=8';
+import { serializeWorks, restoreWorks } from './works.js?v=8';
+import { surgePlan, ebbPlan, forecast, emptyTelemetry } from './melt.js?v=8';
 
 const PREFIX = 'FL1:';
 

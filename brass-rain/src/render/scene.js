@@ -22,18 +22,18 @@
 // description of what to draw, and it touches nothing else on the page.
 // ---------------------------------------------------------------------------
 
-import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=3';
-import { createColours } from './colours.js?v=3';
-import { fitBoard, clipTransform, lampPosition, reelRect } from './layout.js?v=3';
-import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=3';
+import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=4';
+import { createColours } from './colours.js?v=4';
+import { fitBoard, clipTransform, lampPosition, reelRect } from './layout.js?v=4';
+import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=4';
 import {
   packPins, packPockets, packRails, packFlashes, packReels, packArc,
   medianPinRadius, POCKET_KINDS, POCKET_TONES, FLASH_KINDS,
-} from './board-geom.js?v=3';
+} from './board-geom.js?v=4';
 import {
   INSTANCE_VS, RAIL_VS, BALL_VS, GROUND_FS, PIN_FS, BALL_FS, BALL_SHADOW_FS,
   RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, COMPOSITE_FS,
-} from './shaders.js?v=3';
+} from './shaders.js?v=4';
 
 // The unit quad every instance is stamped from, as a triangle strip so no
 // index buffer is needed.

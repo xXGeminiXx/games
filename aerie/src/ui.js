@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=16';
-import { fill } from '../content.js?v=16';
+import { fmt, rate, count, pct } from './numbers.js?v=17';
+import { fill } from '../content.js?v=17';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);

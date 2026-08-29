@@ -141,9 +141,17 @@
   .bcard p.ink{color:var(--ink)}
   .bcard h2{margin-top:14px}
   .bcard .actions{margin-top:14px;display:flex;gap:8px}
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="f62cfe0c9f7a">
+<meta name="build" content="0c8697befe71">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -260,8 +268,8 @@
 </div>
 
 <script type="module">
-  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=7';
-  import { createGame } from './src/game.js?v=7';
+  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=8';
+  import { createGame } from './src/game.js?v=8';
 
   applyIdentity(document);
   if (appliedOverrides.length) console.log('config overrides:', appliedOverrides.join(' '));

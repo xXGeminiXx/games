@@ -69,9 +69,17 @@
   #ending .line{color:var(--label)}
   #ending .again{margin-top:26px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--label);padding-bottom:2px}
   #ending .again:hover{color:var(--figure)}
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="d913855917a7">
+<meta name="build" content="88009d2bba10">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');

@@ -12,7 +12,7 @@
 
 import {
   damage, applySlow, applyBurn, applyPull, forEachInRadius, firstInRadius, MOTE_FLAG,
-} from './motes.js?v=7';
+} from './motes.js?v=8';
 
 /** Put a shot's result on the work that took it. */
 function credit(w, res) {

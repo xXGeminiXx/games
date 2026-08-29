@@ -91,8 +91,8 @@
 // over what it claims; other players replay it and post signed verdicts. None
 // of this is required - a board with no logs at all still works exactly as it
 // did, and every entry simply reads UNVERIFIED.
-import { identity as deviceIdentity, verify as verifySignature } from './identity.js?v=13';
-import { canonicalRun, canonicalWitness, logHash as logHashOf, entryState, STATE } from './verify.js?v=13';
+import { identity as deviceIdentity, verify as verifySignature } from './identity.js?v=14';
+import { canonicalRun, canonicalWitness, logHash as logHashOf, entryState, STATE } from './verify.js?v=14';
 
 const STORAGE_VERSION = 1;
 

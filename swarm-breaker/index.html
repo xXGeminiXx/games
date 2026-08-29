@@ -241,9 +241,17 @@
   }
   .aw .bar i{position:absolute; inset:0 auto 0 0; background:var(--dim)}
   .aw.won .bar i{background:var(--trade)}
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="718349d1d339">
+<meta name="build" content="189a8a553397">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -387,20 +395,20 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=13';
-import { createJuice } from './src/juice.js?v=13';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=13';
-import { createBlockKinds } from './src/blocks.js?v=13';
-import { safeRows } from './src/arrival.js?v=13';
-import { createAwards } from './src/awards.js?v=13';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=13';
-import { createLeaderboard } from './src/leaderboard.js?v=13';
-import * as Tiers from './src/tiers.js?v=13';
-import { createOnboarding } from './src/onboarding.js?v=13';
-import { createVisual } from './src/visual.js?v=13';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=13';
-import { seedForSync, today as utcToday } from './src/daily.js?v=13';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=13';
+         storageKey, offerCost, applyIdentity } from './config.js?v=14';
+import { createJuice } from './src/juice.js?v=14';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=14';
+import { createBlockKinds } from './src/blocks.js?v=14';
+import { safeRows } from './src/arrival.js?v=14';
+import { createAwards } from './src/awards.js?v=14';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=14';
+import { createLeaderboard } from './src/leaderboard.js?v=14';
+import * as Tiers from './src/tiers.js?v=14';
+import { createOnboarding } from './src/onboarding.js?v=14';
+import { createVisual } from './src/visual.js?v=14';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=14';
+import { seedForSync, today as utcToday } from './src/daily.js?v=14';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=14';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.

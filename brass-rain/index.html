@@ -292,9 +292,17 @@
     main{flex-direction:column-reverse}
     #plaques{width:auto;max-height:44%;border-right:0;border-top:1px solid rgba(176,134,55,.35)}
   }
+
+/* A thumb, not a pointer: on touch devices every control gets a real target
+   (WCAG 2.2 asks 24 px; 36 is what a thumb hits without aiming). Layout and
+   look are unchanged on a mouse. */
+@media (pointer: coarse) {
+  button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
+  input[type="range"] { min-height: 28px; }
+}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="73dbf6dc4eb8">
+<meta name="build" content="0eee22da04c8">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -507,7 +515,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=3';
+  import { boot } from './src/ui.js?v=4';
   boot(document);
 </script>
 </body>
