@@ -18,9 +18,9 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=2';
-import { createBalls, launch, stepPhysics } from './physics.js?v=2';
-import { rng as makeRng } from './rng.js?v=2';
+import { createBoard, nailPos, layoutFor } from './board.js?v=3';
+import { createBalls, launch, stepPhysics } from './physics.js?v=3';
+import { rng as makeRng } from './rng.js?v=3';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -41,11 +41,25 @@ export function offerCabinets(cfg, seedFrom, count) {
   const r = makeRng('cabinets:' + seedFrom);
   const out = [];
   const n = Math.max(1, count || 3);
+  const shown = new Set();
   for (let i = 0; i < n; i++) {
-    const seed = (r.next() * 1e9) >>> 0;
+    // A row of three that turns out to be the same cabinet three times is not
+    // a choice. Seeds are drawn until one lands on a face the row has not
+    // shown yet, and once the whole catalogue is on the row the draw is taken
+    // as it comes rather than looped over forever.
+    let seed = (r.next() * 1e9) >>> 0;
+    for (let tries = 0; tries < 40 && shown.size < layoutCount(cfg); tries++) {
+      if (!shown.has(layoutFor(cfg, seed).id)) break;
+      seed = (r.next() * 1e9) >>> 0;
+    }
+    shown.add(layoutFor(cfg, seed).id);
     out.push(readCabinet(cfg, seed, i));
   }
   return out;
+}
+
+function layoutCount(cfg) {
+  return Array.isArray(cfg.board.layouts) && cfg.board.layouts.length ? cfg.board.layouts.length : 1;
 }
 
 /** Everything worth knowing about one machine, read off its own face. */

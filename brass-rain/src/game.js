@@ -11,21 +11,21 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=2';
+import { loadConfig } from '../config.js?v=3';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=2';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=3';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=2';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=2';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=2';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=2';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=2';
-import { rng as makeRng } from './rng.js?v=2';
-import { offerCabinets } from './cabinets.js?v=2';
-import * as Save from './save.js?v=2';
+         handMult, restoreFloor } from './floor.js?v=3';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=3';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=3';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=3';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=3';
+import { rng as makeRng } from './rng.js?v=3';
+import { offerCabinets } from './cabinets.js?v=3';
+import * as Save from './save.js?v=3';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -46,8 +46,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=2');
-  const metaModule = await optional('./meta.js?v=2');
+  const catalogue = await optional('./fittings.js?v=3');
+  const metaModule = await optional('./meta.js?v=3');
   const bench = createBench(catalogue || {});
 
   const game = {
