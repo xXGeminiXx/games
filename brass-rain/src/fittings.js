@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Fittings: the parts that get bolted into the machine, as pure data.
 //
-// This file is the catalogue and the contract. It has no imports, no DOM, no
+// This file is the catalog and the contract. It has no imports, no DOM, no
 // canvas, no timers and no random source of its own. Everything it needs is
 // handed to it. That makes it readable by a test, by a balance tool and by the
 // game itself without any of them dragging the others in.
@@ -19,7 +19,7 @@
 //   mods   Declarative. A plain object of key -> [op, value] where op is
 //          '+' (add), '*' (multiply) or '=' (replace). The machine builder
 //          applies every owned fitting's mods once, before the round starts,
-//          in catalogue order: all '=' first, then all '*', then all '+'.
+//          in catalog order: all '=' first, then all '*', then all '+'.
 //          Deterministic, order independent within a phase, and testable
 //          without running a ball.
 //
@@ -48,12 +48,12 @@
 //   aimFalloff     strength points beyond the window over which gate
 //                  probability decays to its floor
 //
-//   gateProb       chance a launched ball enters the centre gate
+//   gateProb       chance a launched ball enters the center gate
 //   gatePay        balls paid by the gate
-//   jadeProb       chance of the jade pocket
-//   jadePay        balls paid by the jade pocket
-//   creamProb      chance of a cream pocket
-//   creamPay       balls paid by a cream pocket
+//   jadeProb       chance of the big pocket, the single high value mouth
+//   jadePay        balls paid by the big pocket
+//   creamProb      chance of a mid pocket, the pair of middling mouths
+//   creamPay       balls paid by a mid pocket
 //   sideProb       chance of a side pocket
 //   sidePay        balls paid by a side pocket
 //   (out is derived: 1 minus the four above)
@@ -68,7 +68,7 @@
 //   attackerProb   chance of the attacker pocket during fever
 //   attackerPay    balls paid by the attacker pocket
 //   feverGateProb  gate chance during fever, which is what extends a fever
-//   feverCreamProb cream chance during fever
+//   feverCreamProb mid pocket chance during fever
 //   feverSideProb  side chance during fever
 //   continuationAdd balls added to the fever counter by a match during fever
 //
@@ -96,12 +96,12 @@
 //   bumpers        integer count of rubber bumpers set above the gate
 //   shutter        string tag naming pockets a shutter closes ('outer-side')
 //   gates          integer count of gate mouths
-//   diverter       true to move the gate mouth off centre
+//   diverter       true to move the gate mouth off center
 //   duplicateLower true to mirror the lower third so every pocket exists twice
 //   frosted        true to render the glass opaque
 //
 // The board builder resolves these into geometry. Two fittings adding the same
-// tag add the group twice. Nothing here names a colour, a sprite or a node.
+// tag add the group twice. Nothing here names a color, a sprite or a node.
 //
 // ===========================================================================
 // HOOKS
@@ -149,7 +149,7 @@
 //   onPocket     { ball, pocket:{id, kind, base}, payout, fever (bool) }
 //                returns: a number that REPLACES ctx.payout. Returning
 //                undefined leaves it alone. Fittings on this hook run in
-//                catalogue order and each sees the previous one's result.
+//                catalog order and each sees the previous one's result.
 //
 //   onGate       { ball, payout, fever (bool) }
 //                returns: a number that replaces ctx.payout.
@@ -379,7 +379,7 @@ export function analyse(model = BASE_MODEL) {
   };
 }
 
-// ---- catalogue -------------------------------------------------------------
+// ---- catalog -------------------------------------------------------------
 
 function fit(def) {
   const f = {
@@ -395,37 +395,37 @@ export const FITTINGS = [
   // ---- common ---------------------------------------------------------- //
 
   fit({
-    id: 'extra_nail_row', name: 'Extra Nail Row',
-    text: 'A fresh row of nails above the side shelves. Side pocket chance +2 points, now {sideProb%}.',
+    id: 'extra_nail_row', name: 'Side Shelf Nails',
+    text: 'Side pockets catch 2 more balls in every 100, now {sideProb%}. A fresh row of nails feeds the shelves.',
     rarity: 'common', price: 30, hook: 'static', tags: ['board', 'pocket'],
     mods: { sideProb: ['+', 0.02] }, board: { addPins: 'side-shelf' },
     maxStack: 2,
-    bound: 'Side pockets pay 1, so a row is worth +0.02 balls per launch and the pocket total clamp holds at 0.62.'
+    bound: 'Side pockets pay 1 ball, the least on the board. Two rows still leave most balls falling out the bottom.'
   }),
 
   fit({
-    id: 'pulled_nail', name: 'Pulled Nail',
-    text: 'Two nails pulled from the gate shoulder. Gate chance +1 point, now {gateProb%}.',
+    id: 'pulled_nail', name: 'Pulled Slot Nails',
+    text: 'The slot takes 1 more ball in every 100, now {gateProb%}. Two nails are pulled out of its shoulder.',
     rarity: 'common', price: 30, hook: 'static', tags: ['board', 'gate'],
     mods: { gateProb: ['+', 0.01] }, board: { removePins: 'gate-shoulder' },
     maxStack: 3,
-    bound: 'Gate probability is clamped at 0.30, so three copies plus a magnet still cannot open the board.'
+    bound: 'The slot never takes more than 30 balls in 100 whatever you bolt on, so copies stop helping near that ceiling.'
   }),
 
   fit({
-    id: 'brass_lip', name: 'Brass Lip',
-    text: 'A brass lip on the cream pockets. Cream pays {creamPay} instead of 3.',
+    id: 'brass_lip', name: 'Mid Pocket Lip',
+    text: 'The mid pockets pay {creamPay} balls instead of 3. A brass lip stops the ball bouncing back out.',
     rarity: 'common', price: 30, hook: 'static', tags: ['pocket'],
     mods: { creamPay: ['+', 1] },
-    bound: 'One extra ball on a 6 percent pocket is +0.06 RTP.'
+    bound: 'Only the mid pockets, and only about 6 balls in 100 land there. One extra ball every sixteen pulls or so.'
   }),
 
   fit({
-    id: 'rubber_sleeve', name: 'Rubber Sleeve',
-    text: 'Rubber sleeves on ten nails. Every nail the ball touches adds x{per~}, up to x1.20.',
+    id: 'rubber_sleeve', name: 'Rubber Sleeves',
+    text: 'Every nail the ball touches adds x{per~} to what it pays, up to x1.20 on one ball. Ten nails get rubber.',
     rarity: 'common', price: 35, hook: 'onPinHit', tags: ['ball'],
     n: { per: 0.02, cap: 0.20 },
-    bound: 'Hard capped at +0.20 per ball, so a longer fall is worth nothing extra.',
+    bound: 'Stops at x1.20 on a single ball, so a longer fall through the nails is worth nothing extra.',
     apply: (ctx) => {
       const acc = ctx.ball.s.rubber_sleeve || 0;
       if (acc >= 0.20) return;
@@ -437,10 +437,10 @@ export const FITTINGS = [
 
   fit({
     id: 'felt_strip', name: 'Felt Strip',
-    text: 'Felt on the deep nails. Every 4th nail touched adds +{add~} to the pocket value, up to +3.',
+    text: 'Every 4th nail the ball touches adds +{add~} balls to what it pays, up to +3 on one ball.',
     rarity: 'common', price: 30, hook: 'onPinHit', tags: ['ball'],
     n: { every: 4, add: 0.5, cap: 3 },
-    bound: 'Capped at +3 flat, which is worth less than one cream pocket once payouts scale.',
+    bound: 'Stops at +3 balls, and it\'s a flat amount. It fades to nothing once your payouts run into the dozens.',
     apply: (ctx) => {
       const st = ctx.ball.s.felt_strip || { hits: 0, add: 0 };
       st.hits += 1;
@@ -454,195 +454,195 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'counterweight_plate', name: 'Counterweight Plate',
-    text: 'A weight on the launch arm. A launch at strength 80 or over carries x{mul~}.',
+    id: 'counterweight_plate', name: 'Hard Pull Weight',
+    text: 'Pull the handle to 80 or higher and the ball pays x{mul~}. A weight is hung on the handle arm.',
     rarity: 'common', price: 30, hook: 'onLaunch', tags: ['ball', 'aim'],
     n: { min: 0.80, mul: 1.15 },
-    bound: 'Strength 80 and over sits well off the gate sweet spot, so taking it costs gate frequency.',
+    bound: 'A hard pull throws the ball past the slot more often, so you trade slot hits for the bonus.',
     apply: (ctx) => { if (ctx.strength >= 0.80) ctx.ball.mul *= 1.15; }
   }),
 
   fit({
-    id: 'soft_spring', name: 'Soft Spring',
-    text: 'A softer launch spring. A launch at strength 35 or under adds +{add#} to whatever it pays.',
+    id: 'soft_spring', name: 'Soft Pull Spring',
+    text: 'Pull the handle to 35 or lower and the ball pays +{add#} balls on top. A softer spring is fitted.',
     rarity: 'common', price: 30, hook: 'onLaunch', tags: ['ball', 'aim'],
     n: { max: 0.35, add: 2 },
-    bound: 'Flat +2 and only on soft launches, which reach the gate less often.',
+    bound: 'A soft pull reaches the slot less often, so it\'s +2 balls on the pulls least likely to pay at all.',
     apply: (ctx) => { if (ctx.strength <= 0.35) ctx.ball.add += 2; }
   }),
 
   fit({
-    id: 'return_rail', name: 'Return Rail',
-    text: 'A rail under the out lanes. 1 lost ball in 5 rolls back into the tray.',
+    id: 'return_rail', name: 'Catch Tray',
+    text: '1 lost ball in 5 comes back to you. A tray is fitted under the out lanes.',
     rarity: 'common', price: 35, hook: 'onBallLost', tags: ['economy'],
     n: { p: 0.20 },
-    bound: 'Returns a ball, never a payout, so it never touches the quota.',
+    bound: 'It hands back a ball, never a payout, so it never counts toward the goal you have to clear.',
     apply: (ctx) => (ctx.rand() < 0.20 ? ctx.refund + 1 : ctx.refund)
   }),
 
   fit({
-    id: 'wire_basket', name: 'Wire Basket',
-    text: 'Wire baskets behind the side pockets. Side pockets pay {sidePay} instead of 1.',
+    id: 'wire_basket', name: 'Side Pocket Baskets',
+    text: 'Side pockets pay {sidePay} balls instead of 1. Wire baskets catch what used to drop straight through.',
     rarity: 'common', price: 35, hook: 'static', tags: ['pocket'],
     mods: { sidePay: ['+', 1] },
-    bound: 'Doubles the cheapest pocket on the board: +0.10 RTP.'
+    bound: 'Doubles the cheapest pocket on the board. Two balls is still two balls once the machine pays dozens.'
   }),
 
   fit({
-    id: 'reel_detent', name: 'Reel Detent',
-    text: 'A detent on the middle reel. It settles on the reached face {middleWeight%} of the time.',
+    id: 'reel_detent', name: 'Middle Reel Detent',
+    text: 'When the two outer reels match, the middle reel lands on the same board {middleWeight%} of the time. A detent slows it.',
     rarity: 'common', price: 30, hook: 'static', tags: ['reel', 'fever'],
     mods: { middleWeight: ['+', 0.04] },
-    bound: 'Middle reel weight is clamped at 0.75, and it only affects reaches that already happened.'
+    bound: 'It does nothing until the outer reels match on their own, and it tops out at 75 percent.'
   }),
 
   fit({
-    id: 'slack_reel', name: 'Slack Reel',
-    text: 'Slack in the outer reel belts. Reach chance +3 points, now {reachProb%}.',
+    id: 'slack_reel', name: 'Loose Reel Belts',
+    text: 'The two outer reels match 3 more times in every 100 spins, now {reachProb%}. That\'s the first half of starting a BONUS.',
     rarity: 'common', price: 30, hook: 'static', tags: ['reel', 'fever'],
     mods: { reachProb: ['+', 0.03] },
-    bound: 'Reach probability is clamped at 0.55.'
+    bound: 'The outer reels never match more than 55 percent of the time, and the middle reel still has to agree.'
   }),
 
   fit({
-    id: 'gate_tongue', name: 'Gate Tongue',
-    text: 'A tongue in the gate mouth. The gate pays {gatePay} balls instead of 3.',
+    id: 'gate_tongue', name: 'Slot Pay Tongue',
+    text: 'The slot pays {gatePay} balls instead of 3. A tongue in the pocket holds the ball a moment longer.',
     rarity: 'common', price: 30, hook: 'static', tags: ['gate'],
     mods: { gatePay: ['+', 2] },
-    bound: 'Pays balls only. It does not change how often the reels spin.'
+    bound: 'Pays balls only. It doesn\'t make the slot easier to hit or the reels spin any more often.'
   }),
 
   fit({
-    id: 'lamp_reflector', name: 'Lamp Reflector',
-    text: 'A reflector behind the lamp. Fever runs {feverLen} balls instead of 10.',
+    id: 'lamp_reflector', name: 'Bonus Reflector',
+    text: 'A BONUS runs {feverLen} balls instead of 10. A reflector is set behind the lamp.',
     rarity: 'common', price: 35, hook: 'static', tags: ['fever'],
     mods: { feverLen: ['+', 2] },
-    bound: 'Adds length, not rate. With no fever in a round it does nothing at all.'
+    bound: 'Longer BONUSes, not more of them. In a round where the reels never match it does nothing at all.'
   }),
 
   fit({
     id: 'second_rail', name: 'Second Rail',
-    text: 'A second launch rail. {inFlight} balls on the glass at once, so the tray empties and fills twice as fast.',
+    text: '{inFlight} balls in the air at once, so you fire about twice as fast. A second rail is bolted on.',
     rarity: 'common', price: 35, hook: 'static', tags: ['cadence'],
     mods: { inFlight: ['+', 1] },
-    bound: 'Cadence multiplies wins and losses equally. Under RTP 1 it kills you faster.'
+    bound: 'Speed magnifies whatever the machine already does. If it\'s losing balls, this loses them twice as fast.'
   }),
 
   fit({
-    id: 'rail_brush', name: 'Rail Brush',
-    text: 'A brush that wipes the rail clean. Flight time -15%.',
+    id: 'rail_brush', name: 'Quick Fall Brush',
+    text: 'Balls fall 15 percent faster, so you get more pulls per minute. A brush keeps the rail clean.',
     rarity: 'common', price: 30, hook: 'static', tags: ['cadence'],
     mods: { flightTime: ['*', 0.85] },
-    bound: 'Flight time floors at 0.35s and the rail floor caps the gain regardless.'
+    bound: 'Speed changes nothing about what a ball is worth. It only gets you to the same result sooner.'
   }),
 
   fit({
-    id: 'sorting_gate', name: 'Sorting Gate',
-    text: 'A sorting gate on the rail. Every 10th ball of a round is steered into the gate mouth.',
+    id: 'sorting_gate', name: 'Tenth Ball Sorter',
+    text: 'Every 10th ball of a round is steered straight into the slot. A sorter is fitted to the rail.',
     rarity: 'common', price: 40, hook: 'onLaunch', tags: ['gate'],
     n: { every: 10 },
-    bound: 'One in ten is the base gate rate, so this removes drought rather than raising the average.',
+    bound: 'One ball in ten is about what the slot takes anyway. This cuts the dry spells rather than raising the average.',
     apply: (ctx) => { if ((ctx.launchIndex + 1) % 10 === 0) ctx.ball.forceGate = true; }
   }),
 
   fit({
-    id: 'wear_plate', name: 'Wear Plate',
-    text: 'A wear plate under the tray. +{add#} launches added to every round budget.',
+    id: 'wear_plate', name: 'Budget Plate',
+    text: '+{add#} pulls added to every round. A wear plate takes the load off the tray.',
     rarity: 'common', price: 30, hook: 'onRoundStart', tags: ['economy'],
     n: { add: 6 },
-    bound: 'Extra launches at RTP under 1 are extra losses. It only helps a machine already over 1.',
+    bound: 'More pulls on a machine that loses balls just loses more of them. It only helps once yours pays its way.',
     apply: (ctx) => { ctx.round.budget += 6; }
   }),
 
   fit({
-    id: 'till_rail', name: 'Till Rail',
-    text: 'An extra window on the till rail. Clear bonus x{mul~}.',
+    id: 'till_rail', name: 'Till Window',
+    text: 'The bonus for clearing a round is x{mul~}. A second window opens on the till.',
     rarity: 'common', price: 35, hook: 'onRoundEnd', tags: ['economy'],
     n: { mul: 1.12 },
-    bound: 'Pays nothing on a failed round, and the clear bonus is the one number the quota does not count.',
+    bound: 'Pays nothing on a round you fail, and the clear bonus never counts toward the goal you needed.',
     apply: (ctx) => (ctx.cleared ? ctx.bonus * 1.12 : ctx.bonus)
   }),
 
   fit({
-    id: 'oiled_cloth', name: 'Oiled Cloth',
-    text: 'The face is oiled. Flight time -20%, but the ball touches 4 fewer nails.',
+    id: 'oiled_cloth', name: 'Oiled Board',
+    text: 'Balls fall 20 percent faster but touch 4 fewer nails on the way down. The board is wiped with oil.',
     rarity: 'common', price: 25, hook: 'static', tags: ['cadence', 'cost'],
     mods: { flightTime: ['*', 0.80], pinHits: ['+', -4] },
-    bound: 'Cheap because it is a straight trade: it guts every nail fitting you own.'
+    bound: 'Cheap for a reason. Fewer nails guts every part you own that pays off nail contacts.'
   }),
 
   fit({
-    id: 'bent_nail', name: 'Bent Nail',
-    text: 'One nail bent toward the jade pocket. Jade chance +1 point, now {jadeProb%}.',
+    id: 'bent_nail', name: 'Big Pocket Nail',
+    text: 'The big pocket takes 1 more ball in every 100, now {jadeProb%}. One nail is bent to lean toward it.',
     rarity: 'common', price: 35, hook: 'static', tags: ['board', 'pocket'],
     mods: { jadeProb: ['+', 0.01] }, board: { addPins: 'jade-lead' },
-    bound: 'Jade probability is clamped at 0.12.'
+    bound: 'The big pocket never takes more than 12 balls in 100, and it\'s the smallest pocket on the board.'
   }),
 
   fit({
-    id: 'copper_wire', name: 'Copper Wire',
-    text: 'Copper wire across the gate throat. The gate pays +{add#} more while a fever is running.',
+    id: 'copper_wire', name: 'Bonus Slot Wire',
+    text: 'During a BONUS the slot pays +{add#} balls more. Copper wire is run across its throat.',
     rarity: 'common', price: 30, hook: 'onGate', tags: ['gate', 'fever'],
     n: { add: 2 },
-    bound: 'Only during fever, where the gate is a 10 percent event on a short window.',
+    bound: 'BONUS only, and the slot is a rare hit inside an already short window. Worth nothing in a round without one.',
     apply: (ctx) => (ctx.fever ? ctx.payout + 2 : ctx.payout)
   }),
 
   fit({
-    id: 'ball_bearing', name: 'Ball Bearing',
-    text: 'Truer bearings in the tray. Every ball carries x{mul~}.',
+    id: 'ball_bearing', name: 'Ball Bearings',
+    text: 'Every ball pays x{mul~}. Truer bearings are dropped into the tray.',
     rarity: 'common', price: 30, hook: 'onLaunch', tags: ['ball'],
     n: { mul: 1.08 },
     maxStack: 3,
-    bound: 'Three copies is x1.26, which is under one uncommon pocket fitting for the same three slots.',
+    bound: 'Three copies come to about x1.26, less than one better pocket bought with the same three bolt points.',
     apply: (ctx) => { ctx.ball.mul *= 1.08; }
   }),
 
   fit({
-    id: 'return_chute', name: 'Return Chute',
-    text: 'A chute off the budget counter. Every {per#} launches you did not spend returns 1 ball.',
+    id: 'return_chute', name: 'Leftover Chute',
+    text: 'Clear a round and every {per#} pulls you didn\'t use hand back 1 ball.',
     rarity: 'common', price: 30, hook: 'onRoundEnd', tags: ['economy'],
     n: { per: 4 },
-    bound: 'Rewards finishing early, so it pays least exactly when the round was hard.',
+    bound: 'It only pays when you finish early, so it pays least on exactly the rounds that were hard.',
     apply: (ctx) => (ctx.cleared
       ? ctx.bonus + Math.floor(Math.max(0, ctx.round.budget - ctx.round.launches) / 4)
       : ctx.bonus)
   }),
 
   fit({
-    id: 'wiping_cloth', name: 'Wiping Cloth',
-    text: 'A cloth kept by the counter. Reroll cost rises by {step#} instead of 8.',
+    id: 'wiping_cloth', name: 'Reroll Cloth',
+    text: 'Each reroll at the bench costs {step#} more than the last instead of 8.',
     rarity: 'common', price: 25, hook: 'onShopOpen', tags: ['shop'],
     n: { step: 4 },
-    bound: 'Touches the shop only. It never puts a ball on the board.',
+    bound: 'Cheaper shopping and nothing else. It never puts a ball on the board.',
     apply: (ctx) => { ctx.shop.rerollStep = 4; }
   }),
 
   // ---- uncommon -------------------------------------------------------- //
 
   fit({
-    id: 'nail_comb', name: 'Nail Comb',
-    text: 'A comb of nails funnelling into the cream pockets. Cream chance +4 points, now {creamProb%}.',
+    id: 'nail_comb', name: 'Mid Pocket Comb',
+    text: 'The mid pockets catch 4 more balls in every 100, now {creamProb%}. A comb of nails funnels into them.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['board', 'pocket'],
     mods: { creamProb: ['+', 0.04] }, board: { addPins: 'comb' },
-    bound: 'Cream probability is clamped at 0.28 and the pocket total at 0.62.'
+    bound: 'The mid pockets top out at 28 balls in 100, and every pocket together can never take more than about 62.'
   }),
 
   fit({
     id: 'slope_plate', name: 'Slope Plate',
-    text: 'The lower field is shimmed to lean left. Side chance +5 points, jade chance -0.5 points.',
+    text: 'Side pockets catch 5 more balls in every 100, but the big pocket catches half a ball fewer. The lower field leans left.',
     rarity: 'uncommon', price: 60, hook: 'static', tags: ['board', 'pocket', 'cost'],
     mods: { sideProb: ['+', 0.05], jadeProb: ['+', -0.005] }, board: { slope: -0.06 },
-    bound: 'Trades the 5 ball pocket for the 1 ball pocket, so it is a downgrade once jade fittings are on.'
+    bound: 'It trades 5 ball hits for 1 ball hits. That\'s a downgrade the moment you own anything feeding the big pocket.'
   }),
 
   fit({
     id: 'rubber_bumper', name: 'Rubber Bumper',
-    text: 'A rubber bumper set above the gate. Hitting it adds x{mul~} to the ball, once per ball, and widens the run into the gate by 2 points.',
+    text: 'Hitting the bumper adds x{mul~} to what the ball pays, once per ball, and the slot takes 2 more balls in every 100.',
     rarity: 'uncommon', price: 70, hook: 'onPinHit', tags: ['board', 'gate', 'ball'],
     mods: { gateProb: ['+', 0.02] }, board: { bumpers: 1 },
     n: { mul: 0.35 },
-    bound: 'Once per ball, and only balls whose path crosses the bumper touch it.',
+    bound: 'Once per ball, and only balls whose path happens to cross the bumper touch it at all.',
     apply: (ctx) => {
       if (ctx.pin.kind !== 'bumper' || ctx.ball.s.rubber_bumper) return;
       ctx.ball.s.rubber_bumper = 1;
@@ -651,36 +651,36 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'shutter_plate', name: 'Shutter Plate',
-    text: 'A shutter closes the outer side pockets. Side -6 points, cream +4, jade +2, and the balls funnel inward.',
+    id: 'shutter_plate', name: 'Inward Shutter',
+    text: 'Mid pockets catch 4 more balls in every 100 and the big pocket 2 more, but side pockets catch 6 fewer.',
     rarity: 'uncommon', price: 70, hook: 'static', tags: ['board', 'pocket'],
     mods: { sideProb: ['+', -0.06], creamProb: ['+', 0.04], jadeProb: ['+', 0.02] },
     board: { shutter: 'outer-side' },
-    bound: 'Net +0.16 RTP, and it destroys any side pocket build you already bought.'
+    bound: 'A clear gain overall, but it wrecks any side pocket build you already paid for.'
   }),
 
   fit({
-    id: 'horseshoe_magnet', name: 'Horseshoe Magnet',
-    text: 'A horseshoe magnet behind the gate. Gate chance +4 points, now {gateProb%}.',
+    id: 'horseshoe_magnet', name: 'Slot Magnet',
+    text: 'The slot takes 4 more balls in every 100, now {gateProb%}. A horseshoe magnet sits behind it.',
     rarity: 'uncommon', price: 70, hook: 'static', tags: ['gate', 'fever'],
     mods: { gateProb: ['+', 0.04] },
-    bound: 'Gate probability is clamped at 0.30, which is the hard ceiling on fever frequency.'
+    bound: 'The slot stops at 30 balls in 100, and that\'s the hard ceiling on how often a BONUS can start.'
   }),
 
   fit({
-    id: 'reel_brake', name: 'Reel Brake',
-    text: 'A brake shoe on the middle reel. It settles on the reached face {middleWeight%} of the time.',
+    id: 'reel_brake', name: 'Middle Reel Brake',
+    text: 'When the outer reels match, the middle reel lands on the same board {middleWeight%} of the time. A brake shoe drags on it.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['reel', 'fever'],
     mods: { middleWeight: ['+', 0.10] },
-    bound: 'Clamped at 0.75. Reaches still have to happen first.'
+    bound: 'Tops out at 75 percent, and the outer reels still have to match first before this does anything.'
   }),
 
   fit({
-    id: 'held_reel', name: 'Held Reel',
-    text: 'The first reach of every round is held until it matches. Once per round.',
+    id: 'held_reel', name: 'First Match Hold',
+    text: 'The first time the outer reels match in a round, the middle reel is held until it matches too. One guaranteed BONUS a round.',
     rarity: 'uncommon', price: 65, hook: 'onReelSpin', tags: ['reel', 'fever'],
     scope: 'round',
-    bound: 'Exactly one guaranteed fever per round. It cannot fire twice however long the round runs.',
+    bound: 'Exactly one guaranteed BONUS per round. However long the round runs, it never fires twice.',
     apply: (ctx) => {
       if (ctx.state.held_reel || !ctx.spin.reach) return;
       ctx.state.held_reel = 1;
@@ -690,81 +690,81 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'long_fever', name: 'Long Fever',
-    text: 'A longer cam on the fever timer. Fever runs {feverLen} balls.',
+    id: 'long_fever', name: 'Long Bonus',
+    text: 'A BONUS runs {feverLen} balls. A longer cam is fitted to the bonus timer.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['fever'],
     mods: { feverLen: ['+', 4] },
-    bound: 'Length only. A round with no gate luck sees none of it.'
+    bound: 'Length only, never how often one starts. A round where the reels never match sees none of it.'
   }),
 
   fit({
-    id: 'kicker_plate', name: 'Kicker Plate',
-    text: 'A kicker plate in the attacker pocket. It pays {attackerPay} instead of 8.',
+    id: 'kicker_plate', name: 'Jackpot Kicker',
+    text: 'The jackpot pocket pays {attackerPay} balls instead of 8. It only opens during a BONUS.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['fever', 'pocket'],
     mods: { attackerPay: ['+', 3] },
-    bound: 'Fever balls are about 10 percent of a base run, so this is +0.15 overall RTP alone.'
+    bound: 'BONUS only. On a machine that rarely gets one, this is a dead bolt point.'
   }),
 
   fit({
-    id: 'gate_widener', name: 'Gate Widener',
-    text: 'The gate mouth widens while the lamp is warm. Gate chance during fever {feverGateProb%}, so fevers extend more often.',
+    id: 'gate_widener', name: 'Bonus Slot Widener',
+    text: 'During a BONUS the slot takes {feverGateProb%} of balls, and a slot hit inside a BONUS extends it.',
     rarity: 'uncommon', price: 60, hook: 'static', tags: ['fever', 'gate'],
     mods: { feverGateProb: ['+', 0.08] },
-    bound: 'Fever gate chance is clamped at 0.45, which holds expected fever length finite.'
+    bound: 'It stops at 45 percent, which is what keeps a BONUS from running forever. Outside a BONUS it does nothing.'
   }),
 
   fit({
     id: 'third_rail', name: 'Third Rail',
-    text: 'Two more launch rails. {inFlight} balls on the glass at once.',
+    text: '{inFlight} balls in the air at once. Two more rails are bolted to the cabinet.',
     rarity: 'uncommon', price: 70, hook: 'static', tags: ['cadence'],
     mods: { inFlight: ['+', 2] },
-    bound: 'In flight is clamped at 8, so the board never becomes a spray.'
+    bound: 'The cabinet never holds more than 8 balls at once, and speed magnifies losses as readily as wins.'
   }),
 
   fit({
-    id: 'spring_latch', name: 'Spring Latch',
-    text: 'A latch that holds the launch arm. Strength locks to the last value that paid, and every locked ball carries x{mul~}.',
+    id: 'spring_latch', name: 'Strength Latch',
+    text: 'Every ball pays x{mul~}, but the handle locks to the last pull that paid and you can no longer aim.',
     rarity: 'uncommon', price: 60, hook: 'onLaunch', tags: ['ball', 'aim', 'cost'],
     mods: { lockStrength: ['=', 1] },
     n: { mul: 1.20 },
-    bound: 'You lose the strength dial, which is worth about 30 percent of overall RTP when the board is re-nailed each round.',
+    bound: 'Losing the handle is the steepest cost here. Being able to aim is worth more than x1.20 on almost any board.',
     apply: (ctx) => { ctx.ball.mul *= 1.20; }
   }),
 
   fit({
     id: 'trip_wire', name: 'Trip Wire',
-    text: 'A trip wire deep in the lattice. The 12th nail a ball touches adds x{mul~}.',
+    text: 'The 12th nail a ball touches adds x{mul~} to what it pays. A wire is strung deep in the nails.',
     rarity: 'uncommon', price: 60, hook: 'onPinHit', tags: ['ball'],
     n: { at: 12, mul: 1.0 },
-    bound: 'Only balls that reach 12 nails fire it, which is about 60 percent of them and none at all under Thin Glass.',
+    bound: 'Only about 6 balls in 10 get that deep, and none at all if you fit anything that cuts nail contacts.',
     apply: (ctx) => { if (ctx.hitIndex === 12) ctx.ball.mul += 1.0; }
   }),
 
   fit({
-    id: 'bar_magnet', name: 'Bar Magnet',
-    text: 'A bar magnet under the jade pockets. 1 launch in 20 is dragged into a jade pocket.',
+    id: 'bar_magnet', name: 'Big Pocket Magnet',
+    text: '1 ball in 20 is dragged into the big pocket. A bar magnet sits underneath it.',
     rarity: 'uncommon', price: 70, hook: 'onLaunch', tags: ['pocket'],
     n: { p: 0.05 },
-    bound: 'Fixed at 1 in 20 and it overrides the gate, so it trades fever chances for guaranteed small pays.',
+    bound: 'It overrides the slot on those balls, so it trades chances at a BONUS for small guaranteed pays.',
     apply: (ctx) => { if (ctx.rand() < 0.05) ctx.ball.forcePocket = 'jade'; }
   }),
 
   fit({
-    id: 'escapement', name: 'Escapement',
-    text: 'An escapement on the fever counter. Each fever ball adds +{step~} to the fever multiplier, resetting when the lamp cools.',
+    id: 'escapement', name: 'Bonus Climber',
+    text: 'Every ball of a BONUS raises the BONUS multiplier by +{step~}. It drops back when the lamp cools.',
     rarity: 'uncommon', price: 65, hook: 'onFeverBall', tags: ['fever'],
     n: { step: 0.03 },
-    bound: 'Resets at every fever end, so it rewards long chains and nothing else.',
+    bound: 'It resets at the end of every BONUS, so it pays on long ones and almost nothing on short ones.',
     apply: (ctx) => { ctx.fever.mult += 0.03; }
   }),
 
   fit({
-    id: 'counter_wheel', name: 'Counter Wheel',
-    text: 'A counting wheel on the till. Every {every#}th pocket paid in a round pays double.',
+    id: 'counter_wheel', name: 'Doubling Wheel',
+    text: 'Every {every#}th pocket you hit in a round pays double. A counting wheel is fitted to the till.',
     rarity: 'uncommon', price: 60, hook: 'onPocket', tags: ['pocket', 'economy'],
     scope: 'round',
     n: { every: 8 },
-    bound: 'One pocket in eight, counted per round, so a short round sees it twice.',
+    bound: 'The count restarts every round, so a short round may only reach it once.',
     apply: (ctx) => {
       const c = (ctx.state.counter_wheel || 0) + 1;
       ctx.state.counter_wheel = c;
@@ -774,18 +774,18 @@ export const FITTINGS = [
 
   fit({
     id: 'thin_glass', name: 'Thin Glass',
-    text: 'Thinner glass, less drag. Flight time -30%, but the ball touches 5 fewer nails.',
+    text: 'Balls fall 30 percent faster but touch 5 fewer nails on the way down.',
     rarity: 'uncommon', price: 55, hook: 'static', tags: ['cadence', 'cost'],
     mods: { flightTime: ['*', 0.70], pinHits: ['+', -5] },
-    bound: 'Takes the ball below 12 nails, which switches off Trip Wire entirely.'
+    bound: 'It drops a ball under 12 nail contacts, which switches Trip Wire off completely.'
   }),
 
   fit({
-    id: 'hopper', name: 'Hopper',
-    text: 'A hopper of borrowed balls. +{balls#} balls at the start of every round, and that round quota is 8% higher.',
+    id: 'hopper', name: 'Loan Hopper',
+    text: '+{balls#} balls at the start of every round, but that round needs 8 percent more to clear.',
     rarity: 'uncommon', price: 60, hook: 'onRoundStart', tags: ['economy', 'cost'],
     n: { balls: 25, quota: 1.08 },
-    bound: 'The quota rise compounds with the round curve, so it is a loan that gets worse every round.',
+    bound: 'The higher goal stacks on top of the rise every round already brings, so the loan gets worse the longer you play.',
     apply: (ctx) => {
       ctx.tray.balls += 25;
       ctx.round.quota = Math.ceil(ctx.round.quota * 1.08);
@@ -793,57 +793,57 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'diverter', name: 'Diverter',
-    text: 'A diverter plate moves the gate mouth off centre. Gate chance +3 points, but the strength window that finds it is 30% narrower.',
+    id: 'diverter', name: 'Off-Center Slot',
+    text: 'The slot takes 3 more balls in every 100, but the handle range that finds it\'s 30 percent narrower.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['board', 'gate', 'cost'],
     mods: { gateProb: ['+', 0.03], aimWindow: ['*', 0.7] },
     board: { diverter: true },
-    bound: 'The narrower window costs more gate frequency than the 3 points give back unless you actually re-aim each round.'
+    bound: 'The narrow range costs more slot hits than the 3 balls give back unless you re-find the spot every round.'
   }),
 
   fit({
-    id: 'sticky_detent', name: 'Sticky Detent',
-    text: 'A sticky detent on the outer reels. Reach chance {reachProb%}, but the middle reel settles on it only {middleWeight%} of the time.',
+    id: 'sticky_detent', name: 'Sticky Outer Reels',
+    text: 'The outer reels match {reachProb%} of the time, but the middle reel then agrees only {middleWeight%} of the time.',
     rarity: 'uncommon', price: 55, hook: 'static', tags: ['reel', 'fever'],
     mods: { reachProb: ['+', 0.064], middleWeight: ['+', -0.06] },
-    bound: 'Match rate moves from 0.099 to 0.108. It buys tension, not much fever.'
+    bound: 'Full matches go from about 10 in 100 to about 11 in 100. It buys near misses, not many BONUSes.'
   }),
 
   fit({
-    id: 'solenoid', name: 'Solenoid',
-    text: 'A solenoid on the attacker shutter. The first 4 balls of every fever run at 62% attacker chance instead of 50%.',
+    id: 'solenoid', name: 'Jackpot Solenoid',
+    text: 'The first 4 balls of every BONUS hit the jackpot pocket 62 percent of the time instead of the usual 50.',
     rarity: 'uncommon', price: 70, hook: 'onFeverStart', tags: ['fever'],
     n: { balls: 4, attackerProb: 0.62 },
-    bound: 'Four balls only, and the attacker clamp at 0.85 caps what stacking windows can reach.',
+    bound: 'Four balls only, and the jackpot pocket never opens past 85 percent however many parts push on it.',
     apply: (ctx) => { ctx.fever.openings.push({ balls: 4, attackerProb: 0.62 }); }
   }),
 
   fit({
-    id: 'warm_lamp', name: 'Warm Lamp',
-    text: 'The lamp holds its heat. For {balls#} balls after a fever ends, the attacker pocket is still open at {attackerProb%}.',
+    id: 'warm_lamp', name: 'Afterglow Lamp',
+    text: 'For {balls#} balls after a BONUS ends the jackpot pocket stays open, taking {attackerProb%} of them. Normally it shuts at once.',
     rarity: 'uncommon', price: 60, hook: 'onFeverEnd', tags: ['fever'],
     n: { balls: 6, attackerProb: 0.20 },
-    bound: 'Six balls at a fifth of the fever rate, and it does not extend the fever counter.',
+    bound: 'A fifth of the rate you get inside a BONUS, and it doesn\'t make the BONUS itself any longer.',
     apply: (ctx) => { ctx.after.push({ balls: 6, attackerProb: 0.20 }); }
   }),
 
   fit({
-    id: 'anchor_plate', name: 'Anchor Plate',
-    text: 'An anchor plate on the budget counter. Clear with {spare#} or more launches unspent and the till pays {balls#} balls.',
+    id: 'anchor_plate', name: 'Early Finish Plate',
+    text: 'Clear a round with {spare#} or more pulls unused and the till pays you {balls#} balls.',
     rarity: 'uncommon', price: 60, hook: 'onRoundEnd', tags: ['economy'],
     n: { spare: 20, balls: 40 },
-    bound: 'Flat 40 balls. Against a round 12 quota of 389 it is rounding error.',
+    bound: 'A flat 40 balls. By round 12 the goal runs into the hundreds and this barely registers.',
     apply: (ctx) => (ctx.cleared && (ctx.round.budget - ctx.round.launches) >= 20
       ? ctx.bonus + 40
       : ctx.bonus)
   }),
 
   fit({
-    id: 'relay', name: 'Relay',
-    text: 'A relay across the reel contacts. A missed spin has a {p%} chance to spin once more.',
+    id: 'relay', name: 'Respin Relay',
+    text: 'A reel spin that misses has a {p%} chance to spin again. A relay is wired across the contacts.',
     rarity: 'uncommon', price: 65, hook: 'onReelSpin', tags: ['reel', 'fever'],
     n: { p: 0.12 },
-    bound: 'One respin per gate entry, never a chain of them.',
+    bound: 'One extra spin per slot hit, never a chain of them.',
     apply: (ctx) => {
       if (!ctx.spin.matched && ctx.spin.respins < 1 && ctx.rand() < 0.12) ctx.spin.respin = true;
     }
@@ -852,82 +852,82 @@ export const FITTINGS = [
   // ---- rare ------------------------------------------------------------ //
 
   fit({
-    id: 'twin_gate', name: 'Twin Gate',
-    text: 'A second gate mouth cut into the left of the face. Gate chance +7 points, now {gateProb%}.',
+    id: 'twin_gate', name: 'Twin Slot',
+    text: 'The slot takes 7 more balls in every 100, now {gateProb%}. A second pocket is cut into the left of the board.',
     rarity: 'rare', price: 120, hook: 'static', tags: ['board', 'gate', 'fever'],
     mods: { gateProb: ['+', 0.07] }, board: { gates: 2 },
-    bound: 'Gate probability clamps at 0.30, so this plus a magnet plus three pulled nails is already the ceiling.'
+    bound: 'The slot stops at 30 balls in 100. This plus a magnet plus a few pulled nails is already the ceiling.'
   }),
 
   fit({
-    id: 'magnet_coil', name: 'Magnet Coil',
-    text: 'A coil that energises while the lamp is warm. Every pocket pays x{mul~} during a fever.',
+    id: 'magnet_coil', name: 'Bonus Coil',
+    text: 'During a BONUS every pocket pays x{mul~}. A coil energizes while the lamp is warm.',
     rarity: 'rare', price: 110, hook: 'onPocket', tags: ['fever', 'pocket'],
     n: { mul: 1.5 },
-    bound: 'Fever balls only, which is 10 percent of a base run and never more than about half of a chained one.',
+    bound: 'BONUS balls only, which on most machines is well under a fifth of the balls you fire.',
     apply: (ctx) => (ctx.fever ? ctx.payout * 1.5 : ctx.payout)
   }),
 
   fit({
-    id: 'nail_gauge', name: 'Nail Gauge',
-    text: 'The technician gauge, left in the cabinet. Every pocket chance x1.25; the out lanes take the loss.',
+    id: 'nail_gauge', name: 'All-Pocket Nails',
+    text: 'Every pocket on the board takes 25 percent more balls. The out lanes take the loss.',
     rarity: 'rare', price: 125, hook: 'static', tags: ['board', 'pocket'],
     mods: {
       gateProb: ['*', 1.25], jadeProb: ['*', 1.25],
       creamProb: ['*', 1.25], sideProb: ['*', 1.25]
     },
-    bound: 'Multiplies into the 0.62 pocket total clamp, so it is worth less the more board fittings you already own.'
+    bound: 'Every pocket together can never take more than about 62 balls in 100, so this is worth less the more board parts you own.'
   }),
 
   fit({
     id: 'short_strip', name: 'Short Reel Strip',
-    text: 'A shorter reel strip, 8 stops instead of 12. Reach chance {reachProb%}.',
+    text: 'The outer reels match {reachProb%} of the time. Each reel carries 8 faces instead of 12.',
     rarity: 'rare', price: 110, hook: 'static', tags: ['reel', 'fever'],
     mods: { reachProb: ['=', 0.34], stripStops: ['=', 8] },
-    bound: 'Sets reach rather than adding to it, so it overwrites Slack Reel and Sticky Detent instead of stacking.'
+    bound: 'It sets the match rate rather than adding to it, so it overwrites Loose Reel Belts and Sticky Outer Reels instead of stacking.'
   }),
 
   fit({
-    id: 'continuation_lock', name: 'Continuation Lock',
-    text: 'A lock on the fever counter. A match during a fever adds {continuationAdd} balls instead of 10.',
+    id: 'continuation_lock', name: 'Bonus Extender',
+    text: 'A reel match during a BONUS adds {continuationAdd} balls to it instead of 10.',
     rarity: 'rare', price: 125, hook: 'static', tags: ['fever'],
     mods: { continuationAdd: ['+', 8] },
-    bound: 'Expected fever length is feverLen / (1 - feverGateProb * matchProb * continuationAdd) and both factors are clamped, so the series always converges.'
+    bound: 'Both the slot rate and the match rate have ceilings, so a BONUS still ends. Long ones get longer, not endless.'
   }),
 
   fit({
-    id: 'rolling_shutter', name: 'Rolling Shutter',
-    text: 'A rolling shutter closes the out lanes as a fever starts. The first {balls#} fever balls run at {attackerProb%} attacker chance.',
+    id: 'rolling_shutter', name: 'Bonus Shutter',
+    text: 'The first {balls#} balls of every BONUS hit the jackpot pocket {attackerProb%} of the time. A shutter rolls over the out lanes.',
     rarity: 'rare', price: 120, hook: 'onFeverStart', tags: ['board', 'fever'],
     n: { balls: 6, attackerProb: 0.72 },
-    bound: 'Six balls, and the attacker clamp at 0.85 is the ceiling however many windows overlap.',
+    bound: 'Six balls, and the jackpot pocket never opens past 85 percent however many parts stack on it.',
     apply: (ctx) => { ctx.fever.openings.push({ balls: 6, attackerProb: 0.72 }); }
   }),
 
   fit({
-    id: 'pocket_magnet', name: 'Pocket Magnet',
-    text: 'Magnets behind the side pockets. {p%} of lost balls are dragged into the nearest side pocket.',
+    id: 'pocket_magnet', name: 'Out Lane Magnet',
+    text: '{p%} of the balls headed for the out lanes are dragged into a side pocket instead.',
     rarity: 'rare', price: 110, hook: 'onBallLost', tags: ['pocket', 'economy'],
     n: { p: 0.30 },
-    bound: 'Pays the side pocket value, the smallest on the board, so it scales with the weakest thing you own.',
+    bound: 'It pays the side pocket value, the smallest on the board, so it\'s only as good as your weakest pocket.',
     apply: (ctx) => (ctx.rand() < 0.30 ? ctx.refund + ctx.model.sidePay : ctx.refund)
   }),
 
   fit({
-    id: 'ratchet', name: 'Ratchet',
-    text: 'A ratchet on the quota counter. Every round quota is {cut#}% lower.',
+    id: 'ratchet', name: 'Goal Ratchet',
+    text: 'Every round needs {cut#} percent fewer balls to clear. A ratchet is fitted to the goal counter.',
     rarity: 'rare', price: 115, hook: 'onRoundStart', tags: ['economy'],
     n: { mul: 0.88, cut: 12 },
-    bound: 'A flat 12 percent against a quota that grows 17 percent a round: it buys about two thirds of one round.',
+    bound: 'A flat 12 percent against a goal that grows about 17 percent a round. It buys most of one extra round, not a run.',
     apply: (ctx) => { ctx.round.quota = Math.ceil(ctx.round.quota * 0.88); }
   }),
 
   fit({
-    id: 'pawl', name: 'Pawl',
-    text: 'A pawl that holds the budget counter. On a clear, up to {cap#} unspent launches carry into the next round.',
+    id: 'pawl', name: 'Carryover Latch',
+    text: 'Clear a round and up to {cap#} unused pulls carry into the next one.',
     rarity: 'rare', price: 110, hook: 'onRoundEnd', tags: ['economy'],
     n: { cap: 30 },
-    bound: 'Capped at 30 and it never carries twice: the carry is consumed by the next round budget.',
+    bound: 'Capped at 30 and it never carries twice. The next round spends whatever it brought forward.',
     apply: (ctx) => {
       if (ctx.cleared) {
         ctx.carry.launches = Math.min(30, Math.max(0, ctx.round.budget - ctx.round.launches));
@@ -937,74 +937,74 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'score_plate', name: 'Score Plate',
-    text: 'Raised numerals pressed into every pocket. Every pocket pays +2.',
+    id: 'score_plate', name: 'All-Pocket Plate',
+    text: 'Every pocket on the board pays +2 balls, the jackpot pocket included. The numerals are raised in the enamel.',
     rarity: 'rare', price: 130, hook: 'static', tags: ['pocket'],
     mods: {
       gatePay: ['+', 2], jadePay: ['+', 2], creamPay: ['+', 2],
       sidePay: ['+', 2], attackerPay: ['+', 2]
     },
-    bound: 'Additive, so its share of the payout shrinks every time a multiplier fitting is bought after it.'
+    bound: 'A flat amount. Its share of a payout shrinks every time you buy a multiplier after it.'
   }),
 
   fit({
-    id: 'cam', name: 'Cam',
-    text: 'A cam that winds as the round runs. Each launch adds +0.4% to the ball multiplier, up to x{cap~}, reset each round.',
+    id: 'cam', name: 'Warm-Up Cam',
+    text: 'Each pull in a round adds 0.4 percent to what your balls pay, up to x{cap~}. It winds back to nothing each round.',
     rarity: 'rare', price: 110, hook: 'onLaunch', tags: ['ball'],
     n: { per: 0.004, cap: 2.0 },
-    bound: 'Capped at x2.00 and reset every round, so it pays most in the long rounds you were already winning.',
+    bound: 'It resets every round, so it pays most in the long rounds you were already winning.',
     apply: (ctx) => { ctx.ball.mul *= Math.min(2.0, 1 + 0.004 * ctx.launchIndex); }
   }),
 
   fit({
-    id: 'hopper_wheel', name: 'Hopper Wheel',
-    text: 'A wheel that feeds the rail off the fever payout. The first {free#} balls of every fever cost nothing from the tray.',
+    id: 'hopper_wheel', name: 'Free Ball Wheel',
+    text: 'The first {free#} balls of every BONUS cost you nothing.',
     rarity: 'rare', price: 120, hook: 'onFeverBall', tags: ['fever', 'economy'],
     n: { free: 8 },
-    bound: 'Saves 8 balls, never adds a payout, and cannot save more balls than a fever is long.',
+    bound: 'It saves balls, never pays any, and it can\'t save more of them than a BONUS is long.',
     apply: (ctx) => { if (ctx.fever.ballsUsed < 8) ctx.ball.free = true; }
   }),
 
   fit({
     id: 'copper_bus', name: 'Copper Bus',
-    text: 'A copper bus down the left of the lattice. Every nail touched on the left half adds x{per~}, with no cap.',
+    text: 'Every nail touched on the left half of the board adds x{per~} to what the ball pays, with no limit.',
     rarity: 'rare', price: 105, hook: 'onPinHit', tags: ['ball'],
     n: { per: 0.05 },
-    bound: 'Uncapped but geometry bounded: about half of the ball nail contacts are on the left, so pinHits sets the ceiling and Thin Glass or Oiled Cloth cuts it.',
+    bound: 'No cap, but only about half the nails a ball touches are on the left, and anything that speeds the fall cuts them.',
     apply: (ctx) => { if (ctx.pin.side === 'left') ctx.ball.mul += 0.05; }
   }),
 
   fit({
-    id: 'bevel_glass', name: 'Bevel Glass',
-    text: 'Heavier bevelled glass over the fever counter. Fever starts at x{feverMult~} instead of x1.00.',
+    id: 'bevel_glass', name: 'Hot Start Glass',
+    text: 'A BONUS starts at x{feverMult~} instead of x1.00. Heavier glass is set over the bonus counter.',
     rarity: 'rare', price: 115, hook: 'static', tags: ['fever'],
     mods: { feverMult: ['+', 0.5] },
-    bound: 'Multiplies fever payouts only, so a fever free round gets nothing from a 115 ball purchase.'
+    bound: 'It multiplies BONUS payouts only. A round without one gets nothing back for the price.'
   }),
 
   fit({
-    id: 'sprocket', name: 'Sprocket',
-    text: 'A sprocket drive on the rail set. {inFlight} balls on the glass, and the rail can fire every 0.18s.',
+    id: 'sprocket', name: 'Fast Rail Drive',
+    text: '{inFlight} balls in the air at once, and the rail can fire every 0.18 seconds.',
     rarity: 'rare', price: 115, hook: 'static', tags: ['cadence'],
     mods: { inFlight: ['+', 3], launchFloor: ['=', 0.18] },
-    bound: 'In flight is clamped at 8. Cadence is a magnifier in both directions and does nothing to RTP.'
+    bound: 'The cabinet never holds more than 8 balls. Speed changes how fast you find out, not what a ball is worth.'
   }),
 
   fit({
-    id: 'wire_guard', name: 'Wire Guard',
-    text: 'Wire guards close the outer columns. Nothing reaches the far out lanes: cream +6 points, side +4.',
+    id: 'wire_guard', name: 'Out Lane Guards',
+    text: 'Mid pockets catch 6 more balls in every 100 and side pockets 4 more. Guards close the outer columns.',
     rarity: 'rare', price: 120, hook: 'static', tags: ['board', 'pocket'],
     mods: { creamProb: ['+', 0.06], sideProb: ['+', 0.04] },
     board: { removePins: 'outer-columns' },
-    bound: 'Runs into the 0.62 pocket total clamp faster than anything else in the catalogue.'
+    bound: 'It runs into the ceiling on total pocket chance faster than anything else here, so it\'s weakest on a stacked board.'
   }),
 
   fit({
-    id: 'tilt_weight', name: 'Tilt Weight',
-    text: 'A tilt weight that remembers the last paying strength. Launch within 5 of it and the ball carries x{mul~}.',
+    id: 'tilt_weight', name: 'Repeat Pull Weight',
+    text: 'Pull within 5 of the last strength that paid and the ball pays x{mul~}. A tilt weight remembers the spot.',
     rarity: 'rare', price: 105, hook: 'onLaunch', tags: ['ball', 'aim'],
     n: { tol: 0.05, mul: 1.4 },
-    bound: 'Needs a paying pocket to set the mark, so it is dead for the first ball of a round and dead through a drought.',
+    bound: 'It needs a paying hit to set the mark, so it\'s dead on the first ball of a round and dead through any dry spell.',
     apply: (ctx) => {
       const last = ctx.stats.lastPayingStrength;
       if (last != null && Math.abs(ctx.strength - last) <= 0.05) ctx.ball.mul *= 1.4;
@@ -1013,10 +1013,10 @@ export const FITTINGS = [
 
   fit({
     id: 'fuse_wire', name: 'Fuse Wire',
-    text: 'Fuse wire across the till. Every payout x{mul~} until one ball pays more than {blow#}, which blows the fuse for the rest of the run.',
+    text: 'Every payout is x{mul~} until one ball pays more than {blow#} balls. That blows the fuse and the part is done for the run.',
     rarity: 'rare', price: 100, hook: 'onPocket', tags: ['risk', 'pocket'],
     n: { mul: 1.8, blow: 60 },
-    bound: 'Self limiting. On any machine strong enough to matter, the first fever blows it inside two balls.',
+    bound: 'It kills itself. On any machine strong enough to be worth it, the first BONUS blows the fuse within a couple of balls.',
     apply: (ctx) => {
       if (ctx.state.fuse_wire === 'blown') return ctx.payout;
       const out = ctx.payout * 1.8;
@@ -1032,10 +1032,10 @@ export const FITTINGS = [
 
   fit({
     id: 'brass_seven', name: 'The Brass Seven',
-    text: 'The seven face is cut from solid brass. A seven match starts a {balls#} ball fever at x{mult~}. There is one seven in twelve stops.',
+    text: 'Match three sevens and the BONUS runs {balls#} balls at x{mult~}. One board in twelve on each reel is a seven.',
     rarity: 'brass', price: 220, hook: 'onReelSpin', tags: ['reel', 'fever'],
     n: { balls: 40, mult: 2.0 },
-    bound: 'A seven reach is 1 in 144 spins before the middle reel, so this fires about once in 3,400 launched balls unaided.',
+    bound: 'A seven on both outer reels comes up about once in 144 spins, so unaided this fires about once in 3,400 balls.',
     apply: (ctx) => {
       if (ctx.spin.matched && ctx.spin.symbol === 'seven') {
         ctx.spin.feverLen = 40;
@@ -1045,69 +1045,69 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'holding_plate', name: 'Holding Plate',
-    text: 'A plate that holds the gate open after a fever. For {balls#} balls the gate runs at {gateProb%}, so fevers chain.',
+    id: 'holding_plate', name: 'Slot Hold Plate',
+    text: 'For {balls#} balls after a BONUS ends the slot takes {gateProb%} of everything you fire, so one BONUS often runs into the next.',
     rarity: 'brass', price: 210, hook: 'onFeverEnd', tags: ['gate', 'fever'],
     n: { balls: 25, gateProb: 0.35 },
-    bound: 'The hold does not raise payouts, only gate frequency, and it expires after 25 balls whether or not it chained.',
+    bound: 'It only opens the slot. Payouts are unchanged, and the hold expires after 25 balls whether it chained or not.',
     apply: (ctx) => { ctx.after.push({ balls: 25, gateProb: 0.35 }); }
   }),
 
   fit({
-    id: 'second_face', name: 'Second Face',
-    text: 'The lower third of the face is doubled: every pocket exists twice. Every pocket chance x1.6.',
+    id: 'second_face', name: 'Double Board',
+    text: 'Every pocket takes 60 percent more balls. The lower third of the board is doubled, so every pocket exists twice.',
     rarity: 'brass', price: 240, hook: 'static', tags: ['board', 'pocket'],
     mods: {
       gateProb: ['*', 1.6], jadeProb: ['*', 1.6],
       creamProb: ['*', 1.6], sideProb: ['*', 1.6]
     },
     board: { duplicateLower: true },
-    bound: 'The 0.62 pocket total clamp bites immediately, so on a stacked board it delivers well under 1.6.'
+    bound: 'The ceiling on total pocket chance bites at once, so on a stacked board you get well under the 60 percent.'
   }),
 
   fit({
-    id: 'attacker_mouth', name: 'Attacker Mouth',
-    text: 'The attacker pocket is cut wide open. {attackerProb%} attacker chance during a fever, paying {attackerPay}.',
+    id: 'attacker_mouth', name: 'Jackpot Mouthpiece',
+    text: 'During a BONUS the jackpot pocket takes {attackerProb%} of balls and pays {attackerPay}. The pocket is cut wide open.',
     rarity: 'brass', price: 230, hook: 'static', tags: ['fever', 'pocket'],
     mods: { attackerProb: ['=', 0.68], attackerPay: ['+', 6] },
-    bound: 'Fever only. It cannot start a fever, and the attacker clamp at 0.85 caps what shutters can add on top.'
+    bound: 'BONUS only. It can\'t start one, and it sets the rate rather than adding to it, so shutters add less on top.'
   }),
 
   fit({
-    id: 'counter_till', name: 'Counter Till',
-    text: 'A second till behind the counter. Clear bonus x{mul~}.',
+    id: 'counter_till', name: 'Second Till',
+    text: 'The bonus for clearing a round is x{mul~}. A second till opens behind the counter.',
     rarity: 'brass', price: 200, hook: 'onRoundEnd', tags: ['economy'],
     n: { mul: 2.0 },
-    bound: 'Pays nothing on the round that ends the run, which is the round it would have mattered on.',
+    bound: 'It pays nothing on the round that ends your run, which is the round you needed it most.',
     apply: (ctx) => (ctx.cleared ? ctx.bonus * 2.0 : ctx.bonus)
   }),
 
   fit({
     id: 'overflow_rail', name: 'Overflow Rail',
-    text: 'The full rail set, eight abreast, firing every 0.15s. Past the {after#}th launch of a round every ball adds +1.',
+    text: 'Eight balls in the air at once, firing every 0.15 seconds, and past the {after#}th pull of a round every ball pays +1.',
     rarity: 'brass', price: 200, hook: 'onLaunch', tags: ['cadence', 'economy'],
     mods: { inFlight: ['=', 8], launchFloor: ['=', 0.15] },
     n: { after: 100, add: 1 },
-    bound: 'The +1 is flat and only past launch 100, so it is a wide board rescue, not a scaling multiplier.',
+    bound: 'The +1 is flat and only arrives after pull 100, so it rescues a slow grind rather than scaling with a good board.',
     apply: (ctx) => { if (ctx.launchIndex >= 100) ctx.ball.add += 1; }
   }),
 
   fit({
-    id: 'ground_glass', name: 'Ground Glass',
-    text: 'The glass is ground opaque. Every payout x{mul~}, but you cannot watch the ball fall and the strength window that finds the gate is half as wide.',
+    id: 'ground_glass', name: 'Blind Glass',
+    text: 'Every payout is x{mul~}, but the glass goes opaque: you can\'t watch the ball, and the handle range that finds the slot is half as wide.',
     rarity: 'brass', price: 190, hook: 'static', tags: ['risk', 'cost'],
     mods: { payMul: ['*', 2.4], aimWindow: ['*', 0.5] },
     board: { frosted: true },
     n: { mul: 2.4 },
-    bound: 'Halving the aim window costs about 30 percent of overall RTP on a re-nailed board, and it hides the feedback you would use to find the spot again.'
+    bound: 'Half the aim range is a heavy loss on a board you re-find every round, and you lose the sight of the ball you would use to find it.'
   }),
 
   fit({
-    id: 'technicians_plan', name: "Technician's Plan",
-    text: 'The technician own plan, pinned inside the cabinet. One extra bolt point, and every shop offers at least one rare fitting.',
+    id: 'technicians_plan', name: 'The Bench Plan',
+    text: 'One more bolt point on the machine, and the bench always offers at least one rare part.',
     rarity: 'brass', price: 230, hook: 'onShopOpen', tags: ['shop', 'economy'],
     mods: { slots: ['+', 1] },
-    bound: 'One slot and better offers. It puts no ball on the board and pays nothing by itself.',
+    bound: 'A bolt point and better offers. It puts no ball on the board and pays nothing by itself.',
     apply: (ctx) => { ctx.shop.guarantee = 'rare'; }
   })
 
@@ -1134,84 +1134,84 @@ export function byId(id) { return BY_ID.get(id) || null; }
 
 export const SYNERGIES = [
   {
-    ids: ['nail_comb', 'shutter_plate'], name: 'The Funnel', on: 'creamPay', mult: 1.35,
-    text: 'The comb feeds what the shutter turns inward. Cream pockets pay x1.35.'
+    ids: ['nail_comb', 'shutter_plate'], name: 'Mid Pocket Funnel', on: 'creamPay', mult: 1.35,
+    text: 'Mid pockets pay x1.35. The comb feeds them and the shutter turns the rest of the board inward.'
   },
   {
-    ids: ['rubber_sleeve', 'felt_strip', 'trip_wire'], name: 'Wet Nails', on: 'ballMul', mult: 1.50,
-    text: 'Three surfaces on the same nails. Everything a ball picks up on the way down is worth x1.50.'
+    ids: ['rubber_sleeve', 'felt_strip', 'trip_wire'], name: 'Loaded Nails', on: 'ballMul', mult: 1.50,
+    text: 'Everything a ball picks up on the way down is worth x1.50. Three surfaces on the same nails.'
   },
   {
-    ids: ['oiled_cloth', 'rubber_sleeve'], name: 'Slick Board', on: 'ballMul', mult: 0.70, trap: true,
-    text: 'Oil on rubber. The ball skates past the sleeves: what it picks up is worth x0.70.'
+    ids: ['oiled_cloth', 'rubber_sleeve'], name: 'Oil On Rubber', on: 'ballMul', mult: 0.70, trap: true,
+    text: 'Everything a ball picks up on the way down is worth x0.70. It skates past the sleeves instead of gripping them.'
   },
   {
-    ids: ['warm_lamp', 'holding_plate'], name: 'Second Wind', on: 'afterglow', mult: 1.60,
-    text: 'The lamp is still warm when the gate is still open. Everything paid after a fever is worth x1.60.'
+    ids: ['warm_lamp', 'holding_plate'], name: 'Long Afterglow', on: 'afterglow', mult: 1.60,
+    text: 'Everything paid in the balls right after a BONUS is worth x1.60. The lamp is still warm and the slot is still open.'
   },
   {
-    ids: ['holding_plate', 'gate_widener', 'continuation_lock'], name: 'The Chain', on: 'feverLen', mult: 2.20,
-    text: 'Held open, widened, and locked. Expected fever length x2.20.'
+    ids: ['holding_plate', 'gate_widener', 'continuation_lock'], name: 'Bonus Chain', on: 'feverLen', mult: 2.20,
+    text: 'BONUSes run x2.20 longer. Held open, widened, and locked so a reel match stretches them further.'
   },
   {
-    ids: ['twin_gate', 'horseshoe_magnet'], name: 'Twin Mouth', on: 'gateProb', mult: 1.25,
-    text: 'Two mouths and a magnet behind both. Gate chance x1.25, to the 30% ceiling.'
+    ids: ['twin_gate', 'horseshoe_magnet'], name: 'Double Slot Pull', on: 'gateProb', mult: 1.25,
+    text: 'The slot takes x1.25 more balls, up to its 30 in 100 ceiling. Two pockets with a magnet behind them.'
   },
   {
-    ids: ['counterweight_plate', 'spring_latch'], name: 'Hard Rail', on: 'ballMul', mult: 1.45,
-    text: 'The arm is latched at the top of its travel. Ball multiplier x1.45.'
+    ids: ['counterweight_plate', 'spring_latch'], name: 'Latched Hard', on: 'ballMul', mult: 1.45,
+    text: 'Every ball pays x1.45 more. The arm is latched at the top of its travel.'
   },
   {
-    ids: ['tilt_weight', 'spring_latch'], name: 'The Groove', on: 'ballMul', mult: 1.80,
-    text: 'Latched onto the last paying strength and weighted to hold it. Ball multiplier x1.80.'
+    ids: ['tilt_weight', 'spring_latch'], name: 'In The Groove', on: 'ballMul', mult: 1.80,
+    text: 'Every ball pays x1.80 more. Latched onto the last strength that paid, and weighted to hold it.'
   },
   {
-    ids: ['second_face', 'score_plate'], name: 'Full Face', on: 'pocketPay', mult: 1.30,
-    text: 'Twice the pockets, all of them re-numbered. Pocket pay x1.30.'
+    ids: ['second_face', 'score_plate'], name: 'Twice The Pockets', on: 'pocketPay', mult: 1.30,
+    text: 'Every pocket pays x1.30. Twice as many pockets, all of them re-numbered.'
   },
   {
-    ids: ['held_reel', 'brass_seven'], name: 'Held Seven', on: 'sevenProb', mult: 3.00,
-    text: 'The held reach can be held on the seven. Seven chance x3.00 on the first reach of a round.'
+    ids: ['held_reel', 'brass_seven'], name: 'Hold For Sevens', on: 'sevenProb', mult: 3.00,
+    text: 'Three times the chance of a seven on the first reel match of a round, and a seven is the biggest BONUS in the game.'
   },
   {
-    ids: ['attacker_mouth', 'rolling_shutter'], name: 'Open Mouth', on: 'feverEv', mult: 1.35,
-    text: 'The shutter drops across a mouth already cut wide. Fever value x1.35.'
+    ids: ['attacker_mouth', 'rolling_shutter'], name: 'Wide Open Jackpot', on: 'feverEv', mult: 1.35,
+    text: 'A BONUS is worth x1.35. The shutter drops across a pocket already cut wide.'
   },
   {
-    ids: ['escapement', 'bevel_glass'], name: 'The Ramp', on: 'feverEv', mult: 1.50,
-    text: 'A fever that starts high and climbs. Fever value x1.50.'
+    ids: ['escapement', 'bevel_glass'], name: 'Hot And Climbing', on: 'feverEv', mult: 1.50,
+    text: 'A BONUS is worth x1.50. It starts high and climbs with every ball.'
   },
   {
-    ids: ['hopper_wheel', 'long_fever'], name: 'Free Fever', on: 'feverEv', mult: 1.40,
-    text: 'Eight free balls out of fourteen. Fever value x1.40.'
+    ids: ['hopper_wheel', 'long_fever'], name: 'Bonus On The House', on: 'feverEv', mult: 1.40,
+    text: 'A BONUS is worth x1.40. Eight of its fourteen balls cost you nothing.'
   },
   {
-    ids: ['counter_wheel', 'score_plate'], name: 'Bank Shot', on: 'pocketPay', mult: 1.22,
-    text: 'The wheel doubles a pocket that was already raised. Pocket pay x1.22.'
+    ids: ['counter_wheel', 'score_plate'], name: 'Doubled And Raised', on: 'pocketPay', mult: 1.22,
+    text: 'Every pocket pays x1.22. The wheel doubles a pocket that was already worth more.'
   },
   {
-    ids: ['return_rail', 'pocket_magnet'], name: 'Recovery', on: 'recovery', mult: 1.50,
-    text: 'The rail catches what the magnets miss. Balls recovered from the out lanes x1.50.'
+    ids: ['return_rail', 'pocket_magnet'], name: 'Nothing Wasted', on: 'recovery', mult: 1.50,
+    text: 'Balls saved from the out lanes go up x1.50. The tray catches what the magnets miss.'
   },
   {
-    ids: ['second_rail', 'third_rail', 'sprocket'], name: 'Wide Load', on: 'cadence', mult: 1.15,
-    text: 'Every rail the cabinet will take. Launches per minute x1.15 on top of the count.'
+    ids: ['second_rail', 'third_rail', 'sprocket'], name: 'Every Rail Fitted', on: 'cadence', mult: 1.15,
+    text: 'Pulls per minute x1.15, on top of the extra balls already in the air.'
   },
   {
-    ids: ['ground_glass', 'sorting_gate'], name: 'Blind Run', on: 'payout', mult: 1.30,
-    text: 'You cannot see, but every tenth ball finds the gate anyway. Payout x1.30.'
+    ids: ['ground_glass', 'sorting_gate'], name: 'Blind But Sorted', on: 'payout', mult: 1.30,
+    text: 'Every payout x1.30. You can\'t see the ball, but every tenth one finds the slot anyway.'
   },
   {
-    ids: ['fuse_wire', 'attacker_mouth'], name: 'Blown Fuse', on: 'payout', mult: 0.50, trap: true,
-    text: 'The first attacker ball is over sixty. The fuse goes in the first fever: payout x0.50.'
+    ids: ['fuse_wire', 'attacker_mouth'], name: 'Fuse Goes First', on: 'payout', mult: 0.50, trap: true,
+    text: 'Every payout x0.50. The first jackpot ball pays over sixty and blows the fuse in your first BONUS.'
   },
   {
-    ids: ['nail_gauge', 'second_face'], name: 'The Tide', on: 'pocketPay', mult: 1.20,
-    text: 'Both multiply into the same ceiling, so the pockets pay instead. Pocket pay x1.20.'
+    ids: ['nail_gauge', 'second_face'], name: 'Both Into The Ceiling', on: 'pocketPay', mult: 1.20,
+    text: 'Every pocket pays x1.20. Both parts push at the same ceiling on pocket chance, so the pay rises instead.'
   },
   {
-    ids: ['pawl', 'wear_plate', 'anchor_plate'], name: 'Long Night', on: 'budget', mult: 1.30,
-    text: 'Budget added, carried and rewarded. Effective budget x1.30.'
+    ids: ['pawl', 'wear_plate', 'anchor_plate'], name: 'More Pulls', on: 'budget', mult: 1.30,
+    text: 'Effective pull budget x1.30. Pulls added, carried over, and rewarded for going unused.'
   }
 ];
 

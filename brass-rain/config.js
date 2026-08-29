@@ -28,21 +28,20 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   identity: {
     name: 'Brass Rain',
-    tagline: 'One lamp, seven hundred nails, and a tray that never fills itself.',
+    tagline: 'Drop the balls, bend the nails, chase the bonus.',
     storagePrefix: 'brassrain',
 
     // Parked names. Any of these can take the place of name above with no
     // other change anywhere.
     alternates: [
       'Brass Rain',
-      'Kugishi',        // the craftsman who sets the nails
       'The Nail Room',
       'Oxblood',
       'Ten Thousand Nails',
       'Silver Tray',
-      'Fever Line',
+      'Bonus Line',
       'Lacquer',
-      'The Parlour Floor',
+      'The Arcade Floor',
       'Chrome and Brass',
     ],
   },
@@ -50,70 +49,113 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   // WORDS - every label on the furniture, so the whole game can be reworded
   // from one place and so nothing is spelled twice.
+  //
+  // Everything here is written for somebody who has never seen the game. Where
+  // the machine trade has a word of its own, the plain word wins: the pocket
+  // that starts the reels is a SLOT, the payout window a BONUS, the pocket it
+  // opens the JACKPOT POCKET. The four things a player counts are named for what
+  // they buy - BALLS buy pulls and parts, COINS buy arcade machines, STARS buy
+  // upgrades that never go away, and the goal is what a round asks for.
+  //
+  // The braces are filled at the point of use, and the only names that exist
+  // are have, need, n, short, balls and scrip. A new one prints nothing.
   // -------------------------------------------------------------------------
   text: {
     ball:       'ball',
     balls:      'balls',
-    tray:       'Tray',
-    scrip:      'Scrip',
-    marks:      'Marks',
-    quota:      'Quota',
+    tray:       'Balls',
+    scrip:      'Coins',
+    marks:      'Stars',
+    quota:      'Goal',
     round:      'Round',
-    launch:     'Launch',
-    strength:   'Strength',
+    launch:     'Pull',
+    strength:   'Power',
     auto:       'Auto',
-    fever:      'FEVER',
-    gate:       'Gate',
-    attacker:   'Attacker',
-    shop:       'The Bench',
-    fittings:   'Fittings',
-    fitting:    'Fitting',
-    machines:   'The parlour',
+    fever:      'BONUS',
+    gate:       'Slot',
+    attacker:   'Jackpot pocket',
+    shop:       'The workbench',
+    fittings:   'Parts',
+    fitting:    'Part',
+    machines:   'Your arcade',
     machine:    'Machine',
-    attendant:  'Attendant',
+    attendant:  'Manager',
     cashOut:    'Cash out',
-    reroll:     'Reroll',
-    skip:       'Leave the bench',
+    reroll:     'New parts',
+    skip:       'Start the round',
     best:       'Best',
     speed:      'Speed',
     pause:      'Pause',
     resume:     'Resume',
     help:       'Help',
-    newRun:     'New run',
+    newRun:     'New game',
     settings:   'Settings',
 
     // Sentences. Braces are filled in at the point of use.
-    firstLine:  'Turn the handle. Balls arc over the top and fall through the nails. Most are lost. The gate in the middle is the one that matters.',
+    firstLine:  'Pull the handle. Balls arc over the top and rain down through the nails. Pockets pay balls back, and the slot in the middle spins the reels.',
     quotaLine:  '{have} of {need}',
     roundWon:   'Round {n} cleared.',
-    roundLost:  'The tray ran out {short} short.',
-    feverOn:    'Fever - the attacker is open for {n} balls.',
-    feverOff:   'The attacker closed.',
-    gateHit:    'Through the gate.',
-    reelMiss:   'The reels missed.',
-    cashOutAsk: 'Cash out {balls} balls for {scrip} scrip? The run ends here.',
-    emptyTray:  'The tray is empty.',
+    roundLost:  'Out of balls, {short} short of the goal.',
+    feverOn:    'BONUS - the jackpot pocket is open for the next {n} balls.',
+    feverOff:   'The jackpot pocket closed.',
+    gateHit:    'Into the slot.',
+    reelMiss:   'The reels didn\'t match.',
+    cashOutAsk: 'Cash out {balls} balls for {scrip} coins? That ends this game.',
+    emptyTray:  'You\'re out of balls.',
   },
 
   // -------------------------------------------------------------------------
-  // PALETTE - one warm family, one cool accent, built by eye in OKLCH and
-  // written here as hex so the page can use them before any module runs.
+  // PALETTE - the page around the machine.
+  //
+  // The MACHINE is painted by its skin, and every cabinet on the floor wears a
+  // different one: those live in src/render/themes.js because the renderer has
+  // to be able to paint a face whether or not a config ever reaches it. These
+  // are the page's own surfaces - the ground it sits on, the panels, the
+  // lettering - and they are kept in the default machine's family so the room
+  // and the cabinet look like one place.
+  //
+  // The contrasts here are load bearing rather than decorative: the ground has
+  // to stay dark for the machine to be the lit thing in the frame, the panels
+  // have to stay light, and the lettering has to stay readable on the panels.
   // -------------------------------------------------------------------------
   palette: {
-    lacquer:  '#2b0f12',   // the board ground, very dark warm red
-    lacquer2: '#4a1a1c',   // where the lamp pools on it
-    lamp:     '#f6e6c8',   // the single warm light
-    brass:    '#b08637',
-    brassLit: '#f0cf83',
-    chrome:   '#9aa2a8',
+    lacquer:  '#00bac9',   // the machine's own colour, used for accents
+    lacquer2: '#00e0f0',   // and the brighter end of it
+    lamp:     '#e9f9f9',   // the light over the cabinet
+    brass:    '#f0e8cb',
+    brassLit: '#fffbe8',
+    chrome:   '#d5dbde',
     chromeLit:'#ffffff',
-    enamel:   '#e9e6d6',   // plaque cream
-    enamel2:  '#d5d1bd',
-    jade:     '#4fa88a',   // the one cool accent, live values only
-    oxblood:  '#5c1d20',   // lettering on enamel
-    ink:      '#1a0c0d',
-    dim:      '#8c7f76',
-    rule:     '#7d5a2e',
+    enamel:   '#eaf7f8',   // panel faces, and they stay light
+    enamel2:  '#d3ecef',
+    jade:     '#ffa658',   // the one hot accent, live values only
+    oxblood:  '#04242b',   // lettering on the panels, and it stays dark
+    ink:      '#040a12',   // the dark room the cabinet stands in
+    dim:      '#7fa8b0',
+    rule:     '#12707c',
+  },
+
+  // -------------------------------------------------------------------------
+  // RENDER - how the machine is drawn, as distinct from how it plays.
+  //
+  // Everything here has a working default inside the renderer, so a page that
+  // hands over nothing still gets a whole cabinet. These are the numbers worth
+  // stating out loud because they change the proportions of the object.
+  // -------------------------------------------------------------------------
+  render: {
+    // Room around the glass for the body, and how far up through that room the
+    // glass sits. A cabinet is not symmetrical: the sign above the face is
+    // thin and the dish below it is deep.
+    margin: 0.135,
+    lift: 0.30,
+    // The show screen, as a share of the face. This is the single biggest
+    // decision about what the machine looks like: the nails are a ring and an
+    // apron around this panel, and a machine whose screen is a postage stamp
+    // is a nail diagram with a counter on it.
+    screen: { width: 0.40, height: 0.36 },
+    // The strip of drums inside the screen. Everything above and around them
+    // is the show.
+    drums: { width: 0.66, height: 0.30, drop: 0.26 },
   },
 
   // -------------------------------------------------------------------------
@@ -131,7 +173,7 @@ export const CONFIG = {
     fieldBottom: 112,
 
     // The nail lattice. Rows are staggered by half a column.
-    // The lattice is laid at parlour proportions: a ball a little over two
+    // The lattice is laid at arcade proportions: a ball a little over two
     // units across, nails a little over three apart, and about seven hundred
     // of them on the face. A sparser board is easier to reason about and does
     // not look like a machine anybody built.
@@ -148,13 +190,19 @@ export const CONFIG = {
     leanMax: 0.40,
     jitterMax: 0.34,
 
-    // The reel counter is set into the lacquer above the gate. Nails are kept
-    // out of it, because a nail drawn under a counter is a nail a player
-    // cannot see and a ball can still hit.
-    reel: { x: 50, y: 34.8, w: 13.5, h: 5.4 },
+    // The show screen is set into the middle of the face and nails are kept
+    // out of it - a nail drawn under the screen is a nail a player cannot see
+    // and a ball can still hit.
+    //
+    // It is large on purpose, which is what a cabinet of this kind actually
+    // looks like: the field is a ring across the shoulders and an apron below,
+    // and the middle is the panel a player is watching while a ball is in the
+    // air. Balls run down the face of it to the apron, which is also what
+    // happens on the real object.
+    reel: { x: 50, y: 39, w: 38, h: 42 },
 
     // How far a nail head will lean. A board is set by thousandths of an inch
-    // in a parlour; here it is a fraction of a ball, which is small enough
+    // in a arcade; here it is a fraction of a ball, which is small enough
     // that one nail is a nudge and large enough that six are a plan.
     bendReach: 0.95,
     bendsPerRound: 3,
@@ -186,7 +234,7 @@ export const CONFIG = {
     // ------------------------------------------------------------------
     // THE CABINETS
     //
-    // A parlour is a row of different machines, not one machine repeated. A
+    // A arcade is a row of different machines, not one machine repeated. A
     // layout is a whole face: where the gate sits, what mouths are cut into
     // it, how the plates run, how tight the funnel is and how the nails are
     // laid. Two of these read as different objects across a room, which is
@@ -201,13 +249,13 @@ export const CONFIG = {
         id: 'sea',
         baseReturn: 0.60,
         name: 'Sea',
-        note: 'the plain one: a centre gate, shelves high and cream mouths low',
+        note: 'the plain one: a slot in the middle, side pockets high and mid pockets low',
       },
       {
         id: 'tower',
         baseReturn: 0.80,
         name: 'Tower',
-        note: 'a high gate under a long funnel, and everything else pushed low',
+        note: 'a high slot under a long funnel, with everything else pushed low',
         gate: { x: 50, y: 58, w: 3.0, h: 1.42 },
         funnelRows: 5, funnelWidth: 11,
         payPockets: [
@@ -222,7 +270,7 @@ export const CONFIG = {
         id: 'shelf',
         baseReturn: 0.68,
         name: 'Shelf',
-        note: 'four wide shelves either side and a gate that sits low and tight',
+        note: 'four wide side pockets and a slot that sits low and tight',
         gate: { x: 50, y: 88, w: 2.9, h: 1.42 },
         funnelRows: 3, funnelWidth: 8,
         attacker: { x: 50, y: 103, w: 12, h: 2.13 },
@@ -240,7 +288,7 @@ export const CONFIG = {
         id: 'twin',
         baseReturn: 0.53,
         name: 'Twin',
-        note: 'two gates off the centre line, and no jade mouth at all',
+        note: 'two slots off the middle, and no big pocket at all',
         gate: { x: 32, y: 76, w: 3.1, h: 1.42 },
         extraGate: { x: 68, y: 76, w: 3.1, h: 1.42 },
         funnelRows: 3, funnelWidth: 9,
@@ -255,7 +303,7 @@ export const CONFIG = {
         id: 'well',
         baseReturn: 0.81,
         name: 'Well',
-        note: 'a deep centre well: the jade mouth sits right above the gate',
+        note: 'a deep middle well, with the big pocket right above the slot',
         gate: { x: 50, y: 80, w: 3.3, h: 1.42 },
         funnelRows: 4, funnelWidth: 7,
         payPockets: [
@@ -270,7 +318,7 @@ export const CONFIG = {
         id: 'ladder',
         baseReturn: 0.67,
         name: 'Ladder',
-        note: 'mouths stepped down the face in a line, cheapest at the top',
+        note: 'pockets stepped down the board in a line, cheapest at the top',
         gate: { x: 50, y: 92, w: 3.0, h: 1.42 },
         funnelRows: 2, funnelWidth: 8,
         attacker: { x: 50, y: 104, w: 11, h: 2.13 },
@@ -358,10 +406,15 @@ export const CONFIG = {
     // Which face is the seven. A cabinet has one, and parts that care about it
     // ask for it by name rather than by number.
     sevenDigit: 7,
-    spinSeconds: 1.6,
-    holdSeconds: 1.1,     // how long the result stays up
-    // How many more sets of drums can turn at once, arranged around the centre
-    // window. A spin that arrives while the centre is busy opens one of these
+    // A spin nobody is going to remember has to be short - a player sees
+    // thousands of them - and the answer has to stay up long enough to be
+    // read. The last drum settles at 95 hundredths of the way through, so the
+    // seconds after the second drum lands are the near miss, and they are the
+    // seconds the whole machine is built around.
+    spinSeconds: 4.2,
+    holdSeconds: 2.0,     // how long the result stays up
+    // How many more sets of drums can turn at once, arranged around the center
+    // window. A spin that arrives while the center is busy opens one of these
     // instead of waiting in line, so what the gate bought is paid during the
     // round rather than after the last ball has dropped. Past the ring a spin
     // waits, so no run can cover the face in windows.
@@ -384,6 +437,206 @@ export const CONFIG = {
     attackerPay: 6,
     continueChance: 0.30, // chance a fever rolls straight into another
     lampWarm: 1.0,        // how far the lamp warms and brightens
+  },
+
+  // -------------------------------------------------------------------------
+  // WHAT THE MACHINE DOES BACK - the table of things that can happen on the
+  // face while a round is being played.
+  //
+  // Play a certain way and the board answers: a spare mouth is cut into it
+  // somewhere else, a stripe of it lights up, something swims across it, three
+  // doors light and one of them pays. Each entry below is one of those. Adding
+  // a thing the machine does is adding an entry here, not writing code.
+  //
+  // EVERY LIFE IS IN BALLS SENT. Nothing here is measured in seconds, so
+  // nothing is longer on a slow machine or keeps running while the handle is
+  // still.
+  //
+  // WHAT IT IS WORTH. Measured over full runs, the whole table lifts what the
+  // face pays back by about a tenth. That is deliberate: a round is asked for
+  // a share of what the bare face pays, so a table worth much more than this
+  // would quietly make every round easier than the one number the quota is
+  // built on. If these are turned up, `run.baseReturn` and the layouts'
+  // `baseReturn` figures have to be measured again.
+  //
+  //   trigger.kind   what sets an entry off
+  //     dry     that many balls in a row resolved without paying
+  //     hot     that many balls in a row paid
+  //     nails   one ball touched that many nails on the way down
+  //     near    two of the three reels agreed and the third did not
+  //     pace    the round's take passed that share of what the round asks for
+  //     closed  the wide mouth at the bottom of the face has just shut
+  //     chance  nothing at all; it happens on its own, rarely
+  //
+  //   kind           what the entry does
+  //     mouth   an extra pocket opens somewhere on the face
+  //     plate   a brass shutter swings out and steers the balls themselves
+  //     lane    a stripe of the face lights and pays more
+  //     sweep   something crosses the face; mouths it passes pay more
+  //     ride    every mouth pays more for a while
+  //     doors   a row of doors, one of which pays
+  //
+  //   tellBalls      balls of warning before an entry happens. Nothing about
+  //                  the board changes during the warning; it is drawn on the
+  //                  machinery already there so a player learns to read it.
+  //                  0 means the entry lands with no warning at all.
+  // -------------------------------------------------------------------------
+  events: {
+    enabled: true,
+
+    // The ceilings. Every one of these exists so that no run of luck and no
+    // set of entries can leave the face permanently generous.
+    maxAtOnce: 2,         // things happening at the same time
+    maxBalls: 120,        // longest life any entry may ask for, in balls
+    maxMult: 4,           // most the live entries together may multiply a mouth
+    restBalls: 6,         // balls after anything starts before anything else can
+    randomChance: 0.0045, // chance per ball that the rare one goes off on its own
+    tellBalls: 0,         // warning an entry gets when it does not name its own
+
+    // Said when a row of doors closes and one of them opens.
+    doorsWon: 'The middle door opens. It pays {pay} balls.',
+
+    list: [
+      {
+        id: 'sparemouth',
+        name: 'Spare pocket',
+        kind: 'mouth',
+        trigger: { kind: 'dry', count: 11 },
+        line: 'Nothing has paid for a while, so a spare pocket opens on the board. It pays {pay} and it\'s open for the next {n} balls.',
+        balls: 30,
+        restBalls: 45,
+        pay: 4,
+        w: 3.1, h: 1.3,
+        tone: 'jade',
+        clearance: 7,
+        // Where a spare mouth may be cut, as a fraction across the field and a
+        // fraction down it. Every cabinet has a different face, so these are
+        // candidates rather than places: each is checked for the plates, the
+        // other mouths and the counter, and the first that is clear is used.
+        spots: [
+          { x: 0.20, y: 0.42 }, { x: 0.80, y: 0.42 },
+          { x: 0.34, y: 0.58 }, { x: 0.66, y: 0.58 },
+          { x: 0.12, y: 0.62 }, { x: 0.88, y: 0.62 },
+        ],
+      },
+      {
+        id: 'hatch',
+        name: 'The hatch',
+        kind: 'mouth',
+        trigger: { kind: 'chance' },
+        line: 'A hatch opens high on the board. It pays {pay}, and it shuts again after {n} balls.',
+        balls: 30,
+        restBalls: 90,
+        tellBalls: 3,
+        tellLine: 'The lamp dips. Something is about to open.',
+        pay: 9,
+        w: 2.3, h: 1.3,
+        tone: 'brass',
+        clearance: 7,
+        spots: [
+          { x: 0.30, y: 0.26 }, { x: 0.70, y: 0.26 },
+          { x: 0.50, y: 0.22 }, { x: 0.16, y: 0.34 }, { x: 0.84, y: 0.34 },
+        ],
+      },
+      {
+        id: 'shutter',
+        name: 'The shutter',
+        kind: 'plate',
+        trigger: { kind: 'near' },
+        line: 'Two of the three lined up, and a brass shutter swings out across the board. Balls come off it somewhere new for {n} balls.',
+        balls: 30,
+        restBalls: 24,
+        tellBalls: 2,
+        tellLine: 'A shutter is unlatching.',
+        clearance: 8,
+        // Where a shutter may swing, as a fraction across the field and down
+        // it. `len` is its length as a share of the field's width and `tilt`
+        // is how steeply it runs, so a ball landing on it is sent one way. Each
+        // is checked against the mouths before it is used: a shutter passing
+        // under a mouth turns it into a funnel, which is the one arrangement
+        // on this board that pays more than a round is worth.
+        spots: [
+          { x: 0.30, y: 0.44, len: 0.22, tilt: 0.45 },
+          { x: 0.70, y: 0.44, len: 0.22, tilt: -0.45 },
+          { x: 0.24, y: 0.60, len: 0.20, tilt: -0.40 },
+          { x: 0.76, y: 0.60, len: 0.20, tilt: 0.40 },
+          { x: 0.50, y: 0.36, len: 0.26, tilt: 0.30 },
+        ],
+      },
+      {
+        id: 'litstripe',
+        name: 'Lit stripe',
+        kind: 'lane',
+        trigger: { kind: 'nails', hits: 44 },
+        line: 'That ball rattled the whole way down. The narrow stripe it fell through is lit, and anything landing in it pays {x} times as much for {n} balls.',
+        // Measured: about four fifths of everything the ordinary mouths pay
+        // lands within seven units of the middle of the face, so a wide
+        // stripe is not a stripe at all, it is every mouth at once. This one
+        // is about three balls across, and where it lands is the whole point.
+        balls: 20,
+        restBalls: 30,
+        follow: 'ball',
+        width: 9,
+        mult: 2,
+      },
+      {
+        id: 'lantern',
+        name: 'The lantern',
+        kind: 'sweep',
+        trigger: { kind: 'closed' },
+        line: 'The jackpot pocket has shut, and a paper lantern drifts out across the board. Any pocket it passes pays {x} times as much until it reaches the far side.',
+        balls: 24,
+        restBalls: 30,
+        shape: 'lantern',
+        y: 0.46,
+        reach: 10,
+        mult: 2,
+      },
+      {
+        id: 'carp',
+        name: 'The carp',
+        kind: 'sweep',
+        trigger: { kind: 'hot', count: 6 },
+        line: 'A brass carp swims out across the board. Any pocket it\'s passing pays {x} times as much until it reaches the far side.',
+        balls: 34,
+        restBalls: 45,
+        shape: 'carp',
+        y: 0.68,
+        reach: 11,
+        mult: 3,
+      },
+      {
+        id: 'halfagain',
+        name: 'Half again',
+        kind: 'ride',
+        trigger: { kind: 'near' },
+        line: 'Two of the three lined up. Every pocket pays {x} times as much for the next {n} balls.',
+        // Two of three turns up on about a quarter of all spins, and this is
+        // the answer to most of them. It is deliberately the cheapest thing in
+        // the table and deliberately the most frequent: the near miss is what
+        // a player watches for, so it has to be worth watching every time
+        // rather than once a night.
+        balls: 22,
+        restBalls: 14,
+        mult: 1.4,
+      },
+      {
+        id: 'doors',
+        name: 'Three doors',
+        kind: 'doors',
+        trigger: { kind: 'pace', share: 0.5 },
+        line: 'Halfway to what the round asks for. Three doors light up, and one of them pays when they close in {n} balls.',
+        balls: 18,
+        restBalls: 30,
+        tellBalls: 2,
+        tellLine: 'A row of doors is lighting up.',
+        doors: 3,
+        // What is behind each door. One is drawn when the row lights and
+        // hidden until it closes, so the average is what this is worth.
+        prizes: [3, 7, 14],
+        showBalls: 5,
+      },
+    ],
   },
 
   // -------------------------------------------------------------------------
@@ -450,7 +703,7 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
-  // THE FLOOR - the parlour that earns while the handle is still.
+  // THE FLOOR - the arcade that earns while the handle is still.
   // -------------------------------------------------------------------------
   floor: {
     cashRate: 0.004,      // scrip per ball cashed out
@@ -473,7 +726,7 @@ export const CONFIG = {
       { id: 'handle',   name: 'Handle Cabinet', cost: 60,            income: 0.5,    ratio: 1.15 },
       { id: 'digital',  name: 'Digital Sea',   cost: 720,            income: 2,      ratio: 1.14 },
       { id: 'drum',     name: 'Drum Row',      cost: 8640,           income: 8,      ratio: 1.13 },
-      { id: 'twin',     name: 'Twin Attacker', cost: 103680,         income: 32,     ratio: 1.12 },
+      { id: 'twin',     name: 'Twin Jackpot', cost: 103680,         income: 32,     ratio: 1.12 },
       { id: 'kakuhen',  name: 'Chain Bank',    cost: 1244160,        income: 128,    ratio: 1.11 },
       { id: 'silver',   name: 'Silver Hall',   cost: 14929920,       income: 512,    ratio: 1.10 },
       { id: 'corner',   name: 'Corner Stand',  cost: 179159040,      income: 2048,   ratio: 1.09 },

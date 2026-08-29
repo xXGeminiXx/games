@@ -3,15 +3,27 @@
 //
 // WHAT THIS LAYER IS
 //
-// Overnight the parlour's nail technician goes down the row and re-nails every
-// board. The floor is sold back, the boards are straightened, the machines are
-// gone, and the only thing that survives the night is what the technician
+// The player sells the whole arcade and builds it again from nothing. The
+// machines go, the coins go, and the only thing that survives is what was
 // learned about how those boards played. That knowledge is written down as
-// MARKS, and marks are the permanent currency of this game.
+// MARKS, which every screen calls STARS, and it is the permanent currency of
+// this game.
 //
-// A reset therefore trades a floor for a notebook. Everything in this file
-// exists to make that trade honest: the floor really does go, the notebook
+// A reset therefore trades an arcade for a notebook. Everything in this file
+// exists to make that trade honest: the arcade really does go, the notebook
 // really does keep filling, and the notebook never empties.
+//
+// WHAT THE PLAYER CALLS THESE THINGS
+//
+// The identifiers here are older than the words on screen and they no longer
+// match. Anything written for a player has to use the second column.
+//
+//     marks       ->  stars            floor / parlour ->  your arcade
+//     scrip       ->  coins            fitting         ->  part
+//     tray        ->  balls            gate            ->  the slot
+//     fever       ->  a BONUS          attacker        ->  the jackpot pocket
+//     quota       ->  the goal         face            ->  the board
+//     run / night ->  a game           lean a nail     ->  bend a nail
 //
 //
 // THE FORMULA
@@ -40,7 +52,7 @@
 // THE GATE
 //
 // A reset is offered only when it would pay at least `minMarks` (12), and at
-// least `minFraction` (25 per cent) of the marks already held. The flat floor
+// least `minFraction` (25 percent) of the marks already held. The flat floor
 // stops the first reset arriving before it can buy anything worth having; the
 // fraction stops a late player resetting every few minutes for a rounding
 // error. Twelve marks is exactly the cost of the opening tier, so the first
@@ -134,7 +146,7 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=5';
+import { priceAt } from './economy.js?v=6';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -182,7 +194,7 @@ const SHOULDER_RIGHT = Object.freeze({
 });
 
 const SECOND_GATE = Object.freeze({
-  id: 'gate2', kind: 'gate', label: 'Gate', tone: 'chrome',
+  id: 'gate2', kind: 'gate', label: 'Slot', tone: 'chrome',
   x: 27, y: 64, w: 3.4, h: 2.4, pay: 0, open: true,
   // A mouth with nothing gathering balls into it is a mouth nothing reaches,
   // so the description carries its own funnel. A board that ignores these two
@@ -210,40 +222,40 @@ export const NODES = [
 
   {
     id: 'notebook', name: 'The Notebook', tier: 0, cost: 1, needs: [], resets: 1,
-    text: 'The technician keeps a notebook. Every mark ever written in it raises what the whole floor earns, by a quarter of the square root of the count: 12 marks makes it x1.87, 60 marks x2.94, 400 marks x6.',
-    visible: 'A bound notebook on the bench, open at the current page, with the mark count written on it.',
+    text: 'A notebook of everything you have learned. Every star you own raises what your whole arcade earns: 12 stars makes it x1.87, 60 stars x2.94, 400 stars x6.',
+    visible: 'A bound notebook on the workbench, open at the current page, with the star count written on it.',
     gives: { perMark: true },
   },
 
   // -- the opening tier, twelve marks with the root, bought in one go --------
 
   {
-    id: 'first_row', name: 'The First Row', tier: 1, cost: 3, needs: ['notebook'], resets: 1,
-    text: 'Ten Upright Tens are left standing when the floor is sold. Every night opens with a row already earning, and ten is the first milestone, so the row runs at double rate from the first second.',
-    visible: 'Ten machines standing on the floor at the moment a reset finishes, where there used to be an empty row and a price.',
+    id: 'first_row', name: 'A Row to Start With', tier: 1, cost: 3, needs: ['notebook'], resets: 1,
+    text: 'Ten Upright Tens stay in your arcade when you sell the rest. Every fresh start opens with a row already earning, and ten is enough for the first doubling, so they run at double rate from the first second.',
+    visible: 'Ten machines standing in the arcade the moment a restart finishes, where there used to be an empty row and a price.',
     gives: { startMachines: { upright: 10 } },
   },
   {
-    id: 'spare_tray', name: 'The Spare Tray', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'A spare tray under the machine. Every round starts with 60 more balls in it.',
-    visible: 'A second tray under the cabinet, already full, before the first ball is sent.',
+    id: 'spare_tray', name: 'Start Every Round With More Balls', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
+    text: 'The machine is loaded fuller before every round. Each one starts with 60 more balls than it would have.',
+    visible: 'A second tray under the machine, already full, before the first ball is sent.',
     gives: { trayBonus: 60 },
   },
   {
-    id: 'bench_stool', name: 'The Third Stool', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'Room at the bench for one more fitting. Six bolt in at once instead of five.',
-    visible: 'A sixth bolt hole on the fitting rail, empty and lit, from the first shop of the run.',
+    id: 'bench_stool', name: 'Room for a Sixth Part', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
+    text: 'Room in the machine for one more part. Six fit at once instead of five.',
+    visible: 'A sixth empty slot on the part rail, lit, from the first workbench of the game.',
     gives: { shopSlots: 1 },
   },
   {
-    id: 'pin_hammer', name: 'The Pin Hammer', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'A hammer of the technician\'s own. Four nails can be leaned each round instead of three.',
-    visible: 'A fourth bend token on the nail rail, and a fourth nail that will take a lean.',
+    id: 'pin_hammer', name: 'Your Own Hammer', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
+    text: 'A hammer of your own. Four nails can be bent each round instead of three.',
+    visible: 'A fourth bend token on the nail rail, and a fourth nail that will take a bend.',
     gives: { bendsPerRound: 1 },
   },
   {
-    id: 'counter_rail', name: 'The Counter Rail', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'A rail from the tray to the counter. Cashing out pays 30 per cent more scrip per ball.',
+    id: 'counter_rail', name: 'A Better Counter', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
+    text: 'A rail running straight from the tray to the counter. Cashing balls in pays 30 percent more coins per ball.',
     visible: null,
     gives: { cashMult: 1.30 },
   },
@@ -251,117 +263,117 @@ export const NODES = [
   // -- the second page, from the second reset -------------------------------
 
   {
-    id: 'floor_ledger', name: 'The Floor Ledger', tier: 2, cost: 8, needs: ['counter_rail'], resets: 2,
-    text: 'The floor keeps its own books. Every machine earns 50 per cent more, and six more hours of an absence are paid, 18 instead of 12.',
+    id: 'floor_ledger', name: 'The Arcade Ledger', tier: 2, cost: 8, needs: ['counter_rail'], resets: 2,
+    text: 'Your arcade keeps its own books. Every arcade machine earns 50 percent more, and six more hours away are paid for, 18 instead of 12.',
     visible: null,
     gives: { floorMult: 1.50, idleHours: 6 },
   },
   {
-    id: 'wider_gate', name: 'The Filed Gate', tier: 2, cost: 6, needs: ['pin_hammer'], resets: 2,
-    text: 'The gate mouth filed out by four fifths of a board unit, from 3.6 wide to 4.4. The shoulder nails stand further apart to match.',
-    visible: 'A measurably wider gate, with the two shoulder nails that guard it visibly pushed out.',
+    id: 'wider_gate', name: 'A Wider Slot', tier: 2, cost: 6, needs: ['pin_hammer'], resets: 2,
+    text: 'The slot filed wider, from 3.6 across to 4.4. The two nails guarding its shoulders stand further apart to match, so more balls find their way in.',
+    visible: 'A measurably wider slot, with the two shoulder nails that guard it visibly pushed out.',
     gives: { gateWidth: 0.8 },
   },
   {
-    id: 'second_offer', name: 'The Fourth Card', tier: 2, cost: 6, needs: ['bench_stool'], resets: 2,
-    text: 'The bench lays out four fittings instead of three, every shop, for the whole run.',
-    visible: 'A fourth card on the bench at every shop.',
+    id: 'second_offer', name: 'A Fourth Part for Sale', tier: 2, cost: 6, needs: ['bench_stool'], resets: 2,
+    text: 'The workbench lays out four parts instead of three, between every round, for the whole game.',
+    visible: 'A fourth card at the workbench between every round.',
     gives: { shopOffers: 1 },
   },
   {
-    id: 'worn_reroll', name: 'The Worn Deck', tier: 2, cost: 5, needs: ['bench_stool'], resets: 2,
-    text: 'A well-thumbed deck. Every reroll costs 30 per cent less, including the ones that have already climbed.',
+    id: 'worn_reroll', name: 'Cheaper New Parts', tier: 2, cost: 5, needs: ['bench_stool'], resets: 2,
+    text: 'A well-thumbed deck of cards. Asking the workbench for different parts costs 30 percent fewer balls, including after the price has already climbed.',
     visible: null,
     gives: { rerollDiscount: 0.30 },
   },
   {
-    id: 'pay_saucer', name: 'The Saucer', tier: 2, cost: 7, needs: ['spare_tray'], resets: 2,
-    text: 'A brass saucer set high in the centre of the face, paying 4. It catches balls early in the fall, before the nails have finished with them.',
-    visible: 'A new brass mouth in the lacquer high on the centre line, with the nail lattice opened around it.',
+    id: 'pay_saucer', name: 'A Pocket Up High', tier: 2, cost: 7, needs: ['spare_tray'], resets: 2,
+    text: 'A brass saucer set high in the middle of the board, paying 4. It catches balls early in the fall, before the nails have finished with them.',
+    visible: 'A new brass pocket in the lacquer high on the center line, with the nails opened out around it.',
     gives: { extraPockets: [SAUCER] },
   },
   {
-    id: 'first_fitting', name: 'The Bolted Fitting', tier: 2, cost: 8, needs: ['bench_stool'], resets: 2,
-    text: 'A Brass Lip is left bolted to the machine. Round one is played with a fitting already in, before the first shop.',
-    visible: 'A fitting already in slot one of the fitting rail when the run opens.',
+    id: 'first_fitting', name: 'Start With a Part', tier: 2, cost: 8, needs: ['bench_stool'], resets: 2,
+    text: 'A Brass Lip stays in the machine. Round one is played with a part already fitted, before you have seen the workbench at all.',
+    visible: 'A part already in slot one of the part rail when a game opens.',
     gives: { startFittings: ['brass_lip'] },
   },
 
   // -- the third page, from the fifth reset ---------------------------------
 
   {
-    id: 'second_row', name: 'The Second Row', tier: 3, cost: 12, needs: ['first_row'], resets: 5,
-    text: 'Ten Handle Cabinets and five Digital Seas are left standing as well. The cabinets are at their first milestone too.',
-    visible: 'Three rows of machines standing on the floor the moment a reset finishes, not one.',
+    id: 'second_row', name: 'Two More Rows to Start With', tier: 3, cost: 12, needs: ['first_row'], resets: 5,
+    text: 'Ten Handle Cabinets and five Digital Seas stay in your arcade as well, and the Handle Cabinets are at their first doubling too.',
+    visible: 'Three rows of machines standing in the arcade the moment a restart finishes, not one.',
     gives: { startMachines: { handle: 10, digital: 5 } },
   },
   {
-    id: 'nail_gauge', name: 'The Nail Gauge', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
-    text: 'A gauge for the lean. A nail head will go half again as far, 2.4 board units instead of 1.6.',
-    visible: 'The reach ring drawn around a picked nail is half again as wide, and reaches nails it could not before.',
+    id: 'nail_gauge', name: 'Bend Nails Further', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
+    text: 'A gauge for the bend. A nail head will travel half again as far, 2.4 across instead of 1.6.',
+    visible: 'The ring drawn around a picked nail is half again as wide, and covers nails it could not before.',
     gives: { bendReach: 1.5 },
   },
   {
-    id: 'long_lamp', name: 'The Long Lamp', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
-    text: 'A fever runs 30 balls longer, 120 instead of 90, and rolls straight into another 6 points more often, 36 per cent instead of 30.',
+    id: 'long_lamp', name: 'Longer Bonuses', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
+    text: 'A bonus runs 30 balls longer, 120 instead of 90, and rolls straight into another one more often, 36 percent of the time instead of 30.',
     visible: null,
     gives: { feverBalls: 30, continueBonus: 0.06 },
   },
   {
-    id: 'detent_file', name: 'The Filed Detent', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
-    text: 'The reel detent filed back. Three digits agree 3 points more often, 14 per cent instead of 11.',
+    id: 'detent_file', name: 'Reels Match More Often', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
+    text: 'The catch inside the reels filed back. All three digits match 14 percent of the time instead of 11.',
     visible: null,
     gives: { matchBonus: 0.03 },
   },
   {
-    id: 'reel_window', name: 'The Second Window', tier: 3, cost: 18, needs: ['detent_file'], resets: 5,
-    text: 'A second reel window beside the first. One ball through the gate buys two spins instead of one.',
+    id: 'reel_window', name: 'A Second Reel Window', tier: 3, cost: 18, needs: ['detent_file'], resets: 5,
+    text: 'A second window of reels beside the first. One ball into the slot buys two spins instead of one.',
     visible: 'A second window of three digits on the machine head, spinning its own reels beside the original.',
     gives: { spinsPerGate: 1 },
   },
   {
-    id: 'standing_order', name: 'The Standing Order', tier: 3, cost: 18, needs: ['floor_ledger'], resets: 5,
-    text: 'A standing order with the hall. Every machine on the floor earns 75 per cent more again.',
+    id: 'standing_order', name: 'Every Machine Earns More', tier: 3, cost: 18, needs: ['floor_ledger'], resets: 5,
+    text: 'A standing order with the supplier. Every arcade machine you own earns another 75 percent on top.',
     visible: null,
     gives: { floorMult: 1.75 },
   },
   {
-    id: 'two_hands', name: 'Two Hands', tier: 3, cost: 22, needs: ['first_fitting'], resets: 5,
-    text: 'Two balls leave the rail on every pull of the handle instead of one. The tray empties twice as fast, which is a cost as well as a gift.',
-    visible: 'Two balls riding the top rail together on every pull, and a tray counter that falls twice as fast.',
+    id: 'two_hands', name: 'Two Balls a Pull', tier: 3, cost: 22, needs: ['first_fitting'], resets: 5,
+    text: 'Two balls leave the rail on every pull instead of one. Your balls run out twice as fast, so this is a cost as well as a gift.',
+    visible: 'Two balls riding the top rail together on every pull, and a ball count that falls twice as fast.',
     gives: { launchPer: 1 },
   },
 
   // -- the last page, from the ninth reset ----------------------------------
 
   {
-    id: 'short_night', name: 'The Short Night', tier: 4, cost: 40, needs: ['standing_order'], resets: 9,
-    text: 'The parlour closes early. Every round asks for 12 per cent fewer balls, at every round of every run.',
+    id: 'short_night', name: 'Smaller Round Goals', tier: 4, cost: 40, needs: ['standing_order'], resets: 9,
+    text: 'The arcade closes early. Every round asks for 12 percent fewer balls, in every round of every game.',
     visible: null,
     gives: { quotaDiscount: 0.12 },
   },
   {
-    id: 'second_gate', name: 'The Second Gate', tier: 4, cost: 45, needs: ['reel_window'], resets: 9,
-    text: 'A second gate cut into the left of the face, with its own two rows of funnel nails, feeding the same reels.',
-    visible: 'A second gate mouth on the face with a funnel of nails driven above it, where there was only lattice.',
+    id: 'second_gate', name: 'A Second Slot', tier: 4, cost: 45, needs: ['reel_window'], resets: 9,
+    text: 'A second slot cut into the left of the board, with its own two rows of funnel nails, spinning the same reels.',
+    visible: 'A second slot on the board with a funnel of nails driven above it, where there were only plain rows.',
     gives: { extraPockets: [SECOND_GATE] },
   },
   {
-    id: 'bolted_pair', name: 'The Bolted Pair', tier: 4, cost: 50, needs: ['first_fitting', 'two_hands'], resets: 9,
-    text: 'A Lamp Reflector and a Felt Strip are left bolted in as well. Round one is played with three fittings already fitted.',
-    visible: 'Three of the fitting rail\'s slots filled before the first shop, not one.',
+    id: 'bolted_pair', name: 'Start With Three Parts', tier: 4, cost: 50, needs: ['first_fitting', 'two_hands'], resets: 9,
+    text: 'A Lamp Reflector and a Felt Strip stay in the machine as well. Round one is played with three parts already fitted.',
+    visible: 'Three slots on the part rail filled before the first workbench, not one.',
     gives: { startFittings: ['lamp_reflector', 'felt_strip'] },
   },
   {
-    id: 'whole_row', name: 'The Whole Row', tier: 4, cost: 55, needs: ['standing_order', 'second_row'], resets: 9,
-    text: 'The technician works the whole row, not one machine. Every machine earns 125 per cent more again, and cashing out pays double.',
+    id: 'whole_row', name: 'The Whole Arcade Earns More', tier: 4, cost: 55, needs: ['standing_order', 'second_row'], resets: 9,
+    text: 'The work goes into the whole arcade, not one machine. Every arcade machine earns another 125 percent on top, and cashing balls in pays double.',
     visible: null,
     gives: { floorMult: 2.25, cashMult: 2.00 },
   },
   {
-    id: 'pocket_pair', name: 'The Pair', tier: 4, cost: 60, needs: ['pay_saucer'], resets: 9,
-    text: 'Two more mouths set into the shoulders of the face, level with the gate and well out from it, paying 3 each.',
-    visible: 'Two new mouths in the lacquer either side of the gate, catching the balls the funnel turns away.',
+    id: 'pocket_pair', name: 'Two More Pockets', tier: 4, cost: 60, needs: ['pay_saucer'], resets: 9,
+    text: 'Two more pockets set into the shoulders of the board, level with the slot and well out from it, paying 3 each.',
+    visible: 'Two new pockets in the lacquer either side of the slot, catching the balls the funnel turns away.',
     gives: { extraPockets: [SHOULDER_LEFT, SHOULDER_RIGHT] },
   },
 
@@ -373,9 +385,9 @@ export const NODES = [
   // progression away.
 
   {
-    id: 'page_after_page', name: 'Page After Page', tier: 5, cost: 12, ratio: 1.60,
+    id: 'page_after_page', name: 'One More Page', tier: 5, cost: 12, ratio: 1.60,
     needs: [], resets: 1, repeatable: true, maxLevel: 200,
-    text: 'One more page of nail settings. Each page adds 6 per cent to what the floor earns and 3 per cent to what cashing out pays, and each costs 60 per cent more marks than the page before it.',
+    text: 'One more page of nail settings, and this one can be bought over and over. Each page adds 6 percent to what your arcade earns and 3 percent to what cashing balls in pays, and each costs 60 percent more stars than the page before it.',
     visible: null,
     gives: { floorMultPer: 1.06, cashMultPer: 1.03 },
   },
@@ -574,10 +586,10 @@ export function canReset(cfg, meta, floor) {
   const minScrip = tune(cfg, 'minScrip');
 
   if (!(L > 0)) {
-    return { ok: false, why: 'Nothing has been taken yet. There is nothing here for the technician to read.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'Nothing has been earned yet. Build an arcade first, and starting over will be worth something.', marks: 0, need: resetThreshold(cfg, meta) };
   }
   if (L < minScrip) {
-    return { ok: false, why: 'One night at one machine is not a row. Keep the floor running.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'One game at one machine isn\'t an arcade yet. Keep playing and keep buying.', marks: 0, need: resetThreshold(cfg, meta) };
   }
 
   const marks = pendingMarks(cfg, meta, floor);
@@ -588,8 +600,8 @@ export function canReset(cfg, meta, floor) {
       ok: false,
       marks, need,
       why: marks <= 0
-        ? 'The boards have not changed since they were last read. Take more off the floor first.'
-        : 'There are only ' + marks + ' marks in the floor as it stands. The technician will not come out for fewer than ' + need + ', which is ' + short + ' more.',
+        ? 'There\'s nothing new to learn yet. Earn more from the arcade first.'
+        : 'Starting over right now would only pay ' + marks + ' stars. It takes ' + need + ', which is ' + short + ' more, before it\'s worth doing.',
     };
   }
 
@@ -638,7 +650,7 @@ export function nodeStatus(cfg, meta, id) {
   if (resets < needResets) {
     unlocked = false;
     why = needResets === 1
-      ? 'The technician has not been out yet.'
+      ? 'The technician hasn\'t been out yet.'
       : 'Not until the technician has been out ' + needResets + ' times.';
   } else {
     for (const req of node.needs || []) {
@@ -668,7 +680,7 @@ export function nodeStatus(cfg, meta, id) {
 export function buyNode(cfg, meta, id) {
   if (!meta || typeof meta !== 'object') return { ok: false, why: 'There is no notebook to write in.' };
   const node = BY_ID.get(id);
-  if (!node) return { ok: false, why: 'There is no such page.' };
+  if (!node) return { ok: false, why: 'There\'s no such page.' };
 
   const status = nodeStatus(cfg, meta, id);
   if (status.done) return { ok: false, why: status.why };
@@ -676,9 +688,9 @@ export function buyNode(cfg, meta, id) {
 
   const cost = status.cost;
   const held = nonNegative(meta.marks);
-  if (!Number.isFinite(cost)) return { ok: false, why: 'Every page is written.' };
+  if (!Number.isFinite(cost)) return { ok: false, why: 'Every page of the notebook is already written.' };
   if (held < cost) {
-    return { ok: false, why: 'That page costs ' + cost + ' marks and there are ' + Math.floor(held) + ' in hand.' };
+    return { ok: false, why: 'That upgrade costs ' + cost + ' stars and you have ' + Math.floor(held) + '.' };
   }
 
   if (!meta.nodes || typeof meta.nodes !== 'object') meta.nodes = {};
@@ -772,7 +784,7 @@ export function effects(meta) {
     if (g.idleHours) e.idleHours += g.idleHours * level;
 
     // Fractions taken off a price or a target stack the way discounts do, so
-    // that any number of them can never reach or pass 100 per cent.
+    // that any number of them can never reach or pass 100 percent.
     if (g.rerollDiscount) e.rerollDiscount = 1 - (1 - e.rerollDiscount) * (1 - g.rerollDiscount);
     if (g.quotaDiscount) e.quotaDiscount = 1 - (1 - e.quotaDiscount) * (1 - g.quotaDiscount);
 

@@ -7,7 +7,7 @@
 //
 // Two things it is careful about.
 //
-// Nothing here is ever announced only by movement or only by colour. Every
+// Nothing here is ever announced only by movement or only by color. Every
 // state that matters is a word and a number as well, because a signal that
 // needs sound or a steady eye to catch is a signal some players never get.
 //
@@ -15,12 +15,12 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=5';
-import { createScene } from './render/scene.js?v=5';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=5';
-import { num, count, duration, mult, pct, fill } from './format.js?v=5';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=5';
-import { nailPos } from './board.js?v=5';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=6';
+import { createScene } from './render/scene.js?v=6';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=6';
+import { num, count, duration, mult, pct, fill } from './format.js?v=6';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=6';
+import { nailPos } from './board.js?v=6';
 
 const SPEEDS = [1, 2, 4];
 
@@ -42,7 +42,13 @@ export async function boot(doc) {
   let lastLog = 0;
   let shownRow = false;
 
+  // The first-run card. Shown until it is dismissed once, then never again.
+  // The flag sits beside the save rather than inside it, so a player who
+  // starts a new game is not told how to play a second time.
+  const primerKey = cfg.identity.storagePrefix + ':primed';
+
   wire();
+  openPrimer();
   paint(game.reading());
   game.start(now());
   requestAnimationFrame(loop);
@@ -77,18 +83,19 @@ export async function boot(doc) {
     on(el.closeSettings, 'click', () => hide(el.settingsSheet));
     on(el.toHelp, 'click', () => openHelp());
     on(el.closeHelp, 'click', () => hide(el.helpSheet));
+    on(el.primerGo, 'click', () => closePrimer());
 
     on(el.reroll, 'click', () => { game.reroll(); paintBench(); });
     on(el.leave, 'click', () => { game.leaveBench(); hide(el.benchSheet); });
     on(el.straighten, 'click', () => { game.straightenAll(); paintBench(); });
 
     on(el.newRun, 'click', () => {
-      if (confirm(cfg.text.newRun + '? The night you are on ends now.')) {
+      if (confirm('Start a new game? The one you\'re playing ends right now.')) {
         game.newRun(); hide(el.settingsSheet);
       }
     });
     on(el.wipe, 'click', () => {
-      if (confirm('Erase the parlour, the floor and everything the technician learned? This cannot be undone.')) {
+      if (confirm('Erase this game, your whole arcade, every star and every upgrade? This can\'t be undone.')) {
         game.wipe(); location.reload();
       }
     });
@@ -118,7 +125,10 @@ export async function boot(doc) {
       else if (e.key === 'a' || e.key === 'A') game.setAuto(!game.run.auto);
       else if (e.key === 'ArrowLeft') game.setStrength(game.run.strength - 0.01);
       else if (e.key === 'ArrowRight') game.setStrength(game.run.strength + 0.01);
-      else if (e.key === 'Escape') { hide(el.floorSheet); hide(el.settingsSheet); hide(el.helpSheet); }
+      else if (e.key === 'Escape') {
+        hide(el.floorSheet); hide(el.settingsSheet); hide(el.helpSheet);
+        if (el.primerSheet && !el.primerSheet.hidden) closePrimer();
+      }
       else if (e.key === 'f' || e.key === 'F') openFloor();
     });
 
@@ -168,7 +178,7 @@ export async function boot(doc) {
     const { fit, rect } = faceFit();
     const p = pixelToBoard(fit, e.clientX - rect.left, e.clientY - rect.top);
     const i = game.nailAt(p.x, p.y, 4);
-    if (i < 0) { say('No nail there. Click a nail, then drag it.'); return; }
+    if (i < 0) { say('No nail there. Press right on a nail, then drag it.'); return; }
     dragNail(i, rect, fit);
   }
 
@@ -183,7 +193,7 @@ export async function boot(doc) {
       doc.removeEventListener('pointerup', up);
       const p = pixelToBoard(fit, ev.clientX - rect.left, ev.clientY - rect.top);
       const r = game.bend(i, p.x, p.y);
-      say(r.ok ? 'Nail leaned. ' + game.bendsLeft() + ' left this round.' : r.why);
+      say(r.ok ? 'Nail bent. ' + game.bendsLeft() + ' bends left this round.' : r.why);
       paintBench();
     };
     doc.addEventListener('pointermove', move);
@@ -205,9 +215,9 @@ export async function boot(doc) {
     el.quotaTube.firstElementChild.style.width = (done * 100).toFixed(1) + '%';
     el.quotaTube.classList.toggle('done', done >= 1);
     el.perBall.textContent = r.won >= r.quota
-      ? 'Cleared. The counter pays ' + num(r.nextBonus) + ' balls.'
-      : num(r.pullsLeft) + ' pulls left' + (r.perPull > 1 ? ' at ' + r.perPull + ' balls each' : '')
-        + ', ' + r.perBall.toFixed(2) + ' a ball needed from them';
+      ? 'Goal met. The counter pays a bonus of ' + num(r.nextBonus) + ' balls.'
+      : num(r.pullsLeft) + ' pulls left' + (r.perPull > 1 ? ' at ' + r.perPull + ' balls a pull' : '')
+        + '. Each of those balls has to win ' + r.perBall.toFixed(2) + ' to hit the goal.';
 
     el.strengthOut.textContent = r.strength.toFixed(2);
     if (doc.activeElement !== el.handle) el.handle.value = String(r.strength);
@@ -258,12 +268,12 @@ export async function boot(doc) {
 
   function paintRail(r) {
     const cells = [
-      ['Tray', count(r.tray), false],
-      ['Won', count(r.won), false],
+      ['Balls you hold', count(r.tray), false],
+      ['Won this round', count(r.won), false],
       ['Pulls left', count(r.pullsLeft) + ' of ' + count(r.pulls), false],
-      ['In flight', count(r.inFlight), false],
-      ['Gates', count(r.stats.gates), false],
-      ['Fevers', count(r.stats.fevers), r.fever],
+      ['Balls falling', count(r.inFlight), false],
+      ['Slot hits', count(r.stats.gates), false],
+      ['Bonuses', count(r.stats.fevers), r.fever],
       ['Best round', count(Math.max(r.bestRound, r.round - 1)), false],
     ];
     if (!el.rail._built || el.rail._built !== cells.length) {
@@ -287,14 +297,14 @@ export async function boot(doc) {
   function paintBanner(r) {
     if (r.fever) {
       el.banner.hidden = false;
-      el.banner.textContent = cfg.text.fever + ' - ' + r.feverLeft + ' balls'
-        + (r.feverChain > 1 ? ' - chain ' + r.feverChain : '');
+      el.banner.textContent = cfg.text.fever + ' - jackpot pocket open, ' + r.feverLeft + ' balls left'
+        + (r.feverChain > 1 ? ' - streak ' + r.feverChain : '');
     } else if (r.settling) {
       el.banner.hidden = false;
-      el.banner.textContent = 'Letting the face clear';
+      el.banner.textContent = 'Waiting for the last balls to land';
     } else if (r.reel && r.reel.spinning) {
       el.banner.hidden = false;
-      el.banner.textContent = 'Reels turning';
+      el.banner.textContent = 'Reels spinning';
     } else {
       el.banner.hidden = true;
     }
@@ -333,9 +343,9 @@ export async function boot(doc) {
   // ---- the bench -----------------------------------------------------
   function paintBench() {
     const r = game.reading();
-    el.benchLede.textContent = 'Round ' + r.round + ' is cleared. The machine is on the bench: bolt a part in, '
-      + 'lean a nail, then start the next round. The tray is your money here - '
-      + count(r.tray) + ' balls.';
+    el.benchLede.textContent = 'Round ' + r.round + ' is cleared. Between rounds the machine is open: buy a part, '
+      + 'bend a nail, then start the next round. Balls are the money here, and you have '
+      + count(r.tray) + ' of them.';
 
     el.offers.textContent = '';
     game.offers().forEach((offer, i) => {
@@ -362,7 +372,7 @@ export async function boot(doc) {
       });
       const b = doc.createElement('button');
       b.type = 'button';
-      b.textContent = 'Bolt in';
+      b.textContent = 'Buy';
       b.disabled = r.tray < offer.price || r.fittings.length >= r.slots;
       b.addEventListener('click', () => {
         const res = game.buyFitting(f.id);
@@ -394,15 +404,16 @@ export async function boot(doc) {
       });
       el.owned.appendChild(chip);
     }
-    if (!r.fittings.length) el.owned.textContent = 'Nothing bolted in yet.';
+    if (!r.fittings.length) el.owned.textContent = 'No parts in this machine yet.';
 
     paintLanding();
-    el.bendLede.textContent = 'Drag a nail on the face, to the right, to lean it. '
-      + game.bendsLeft() + ' of ' + (cfg.board.bendsPerRound) + ' bends left, '
-      + r.bends + ' nails currently leaning. A nail cannot be leaned into another nail, '
-      + 'into a mouth, or further than its head will go.';
+    el.bendLede.textContent = 'Drag any nail on the board to the right to bend it. Bending steers where the balls '
+      + 'fall, so bend the ones that feed balls into the slot. '
+      + game.bendsLeft() + ' of ' + (cfg.board.bendsPerRound) + ' bends left this round, '
+      + r.bends + ' nails bent so far. A nail won\'t go into another nail, into a pocket, '
+      + 'or further than its head reaches.';
 
-    el.reroll.textContent = 'Reroll for ' + num(game.rerollPrice()) + ' balls';
+    el.reroll.textContent = 'Show different parts for ' + num(game.rerollPrice()) + ' balls';
     el.reroll.disabled = r.tray < game.rerollPrice();
   }
 
@@ -425,7 +436,7 @@ export async function boot(doc) {
     const paidSrc = usingLive ? run.landingPaid : run.landingPaidLast;
     const total = sum(src);
     if (total <= 0) {
-      el.bendChart.textContent = 'Play a round and this fills in with where the balls actually went.';
+      el.bendChart.textContent = 'Play a round and this fills in with where the balls actually ended up.';
       return;
     }
     const peak = Math.max(...src);
@@ -438,8 +449,8 @@ export async function boot(doc) {
       bar += blocks[Math.min(blocks.length - 1, Math.round(t * (blocks.length - 1)))];
     }
     const paid = sum(paidSrc);
-    el.bendChart.textContent = 'Where the balls went, left to right across the face:  ' + bar
-      + '   (' + count(paid) + ' of ' + count(total) + ' landed somewhere that paid)';
+    el.bendChart.textContent = 'Where the balls landed, left to right across the board:  ' + bar
+      + '   (' + count(paid) + ' of ' + count(total) + ' landed in a pocket that paid)';
   }
 
   function sum(arr) { let t = 0; for (let i = 0; i < arr.length; i++) t += arr[i]; return t; }
@@ -501,7 +512,7 @@ export async function boot(doc) {
       el.tip.querySelector('.rar').innerHTML = '';
       el.tip.querySelector('.rar').appendChild(doc.createTextNode(t.rarity));
       const cost = doc.createElement('b');
-      cost.textContent = '  bought for ' + num(t.price) + ' balls';
+      cost.textContent = '  ' + num(t.price) + ' balls';
       el.tip.querySelector('.rar').appendChild(cost);
       el.tip.querySelector('p').textContent = t.text;
 
@@ -619,46 +630,106 @@ export async function boot(doc) {
     return f ? f.name : id;
   }
 
-  // ---- the row of machines -------------------------------------------
+  // ---- picking a machine ---------------------------------------------
+  //
+  // Three machines are offered at a time and no two are nailed alike. The one
+  // number that decides whether a machine is generous is how many balls come
+  // back for each ball spent, so that is the headline and it is spelled out in
+  // words rather than left as a ratio to be worked out.
+
+  // The measuring code names things the way a machine shop does. These are the
+  // same facts in the words a first-time player already has.
+  const DROP_WORDS = {
+    'walks balls left': 'pushes balls to the left',
+    'walks balls right': 'pushes balls to the right',
+    'runs straight': 'drops balls straight down',
+  };
+  const FUNNEL_WORDS = {
+    'no funnel over the gate': 'nothing funnels balls toward the slot',
+    'a tight funnel over the gate': 'a tight funnel of nails feeds the slot',
+    'an ordinary funnel over the gate': 'an ordinary funnel of nails feeds the slot',
+    'a wide funnel over the gate': 'a wide funnel of nails feeds the slot',
+  };
+  const POWER_WORDS = {
+    'a soft launch': 'a soft pull',
+    'a hard launch': 'a hard pull',
+    'a launch around the middle': 'a pull around the middle',
+    'nowhere in particular': 'no setting in particular',
+  };
+  const plain = (table, word) => table[word] || word || '';
+
   function openRow() {
     show(el.rowSheet);
-    // Reading a row means putting a few hundred balls through three boards,
+    // Reading three machines means putting a few hundred balls through each,
     // which takes long enough to be seen. The sheet is put up first and says
     // what it is doing, so the pause reads as work rather than as a hang.
     if (game.row) { paintRow(); return; }
-    el.rowLede.textContent = 'Trying each machine...';
+    el.rowLede.textContent = 'Testing each machine...';
     el.cabinets.textContent = '';
     requestAnimationFrame(() => requestAnimationFrame(paintRow));
   }
 
   function paintRow() {
     const r = game.reading();
-    el.rowTitle.textContent = r.over ? 'The night is over' : 'Walk the row';
+    el.rowTitle.textContent = r.over ? 'That game is over' : 'Pick a machine to play';
     el.rowLede.textContent = r.over
-      ? 'Round ' + r.round + ' beat the machine. Cash the tray out at the counter, then pick where to sit next. '
-        + 'No two cabinets are nailed the same, and the numbers below were measured on these three.'
-      : 'Every cabinet is nailed differently. These three were each given a few hundred balls at several '
-        + 'handle settings; what is shown is the best each one managed. Sitting down starts a new night.';
+      ? 'Round ' + r.round + ' beat you. Pick where to play next. Every machine has its nails, its '
+        + 'pockets and its slot in different places, so what pays on one doesn\'t pay on the next. '
+        + 'Each machine below was measured by dropping a few hundred balls through it.'
+      : 'Every machine has its nails, its pockets and its slot in different places, so what pays on one '
+        + 'doesn\'t pay on the next. Each was measured by dropping a few hundred balls through it at '
+        + 'several handle settings. Picking one starts a new game.';
 
     el.cabinets.textContent = '';
     for (const cab of game.cabinets()) {
+      const label = cab.layout || cab.name;
       const d = doc.createElement('div');
       d.className = 'cab';
-      d.innerHTML = '<h4></h4><div class="big"></div><p></p>'
-        + '<dl><dt>Nails</dt><dd class="n1"></dd><dt>Rows</dt><dd class="n2"></dd>'
-        + '<dt>Back per ball</dt><dd class="n3"></dd></dl>';
-      d.querySelector('h4').textContent = cab.name + (cab.layout ? '  ' + cab.layout : '');
-      d.querySelector('.big').textContent = pct(cab.gate) + ' to the gate';
-      d.querySelector('p').textContent = cab.line;
-      d.querySelector('.n1').textContent = count(cab.nails);
-      d.querySelector('.n2').textContent = cab.leanWord;
-      d.querySelector('.n3').textContent = cab.back.toFixed(2);
+      // .theme is left empty here. Whatever gives a machine its own name and
+      // color fills it without this code having to know about it.
+      d.innerHTML = '<h4></h4><div class="theme"></div><div class="big"></div><p></p>'
+        + '<dl><dt>Balls reaching the slot</dt><dd class="n1"></dd>'
+        + '<dt>Nails on the board</dt><dd class="n2"></dd>'
+        + '<dt>Machine number</dt><dd class="n3"></dd></dl>'
+        + '<div class="warn"></div>';
+      d.querySelector('h4').textContent = label;
+
+      const big = d.querySelector('.big');
+      big.textContent = cab.back.toFixed(2) + ' balls back';
+      const small = doc.createElement('small');
+      // Said as measured, not as a rule. Most machines pay back under 1.00 and
+      // a few read over it at their best setting, and a card that always
+      // claimed the first would be telling the player something untrue about
+      // the machine right in front of them.
+      small.textContent = cab.back >= 1
+        ? 'For every ball you spend here, ' + cab.back.toFixed(2) + ' comes back out of the pockets. '
+          + 'Over 1.00, so the pockets alone can pay for the balls you feed it, and a bonus is profit on top.'
+        : 'For every ball you spend here, ' + cab.back.toFixed(2) + ' comes back out of the pockets. '
+          + 'Under 1.00, so this machine keeps the difference and a bonus is the only way to finish ahead.';
+      big.appendChild(small);
+
+      d.querySelector('p').textContent = 'It ' + plain(DROP_WORDS, cab.leanWord) + ', and '
+        + plain(FUNNEL_WORDS, cab.funnelWord) + '. It paid best on ' + plain(POWER_WORDS, cab.where) + '.';
+      d.querySelector('.n1').textContent = pct(cab.gate);
+      d.querySelector('.n2').textContent = count(cab.nails);
+      d.querySelector('.n3').textContent = cab.name;
+
+      const cost = r.tray > 0
+        ? 'Starts a new game. Your ' + count(r.tray) + ' balls are cashed in first, for '
+          + num(game.cashOutValue()) + ' coins.'
+        : r.over
+          ? 'Starts a new game.'
+          : 'Starts a new game. The round you\'re playing now is lost.';
+      d.querySelector('.warn').textContent = cost;
+
       const b = doc.createElement('button');
       b.type = 'button';
-      b.textContent = 'Sit at ' + cab.name;
+      b.textContent = 'Play ' + label;
       b.addEventListener('click', () => {
-        if (r.tray > 0 && !confirm('Sitting down starts a new night. The ' + count(r.tray)
-            + ' balls in the tray are cashed out first, for ' + num(game.cashOutValue()) + ' scrip. Go ahead?')) return;
+        // Asked every time there is a game to lose, not only when there are
+        // balls to cash in: an empty tray in the middle of a good run is still
+        // a run, and restarting it without a word is how one gets thrown away.
+        if (!r.over && !confirm(cost + ' Go ahead?')) return;
         if (r.tray > 0) game.cashOut();
         game.sitAt(cab.seed);
         hide(el.rowSheet);
@@ -668,14 +739,20 @@ export async function boot(doc) {
     }
   }
 
-  // ---- the floor -----------------------------------------------------
+  // ---- the arcade ----------------------------------------------------
+  //
+  // A second, separate set of machines. These are not played and never appear
+  // on screen as a board: they are bought with coins and they earn coins on
+  // their own, including while the page is closed.
   function openFloor() { show(el.floorSheet); paintFloor(); }
 
   function paintFloor() {
     const r = game.reading();
-    el.floorLede.textContent = 'The parlour earns ' + num(r.income) + ' scrip a second whether you are at the handle '
-      + 'or not, and everything in it is multiplied by ' + mult(game.handMultiplier())
-      + ' because you have taken a night to round ' + Math.max(r.bestRound, 0) + '. You hold ' + num(r.scrip) + '.';
+    el.floorLede.textContent = 'These are machines you OWN, not machines you play. They earn '
+      + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
+      + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
+      + ' because your best game reached round ' + Math.max(r.bestRound, 0)
+      + ', so playing well is the best thing you can do for the arcade. You hold ' + num(r.scrip) + ' coins.';
 
     if (!el.bulkbar._built) {
       for (const step of BULK_STEPS) {
@@ -712,6 +789,7 @@ export async function boot(doc) {
       const buy = doc.createElement('button');
       buy.type = 'button';
       buy.textContent = q.k > 0 ? 'Buy ' + count(q.k) : 'Buy';
+      buy.title = 'Costs coins. Adds to what your arcade earns every second.';
       buy.disabled = !affordable;
       buy.addEventListener('click', () => { game.buyMachine(m.id, bulk); paintFloor(); });
       cells[4].appendChild(buy);
@@ -720,16 +798,16 @@ export async function boot(doc) {
         const note = doc.createElement('span');
         note.style.fontSize = '11px';
         note.style.color = '#8c7f76';
-        note.textContent = (mile.next - mile.owned) + ' more doubles it';
+        note.textContent = 'buy ' + (mile.next - mile.owned) + ' more to double what these earn';
         cells[5].appendChild(note);
       } else if (mile.owned > 0) {
-        cells[5].textContent = 'every doubling taken';
+        cells[5].textContent = 'every doubling already taken';
       }
       body.appendChild(tr);
     }
     if (!body.children.length) {
       const tr = doc.createElement('tr');
-      tr.innerHTML = '<td colspan="6">Cash a tray out at the machine and the first cabinet comes within reach.</td>';
+      tr.innerHTML = '<td colspan="6">Trade some balls for coins at the machine, and the cheapest arcade machine here comes within reach.</td>';
       body.appendChild(tr);
     }
 
@@ -744,23 +822,25 @@ export async function boot(doc) {
     const can = typeof m.canReset === 'function' ? m.canReset(cfg, game.meta, game.floor) : { ok: false, why: '' };
 
     const h = doc.createElement('h3');
-    h.textContent = 'The technician';
+    h.textContent = 'Start over, and keep what you learned';
     el.prestigeBox.appendChild(h);
 
     const p = doc.createElement('p');
     p.className = 'lede';
     p.textContent = can.ok
-      ? 'Let the technician re-nail every board overnight. The floor goes; ' + num(pending)
-        + ' marks stay, and marks buy things that never go away.'
-      : (can.why || 'Not yet worth calling anybody in.');
+      ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
+        + num(pending) + ' stars. Stars buy permanent upgrades, listed below, and those never go away no '
+        + 'matter how many times you start over. You have ' + num((game.meta && game.meta.marks) || 0) + ' stars now.'
+      : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.');
     el.prestigeBox.appendChild(p);
 
     if (can.ok) {
       const b = doc.createElement('button');
       b.type = 'button';
-      b.textContent = 'Re-nail the floor for ' + num(pending) + ' marks';
+      b.textContent = 'Sell the arcade for ' + num(pending) + ' stars';
       b.addEventListener('click', () => {
-        if (confirm('Every machine on the floor goes. You keep ' + num(pending) + ' marks. Do it?')) {
+        if (confirm('Every machine in your arcade is sold and your coins go with it. You keep '
+            + num(pending) + ' stars and every upgrade you have already bought. Do it?')) {
           game.prestige(); paintFloor();
         }
       });
@@ -768,6 +848,9 @@ export async function boot(doc) {
     }
 
     if (Array.isArray(m.NODES) && m.NODES.length) {
+      const subhead = doc.createElement('h3');
+      subhead.textContent = 'Permanent upgrades, bought with stars';
+      el.prestigeBox.appendChild(subhead);
       const wrap = doc.createElement('div');
       wrap.className = 'nodes';
       wrap.style.marginTop = '10px';
@@ -781,7 +864,7 @@ export async function boot(doc) {
         if (!have) {
           const b = doc.createElement('button');
           b.type = 'button';
-          b.textContent = num(node.cost) + ' marks';
+          b.textContent = 'Buy for ' + num(node.cost) + ' stars';
           b.disabled = (game.meta.marks || 0) < node.cost;
           b.addEventListener('click', () => { const r = game.buyNode(node.id); if (!r.ok) say(r.why); paintFloor(); });
           d.appendChild(b);
@@ -812,6 +895,22 @@ export async function boot(doc) {
     el.mPins.textContent = count(game.run.board.pinCount);
   }
 
+  function openPrimer() {
+    if (!el.primerSheet) return;
+    let seen = null;
+    try { seen = game.storage ? game.storage.getItem(primerKey) : null; } catch (e) { seen = null; }
+    if (seen) return;
+    show(el.primerSheet);
+  }
+
+  function closePrimer() {
+    hide(el.primerSheet);
+    // Storage can be full or switched off. If the flag will not write, the
+    // card comes back next visit, which is a far smaller problem than the
+    // game refusing to start.
+    try { if (game.storage) game.storage.setItem(primerKey, '1'); } catch (e) { /* nothing to do */ }
+  }
+
   function openHelp() {
     show(el.helpSheet);
     if (el.helpBody._built) return;
@@ -827,9 +926,9 @@ export async function boot(doc) {
 
   function showAway(away) {
     const line = away.capped
-      ? 'You were away ' + duration(away.away) + '. The floor pays for the first '
-        + duration(away.paid) + ' of that, which came to ' + num(away.gained) + ' scrip.'
-      : 'You were away ' + duration(away.away) + '. The floor made ' + num(away.gained) + ' scrip.';
+      ? 'You were away ' + duration(away.away) + '. Your arcade pays for the first '
+        + duration(away.paid) + ' of that, which came to ' + num(away.gained) + ' coins.'
+      : 'You were away ' + duration(away.away) + '. Your arcade earned ' + num(away.gained) + ' coins.';
     say(line);
   }
 
@@ -853,37 +952,72 @@ export async function boot(doc) {
       elements.canvas._h = Math.round(rect.height);
       return s;
     } catch (e) {
-      elements.hint.textContent = 'This browser could not start the machine face: ' + (e && e.message ? e.message : e);
+      elements.hint.textContent = 'This browser could not draw the game board: ' + (e && e.message ? e.message : e);
       return null;
     }
   }
 }
 
+// Every word the game uses that a player would otherwise have to guess at,
+// defined in the order they run into it. This is the reference behind the Help
+// button, and it is the only place any of these words is explained in full, so
+// a term used anywhere on screen has to appear here.
 const HELP = [
-  ['The round', 'A round rents the machine for a number of PULLS and asks for a number of balls back. '
-    + 'Later the machine sends several balls a pull, so the same number of pulls puts far more on the face - '
-    + 'a round stays about as long as it ever was while the rain in it gets heavier. Clearing pays a bonus '
-    + 'into the tray, and the sooner you clear the more of the rental you have left over.'],
-  ['The handle', 'Strength decides how far around the outer rail a ball gets before it drops onto the face. '
-    + 'It is the only thing you control while a round is running, and it matters: the difference between the best '
-    + 'setting and the worst is most of what the machine pays. Arrow keys nudge it, space pulls, A runs the handle by itself.'],
-  ['The gate', 'The narrow mouth in the middle. A ball through it spins the reels. Three matching digits open '
-    + 'the attacker, and while the attacker is open the plates run almost everything into it. The odds are printed '
-    + 'on the plaque, the way a real cabinet prints them on the glass. Nothing is hidden and nothing is arranged.'],
-  ['The nails', 'Between rounds the machine goes on the bench and you can lean the nails. Drag one. A well chosen '
-    + 'lean puts about a quarter more balls through the gate and a badly chosen one costs you, so it is a night of '
-    + 'small deliberate changes rather than one clever move. The chart on the bench shows where the last round '
-    + 'actually went; lean the nails that feed the gate. This is the whole craft of the thing.'],
-  ['The tray', 'Launching costs a ball. Pockets pay balls. Played straight the face pays back less than it takes, '
-    + 'so a round only comes out ahead through a fever. The tray is also the money at the bench: parts and rerolls '
-    + 'are bought with the balls you have not spent.'],
-  ['The row', 'Every cabinet on the row is a different machine, not the same one nailed differently. Six faces exist '
-    + 'and each has its mouths in different places, its gate at a different height and its own funnel, so what pays '
-    + 'on one does not pay on the next. What a cabinet asks of you is scaled to what it pays, so a thin board is not '
-    + 'a punishment - it is a different game. Walk the row before you sit down.'],
-  ['The parlour', 'Cash a tray out and it becomes scrip, which buys machines. Machines you own earn on their own. '
-    + 'What they earn is multiplied by how deep you have taken a night at the handle, so playing is always the best '
-    + 'thing you can do for the parlour.'],
+  ['Balls', 'Everything is counted in balls. Pulling the handle spends a ball and sends it arcing over the '
+    + 'top of the board. Balls that land in a pocket pay balls back into your count, and the count is on '
+    + 'the counter rail along the bottom of the screen. Balls are also the money at the workbench between '
+    + 'rounds. Run out of balls before you reach the round goal and the game ends.'],
+  ['The board and the nails', 'The board is the tall lit panel filling most of the screen: a field of several '
+    + 'hundred brass nails with pockets cut into it. A falling ball bounces off nail after nail, so where the '
+    + 'nails stand decides where the balls end up. Nothing is rigged and nothing is hidden.'],
+  ['The handle and the power', 'The power slider sets how hard a ball is thrown around the outer rail before '
+    + 'it drops onto the nails. It\'s the only thing you control while a round is running, and it\'s worth '
+    + 'a lot: the gap between the best power setting and the worst is most of what a machine pays. The arrow '
+    + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself.'],
+  ['The pockets', 'A pocket is a pocket in the board that catches a ball and pays for it. There are three '
+    + 'kinds always on the board. SIDE POCKETS, out at the edges, pay 1 ball. MID POCKETS, the wider ones '
+    + 'lower down, pay 2 or 3. The BIG POCKET is the single green one, pays 5, and is the hardest of them to '
+    + 'reach. Balls that find no pocket run out through the OUT LANES at the bottom and are gone, which is '
+    + 'most of them, and is why straight play slowly loses ground.'],
+  ['The slot and the reels', 'The slot is the narrow pocket in the middle of the board, under a funnel of '
+    + 'nails. It pays nothing by itself. What it does is spin the three reels, and that makes it the pocket '
+    + 'worth aiming everything at. The plaque on the left prints the real odds, the way an arcade cabinet '
+    + 'prints them on the glass.'],
+  ['The bonus and the jackpot pocket', 'The JACKPOT POCKET is the wide pocket across the bottom of the '
+    + 'board, and it\'s shut almost all of the time. When all three reels stop on the same digit a BONUS '
+    + 'starts: the jackpot pocket swings open, the board runs nearly every falling ball straight into it, '
+    + 'and it pays hard for the next hundred balls or so. A bonus can roll straight into another one, which '
+    + 'the banner counts as a streak. This is the whole point of the game. Played straight the board pays '
+    + 'back less than it takes, so a bonus is the only way a round finishes ahead.'],
+  ['A round and its goal', 'A round rents the machine for a set number of PULLS and asks you to win a set '
+    + 'number of balls back, which is the GOAL. Meet the goal and the counter pays a bonus of balls and the '
+    + 'next round starts, harder. Miss it and the game is over. Later on a machine sends several balls per '
+    + 'pull, so the same number of pulls puts far more on the board and a round stays about as long as it '
+    + 'ever was while raining much harder.'],
+  ['The workbench', 'Between rounds the machine opens up. Parts are for sale, paid for with the balls you '
+    + 'haven\'t launched, and a part changes how this machine behaves for the rest of the game. Up to five '
+    + 'can be in the machine at once, and clicking one already in takes it back out. Some parts work '
+    + 'together, and the card says so when they do.'],
+  ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending '
+    + 'steers where balls fall, and there are only a few bends per round, so the good ones are the nails '
+    + 'that feed balls into the slot. The chart at the workbench shows where the last round actually ended '
+    + 'up, which is how you tell which nails are worth bending. This is the craft of the game, and nobody '
+    + 'else lets you do it.'],
+  ['Picking a machine', 'There are six machines and they\'re genuinely different boards, not one board with '
+    + 'the colors changed: the pockets, the slot and the funnel all sit somewhere else. Change machine at '
+    + 'the top of the screen to see three of them measured for you. The number that matters most is how many '
+    + 'balls come back for each ball spent. Picking a machine starts a new game, so what you win on a '
+    + 'machine is worth checking before you sit down for hours.'],
+  ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines '
+    + 'for your arcade. Those are a separate set of machines that you never play and never see on the '
+    + 'board: they simply earn coins every second, including while the page is closed. What they earn is '
+    + 'multiplied by how far you have gotten at the handle, so playing well is the best thing you can do '
+    + 'for the arcade.'],
+  ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again '
+    + 'from nothing. Doing that pays STARS. Stars buy permanent upgrades, and permanent means permanent: '
+    + 'they survive every restart forever after. Because the arcade rebuilds far faster the second time, '
+    + 'selling it\'s a step forward rather than a punishment. Starting over never takes stars away and can '
+    + 'never leave you with fewer than you had.'],
 ];
 
 function index(doc) {
@@ -912,10 +1046,11 @@ function index(doc) {
     mFps: $('mFps'), mScale: $('mScale'), mBalls: $('mBalls'), mPins: $('mPins'),
     newRun: $('newRun'), wipe: $('wipe'), closeSettings: $('closeSettings'),
     helpSheet: $('help'), helpBody: $('helpBody'), closeHelp: $('closeHelp'),
+    primerSheet: $('primer'), primerGo: $('primerGo'),
   };
 }
 
-/** Puts the configured name and colours onto a page that shipped with neither. */
+/** Puts the configured name and colors onto a page that shipped with neither. */
 export function applyIdentity(doc, cfg, el) {
   doc.title = cfg.identity.name;
   if (el.title) el.title.textContent = cfg.identity.name;

@@ -13,10 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=5';
-import { createBoard, pocket } from './board.js?v=5';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=5';
-import { fire, hasHook } from './hooks.js?v=5';
+import { rng as makeRng } from './rng.js?v=6';
+import { createBoard, pocket } from './board.js?v=6';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=6';
+import { fire, hasHook } from './hooks.js?v=6';
+import {
+  createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
+  eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
+} from './events.js?v=6';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -78,6 +82,10 @@ export function createRun(cfg, seed, meta, fitted) {
     // used to wait for the first, which pushed its payout past the end of the
     // round; it now opens its own window around the centre one.
     reel: { spinning: false, t: 0, queued: 0, digits: [0, 0, 0], result: null, holdT: 0, around: [] },
+    // What the machine is doing back. Everything the face is showing beyond
+    // the mouths it was built with lives here; src/events.js documents the
+    // shape the picture reads.
+    events: createEvents(),
 
     fittings: [],
     mods: baseMods(),
@@ -103,6 +111,13 @@ export function createRun(cfg, seed, meta, fitted) {
     stats: {
       launched: 0, won: 0, lost: 0, gates: 0, spins: 0,
       fevers: 0, chains: 0, bestRound: 0, bestFever: 0, pinHits: 0,
+      // Balls this run was paid that it would not have been paid by the
+      // cabinet on its own: what a lit stripe, a shutter, a spare mouth and a
+      // row of doors added on top. Kept because the quota a round asks for is
+      // derived from what the bare face pays, so what the rest of it is worth
+      // has to be a number somebody can read rather than a number inferred by
+      // playing the same seed twice and watching it diverge.
+      eventBalls: 0,
     },
 
     // Where balls have been ending up, across the width of the face. This is
@@ -258,6 +273,10 @@ export function startRound(state, n) {
   state.landingPaid.fill(0);
   clearBalls(state.balls);
   closeAttacker(state);
+  // Nothing carries across a round. A round starts on the face the cabinet was
+  // built with, so a spare mouth cut into it cannot still be there while the
+  // nails are being set at the bench.
+  resetEvents(state);
   state.counters.launchesThisRound = 0;
   state.counters.pocketsThisRound = 0;
   state.counters.feversThisRound = 0;
@@ -370,6 +389,9 @@ export function pullHandle(state) {
     state.launched++;
     state.stats.launched++;
     sent++;
+    // Balls sent is the only clock anything the machine is doing back runs on,
+    // so it is ticked here, once per ball, whatever else is going on.
+    eventsOnLaunch(state);
     // A fever is measured in balls sent, not in seconds, so it cannot be
     // stretched by playing slowly or cut short by a pause.
     if (state.fever.active) {
@@ -419,6 +441,14 @@ export function stepRun(state, dt, out) {
   for (const e of out.events) resolveEvent(state, e, out);
   out.events.length = 0;
 
+  // Anything the machine paid out on its own - a row of doors closing on the
+  // ball that ended it - is flashed on the face through the same collector the
+  // mouths use, so the picture has one place to read a payout from.
+  if (state.events.marks.length) {
+    for (const m of state.events.marks) out.marks.push(m);
+    state.events.marks.length = 0;
+  }
+
   checkRoundEnd(state);
 }
 
@@ -428,8 +458,12 @@ function resolveEvent(state, e, out) {
   const col = landingColumn(state.board, e.x);
   state.landing[col]++;
   if (e.kind === 'pay' || e.kind === 'attacker' || e.kind === 'gate') state.landingPaid[col]++;
+  // What this ball did on the way down, offered to whatever the machine might
+  // do back. A ball that rattled the whole face is the one a player noticed.
+  eventsOnBallHits(state, e.hits || 0, e.x);
   if (e.type === 'out') {
     state.stats.lost++;
+    eventsOnResolve(state, 0, e.x);
     const lost = moment(state, 'onBallLost', { ball: ballOf(e), refund: state.mods.refund, value: state.mods.refund });
     let back = lost && Number.isFinite(lost.value) ? lost.value : state.mods.refund;
     if (lost && Number.isFinite(lost.refund) && lost.refund !== state.mods.refund) back = lost.refund;
@@ -462,6 +496,9 @@ function resolveEvent(state, e, out) {
     state.reel.queued = Math.min(8, state.reel.queued + Math.max(1, spins));
     logLine(state, 'gate', cfg.text.gateHit);
     out.marks.push({ kind: 'gate', x: e.x, y: e.y });
+    // A ball through the gate is the best thing that happens on this board, so
+    // it ends a run of nothing whether or not the gate itself paid anything.
+    eventsOnResolve(state, 1, e.x);
     return;
   }
   const feverMult = e.kind === 'attacker' ? state.fever.mult * state.mods.feverMult : 1;
@@ -494,7 +531,16 @@ function resolveEvent(state, e, out) {
   // a quarter: a part promising eight percent more per ball delivered exactly
   // nothing on a board where nothing pays enough for eight percent to be a
   // whole ball. The remainder is kept and paid out as soon as it adds up.
-  const exact = Math.max(0, base * state.mods.payMult * feverMult * gateMult);
+  // What the machine is doing back is applied here rather than folded into the
+  // mods, so a lit stripe and a shutter are worth exactly what they say and
+  // are gone the moment they end. It never lifts the wide mouth at the bottom.
+  const eventMult = eventsPayMult(state, e.kind, e.x, e.y);
+  const exact = Math.max(0, base * state.mods.payMult * feverMult * gateMult * eventMult);
+  // A mouth an event cut into the face pays nothing but event money; a mouth
+  // the cabinet was built with pays the part above what it would have paid.
+  state.stats.eventBalls += isEventPocket(state, e.pocket)
+    ? exact
+    : exact - exact / eventMult;
   state.wonFrac = (state.wonFrac || 0) + exact;
   const pay = Math.floor(state.wonFrac);
   state.wonFrac -= pay;
@@ -507,6 +553,8 @@ function resolveEvent(state, e, out) {
     state.counters.pocketsThisRound++;
     state.counters.lastPayingStrength = state.strength;
   }
+  eventsOnResolve(state, exact, e.x);
+  if (pay > 0) eventsOnTake(state);
 }
 
 /** How many balls a set of windows is worth, ignoring anything malformed. */
@@ -710,6 +758,9 @@ function stepOneReel(state, reel, dt, out) {
     startFever(state, out, reel.plan.feverLen, reel.plan.feverMult, reel.plan.digits[0]);
   } else if (reel.plan.result === 'near') {
     logLine(state, 'reel', cfg.text.reelMiss);
+    // Two of the three agreeing is the moment a player is watching hardest,
+    // and it happens on about a quarter of spins. The machine answers it.
+    eventsOnReels(state, 'near');
   }
   reel.plan = null;
 }
@@ -781,6 +832,9 @@ export function endFever(state) {
   f.chain = 0;
   closeAttacker(state);
   logLine(state, 'fever', cfg.text.feverOff);
+  // The wide mouth shutting is a moment on its own, and the machine answers it
+  // so that the end of a good spell is not simply the board going quiet.
+  eventsOnWideShut(state);
 }
 
 function checkRoundEnd(state) {
@@ -792,6 +846,11 @@ function checkRoundEnd(state) {
     if (state.balls.n <= 0 && state.reel.queued <= 0 && !state.reel.spinning && state.reel.holdT <= 0
         && state.reel.around.length <= 0) {
       state.phase = state.won >= state.quota ? PHASE_SHOP : PHASE_OVER;
+      // The face goes back to the way the cabinet was built before anybody is
+      // allowed near it with a hammer. Setting nails around a shutter that is
+      // about to swing back in would be setting them against a board that does
+      // not exist.
+      resetEvents(state);
       if (state.phase === PHASE_OVER) {
         state.over = true;
         logLine(state, 'lost', state.cfg.text.roundLost.replace('{short}', String(state.quota - state.won)));

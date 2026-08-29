@@ -11,21 +11,22 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=5';
+import { loadConfig } from '../config.js?v=6';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=5';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=6';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=5';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=5';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=5';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=5';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=5';
-import { rng as makeRng } from './rng.js?v=5';
-import { offerCabinets } from './cabinets.js?v=5';
-import * as Save from './save.js?v=5';
+         handMult, restoreFloor } from './floor.js?v=6';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=6';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=6';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=6';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=6';
+import { rng as makeRng } from './rng.js?v=6';
+import { offerCabinets } from './cabinets.js?v=6';
+import * as Save from './save.js?v=6';
+import { showState } from './render/reach.js?v=6';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -46,8 +47,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=5');
-  const metaModule = await optional('./meta.js?v=5');
+  const catalogue = await optional('./fittings.js?v=6');
+  const metaModule = await optional('./meta.js?v=6');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -715,9 +716,25 @@ export function frame(game, now) {
 /** What the renderer is handed. */
 export function view(game) {
   const run = game.run;
+  const cfg = game.cfg;
   return {
     board: run.board,
     balls: run.balls,
+    // Which machine this is. A cabinet keeps its paint, so the skin follows
+    // the layout rather than the round.
+    theme: run.board && run.board.layout ? run.board.layout.id : null,
+    name: cfg.identity ? cfg.identity.name : null,
+    // What the screen in the middle of it should be doing. Derived from the
+    // spin that is already under way and never able to change it.
+    show: showState(run.reel, {
+      spinSeconds: cfg.reels.spinSeconds,
+      holdSeconds: cfg.reels.holdSeconds,
+      faces: cfg.reels.digits,
+      salt: run.stats ? run.stats.spins : 0,
+    }, game.showState || (game.showState = {})),
+    // The things the machine is doing back. Handed over as the run keeps them,
+    // so the picture reads the live list rather than a copy made every frame.
+    events: run.events,
     fever: run.fever.active ? 1 : 0,
     flashes: game.out.flashes,
     marks: game.out.marks,

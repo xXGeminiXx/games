@@ -259,31 +259,187 @@ export function packArc(rail, into) {
  * the window is dark, in which case the drums are packed blank.
  */
 // Where a second, third or seventh set of drums sits when more than one is
-// turning at once. Offsets are in multiples of the window itself, so the
-// pattern holds its shape on any size of board, and no two windows touch: the
-// ones beside each other are more than a window apart across, and the ones
-// above and below are more than a window apart down.
+// turning at once.
 //
-// The order fills the ring evenly rather than sweeping round it, so two
-// windows sit above and below the centre and four sit at its corners.
+// They are arranged around the show screen, not around each other, because the
+// screen is the largest thing on the face and anything that lands on it is
+// unreadable. Offsets are in multiples of the screen's HALF extent, so a
+// number past one is clear of its edge whatever size the screen is built at.
+//
+// The order fills the ring evenly rather than sweeping round it: the first two
+// open beside the screen where there is most room, then the pair below on the
+// apron, then the pair above in the shoulders, which is the tightest space and
+// is why they sit closer in.
 export const REEL_RING = [
-  [0, -1.35], [0, 1.35],
-  [-1.18, -0.72], [1.18, -0.72],
-  [-1.18, 0.72], [1.18, 0.72],
+  [-1.38, 0.10], [1.38, 0.10],
+  [-1.30, 0.86], [1.30, 0.86],
+  [-1.20, -0.60], [1.20, -0.60],
 ];
+
+// How big an extra window is beside the main strip of drums. Smaller, because
+// only one of them is the spin being watched and the rest are a queue.
+export const RING_SCALE = 0.62;
 
 /** How many windows can be on the face at once, the centre one included. */
 export const REEL_WINDOWS = REEL_RING.length + 1;
 
+/**
+ * The show screen: one instance, carrying what the machine is doing.
+ *
+ * A cabinet is built around this. The nails are a ring and an apron about it,
+ * not the other way round, and it is the thing a player is actually watching
+ * while a ball is in the air. One rectangle is enough because everything on it
+ * is measured per pixel in the fragment shader.
+ */
+export function packScreen(rect, show, into) {
+  const data = ensureFloats(into, STRIDE);
+  const s = show || {};
+  data[0] = finite(rect.x, 0);
+  data[1] = finite(rect.y, 0);
+  data[2] = Math.max(1e-4, finite(rect.w, 1)) * 0.5;
+  data[3] = Math.max(1e-4, finite(rect.h, 1)) * 0.5;
+  data[4] = Math.max(0, Math.min(4, Math.floor(finite(s.phase, 0))));
+  data[5] = Math.max(0, Math.min(4, Math.floor(finite(s.tier, 0))));
+  data[6] = Math.max(0, Math.min(1, finite(s.progress, 0)));
+  data[7] = Math.max(0, Math.min(1, finite(s.intensity, 0)));
+  return { data, count: 1 };
+}
+
+/**
+ * How hard the machine is pushing, on one scale from nothing to everything.
+ *
+ * Every part of the picture that answers to the show - the screen, the side
+ * lamps, the topper, the rays - rides this one number, so they escalate
+ * together instead of each being tuned against the others. A rung of the
+ * ladder sets the ceiling and the seconds inside it set how far up that
+ * ceiling the machine has climbed.
+ */
+export function showIntensity(show) {
+  if (!show) return 0;
+  const tier = Math.max(0, Math.min(4, Math.floor(finite(show.tier, 0))));
+  const ceiling = [0.10, 0.42, 0.66, 0.86, 1.00][tier];
+  if (show.phase === 4) {
+    // Paid. The dip before it blazes is worth more than the blaze alone.
+    const dip = 1 - 0.75 * finite(show.revival, 0);
+    return Math.max(0.55, Math.min(1, (0.72 + 0.28 * finite(show.win, 0)) * dip));
+  }
+  if (show.phase === 2) {
+    const climb = Math.pow(Math.max(0, Math.min(1, finite(show.crawl, 0))), 0.7);
+    return Math.min(1, 0.18 + (ceiling - 0.18) * climb);
+  }
+  if (show.phase === 3) return Math.max(0, ceiling * 0.35 * (1 - finite(show.hold, 0)));
+  if (show.phase === 1) return 0.14 + 0.06 * finite(show.progress, 0);
+  return 0.08;
+}
+
+// The things the machine does back, in the order the shader indexes them.
+export const EVENT_KINDS = ['lane', 'sweep', 'ride', 'doors'];
+
+// What a crossing object is. Named in the configuration, drawn here.
+export const EVENT_SHAPES = ['carp', 'lantern', 'hatch'];
+
+/** How many of these can be on the board at once before the rest are dropped. */
+export const EVENT_CAP = 8;
+
+const kindIndex = (k) => Math.max(0, EVENT_KINDS.indexOf(k));
+const shapeIndex = (s) => Math.max(0, EVENT_SHAPES.indexOf(s));
+
+/**
+ * The live events, as one instance each.
+ *
+ * Only the four that need drawing are packed. An extra mouth and a brass
+ * shutter are already on the board's own pockets and plates, so whatever draws
+ * those draws these, and packing them again would draw them twice.
+ *
+ * An event that is only being announced is not packed at all. Nothing about
+ * the board has changed yet, and it has no position to be drawn at: the
+ * warning is carried on the machinery that is always there - the lamps, the
+ * sign, the screen - which is what makes it a warning rather than a preview.
+ */
+export function packEvents(events, boardW, boardH, into) {
+  const list = events && Array.isArray(events.active) ? events.active : [];
+  const data = ensureFloats(into, EVENT_CAP * STRIDE);
+  let count = 0;
+  for (let i = 0; i < list.length && count < EVENT_CAP; i++) {
+    const e = list[i];
+    if (!e || e.pending) continue;
+    const kind = EVENT_KINDS.indexOf(e.kind);
+    if (kind < 0) continue;
+    const o = count * STRIDE;
+    // How far through it is, and how close it is to ending, because a thing
+    // about to stop should be seen stopping rather than simply vanishing.
+    const progress = Math.max(0, Math.min(1, finite(e.progress, 0)));
+    const fade = e.done ? 0 : Math.min(1, Math.max(0.0, 1 - Math.max(0, progress - 0.88) / 0.12));
+    let extra = 0;
+    if (kind === 0) {
+      const x0 = finite(e.x0, 0), x1 = finite(e.x1, boardW);
+      const yT = finite(e.yTop, 0), yB = finite(e.yBottom, boardH);
+      data[o] = (x0 + x1) * 0.5;
+      data[o + 1] = (yT + yB) * 0.5;
+      data[o + 2] = Math.max(1e-3, Math.abs(x1 - x0) * 0.5);
+      data[o + 3] = Math.max(1e-3, Math.abs(yB - yT) * 0.5);
+    } else if (kind === 1) {
+      const r = Math.max(1e-3, finite(e.r, boardW * 0.05));
+      data[o] = finite(e.x, boardW * 0.5);
+      data[o + 1] = finite(e.y, boardH * 0.5);
+      // Room around it for the tail, the glow and the shadow it lays down.
+      data[o + 2] = r * 1.9;
+      data[o + 3] = r * 1.35;
+      extra = shapeIndex(e.shape) + (finite(e.dir, 1) >= 0 ? 0 : 0.5);
+    } else if (kind === 2) {
+      data[o] = boardW * 0.5;
+      data[o + 1] = boardH * 0.5;
+      data[o + 2] = boardW * 0.5;
+      data[o + 3] = boardH * 0.5;
+      extra = Math.max(1, finite(e.mult, 1));
+    } else {
+      const n = Math.max(1, Math.floor(finite(e.doors, 3)));
+      const pick = Math.max(0, Math.min(n - 1, Math.floor(finite(e.pick, 0))));
+      data[o] = boardW * 0.5;
+      data[o + 1] = boardH * 0.80;
+      data[o + 2] = Math.min(boardW * 0.42, n * boardW * 0.085);
+      data[o + 3] = boardH * 0.055;
+      extra = n * 100 + pick * 10 + (e.revealed ? 1 : 0);
+    }
+    data[o + 4] = kind;
+    data[o + 5] = progress;
+    data[o + 6] = fade;
+    data[o + 7] = extra;
+    count++;
+  }
+  return { data, count };
+}
+
+/**
+ * How loudly the machine is announcing something that has not happened yet.
+ *
+ * A warning has nowhere on the board to be drawn, because the thing it is
+ * warning about does not exist yet. So it is carried on the parts that are
+ * always there and always lit, and this is the one number that drives them.
+ */
+export function tellHeat(events) {
+  const list = events && Array.isArray(events.active) ? events.active : [];
+  let most = 0;
+  for (const e of list) {
+    if (!e || !e.pending) continue;
+    const total = Math.max(1, finite(e.tellBalls, 0));
+    const left = Math.max(0, finite(e.tellLeft, 0));
+    most = Math.max(most, Math.min(1, 1 - left / total));
+  }
+  return most;
+}
+
 /** One window: the brass frame, then the three drums inside it. */
-function packOneReel(data, at, digits, rect) {
+function packOneReel(data, at, digits, rect, housed, lastFace) {
   data[at] = rect.x;
   data[at + 1] = rect.y;
   data[at + 2] = rect.w * 0.5;
   data[at + 3] = rect.h * 0.5;
   const lit = !!(digits && digits.length === 3);
   data[at + 4] = 0;
-  data[at + 5] = 0;
+  // A window set into the show screen already has a housing around it, so it
+  // is drawn as a bare drum bezel rather than as a second brass surround.
+  data[at + 5] = housed ? 1 : 0;
   data[at + 6] = 1;
   data[at + 7] = lit ? 1 : 0;
   // Drums sit inside the frame with the brass surround left showing.
@@ -292,17 +448,21 @@ function packOneReel(data, at, digits, rect) {
   const drumH = rect.h - inset * 2;
   for (let i = 0; i < 3; i++) {
     const o = at + (i + 1) * STRIDE;
-    const raw = Math.floor(Number(digits && digits[i]) || 0);
+    // The last drum can be told what to show while it is still turning, so it
+    // steps through faces one at a time instead of flickering. What it stops
+    // on is never overridden: that face belongs to the spin.
+    const over = i === 2 && Number.isFinite(lastFace) && lastFace >= 0 ? lastFace : null;
+    const raw = Math.floor(over === null ? (Number(digits && digits[i]) || 0) : over);
     data[o] = rect.x - rect.w * 0.5 + inset + drumW * (i + 0.5);
     data[o + 1] = rect.y;
     data[o + 2] = drumW * 0.5 * 0.94;
     data[o + 3] = drumH * 0.5;
     // A dark window is a real state: the drums are there, they are simply not
     // showing anything, which is not the same as a nought.
-    data[o + 4] = lit ? ((raw % 10) + 10) % 10 : -1;
+    data[o + 4] = lit || over !== null ? ((raw % 10) + 10) % 10 : -1;
     data[o + 5] = i;
     data[o + 6] = 0;
-    data[o + 7] = 0;
+    data[o + 7] = housed ? 1 : 0;
   }
   return at + 4 * STRIDE;
 }
@@ -316,21 +476,27 @@ function packOneReel(data, at, digits, rect) {
  * The buffer is always sized for a full ring, so a busy frame never reallocates
  * and a quiet one costs the same as it always did.
  */
-export function packReels(digits, rect, into, around) {
+export function packReels(digits, rect, into, around, opts) {
+  const o = opts || {};
   const data = ensureFloats(into, REEL_WINDOWS * 4 * STRIDE);
-  let at = packOneReel(data, 0, digits, rect);
+  let at = packOneReel(data, 0, digits, rect, o.housed, o.lastFace);
   let drawn = 1;
+  // The extra windows are spaced against whatever they are arranged around,
+  // which is the screen and not the strip of drums inside it, so the pattern
+  // clears the housing instead of landing on top of it.
+  const ring = o.ring || rect;
+  const scale = Number.isFinite(o.ringScale) ? o.ringScale : RING_SCALE;
   const extra = Array.isArray(around) ? around : [];
   for (const w of extra) {
     if (drawn >= REEL_WINDOWS) break;
     const slot = Math.max(1, Math.floor(Number(w && w.slot) || 1));
     const off = REEL_RING[(slot - 1) % REEL_RING.length];
     at = packOneReel(data, at, w && w.digits, {
-      x: rect.x + off[0] * rect.w,
-      y: rect.y + off[1] * rect.h,
-      w: rect.w,
-      h: rect.h,
-    });
+      x: ring.x + off[0] * ring.w * 0.5,
+      y: ring.y + off[1] * ring.h * 0.5,
+      w: rect.w * scale,
+      h: rect.h * scale,
+    }, false, -1);
     drawn++;
   }
   return { data, count: drawn * 4 };

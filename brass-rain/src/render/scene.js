@@ -22,18 +22,21 @@
 // description of what to draw, and it touches nothing else on the page.
 // ---------------------------------------------------------------------------
 
-import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=5';
-import { createColours } from './colours.js?v=5';
-import { fitBoard, clipTransform, lampPosition, reelRect } from './layout.js?v=5';
-import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=5';
+import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=6';
+import { createColours } from './colours.js?v=6';
+import { fitBoard, clipTransform, lampPosition, reelRect, screenRect, drumStrip } from './layout.js?v=6';
+import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=6';
 import {
-  packPins, packPockets, packRails, packFlashes, packReels, packArc,
-  medianPinRadius, POCKET_KINDS, POCKET_TONES, FLASH_KINDS, REEL_WINDOWS,
-} from './board-geom.js?v=5';
+  packPins, packPockets, packRails, packFlashes, packReels, packArc, packScreen,
+  packEvents, tellHeat, showIntensity, medianPinRadius,
+  POCKET_KINDS, POCKET_TONES, FLASH_KINDS, REEL_WINDOWS, EVENT_CAP,
+} from './board-geom.js?v=6';
 import {
   INSTANCE_VS, RAIL_VS, BALL_VS, GROUND_FS, PIN_FS, BALL_FS, BALL_SHADOW_FS,
-  RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, COMPOSITE_FS,
-} from './shaders.js?v=5';
+  RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, SCREEN_FS, EVENT_FS, COMPOSITE_FS,
+} from './shaders.js?v=6';
+import { themeForCabinet, themeIndex, DEFAULT_THEME } from './themes.js?v=6';
+import { encode as encodeName, MAX_LETTERS } from './marquee.js?v=6';
 
 // The unit quad every instance is stamped from, as a triangle strip so no
 // index buffer is needed.
@@ -52,7 +55,10 @@ export function createScene(canvas, cfg) {
   // and where the launch rail runs. Optional, and everything has a fallback,
   // but a renderer told these draws the machine that is actually being played.
   const P = conf.physics || {};
-  const colours = createColours(conf);
+  const colours = createColours(conf, themeForCabinet(R.theme || (conf.identity && conf.identity.theme)));
+  // What the sign on top says. A machine with no name on it is a prototype.
+  const sign = encodeName((conf.identity && conf.identity.name) || R.name || 'BRASS RAIN');
+  let signed = null;
 
   const G = createGL(canvas, { antialias: false, alpha: false, maxDpr: num(R.maxDpr, 2) });
   const gl = G.gl;
@@ -81,7 +87,11 @@ export function createScene(canvas, cfg) {
     }
   }
 
-  const margin = num(R.margin, 0.045);
+  // The face no longer fills the window: it is set into a cabinet with a sign
+  // above it and a dish below it, so it is given room and pushed up through
+  // the slack rather than centred in it.
+  const margin = num(R.margin, 0.135);
+  const lift = num(R.lift, 0.30);
   const bezelPx = num(R.bezel, 2.2);
   const ballMinPixels = num(R.ballMinPixels, 4.5);
   const maxDpr = num(R.maxDpr, 2);
@@ -108,6 +118,9 @@ export function createScene(canvas, cfg) {
   let settleSpeed = 1;
   let pocketPad = 0;
   let reel = { x: 0, y: 0, w: 1, h: 1 };
+  let screen = { x: 0, y: 0, w: 1, h: 1 };
+  let screenPack = null;
+  let eventPack = null;
   let arcPack = null;
   let arcCount = 0;
   let pinPack = null;
@@ -131,12 +144,22 @@ export function createScene(canvas, cfg) {
     u_chrome: colours.lin.chrome,
     u_enamel: colours.lin.enamel,
     u_oxblood: colours.lin.oxblood,
+    u_screen: colours.lin.screen,
+    u_glow: colours.lin.glow,
+    u_shell: colours.lin.shell,
+    u_room: colours.lin.room,
+    // How hard the machine is pushing, what it is pushing about, and which
+    // skin's motif is on the panel.
+    u_show: new Float32Array(4),
+    u_name: sign.codes,
+    u_nameLen: sign.length,
     u_pocketFill: colours.pocketFill,
     u_flashTint: new Float32Array(12),
     u_encode: 0,
     u_decode: 0,
     u_reflect: 1,
     u_glass: 1,
+    u_shadow: 1,
     u_time: 0,
     u_ballR: 1,
     u_grow: 1.18,
@@ -212,6 +235,8 @@ export function createScene(canvas, cfg) {
     // so a frame with seven sets turning uploads into a buffer that is already
     // the right size.
     res.reelInst = instanceBuffer(REEL_WINDOWS * 4 * 32);
+    res.screenInst = instanceBuffer(32);
+    res.eventInst = instanceBuffer(EVENT_CAP * 32);
 
     res.ballCap = 2048;
     res.ballX = instanceBuffer(res.ballCap * 4);
@@ -231,6 +256,8 @@ export function createScene(canvas, cfg) {
     res.pocket = rectPass(POCKET_FS, res.pocketInst);
     res.flash = rectPass(FLASH_FS, res.flashInst);
     res.reel = rectPass(REEL_FS, res.reelInst);
+    res.screen = rectPass(SCREEN_FS, res.screenInst);
+    res.event = rectPass(EVENT_FS, res.eventInst);
 
     res.railProg = program(gl, RAIL_VS, RAIL_FS);
     res.railVao = vao(gl, res.railProg, {
@@ -271,11 +298,11 @@ export function createScene(canvas, cfg) {
     if (!r) return;
     if (!deleteObjects) return;
     gl.deleteBuffer(r.quad);
-    for (const key of ['pinInst', 'pocketInst', 'railInst', 'flashInst', 'reelInst', 'arcInst',
+    for (const key of ['pinInst', 'pocketInst', 'railInst', 'flashInst', 'reelInst', 'arcInst', 'screenInst', 'eventInst',
       'ballX', 'ballY', 'ballVX', 'ballVY', 'ballSpin']) {
       if (r[key]) gl.deleteBuffer(r[key].buf);
     }
-    for (const pass of [r.pin, r.pocket, r.flash, r.reel, r.arc]) {
+    for (const pass of [r.pin, r.pocket, r.flash, r.reel, r.arc, r.screen, r.event]) {
       if (!pass) continue;
       pass.v.dispose();
       pass.prog.dispose();
@@ -362,9 +389,12 @@ export function createScene(canvas, cfg) {
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, railPack.data, 0, railCount * 8);
     }
 
-    // The counter sits above the gate, because the gate is what it is
-    // counting, and a config may put it anywhere instead.
-    reel = reelRect(boardW, boardH, R.reel || overGate(board));
+    // The show screen, and the strip of drums set into it. The board states
+    // where its window is and how much room has been kept clear for it; the
+    // screen is that window at the size a cabinet actually builds one.
+    const window = reelRect(boardW, boardH, R.reel || overGate(board));
+    screen = screenRect(boardW, boardH, window, R.screen);
+    reel = drumStrip(screen, R.drums);
 
     // The launch rail. Its geometry belongs to the simulation - a drawn rail
     // that balls do not ride is worse than none - so the config is asked
@@ -417,13 +447,36 @@ export function createScene(canvas, cfg) {
     lastNow = t0;
 
     const board = view.board;
+    // A machine keeps its paint. Repainting rewrites the material arrays the
+    // uniforms already point at, so a skin change costs a hundred floats and
+    // never a rebuild.
+    colours.paint(themeForCabinet(view.theme));
+    // The name on the sign arrives with the frame, because the page that owns
+    // the name and the page that owns the renderer are not the same page. It
+    // is only re-cut when it actually changes.
+    if (typeof view.name === 'string' && view.name && view.name !== signed) {
+      signed = view.name;
+      const e = encodeName(view.name, U.u_name);
+      U.u_name = e.codes;
+      U.u_nameLen = e.length;
+    }
     if (board.version !== boardVersion) uploadBoard(board);
+
+    const show = view.show || null;
+    // Two things push the machine: the spin in the middle of it, and anything
+    // it is about to do that it has not done yet. They ride the same number,
+    // so a warning lights the same lamps a near miss does.
+    const heat = Math.max(showIntensity(show), tellHeat(view.events));
+    U.u_show[0] = heat;
+    U.u_show[1] = show ? Math.max(0, Math.min(1, Number(show.revival) || 0)) : 0;
+    U.u_show[2] = show ? Math.max(0, Math.min(1, Number(show.win) || 0)) : 0;
+    U.u_show[3] = themeIndex(colours.theme());
 
     const q = quality;
     const size = sceneSize(bufW, bufH, q.scale);
     const tgt = res.sceneTarget.fit(size.w, size.h, dt);
 
-    const fitScene = fitBoard(tgt.width, tgt.height, boardW, boardH, { margin });
+    const fitScene = fitBoard(tgt.width, tgt.height, boardW, boardH, { margin, lift });
     clipTransform(fitScene, U.u_xform);
 
     // A ball is the one thing on the face a player watches for a whole round,
@@ -433,12 +486,15 @@ export function createScene(canvas, cfg) {
     const minR = ballMinPixels / Math.max(fitScene.scale, 1e-6);
     U.u_ballR = Math.max(ballR, minR);
 
-    const fever = Math.max(0, Math.min(1, num(view.fever, 0)));
+    // The lamp answers to the fever and to the show, so an escalating machine
+    // warms the whole face and not only the panel in the middle of it.
+    const fever = Math.max(0, Math.min(1, Math.max(num(view.fever, 0), heat * 0.55)));
     U.u_lamp = colours.lampInto(fever);
     U.u_lampPos[3] = colours.lampGain(fever);
     U.u_time = num(view.t, 0);
     U.u_reflect = q.reflections ? 1 : 0;
     U.u_glass = q.glass ? 1 : 0;
+    U.u_shadow = q.shadows ? 1 : 0;
     U.u_smearK = smearK;
     U.u_settle = settleSpeed;
 
@@ -486,6 +542,28 @@ export function createScene(canvas, cfg) {
       stats.pins = pinCount;
     }
 
+    // The screen goes on after the field and before the balls, because a ball
+    // crosses in front of it and a nail never does.
+    screenPack = packScreen(screen, {
+      phase: show ? show.phase : 0,
+      tier: show ? show.tier : 0,
+      progress: show ? num(show.beat, 0) : 0,
+      intensity: heat,
+    }, screenPack ? screenPack.data : null);
+    gl.bindBuffer(gl.ARRAY_BUFFER, res.screenInst.buf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, screenPack.data, 0, 8);
+    drawInstances(res.screen, 1);
+
+    // What the machine is doing back. Over the field, because a lit stripe
+    // lights the nails in it, and under the balls, because all of it is behind
+    // the glass and a ball is in front of it.
+    eventPack = packEvents(view.events, boardW, boardH, eventPack ? eventPack.data : null);
+    if (eventPack.count) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, res.eventInst.buf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, eventPack.data, 0, eventPack.count * 8);
+      drawInstances(res.event, eventPack.count);
+    }
+
     // ---- the moving half ---------------------------------------------------
     const balls = view.balls;
     const n = balls ? drawnBalls(balls.n, q) : 0;
@@ -501,7 +579,11 @@ export function createScene(canvas, cfg) {
 
     // The window is part of the machine and is always on the face. Only what
     // is showing in it comes and goes.
-    reelScratch = packReels(view.reels, reel, reelScratch ? reelScratch.data : null, view.reelsAround);
+    reelScratch = packReels(view.reels, reel, reelScratch ? reelScratch.data : null, view.reelsAround, {
+      housed: true,
+      ring: screen,
+      lastFace: show && Number.isFinite(show.face) ? show.face : -1,
+    });
     gl.bindBuffer(gl.ARRAY_BUFFER, res.reelInst.buf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, reelScratch.data, 0, reelScratch.count * 8);
     drawInstances(res.reel, reelScratch.count);
@@ -509,7 +591,7 @@ export function createScene(canvas, cfg) {
     // ---- the glass and the frame, at full resolution ------------------------
     bindScreen(gl);
     gl.disable(gl.BLEND);
-    const fitBuf = fitBoard(bufW, bufH, boardW, boardH, { margin });
+    const fitBuf = fitBoard(bufW, bufH, boardW, boardH, { margin, lift });
     U.u_res[0] = bufW;
     U.u_res[1] = bufH;
     U.u_fit[0] = fitBuf.ox;
@@ -608,6 +690,22 @@ export function createScene(canvas, cfg) {
 
     draw,
 
+    /** What the lit sign on top of the cabinet spells. */
+    setName(name) {
+      const e = encodeName(name, U.u_name);
+      U.u_name = e.codes;
+      U.u_nameLen = e.length;
+      return e.length;
+    },
+
+    /** The skin the machine is painted in, and which one it is now wearing. */
+    setTheme(id) {
+      colours.paint(themeForCabinet(id));
+      return colours.theme();
+    },
+
+    theme() { return colours.theme(); },
+
     setQuality(q) {
       quality = normaliseQuality(q, quality);
       return quality;
@@ -628,7 +726,7 @@ export function createScene(canvas, cfg) {
      * about the outside world.
      */
     project(x, y, out) {
-      const fit = fitBoard(bufW, bufH, boardW, boardH, { margin });
+      const fit = fitBoard(bufW, bufH, boardW, boardH, { margin, lift });
       const p = out || projected;
       p.x = (fit.ox + x * fit.scale) / dprUsed;
       p.y = (fit.oy + y * fit.scale) / dprUsed;
@@ -641,6 +739,8 @@ export function createScene(canvas, cfg) {
       teardown(!lost);
       pinPack = null;
       pocketPack = null;
+      screenPack = null;
+      eventPack = null;
       railPack = null;
       flashScratch = null;
       reelScratch = null;

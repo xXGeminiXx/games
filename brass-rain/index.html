@@ -112,8 +112,11 @@
   #face{flex:1 1 auto;min-width:0;position:relative;background:#120507;overflow:hidden}
   #view{display:block;width:100%;height:100%}
   #face.bending #view{cursor:crosshair}
+  /* Sits under the lit sign on top of the cabinet rather than across it. The
+     sign is drawn as part of the machine and scales with the window, so this
+     is anchored to the bottom of the face where there is no cabinet art. */
   #banner{
-    position:absolute;left:50%;top:10px;transform:translateX(-50%);
+    position:absolute;left:50%;bottom:34px;transform:translateX(-50%);
     padding:4px 16px;border-radius:3px;
     font:600 13px/1 var(--narrow);letter-spacing:.3em;text-transform:uppercase;
     background:var(--jade);color:#06180f;box-shadow:0 2px 8px rgba(0,0,0,.5);
@@ -121,7 +124,7 @@
   }
   #banner[hidden]{display:none}
   #hint{
-    position:absolute;left:50%;bottom:9px;transform:translateX(-50%);max-width:78%;
+    position:absolute;left:50%;bottom:8px;transform:translateX(-50%);max-width:78%;
     font-size:12px;color:#c8b8a4;text-align:center;pointer-events:none;
     text-shadow:0 1px 3px #000;
   }
@@ -140,6 +143,12 @@
     border-top:1px solid #d8b56a;
     padding:4px 8px;
   }
+  /* The workbench panel is 520px wide and sits over the left of the window, so
+     the first counter on the rail disappears behind it while the panel is
+     open. The rail is drawn before the panel in the document, so it cannot be
+     reached with a sibling selector; it is moved clear from the body instead. */
+  body:has(.sheet.dock:not([hidden])) footer{ padding-left:528px; }
+
   .counter{
     flex:1 1 0;min-width:0;margin:0 2px;padding:3px 8px 4px;border-radius:3px;
     background:linear-gradient(#160a05,#241209);
@@ -249,8 +258,8 @@
   .settingrow output{flex:0 0 74px;text-align:right;font-size:12px;color:var(--lamp)}
 
   #owned{display:flex;flex-wrap:wrap;gap:5px}
-  /* A bolted-in part. Its rarity is carried by a coloured bead rather than by
-     the chip's own colour, so the row still reads as one row of parts and the
+  /* A bolted-in part. Its rarity is carried by a colored bead rather than by
+     the chip's own color, so the row still reads as one row of parts and the
      rarest thing in it is still findable at a glance. */
   .chip{
     display:inline-flex;align-items:center;gap:6px;
@@ -283,6 +292,21 @@
   #tip .bound{color:#7a6a60;font-style:italic;border-top:1px dotted rgba(92,29,32,.25);padding-top:5px;margin-top:2px}
   #tip .combos{color:#1d6b55;font-weight:600;margin-top:4px}
   #tip .tags{color:#8a7f74;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
+
+  /* the first-run card */
+  #primer{z-index:30}
+  .panel.primer{max-width:600px}
+  #primerList{margin:0;padding:0 0 0 20px;font-size:13px;line-height:1.5;color:var(--enamel)}
+  #primerList li{margin:0 0 8px}
+  #primerList li:last-child{margin-bottom:0}
+  #primerList b{color:var(--brass-lit);font-weight:600}
+
+  /* a machine card on the picker. .theme is left empty here and filled by
+     whatever gives a machine its own name and color. */
+  .cab .theme{font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+  .cab .theme:empty{display:none}
+  .cab .big small{display:block;font:11px/1.3 var(--narrow);letter-spacing:0;color:var(--dim);margin-top:3px;text-transform:none}
+  .cab .warn{font-size:11px;color:#d09a6a}
 
   .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12px}
   .kv dt{color:var(--dim)}
@@ -433,7 +457,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="a5c2ddf850ea">
+<meta name="build" content="a514396acd5c">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -483,8 +507,8 @@
 <header>
   <div id="brand"><b id="title">Brass Rain</b><span id="tagline"></span></div>
   <div id="tools">
-    <button id="toRow" type="button">The row</button>
-    <button id="toFloor" type="button">The parlour</button>
+    <button id="toRow" type="button">Change machine</button>
+    <button id="toFloor" type="button">Your arcade</button>
     <button id="toSettings" type="button">Settings</button>
     <button id="toHelp" type="button">Help</button>
   </div>
@@ -495,7 +519,7 @@
 
     <section class="plaque" id="pRound">
       <h2>Round <span id="roundNo">1</span> <span id="cabinet"></span></h2>
-      <div class="row"><span class="big" id="wonNow">0</span><span class="sub">of <b id="quotaNo">0</b></span></div>
+      <div class="row"><span class="big" id="wonNow">0</span><span class="sub">balls won of the <b id="quotaNo">0</b> this round needs</span></div>
       <div class="tube" id="quotaTube"><i style="width:0%"></i></div>
       <div class="row"><span class="sub" id="perBall"></span></div>
     </section>
@@ -503,8 +527,8 @@
     <section class="plaque" id="pHandle">
       <h2>The handle</h2>
       <input id="handle" type="range" min="0" max="1" step="0.005" value="0.62"
-             aria-label="Launch strength">
-      <div class="row"><span class="sub">Strength</span><b id="strengthOut">0.62</b></div>
+             aria-label="How hard the handle throws a ball">
+      <div class="row"><span class="sub">Power</span><b id="strengthOut">0.62</b></div>
       <div class="row"><span class="sub">Balls per pull</span><b id="perPull">1</b></div>
       <div class="knobrow">
         <button id="pull" type="button">Pull</button>
@@ -514,25 +538,25 @@
     </section>
 
     <section class="plaque" id="pOdds">
-      <h2>Printed on the glass</h2>
-      <div class="row"><span class="sub">Reels agree</span><b id="oddsMatch">11%</b></div>
-      <div class="row"><span class="sub">Fever continues</span><b id="oddsCont">30%</b></div>
-      <div class="row"><span class="sub">Through the gate</span><b id="oddsGate">-</b></div>
-      <div class="row"><span class="sub">Back per ball</span><b id="oddsBack">-</b></div>
+      <h2>The odds, printed on the glass</h2>
+      <div class="row"><span class="sub">All three reels match</span><b id="oddsMatch">11%</b></div>
+      <div class="row"><span class="sub">A bonus runs on again</span><b id="oddsCont">30%</b></div>
+      <div class="row"><span class="sub">Balls reaching the slot</span><b id="oddsGate">-</b></div>
+      <div class="row"><span class="sub">Balls back per ball spent</span><b id="oddsBack">-</b></div>
     </section>
 
     <section class="plaque" id="pFloor">
-      <h2>The parlour</h2>
-      <div class="row"><span class="big" id="scrip">0</span><span class="sub">scrip</span></div>
-      <div class="row"><span class="sub">Earning</span><b class="live" id="income">0 /s</b></div>
-      <div class="row"><span class="sub">Your best round pays</span><b id="handMult">x1</b></div>
+      <h2>Your arcade</h2>
+      <div class="row"><span class="big" id="scrip">0</span><span class="sub">coins</span></div>
+      <div class="row"><span class="sub">Coins a second, even while away</span><b class="live" id="income">0 /s</b></div>
+      <div class="row"><span class="sub">Bonus for how far you have played</span><b id="handMult">x1</b></div>
       <div class="knobrow">
-        <button id="cash" type="button">Cash out</button>
+        <button id="cash" type="button">Trade balls for coins</button>
       </div>
     </section>
 
     <section class="plaque" id="pLog">
-      <h2>The night</h2>
+      <h2>What just happened</h2>
       <ul id="log"></ul>
     </section>
 
@@ -553,45 +577,45 @@
 <!-- the bench, between rounds -->
 <div class="sheet dock" id="bench" hidden>
   <div class="panel">
-    <h1>The bench</h1>
+    <h1>The workbench</h1>
     <p class="lede" id="benchLede"></p>
-    <h3>Parts</h3>
+    <h3>Parts for sale, paid for in balls</h3>
     <div id="offers"></div>
-    <h3>Bolted in <span id="slotCount"></span></h3>
+    <h3>Parts in this machine <span id="slotCount"></span></h3>
     <div id="owned"></div>
-    <h3>The nails</h3>
+    <h3>Bending the nails</h3>
     <p class="lede" id="bendLede"></p>
     <p class="lede" id="bendChart"></p>
     <div class="sheetfoot">
-      <button id="reroll" type="button" class="ghost">Reroll</button>
+      <button id="reroll" type="button" class="ghost">Show different parts</button>
       <button id="straighten" type="button" class="ghost">Straighten every nail</button>
       <button id="leave" type="button">Start the round</button>
     </div>
   </div>
 </div>
 
-<!-- the parlour floor -->
+<!-- the arcade: machines that are owned, never played -->
 <div class="sheet" id="floor" hidden>
   <div class="panel">
-    <h1>The parlour</h1>
+    <h1>Your arcade</h1>
     <p class="lede" id="floorLede"></p>
     <div id="bulkbar"></div>
     <table id="machines"><thead><tr>
-      <th>Machine</th><th class="n">Owned</th><th class="n">Earns</th><th class="n">Next</th><th></th><th></th>
+      <th>Arcade machine</th><th class="n">You own</th><th class="n">Earns</th><th class="n">Price</th><th></th><th></th>
     </tr></thead><tbody></tbody></table>
     <div id="prestigeBox"></div>
-    <div class="sheetfoot"><button id="closeFloor" type="button">Back to the machine</button></div>
+    <div class="sheetfoot"><button id="closeFloor" type="button">Back to the game</button></div>
   </div>
 </div>
 
-<!-- the row: which machine to sit at -->
+<!-- picking which machine to play -->
 <div class="sheet" id="row" hidden>
   <div class="panel">
-    <h1 id="rowTitle">Walk the row</h1>
+    <h1 id="rowTitle">Pick a machine to play</h1>
     <p class="lede" id="rowLede"></p>
     <div id="cabinets"></div>
     <div class="sheetfoot">
-      <button id="rowLater" type="button" class="ghost">Stay where you are</button>
+      <button id="rowLater" type="button" class="ghost">Keep playing the one I am on</button>
     </div>
   </div>
 </div>
@@ -624,15 +648,34 @@
     <dl class="kv">
       <dt>Frames a second</dt><dd id="mFps">-</dd>
       <dt>Drawing at</dt><dd id="mScale">-</dd>
-      <dt>Balls in flight</dt><dd id="mBalls">-</dd>
-      <dt>Nails on the face</dt><dd id="mPins">-</dd>
+      <dt>Balls falling right now</dt><dd id="mBalls">-</dd>
+      <dt>Nails on the board</dt><dd id="mPins">-</dd>
     </dl>
     <h3>This save</h3>
     <div class="knobrow">
-      <button id="newRun" type="button" class="ghost">Start a new night</button>
+      <button id="newRun" type="button" class="ghost">Start a new game</button>
       <button id="wipe" type="button" class="ghost">Erase everything</button>
     </div>
     <div class="sheetfoot"><button id="closeSettings" type="button">Close</button></div>
+  </div>
+</div>
+
+<!-- shown once, on a first visit, and never again after it is dismissed -->
+<div class="sheet" id="primer" hidden>
+  <div class="panel primer">
+    <h1 id="primerTitle">How this game works</h1>
+    <p class="lede">Six lines, then you are playing.</p>
+    <ol id="primerList">
+      <li><b>Pull the handle.</b> Balls arc over the top and rain down through the nails.</li>
+      <li><b>Pockets pay.</b> A ball that drops into a pocket pays balls back. Most balls miss, so playing straight slowly loses.</li>
+      <li><b>The slot in the middle spins the reels.</b> That narrow mouth is the one worth aiming at.</li>
+      <li><b>Three matching reels start a BONUS.</b> The jackpot pocket swings open and pays hard for the next hundred balls or so. This is how you get ahead.</li>
+      <li><b>Between rounds you shop.</b> Balls you have not launched buy parts at the workbench, and you can bend nails to steer the rain toward the slot.</li>
+      <li><b>Cash balls out for coins.</b> Coins buy machines for your arcade, and those earn coins around the clock, even while you are away.</li>
+    </ol>
+    <div class="sheetfoot">
+      <button id="primerGo" type="button">Got it, let me play</button>
+    </div>
   </div>
 </div>
 
@@ -646,7 +689,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=5';
+  import { boot } from './src/ui.js?v=6';
   boot(document);
 </script>
 </body>

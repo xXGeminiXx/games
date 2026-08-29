@@ -22,7 +22,7 @@
  * Returns pixels per board unit, the top left corner of the face in pixels,
  * and the face size in pixels. Pixel y runs downward, matching board y.
  */
-export function fitBoard(bufW, bufH, boardW, boardH, { margin = 0.045 } = {}) {
+export function fitBoard(bufW, bufH, boardW, boardH, { margin = 0.045, lift = 0 } = {}) {
   const w = Math.max(1, bufW);
   const h = Math.max(1, bufH);
   const bw = Math.max(1e-6, boardW);
@@ -33,10 +33,17 @@ export function fitBoard(bufW, bufH, boardW, boardH, { margin = 0.045 } = {}) {
   const scale = Math.min(availW / bw, availH / bh);
   const faceW = bw * scale;
   const faceH = bh * scale;
+  // A cabinet is not symmetrical. The glass sits high in it because the dish
+  // the balls fall into is under the glass and the topper above it is thin, so
+  // the face is pushed up through the slack rather than centred in it. Nothing
+  // asks for a lift by default, and then this is a centred fit exactly as
+  // before.
+  const slack = Math.max(0, (h - faceH) * 0.5);
+  const shift = slack * Math.max(-1, Math.min(1, Number(lift) || 0));
   return {
     scale,
     ox: (w - faceW) * 0.5,
-    oy: (h - faceH) * 0.5,
+    oy: (h - faceH) * 0.5 - shift,
     w: faceW,
     h: faceH,
     bufW: w,
@@ -103,6 +110,46 @@ export function reelRect(boardW, boardH, given) {
     w,
     h,
   };
+}
+
+/**
+ * The show screen, in board units, as { x, y, w, h } with x and y at its
+ * centre.
+ *
+ * This is the thing the machine is built around: on a real cabinet the screen
+ * is the middle of the glass and the nails are a ring around and below it, not
+ * the other way round. So it is sized against the board rather than against
+ * whatever counter window happens to be configured - about a third of the
+ * width and a quarter of the height, high in the face - and the counter window
+ * is only used for where it is centred.
+ *
+ * A board that already asks for a window at least this big is left alone,
+ * because a cabinet that states its own screen means it.
+ */
+export function screenRect(boardW, boardH, given, { width = 0.40, height = 0.36 } = {}) {
+  const g = given || {};
+  const w = Math.max(num(g.w, 0), boardW * width);
+  const h = Math.max(num(g.h, 0), boardH * height);
+  return {
+    x: num(g.x, boardW * 0.5),
+    y: num(g.y, boardH * 0.25),
+    w,
+    h,
+  };
+}
+
+/**
+ * Where the three drums sit inside the screen, as { x, y, w, h }.
+ *
+ * A cabinet does not give the whole screen to the drums. They are a strip
+ * across the lower middle of it, and everything above and around them is the
+ * show, which is what makes a spin something to watch rather than three
+ * numbers changing.
+ */
+export function drumStrip(screen, { width = 0.66, height = 0.30, drop = 0.26 } = {}) {
+  const w = screen.w * Math.max(0.1, Math.min(1, width));
+  const h = screen.h * Math.max(0.05, Math.min(1, height));
+  return { x: screen.x, y: screen.y + screen.h * drop, w, h };
 }
 
 const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
