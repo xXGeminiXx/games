@@ -157,11 +157,12 @@ export const CONFIG = {
         // The old tell named the object; this one names the thing that plays
         // differently, which is that the view keeps pulling back.
         tell: 'a picture that pulls back',
-        blurb: 'Julia sets and the Mandelbrot set, dealt downward a row at a '
-             + 'time. You start close in, a few big blocks with a spiral '
-             + 'cutting through them, and the view pulls back until the whole '
-             + 'set is on the screen and the blocks are its pixels. Pale lace '
-             + 'breaks easily; the dark rim does not.',
+        blurb: 'Julia sets and the Mandelbrot set, dealt downward. The blocks '
+             + 'are pieces of the picture itself, cut along its bands and rays '
+             + 'and never square, and the swarm slips through every gap in the '
+             + 'lace. You start close in and the view pulls back until the '
+             + 'whole set is on the screen. Pale lace breaks easily; the dark '
+             + 'rim does not.',
       },
       {
         // The earlier fractal field - whole geometric constructions (gasket,
@@ -270,59 +271,58 @@ export const CONFIG = {
     // HOW FAST THE FIELD COMES DOWN, in pixels per turn. One row a turn at a
     // sixty-five pixel cell; six rows a turn at an eleven pixel one. Rows are
     // thinner as the view pulls back, so without this the descent would slow
-    // to a crawl exactly when the picture is biggest - the field would go from
-    // a metronome to a still life. Held at roughly a starting cell.
+    // to a crawl exactly when the picture is biggest.
     descentPx: 60,
 
     // Health per row, as a multiple of the tier's block number, shared among
-    // the row's blocks by weight (see `economy.rowBlocks` for the idea).
-    // `turnScale` says how that scales when several rows arrive in one turn:
-    // 0 keeps the whole TURN at one row's worth, 1 gives every row the full
-    // amount, and 0.3 is near the low end so a six-row turn is about 1.7
-    // rows' worth - a wide turn is heavier than a narrow one, not six times.
-    //
-    // TWO, MEASURED. At four (the figure field's number) with the rows open,
-    // every tier above shallows died at the same depth whether the bot aimed
-    // or not - health per turn, not walls, was ending runs. Swept at 2, 2.6
-    // and 3.2 over ten runs a cell with tools/mode-sim.js: two is the one
-    // where aiming is rewarded on every tier (x2.4 shallows, x3.2 swell,
-    // x1.7 undertow, x1.6 maelstrom) and the aiming bot reaches the wide rungs
-    // where the picture is. It plays easier than the main field on the low
-    // tiers and level with it on the top one, which for a field that exists
-    // to be seen is the right way round.
+    // the row's pieces by weight (area, and how deep into the band). Several
+    // rows arriving in one turn share it by `turnScale`: 0 keeps the whole
+    // TURN at one row's worth, 1 gives every row the full amount.
     rowBudget: 2,
     turnScale: 0.3,
-    // Bounds on one block's share of the tier number. Far below the figure
-    // field's, because a dense picture row is forty cells and each should be
-    // a chip, not a pillar.
+    // Bounds on one piece's share of the tier number. A picture row can be
+    // forty pieces, each a chip, or one arc that is the whole row.
     shareMin: 0.02,
     shareMax: 2,
 
+    // THE PIECES. The band is cut along its iteration shells (`shell`
+    // iterations each) and along the external rays of the `rayIter`-th
+    // iterate, starting from `sectors` slices of the ray angle and doubling
+    // them, up to `maxLevel` times, until no piece is larger than `maxArea`
+    // cells; a piece smaller than `minArea` joins its longest neighbour.
+    // Areas are in world cells, so a piece is the size of a cell or so at
+    // every rung: big lace at the start, the picture's pixels at the end.
+    // MEASURED with tools/mode-sim.js (6 runs a cell, aim bot median depth):
+    // minArea 0.12 -> 49/49/50/39/24 across the tiers, 0.5 -> 63/66/38/37/26
+    // with the aiming bot pulling further ahead of the sweep, so bigger
+    // pieces reward aim a little more and read as blocks rather than dust.
+    pieces: {
+      maxArea: 1.6,
+      minArea: 0.45,
+      sectors: 4,
+      rayIter: 5,
+      shell: 1,
+      maxLevel: 8,
+    },
+    // A strip more than this share band across its dealt width is a wall,
+    // and its faintest pieces give way until it is not. 0 turns it off.
+    maxFill: 0.7,
+
     // Escape-time iteration cap. Deep enough that the sixty-five pixel cells
-    // at the start still show structure near the boundary.
-    maxIter: 240,
-    // Samples per cell edge for the mass test (4 = sixteen points a cell), and
-    // the share of them that must be past the threshold for a cell to be a
-    // block.
+    // at the start still show structure near the boundary; the bands past
+    // this are thinner than a pixel at any size the field is shown at.
+    maxIter: 160,
+    // Coarse samples per cell edge, and the share past the threshold, for the
+    // cell-level view that trims a panel to where its mass is.
     samples: 4,
     massShare: 0.35,
-    // Share of a panel's window that becomes blocks. The threshold is chosen
+    // Share of a panel's window that becomes band. The threshold is chosen
     // per panel to hit this, so a thin dendrite and a fat rabbit are equally
-    // playable.
-    massTarget: 0.32,
+    // playable. Lower is closer to the set: more lace, less halo.
+    massTarget: 0.26,
     // The near band: iteration counts below this share of the cap are sky, no
     // matter what the target asks for.
     nearShare: 0.05,
-    // EVERY ROW KEEPS THIS SHARE OF ITS WIDTH OPEN. A narrow view of the
-    // middle of a dense set is halo from edge to edge, and a solid row is a
-    // wall the swarm strikes once and leaves. The cells that give way are the
-    // row's faintest - the outer halo, read as the sky it looks like. The
-    // main field's rows are about five eighths open; this is denser than that
-    // on purpose, and measured rather than guessed.
-    openShare: 0.34,
-    // Consecutive solid rows allowed before one gives up its faintest cell.
-    // With the share above this is a backstop that should never fire.
-    maxSolidRun: 2,
     // Bounding-box scan resolution and the margin around the set.
     scan: 140,
     margin: 0.06,
@@ -335,11 +335,11 @@ export const CONFIG = {
     mandelbrotEvery: 3,
 
     // THE PICTURE. A cyclic ramp over the smooth iteration count, `cycle`
-    // iterations per pass, so the bands tighten toward the boundary the way an
-    // escape-time picture does. Dark sky in the game's own void rather than
-    // the cyan of a poster, because the swarm is cyan and has to stay the
-    // brightest cool thing on screen; the set keeps the blue, violet and pale
-    // lilac of the reference.
+    // iterations per pass, starting `phase` of the way round at the band's
+    // outer edge so the sky runs down through the dark and the lace comes up
+    // through blue and violet to white at the set. Dark sky in the game's own
+    // void rather than the cyan of a poster, because the swarm is cyan and
+    // has to stay the brightest cool thing on screen.
     ramp: [
       [0.00, '#0b1030'],
       [0.14, '#1a3aa8'],
@@ -351,20 +351,22 @@ export const CONFIG = {
       [1.00, '#0b1030'],
     ],
     inside: '#05060f',      // the interior of the set
-    cycle: 24,
-    // The picture under the empty cells, and how far a worn block darkens.
+    cycle: 40,
+    phase: 0.12,
+    // The picture under the empty cells, and how far a worn piece darkens.
     ghost: 0.24,
     wear: 0.6,
+    // The outline traced round every piece, as an alpha of the void.
+    outline: 0.6,
+    // Rows from the line at which a piece's outline turns hot.
+    threatRows: 2.5,
     // Share of the field's aerial haze the picture takes. The main field
     // fades its far rows to almost nothing; a picture washed out at the top is
     // just less picture, so it takes less.
     haze: 0.45,
-    // Cells narrower than this carry no health number - the plate would cover
-    // more picture than it explains. Seams and corner frames stop at their own
-    // sizes, below which they are a mesh over a picture.
+    // A piece whose widest inside span is narrower than this carries no
+    // health number - the picture is the information at that size.
     numeralMin: 22,
-    seamMin: 26,
-    frameMin: 20,
   },
 
   // -------------------------------------------------------------------------
@@ -470,7 +472,9 @@ export const CONFIG = {
         id: 'splinter', name: 'splinter', weight: 0.8, from: 16, tint: 'hot',
         // A trap. Breaking it leaves two smaller blocks where one used to be,
         // so the field gets wider rather than emptier and a careless clear can
-        // cost more than it gained.
+        // cost more than it gained. The pieces go in the free cells beside
+        // it, so it needs a field made of cells.
+        needsLattice: true,
         effect: { splinter: { count: 2, hp: 0.45 } },
       },
       {
@@ -976,7 +980,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 10,
+    build: 11,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.

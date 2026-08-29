@@ -1483,6 +1483,17 @@ export function createVisual(opts) {
 
     const off = (sliding ? ease(slide) - 1 : 0) * CELL;
     const rowsToFloor = (FLOOR - TOP) / CELL;
+
+    // A surface that draws the whole field draws it: the blocks are its
+    // pieces, with their own outlines and their own numbers, and none of the
+    // cell furniture below - seams, bezels, plates, scars - applies to them.
+    if (surface && typeof surface.draw === 'function') {
+      surface.draw(ctx, {
+        cell: CELL, origin: ORIGIN, top: TOP, floor: FLOOR, width: W, off,
+        rowsTall: rowsToFloor, dt: 1 / 60, blocks: list, pressure,
+      });
+      return;
+    }
     // The leftmost world column on screen. The lattice eases cell and origin
     // together, so this is exact at rest and within a column mid-ease.
     const LO = Math.round(-ORIGIN / CELL);
@@ -2692,7 +2703,7 @@ export function createVisual(opts) {
    * seams and frames stop. Pass null to go back to materials.
    */
   function setSurface(s) {
-    surface = s && typeof s.paint === 'function' ? s : null;
+    surface = s && (typeof s.paint === 'function' || typeof s.draw === 'function') ? s : null;
   }
 
   /** The column grid in the backdrop. Off for a field that is a picture. */

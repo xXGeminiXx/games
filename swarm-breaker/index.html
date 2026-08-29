@@ -211,7 +211,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="bf6fdfc16197">
+<meta name="build" content="e688bde176fa">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -348,17 +348,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=10';
-import { createJuice } from './src/juice.js?v=10';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=10';
-import { createBlockKinds } from './src/blocks.js?v=10';
-import { safeRows } from './src/arrival.js?v=10';
-import { createAwards } from './src/awards.js?v=10';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=10';
-import { createLeaderboard } from './src/leaderboard.js?v=10';
-import * as Tiers from './src/tiers.js?v=10';
-import { createOnboarding } from './src/onboarding.js?v=10';
-import { createVisual } from './src/visual.js?v=10';
+         storageKey, offerCost, applyIdentity } from './config.js?v=11';
+import { createJuice } from './src/juice.js?v=11';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=11';
+import { createBlockKinds } from './src/blocks.js?v=11';
+import { safeRows } from './src/arrival.js?v=11';
+import { createAwards } from './src/awards.js?v=11';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=11';
+import { createLeaderboard } from './src/leaderboard.js?v=11';
+import * as Tiers from './src/tiers.js?v=11';
+import { createOnboarding } from './src/onboarding.js?v=11';
+import { createVisual } from './src/visual.js?v=11';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -421,6 +421,9 @@ function bindField(){
 
 // Seconds a newly placed block spends announcing itself. See markArrivals.
 const ARRIVAL_FLASH = Math.max(0, Number(CONFIG.feel.arrivalFlash) || 0);
+
+// Milliseconds of a quiet frame a field may spend working ahead. See tick().
+const PREPARE_MS = 5;
 
 // Seconds a moment stays on screen. See moment().
 const MOMENT_LIFE = Math.max(0.4, Number(CONFIG.feel.momentLife) || 1.6);
@@ -509,7 +512,7 @@ function fresh(){
   // A field that deals a SEQUENCE - the figure field, the picture field - is
   // restored by replaying it, so its source is kept where a save can reach it.
   S.form = S.field.dealsSequence ? S.field.source : null;
-  S.kinds = createBlockKinds(S.seed);
+  S.kinds = createBlockKinds(S.seed, { lattice: S.field.lattice !== false });
   S.dealt = 0;
   ROWS_TURN = 1;
   bindField();
@@ -589,9 +592,18 @@ function addRow(extra){
     // pass that cleared everything around them.
     const bhp = k ? Math.max(1, Math.round(hp * S.kinds.healthScale(k))) : hp;
     const b = { c: cell.c, r: cell.r, hp: bhp, max: bhp };
-    if (k) b.k = k;
-    // The row a picture cell was cut from. Its face is looked up by it.
+    if (k){
+      b.k = k;
+      // The kind's colour travels with the block, so whatever draws it can
+      // mark it without asking the roller.
+      const kd = S.kinds.byId(k);
+      if (kd && kd.tint) b.tint = kd.tint;
+    }
+    // The row a picture block was cut from. Its face is looked up by it.
     if (cell.R !== undefined) b.R = cell.R;
+    // A PIECE of a picture rather than a cell: it carries the id its outline
+    // and its collision are looked up by, and the field keeps a hand on it.
+    if (cell.id !== undefined){ b.id = cell.id; S.field.bind(b); }
     // A block that arrives at the top edge announces itself by sliding in from
     // it. One that appears in the middle of the board has no motion to be
     // noticed by, so it is given a flash instead - see markArrivals.
@@ -996,6 +1008,8 @@ function buildIndex(){
 }
 
 function hitBlocks(b){
+  // A field whose blocks are pieces of a picture answers for its own shapes.
+  if (S.field.probe) return hitPieces(b);
   if (S.rows.length > INDEX_ABOVE) return hitBlocksIndexed(b);
   for (let i = S.rows.length - 1; i >= 0; i--){
     if (strike(b, S.rows[i], i)) return;
@@ -1019,6 +1033,95 @@ function hitBlocksIndexed(b){
   for (const bl of found){
     if (strike(b, bl, -1)) return;
   }
+}
+
+// A body against the pieces of a picture.
+//
+// The field says which piece the body overlaps, the direction out of it and
+// how far. Into the piece, the body reflects about that direction with its
+// speed kept exactly and the piece takes the hit; already leaving it, the body
+// is only stepped clear, because that is the same contact still resolving and
+// not a fresh one.
+function hitPieces(b){
+  const rad = R / CELL;
+  const probe = () => S.field.probe((b.x - ORIGIN) / CELL, (b.y - TOP) / CELL, rad);
+  const hit = probe();
+  if (!hit || !hit.block) return;
+  const bl = hit.block;
+  const dot = b.vx * hit.nx + b.vy * hit.ny;
+  if (dot >= 0){
+    if (hit.depth > 0){ b.x += hit.nx * hit.depth * CELL; b.y += hit.ny * hit.depth * CELL; }
+    return;
+  }
+  const sp = Math.hypot(b.vx, b.vy);
+  const dx = b.vx / sp, dy = b.vy / sp;                  // the way it came in
+  b.vx -= 2 * dot * hit.nx; b.vy -= 2 * dot * hit.ny;
+  const sp2 = Math.hypot(b.vx, b.vy);
+  if (sp2 > 0){ b.vx *= sp / sp2; b.vy *= sp / sp2; }
+  const x0 = b.x, y0 = b.y;
+  if (hit.depth > 0){ b.x += hit.nx * hit.depth * CELL; b.y += hit.ny * hit.depth * CELL; }
+  // A body wedged in a pocket of the lace has no single direction out, and a
+  // push along the overlap can carry it into the other wall of the pocket.
+  // The path it came in on was clear a substep ago, so it backs up along
+  // that until it is, stopping at the first free point.
+  const again = probe();
+  if (again && again.depth > 1e-3){
+    const stepLen = sp / SUBSTEPS;
+    for (let k = 1; k <= 4; k++){
+      b.x = x0 - dx * stepLen * k / 4; b.y = y0 - dy * stepLen * k / 4;
+      const h = probe();
+      if (!h || h.depth <= 1e-3) break;
+    }
+  }
+  damage(b, bl, -1, pieceX(bl), pieceY(bl));
+}
+
+// Where a piece is on screen: its centre of mass.
+const pieceX = bl => ORIGIN + bl.cu * CELL;
+const pieceY = bl => TOP + (bl.r + 1 - bl.hc) * CELL;
+
+// The colour a block's debris takes: the picture's own where there is one,
+// the block's material otherwise.
+function shadeOf(bl){
+  const s = (S.field.surface && typeof S.field.surface.shadeOf === 'function') ? S.field.surface.shadeOf(bl) : null;
+  if (s) return s;
+  const m = look.materialFor(bl.max).mat;
+  return `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
+}
+
+// One contact landed: the block takes the swarm's sharpness, and if that was
+// the last of it, it breaks, pays, and does whatever its kind does. Shared by
+// every collision shape, so a piece of a picture breaks exactly as a cell
+// does. `i` is the block's index in the list when the caller knows it.
+function damage(b, bl, i, x, y){
+  // It touched something, so its run at the ceiling is no longer clean.
+  b.clean = false;
+  const nx = b.vx, ny = b.vy;
+  const shade = shadeOf(bl);
+  bl.hp -= S.power;
+  juice.hit(b.x, b.y, S.power, nx, ny);
+  if (bl.hp <= 0){
+    juice.destroy(x, y, shade, nx, ny);
+    const at = i >= 0 ? i : S.rows.indexOf(bl);
+    if (at >= 0) S.rows.splice(at, 1);
+    retire(bl);
+    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    S.turnKills = (S.turnKills || 0) + 1;
+    if (bl.k){
+      // Breaking one is how a player finds out what it does, so breaking one
+      // is what the record is of.
+      if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
+      applyBlockEffect(S.kinds.effectOf(bl.k), x, y, bl);
+    }
+  }
+}
+
+// A block is gone. Everything that looks blocks up - the cell index, the
+// field's own hand on a piece - is told so, in one place.
+function retire(bl){
+  bl.dead = true;
+  indexDirty = true;
+  if (bl.id !== undefined && S.field.unbind) S.field.unbind(bl.id);
 }
 
 // One body against one block. True if the body struck it.
@@ -1055,28 +1158,7 @@ function strike(b, bl, i){
   if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
   else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
 
-  // It touched something, so its run at the ceiling is no longer clean.
-  b.clean = false;
-  const nx = b.vx, ny = b.vy;
-  const m = look.materialFor(bl.max).mat;
-  const shade = `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
-  bl.hp -= S.power;
-  juice.hit(b.x, b.y, S.power, nx, ny);
-  if (bl.hp <= 0){
-    juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
-    const at = i >= 0 ? i : S.rows.indexOf(bl);
-    if (at >= 0) S.rows.splice(at, 1);
-    bl.dead = true;
-    indexDirty = true;
-    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
-    S.turnKills = (S.turnKills || 0) + 1;
-    if (bl.k){
-      // Breaking one is how a player finds out what it does, so breaking one
-      // is what the record is of.
-      if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
-      applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2, bl);
-    }
-  }
+  damage(b, bl, i, bx + bw / 2, by + bh / 2);
   return true;
 }
 
@@ -1086,6 +1168,8 @@ function strike(b, bl, i){
 // "this one is different" from across the field without touching the figure.
 function markSpecials(X){
   if (!S.kinds) return;
+  // A field that draws its own pieces marks its own kinds, in their outlines.
+  if (S.field.surface && typeof S.field.surface.draw === 'function') return;
   const off = look.slideOffset || 0;
   const pad = CELL * 0.046;
   X.save();
@@ -1146,27 +1230,26 @@ function applyBlockEffect(e, x, y, src){
   if (e.balls) S.balls += e.balls;
   if (e.power) S.power += e.power;
 
-  if (e.clearRow){
-    let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
-    sweep(S.rows.filter(b => b.r === lo));
-  }
+  if (e.clearRow) sweep(lowestBlocks());
 
-  // Its whole column, top to bottom.
-  if (e.column && src) sweep(S.rows.filter(b => b.c === src.c));
+  // Its whole column, top to bottom. A piece of a picture spans columns, so
+  // it is every piece standing over the column its centre is in.
+  if (e.column && src) sweep(S.rows.filter(b => sameColumn(b, src)));
 
   // Everything touching it, corners included. This is what pays for breaking
   // into the MIDDLE of a clump rather than nibbling its edge.
-  if (e.chain && src) {
-    sweep(S.rows.filter(b => Math.abs(b.c - src.c) <= 1 && Math.abs(b.r - src.r) <= 1));
-  }
+  if (e.chain && src) sweep(S.rows.filter(b => adjacent(b, src)));
 
   // A row of headroom handed back. Nothing is destroyed - the field simply
   // stands further from the line than it did, which is worth most at exactly
-  // the moment it is hardest to earn.
+  // the moment it is hardest to earn. A field that places its own pieces is
+  // moved as a whole, so the picture and the pieces stay one thing.
   if (e.lift > 0) {
     const n = e.lift | 0;
-    for (const b of S.rows) b.r = Math.max(0, b.r - n);
+    const cells = S.field.lattice !== false;
+    for (const b of S.rows) b.r = cells ? Math.max(0, b.r - n) : b.r - n;
     for (const p of S.drops) p.r = Math.max(0, p.r - n);
+    if (S.field.source && typeof S.field.source.lift === 'function') S.field.source.lift(n);
     indexDirty = true;
     juice.destroy(W / 2, TOP + CELL, CONFIG.palette.force, 0, -1);
   }
@@ -1178,8 +1261,43 @@ function applyBlockEffect(e, x, y, src){
   }
 
   // A TRAP. Breaking it leaves smaller blocks where one used to be, so a
-  // careless clear widens the field instead of emptying it.
-  if (e.splinter && src) splinter(src, e.splinter);
+  // careless clear widens the field instead of emptying it. Only where there
+  // are cells to leave them in.
+  if (e.splinter && src && src.id === undefined) splinter(src, e.splinter);
+}
+
+// Whether two blocks share a column. Cells compare their column; a piece of a
+// picture spans a range of columns and is asked whether it stands over the
+// column the other's centre is in.
+function sameColumn(b, src){
+  const cc = src.box ? Math.floor(src.cu) : src.c;
+  return b.box ? (b.box.c0 <= cc && b.box.c1 > cc) : b.c === cc;
+}
+
+// Whether two blocks touch, corners included. Pieces compare their bounding
+// boxes in world cells, a cell apart at most.
+function adjacent(b, src){
+  if (b.box && src.box){
+    return b.box.c0 - 1 < src.box.c1 && b.box.c1 + 1 > src.box.c0
+        && b.box.R0 - 1 < src.box.R1 && b.box.R1 + 1 > src.box.R0;
+  }
+  return Math.abs(b.c - src.c) <= 1 && Math.abs(b.r - src.r) <= 1;
+}
+
+// The blocks of the lowest row. Cells sit on whole rows; a piece's lower edge
+// is fractional, so the lowest row is everything within one row of the lowest.
+function lowestBlocks(){
+  let lo = -Infinity;
+  for (const b of S.rows) if (b.r > lo) lo = b.r;
+  return S.rows.filter(b => b.r > lo - 0.999);
+}
+
+// Blocks removed without breaking: nothing is paid and no kind goes off.
+function purge(list){
+  if (!list || !list.length) return;
+  const gone = new Set(list);
+  for (const bl of gone) retire(bl);
+  S.rows = S.rows.filter(b => !gone.has(b));
 }
 
 // Destroy a set of blocks that something else broke.
@@ -1192,13 +1310,14 @@ function sweep(list){
   if (!list || !list.length) return;
   const gone = new Set(list);
   for (const bl of gone){
-    const m = look.materialFor(bl.max).mat;
-    juice.destroy(cx(bl.c), cyOf(bl.r), `hsl(${m.h} ${m.s}% ${m.l + 14}%)`, 0, -1);
+    const x = bl.id !== undefined ? pieceX(bl) : cx(bl.c);
+    const y = bl.id !== undefined ? pieceY(bl) : cyOf(bl.r);
+    juice.destroy(x, y, shadeOf(bl), 0, -1);
     S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
     S.turnKills = (S.turnKills || 0) + 1;
+    retire(bl);
   }
   S.rows = S.rows.filter(b => !gone.has(b));
-  indexDirty = true;
 }
 
 // What a splinter leaves behind. The pieces go in free cells beside where the
@@ -1415,9 +1534,13 @@ function drawMoments(X){
 // Essence is the economy seed. Blocks and pickups pay it out; it buys the
 // things that would otherwise be a grind. Buying past tedium is the loop.
 
+// How much field the lowest row is, in cells. A cell is one; a piece of a
+// picture is its area, so a row of thirty slivers of lace is not priced as
+// thirty walls.
 function lowestRowSize(){
-  let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
-  return S.rows.filter(b => b.r === lo).length;
+  let n = 0;
+  for (const b of lowestBlocks()) n += b.area > 0 ? b.area : 1;
+  return n;
 }
 
 // What each offer DOES. The list itself, its names, its prices and its order
@@ -1426,10 +1549,7 @@ const EFFECTS = {
   ball:  o => { S.balls += o.amount; },
   power: o => { S.power += o.amount; },
   gain:  o => { S.gain  += o.amount; },
-  clear: () => {
-    let lo = -1; S.rows.forEach(b => lo = Math.max(lo, b.r));
-    S.rows = S.rows.filter(b => b.r !== lo);
-  },
+  clear: () => { purge(lowestBlocks()); },
 };
 
 // Clearing a row is priced by how much of the field it removes, so a wide row
@@ -1607,8 +1727,9 @@ const store = createSave({
     owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
     clears: S.clears | 0, streak: S.streak | 0, kindsSeen: (S.kindsSeen || []).slice(),
-    // A picture block keeps the row it was cut from, or it comes back faceless.
-    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k, R: b.R })),
+    // A picture block keeps the row it was cut from and the id of its piece,
+    // or it comes back faceless.
+    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k, R: b.R, id: b.id })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind, t: p.t })),
     // A sprayed body belongs to the turn it was thrown in, and a save is taken
     // between turns, so only the swarm is worth writing down.
@@ -1624,6 +1745,10 @@ const store = createSave({
     // slightly wrong run beats no run - which is why this asks about the
     // version rather than about `degraded`.
     if (report && (report.future || report.version !== currentSchema())) return;
+    // A picture run saved before its blocks were pieces has cells with no
+    // outline to look up. It is left where it is rather than half restored.
+    if (normaliseMode(v.mode) === 'fractal' && Array.isArray(v.rows)
+        && v.rows.some(b => !b || b.id === undefined)) return;
     // A saved run is played on the field it was started on, whatever the menu
     // happens to be pointing at now.
     MODE = normaliseMode(v.mode);
@@ -1631,7 +1756,7 @@ const store = createSave({
     S.seed = v.seed >>> 0;
     S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
     S.form = S.field.dealsSequence ? S.field.source : null;
-    S.kinds = createBlockKinds(S.seed);
+    S.kinds = createBlockKinds(S.seed, { lattice: S.field.lattice !== false });
     // A field that deals a sequence has no way to be asked for row N, so it is
     // restored by replaying it up to where the run had got to.
     S.dealt = v.dealt | 0;
@@ -1651,6 +1776,14 @@ const store = createSave({
     S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
     S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
+    // A piece is handed back to the field it was cut from; one the replayed
+    // field does not know is dropped rather than left with no shape. A kind's
+    // colour is not saved, so it is looked up again.
+    for (const b of S.rows){
+      if (b.id !== undefined && S.field.bind && !S.field.bind(b)) b.dead = true;
+      if (b.k){ const kd = S.kinds.byId(b.k); if (kd && kd.tint) b.tint = kd.tint; }
+    }
+    S.rows = S.rows.filter(b => !b.dead);
     S.drops = Array.isArray(v.drops) ? v.drops.slice() : [];
     S.clears = v.clears | 0; S.streak = v.streak | 0;
     S.kindsSeen = Array.isArray(v.kindsSeen) ? v.kindsSeen.slice() : [];
@@ -1894,6 +2027,10 @@ function tick(now){
     const n = turnSteps();
     for (let k = 0; k < n; k++){ sim(); if (!S.firing) break; }
     if (CONFIG.feel.onboarding) teach.update(dt, S);
+    // A field that has work to do ahead of itself - the next picture to cut -
+    // does a few milliseconds of it in each quiet frame, so the turn that
+    // first needs it never pays for it.
+    if (!S.firing && S.field.prepare) S.field.prepare(PREPARE_MS);
   }
   draw(); hud(); paintShell();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
@@ -1903,6 +2040,8 @@ function tick(now){
 fresh();
 const resumed = store.load();
 store.start();
+// A handle for tools that drive the page: the live run and the view.
+if (typeof window !== 'undefined') window.game = { get state(){ return S; }, get cell(){ return CELL; }, get origin(){ return ORIGIN; } };
 // A player with a run in progress is dropped back into it; anyone else is
 // asked what they want to play.
 if (!(resumed && resumed.ok && resumed.found)) openMenu();

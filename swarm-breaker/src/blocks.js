@@ -64,6 +64,8 @@ function tintOf(name) {
  * @param {number} [opts.share]       share of blocks that are special
  * @param {number} [opts.firstDepth]  no kind appears above this depth
  * @param {Array}  [opts.kinds]       kind definitions; defaults to config
+ * @param {boolean} [opts.lattice]    false on a field whose blocks are not
+ *                                    cells; kinds marked needsLattice are dropped
  * @returns {{rollFor: function, byId: function, list: Array, share: number}}
  */
 export function createBlockKinds(seed, opts) {
@@ -71,9 +73,13 @@ export function createBlockKinds(seed, opts) {
   const s = (seed >>> 0) || 1;
 
   // A kind with no weight, no effect or an impossible depth is not an error;
-  // it is a kind that has been switched off, and it simply never rolls.
+  // it is a kind that has been switched off, and it simply never rolls. A
+  // kind that needs the lattice - one that puts new blocks in the cells
+  // beside it - is switched off on a field whose blocks are not cells.
+  const lattice = !opts || opts.lattice !== false;
   const kinds = (Array.isArray(cfg.kinds) ? cfg.kinds : [])
     .filter(k => k && k.id && k.effect && (k.weight || 0) > 0)
+    .filter(k => lattice || !k.needsLattice)
     .map(k => Object.assign({}, k, { tint: tintOf(k.tint) }));
 
   const share = Math.max(0, Math.min(1, Number(cfg.share) || 0));

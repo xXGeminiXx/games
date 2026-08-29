@@ -24,9 +24,10 @@
 //
 //   fractal   The field is an escape-time picture - Julia sets and the
 //             Mandelbrot set - fixed in world space and dealt downward a row
-//             at a time. A block is a cell where the set has mass, its face is
-//             the picture at pixel resolution, and the view pulls back over
-//             the run until the whole set is on screen. src/fractal.js and
+//             at a time. A block is a PIECE of the picture's band, cut along
+//             its own bands and rays and never square; the swarm collides
+//             with its pixels, and the view pulls back over the run until the
+//             whole set is on screen. src/fractal.js and
 //             src/fractal-surface.js.
 //
 //   figures   The field this mode used to be: a whole geometric construction -
@@ -157,9 +158,8 @@ const BUILDERS = {
 
   fractal(seed, opts) {
     const src = createFractalSource(seed, opts && opts.fractal);
-    // The ordinary descent, except that the source is told about every step.
-    // The picture has to be drawn under rows whose blocks are all gone, and
-    // the step count is the only thing that says where those rows are.
+    // The ordinary descent, except that the source is told about every step:
+    // the picture is placed by the step count, and so are the pieces.
     const base = arrivalOf('descend');
     const arrival = Object.assign({}, base, {
       advance(view) {
@@ -177,8 +177,10 @@ const BUILDERS = {
       widens: true,
       dealsSequence: true,
       sharesHealth: true,
-      // One block's share of the tier number is bounded far more loosely than
-      // the figure field's: a picture row can be forty cells, each a chip.
+      // The blocks here are PIECES of a picture, not cells of a lattice. They
+      // have their own outlines and their own collision, and a block kind that
+      // needs a free cell beside it has nowhere to put one.
+      lattice: false,
       shareBounds: {
         min: cfg.shareMin > 0 ? Number(cfg.shareMin) : CONFIG.economy.rowShareMin,
         max: cfg.shareMax > 0 ? Number(cfg.shareMax) : CONFIG.economy.rowShareMax,
@@ -192,37 +194,39 @@ const BUILDERS = {
       /** Rows this turn deals, so the field keeps its pace in pixels. */
       rowsPerTurn() { return src.rowsPerTurn(); },
       // The width is known before the row is, which is how the view learns it
-      // has to pull back. It can change on any row here; the picture is fixed
-      // in world columns, so a wider row is more of the same picture.
+      // has to pull back. The picture is fixed in world columns, so a wider
+      // row is more of the same picture.
       width() { return src.width(); },
       nextRow() { return src.nextRow(); },
       arrive() {
-        const width = src.width();
-        const cells = src.nextRow();
-        const out = rowArrival(cells, width);
-        // Each block remembers the row it was cut from and how deep into the
-        // set it sits. The first places its face on the picture, the second
-        // decides its share of the row's health.
-        for (const b of out.blocks) {
-          b.R = cells.R;
-          b.w = cells.w[b.c - cells.lo];
-        }
-        return out;
+        const row = src.nextRow();
+        // Each piece remembers the row it belongs to and the id its outline
+        // is looked up by; its weight decides its share of the row's health.
+        const blocks = row.pieces.map(p => ({
+          c: p.c, r: p.r, w: p.w, R: row.R, id: p.id, cu: p.cu, hc: p.hc, box: p.box, mu: p.mu,
+        }));
+        return { blocks, open: row.open };
       },
-      preview(depth, n) {
-        return { rows: src.upcoming(n), lo: leftEdgeAt(src.width()) };
-      },
+      // Nothing is previewed as rows of cells: the pieces arrive as the
+      // picture scrolls in, and the picture under the field is the preview.
+      preview() { return null; },
       label() { return src.figure().name; },
       signature() { return { name: src.figure().name, key: 'fractal' }; },
       // THE COLOUR THIS FIELD IS DRAWN ON. The page outside the board takes
       // its hue from here, so the frame belongs to the picture instead of
-      // being a second ground butted against it. Read off the ramp the
-      // picture is painted with, so the two can never disagree.
+      // being a second ground butted against it.
       ground: rampGround(cfg.ramp),
-      // What the blocks are made of. The block layer paints through this
-      // instead of drawing materials.
+      // What the blocks are made of, and how they are drawn. The block layer
+      // hands the whole field to this instead of drawing cells.
       surface: createFractalSurface(src),
       source: src,
+      /** Attach a live block to its piece; false if the piece is unknown. */
+      bind(b) { return src.bind(b); },
+      unbind(id) { src.unbind(id); },
+      /** A body against the pieces; see src/fractal.js probe(). */
+      probe(u, rr, rad) { return src.probe(u, rr, rad); },
+      /** Cut the next panel a little at a time between turns. */
+      prepare(ms) { return src.prepare(ms); },
     };
   },
 

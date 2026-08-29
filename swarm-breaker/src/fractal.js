@@ -1,75 +1,54 @@
 // ===========================================================================
-// FRACTAL - the field is an escape-time fractal, and the blocks are its mass
+// FRACTAL - the field is an escape-time picture, and the blocks are pieces of it
 //
-// Julia sets and the Mandelbrot set, drawn onto the lattice. Every cell of the
-// world grid maps to a fixed rectangle of the complex plane, so the picture is
-// one thing that the view reveals more of as it pulls back, and a block is a
-// cell where the set has mass: the filigree around the boundary and the body
-// inside it. The sky between the arms is empty, which is what lets the swarm
-// into the spirals.
+// Julia sets and the Mandelbrot set, laid onto the world and dealt downward.
+// The picture is one thing fixed in world space: every world column maps to a
+// fixed strip of the complex plane for as long as its panel lasts, so pulling
+// the view back reveals more of the same picture rather than dealing another.
 //
-// The picture does not live at the resolution of the cells. A cell at the
-// start of a run is sixty-five pixels across and the fractal inside it is
-// drawn at every one of those pixels (src/fractal-surface.js), which is what
-// makes the opening read as a handful of blocks with a spiral cutting through
-// them rather than as a handful of squares. As the lattice widens the cells
-// shrink toward pixels and the silhouette itself becomes the picture.
+// A BLOCK IS NOT A CELL HERE. It is a PIECE: a region of the band around the
+// set whose outline is the picture's own geometry. The band - the filigree
+// between the outer sky and the hollow inside of the set - is cut two ways,
+// and only two ways:
 //
-// ---------------------------------------------------------------------------
-// PANELS
+//   along ITERATION SHELLS, the equipotential curves an escape-time picture
+//   draws as its colour bands, and
+//   along EXTERNAL RAYS, the curves of constant argument of an early iterate,
+//   which run from the outside in to the set and follow its filigree.
 //
-// The field is a sequence of PANELS stacked in world rows. A panel is one
-// picture - a Julia set for a constant chosen by the seed, or the Mandelbrot
-// set - fitted to the widest lattice the ladder reaches. Its window is fitted
-// to the set's own bounding box, so a panel is as tall as its picture and no
-// taller; the rows are dealt from the bottom of the picture upward, because a
-// row arrives at the top of the screen and everything already there moves
-// down, so the first row dealt ends up lowest and the picture stands the right
-// way up.
+// A cell of that cutting is a curved quadrilateral: two arcs and two rays.
+// Where the set is smooth the cells are fat arcs; where it is lace the cells
+// are the lace. Cells bigger than a target are cut by finer rays until they
+// fit, cells smaller than a floor are merged into a neighbour, and each
+// connected region that is left is one piece. Nothing straight is ever drawn
+// through the band: no lattice line, no row seam, no square.
 //
-// A panel is fitted at the WIDEST width and every row is dealt CROPPED to the
-// width the lattice has when that row arrives. The world column of a cell
-// never changes, so a widening reveals the outer columns of the same picture
-// instead of dealing a different one. The rows below stay cropped to the
-// width they arrived at, which is what it looks like to pull a camera back
-// over a strip that is still scrolling.
+// Every piece is known at PIXEL resolution. Each world row is rasterised once,
+// at the size its cells have on screen when it is dealt, into a strip that
+// holds the smooth iteration count and the piece id of every pixel. The same
+// strip is what the swarm collides against (src/fractal-surface.js paints
+// from it; index.html asks probe() where a body is touching), so what the
+// player sees is exactly what a body bounces off, and a gap in the lace is a
+// gap a body can use whatever the size of a cell.
 //
-// ---------------------------------------------------------------------------
-// MASS AND WEIGHT
+// The inside of the set is hollow, and the sky outside the band is sky. Both
+// are where the swarm goes.
 //
-// A cell samples the plane at a small grid of points. It is a block when
-// enough of those points sit in the BAND around the set - at or past the
-// panel's threshold iteration count, and escaped. The inside of the set, the
-// black of the picture, is HOLLOW: it is where the swarm gets to go. Measured
-// with the inside solid, the middle of every Julia set arrived as full rows
-// across a narrow view and every tier above the first died at the same depth
-// whether the player aimed or not. Hollow, the blocks are the filigree itself,
-// the eyes of the spirals are rooms a body can get into, and a row is never a
-// wall for long.
+// Rows are still the unit of ARRIVAL. A piece belongs to the row its lowest
+// pixel lies in and is dealt when that row arrives at the top of the field,
+// so its upper part enters the screen over the following steps like any
+// scrolling picture. Rows are dealt from the bottom of a panel upward, so a
+// picture stands the right way up.
 //
-// The threshold is chosen per panel so that the band fills the window to a
-// target share - a fat rabbit and a thin dendrite come out equally playable.
-// The cell also carries a WEIGHT, how deep into the band it sits, and the
-// row's health is shared by weight: the pale outer lace is many soft cells,
-// the dark rim against the inside is fewer hard ones.
-//
-// EVERY ROW KEEPS SKY. A narrow view of the middle of a dense set is solid
-// halo from edge to edge, and a solid row is a wall: a body strikes it once
-// and comes home, where a row with holes lets the swarm in to ricochet.
-// Measured on the shipped sets, the middle of a seahorse arrived as full rows
-// for five turns running at ten columns. So a dealt row is guaranteed a share
-// of its width open - `openShare` - and the cells that give way are its
-// faintest, which is the outer halo being read as the sky it looks like. The
-// picture under the field is untouched; only where a block stands changes.
-//
-// Everything here is a pure function of (seed, row). No draw happens at deal
-// time; a row can be asked for again by a save or a test and it is the same
-// row.
+// Everything here is a pure function of (seed, row). A row can be asked for
+// again by a save or a test and it is the same row, the same pieces, the same
+// ids.
 // ===========================================================================
 
 import { CONFIG, leftEdgeAt } from '../config.js';
 
 const LN2 = Math.LN2;
+const TAU = Math.PI * 2;
 
 /** Deterministic 32 bit hash. */
 export function hash(a, b) {
@@ -115,7 +94,36 @@ export function escape(zr, zi, cr, ci, maxIter) {
     n++;
   }
   if (n >= maxIter) return Infinity;
-  // n + 1 - log2(log2 |z|). |z|^2 is what we have, so log|z| = log(r2) / 2.
+  const lz = Math.log(zr2 + zi2) * 0.5;
+  const mu = n + 1 - Math.log(lz / LN2) / LN2;
+  return mu > 0 ? mu : 0;
+}
+
+// The angle of an early iterate, written here by escapeRay() beside its
+// return value so the hot loop allocates nothing.
+let rayAngle = 0;
+
+/**
+ * escape(), and the argument of the `rayIter`-th iterate on the side.
+ *
+ * The curves of constant argument of z_m are the external rays of the set at
+ * level m: they come in from far away and land on the boundary, and they bend
+ * with its filigree more the larger m is. Cutting the band along them is what
+ * gives a piece a fractal outline instead of a straight one.
+ */
+function escapeRay(zr, zi, cr, ci, maxIter, rayIter) {
+  let n = 0, zr2 = zr * zr, zi2 = zi * zi;
+  let ar = zr, ai = zi;
+  while (n < maxIter && zr2 + zi2 <= 256) {
+    zi = 2 * zr * zi + ci;
+    zr = zr2 - zi2 + cr;
+    zr2 = zr * zr; zi2 = zi * zi;
+    n++;
+    if (n === rayIter) { ar = zr; ai = zi; }
+  }
+  if (n < rayIter) { ar = zr; ai = zi; }
+  rayAngle = Math.atan2(ai, ar);
+  if (n >= maxIter) return Infinity;
   const lz = Math.log(zr2 + zi2) * 0.5;
   const mu = n + 1 - Math.log(lz / LN2) / LN2;
   return mu > 0 ? mu : 0;
@@ -138,14 +146,9 @@ function makePanel(seed, index, cfg, cols, startWidth) {
   let kind, cr, ci, name, angle;
   if (isMandel) {
     kind = 'mandelbrot'; cr = 0; ci = 0; name = 'mandelbrot';
-    // Stood on end: the tail points down the screen. Alternate which way
-    // round between visits so the picture is not the same twice.
     angle = (Math.floor(index / every) & 1) ? -Math.PI / 2 : Math.PI / 2;
   } else {
     kind = 'julia';
-    // Never the same constant twice in a row, and the first panel of every
-    // run is one of the spiral family, because that is the shape that says
-    // what the field is made of.
     const pool = JULIA;
     let pick = hash(seed, index * 7 + 3) % pool.length;
     if (index === 0) pick = hash(seed, 11) % 3;
@@ -153,8 +156,6 @@ function makePanel(seed, index, cfg, cols, startWidth) {
     if (index > 0 && pick === prev) pick = (pick + 1) % pool.length;
     const j = pool[pick];
     cr = j.re; ci = j.im; name = j.name;
-    // A quarter turn one way or the other, or none: a Julia set is symmetric
-    // through the origin, so this is orientation, not a different set.
     angle = [0, Math.PI / 2, -Math.PI / 2][hash(seed, index * 13 + 5) % 3];
   }
   const ca = Math.cos(angle), sa = Math.sin(angle);
@@ -164,10 +165,6 @@ function makePanel(seed, index, cfg, cols, startWidth) {
     : (u, v) => { const p = toPlane(u, v); return escape(p[0], p[1], cr, ci, maxIter); };
 
   // --- fit the window to the set ------------------------------------------
-  //
-  // Scan picture space for everything that is near or inside the set, and
-  // wrap the window around it. The scan is coarse and deterministic; it only
-  // decides where the picture sits and how tall the panel is.
   const N = Math.max(48, cfg.scan | 0);
   const span = 2.2;
   const near = maxIter * Math.min(0.5, Math.max(0.01, Number(cfg.nearShare) || 0.05));
@@ -190,14 +187,12 @@ function makePanel(seed, index, cfg, cols, startWidth) {
   const pad = Math.max(u1 - u0, v1 - v0) * margin;
   u0 -= pad; u1 += pad; v0 -= pad; v1 += pad;
 
-  // Width fits the columns exactly; the height follows at the same scale and
-  // is clamped so a panel is neither a sliver nor a whole run.
   const dx = (u1 - u0) / cols;
   const minRows = Math.max(8, cfg.minRows | 0), maxRows = Math.max(minRows, cfg.maxRows | 0);
   let rows = Math.round((v1 - v0) / dx);
   rows = Math.min(maxRows, Math.max(minRows, rows));
   const vc = (v0 + v1) / 2;
-  const top = vc - rows * dx / 2;          // picture row 0 starts here
+  const top = vc - rows * dx / 2;
 
   // --- the mass threshold ---------------------------------------------------
   //
@@ -226,27 +221,27 @@ function makePanel(seed, index, cfg, cols, startWidth) {
   let T = escaped.length ? escaped[Math.max(0, escaped.length - want)] : near;
   T = Math.max(near, Math.min(maxIter * 0.9, T));
 
-  const p = { index, kind, name, cr, ci, angle, cols, rows, u0, dx, top, T, maxIter, iter, toPlane, masks: null };
+  const p = {
+    index, kind, name, cr, ci, angle, cols, rows, u0, dx, top, T, maxIter, iter, toPlane,
+    isMandel, ca, sa, masks: null, labeled: false,
+  };
 
-  // --- the masks, and the trim ---------------------------------------------
+  // --- the coarse masks, and the trim ---------------------------------------
   //
-  // Every row's mask is built here, once, so the panel can be cut down to
-  // where its mass actually is. The bottom is cut to the first row with a
-  // block in the columns the view will have when the panel starts arriving -
-  // a panel that opens with a dozen rows of sky in the middle of the picture
-  // spends the whole opening dealing nothing, and the opening is where the
-  // pull-back is supposed to start. The top is cut to the last row with any
-  // mass at all.
+  // A cell-level view of where the band is, used only to cut the panel down
+  // to where its mass actually is. The bottom is cut to the first row with
+  // band in the columns the view will have when the panel starts arriving -
+  // a panel that opens with a dozen rows of sky spends the whole opening
+  // dealing nothing. The top is cut to the last row with any mass at all.
   const all = [];
   for (let j = 0; j < rows; j++) all.push(maskRow(p, j, cfg));
   const sw = Math.max(1, Math.min(cols, startWidth | 0 || cols));
   const cLo = Math.floor((cols - sw) / 2), cHi = cLo + sw;
-  const rowHas = (m, a, b) => { for (let c = a; c < b; c++) if (m.mask[c]) return true; return false; };
+  const rowHas = (m, a, b) => { for (let c = a; c < b; c++) if (m[c]) return true; return false; };
   let jBottom = rows - 1;
   while (jBottom > 0 && !rowHas(all[jBottom], cLo, cHi)) jBottom--;
   let jTop = 0;
   while (jTop < jBottom && !rowHas(all[jTop], 0, cols)) jTop++;
-  // Never below the floor of what a panel may be.
   if (jBottom - jTop + 1 < minRows) {
     const need = minRows - (jBottom - jTop + 1);
     jTop = Math.max(0, jTop - need);
@@ -265,32 +260,28 @@ function depthOf(mu, p) {
   return t < 0 ? 0 : t > 1 ? 1 : t;
 }
 
-/** The mask and weights of picture row j of a panel, at full width. */
+/** Coarse band presence per cell of picture row j, for the trim. */
 function maskRow(p, j, cfg) {
   const samples = Math.max(1, Math.min(8, cfg.samples | 0 || 4));
   const massShare = Math.min(1, Math.max(0.05, Number(cfg.massShare) || 0.35));
   const cols = p.cols;
-  const mask = new Uint8Array(cols), w = new Float32Array(cols);
+  const mask = new Uint8Array(cols);
   const v0 = p.top + j * p.dx;
   const step = p.dx / samples;
   const n = samples * samples;
   for (let c = 0; c < cols; c++) {
     const uc = p.u0 + c * p.dx;
-    let hits = 0, sum = 0;
+    let hits = 0;
     for (let y = 0; y < samples; y++) {
       const v = v0 + (y + 0.5) * step;
       for (let x = 0; x < samples; x++) {
         const mu = p.iter(uc + (x + 0.5) * step, v);
-        // In the band: past the threshold, and escaped. The inside is hollow.
-        if (mu >= p.T && mu !== Infinity) { hits++; sum += depthOf(mu, p); }
+        if (mu >= p.T && mu !== Infinity) hits++;
       }
     }
-    if (hits / n >= massShare) {
-      mask[c] = 1;
-      w[c] = 0.15 + 0.85 * (sum / hits);
-    }
+    if (hits / n >= massShare) mask[c] = 1;
   }
-  return { mask, w };
+  return mask;
 }
 
 /**
@@ -308,41 +299,34 @@ export function createFractalSource(seed, opts) {
   const cols = Math.max(...ladder);              // the panel width, world columns
   const panelLo = leftEdgeAt(cols);
   const gap = Math.max(0, cfg.gap | 0);
-  const samples = Math.max(1, Math.min(8, cfg.samples | 0 || 4));
-  const maxSolidRun = Math.max(1, cfg.maxSolidRun | 0 || 2);
-  const openShare = Math.min(0.9, Math.max(0, Number(cfg.openShare) || 0));
   const boardW = CONFIG.board.width;
   const cell0 = boardW / CONFIG.board.cols;
+  const fieldH = (CONFIG.board.height - CONFIG.board.floorGap) - (CONFIG.board.topGap + Math.max(0, CONFIG.board.ceilingGap | 0));
   const descentPx = Math.max(4, Number(cfg.descentPx) || cell0);
+
+  // The cutting.
+  const PC = Object.assign({}, cfg.pieces || {});
+  const maxArea = Math.max(0.05, Number(PC.maxArea) || 1.4);       // cells^2
+  const minArea = Math.max(0, Number(PC.minArea) || 0.12);          // cells^2
+  const sectors0 = Math.max(1, PC.sectors | 0 || 4);
+  const rayIter = Math.max(1, PC.rayIter | 0 || 5);
+  const shellW = Math.max(0.1, Number(PC.shell) || 1);
+  const maxLevel = Math.max(0, Math.min(12, PC.maxLevel | 0 || 8));
+  const maxFill = Math.min(1, Math.max(0, Number(cfg.maxFill) || 0));
+  const maxIterN = Math.max(32, cfg.maxIter | 0);
 
   const panels = [];                 // built in order; panel k starts at row starts[k]
   const starts = [];
-  const rowCache = new Map();        // R -> { mask: Uint8Array, w: Float32Array }
+  const strips = new Map();          // R -> strip
+  const pieces = new Map();          // id -> piece
   const dealtRows = new Map();       // R -> { width, lo, r0 }
+  const liveById = new Map();        // id -> the game's live block
+  const live = [];                   // the same, dense by id, for the hot loop
   let dealt = 0;                     // rows dealt so far; the next row is R = dealt
   let steps = 0;                     // times the board has stepped down
-  let solidRun = 0;                  // consecutive full rows dealt
-
-  function panelAt(k) {
-    while (panels.length <= k) {
-      const start = panels.length ? starts[panels.length - 1] + panels[panels.length - 1].rows + gap : 0;
-      const p = makePanel(s, panels.length, cfg, cols, widthAt(start));
-      panels.push(p); starts.push(start);
-    }
-    return panels[k];
-  }
-
-  /** Which panel and picture row a world row belongs to; null for a gap row. */
-  function locate(R) {
-    let k = 0;
-    for (;;) {
-      const p = panelAt(k);
-      const start = starts[k];
-      if (R < start) return null;                          // inside the gap before k
-      if (R < start + p.rows) return { panel: p, k, j: p.rows - 1 - (R - start) };
-      k++;
-    }
-  }
+  let nextId = 1;
+  let rowAtScreen = null;            // sr -> R, rebuilt when placement changes
+  let placementDirty = true;
 
   /** Width the lattice has for row R. The ladder climbs one rung every
    *  `rungRows` rows and holds at the top. */
@@ -351,43 +335,699 @@ export function createFractalSource(seed, opts) {
     return ladder[Math.min(rung, ladder.length - 1)];
   }
 
-  /** The full-width mask and weights of world row R. A gap row is empty. */
-  function rowOf(R) {
-    let row = rowCache.get(R);
-    if (row) return row;
-    const at = locate(R);
-    row = at ? at.panel.masks[at.j] : { mask: new Uint8Array(cols), w: new Float32Array(cols) };
-    rowCache.set(R, row);
-    return row;
+  /** Rows the field shows between its top and the swarm line at a width. */
+  function fieldRowsAt(width) { return fieldH / (boardW / width); }
+
+  /**
+   * The width a row is RASTERISED at: the widest the view will reach while
+   * the row is still on screen. A row is dealt at one width and stays on
+   * screen while the view pulls back past it, and what the pull-back reveals
+   * beside it has to already be there.
+   */
+  function renderWidthAt(R) {
+    const w = widthAt(R);
+    return widthAt(R + Math.ceil(fieldRowsAt(w)) + 1);
   }
 
-  /** One row cropped to a width: cells relative to the row's left edge, with
-   *  the sky guarantee applied. The same for a deal and for a preview. */
-  function crop(R, width) {
-    const row = rowOf(R);
-    const lo = leftEdgeAt(width);
-    const cells = new Array(width), w = new Array(width);
-    let solid = 0;
-    for (let i = 0; i < width; i++) {
-      const c = lo + i - panelLo;
-      cells[i] = c >= 0 && c < cols ? !!row.mask[c] : false;
-      w[i] = c >= 0 && c < cols ? row.w[c] : 0;
-      if (cells[i]) solid++;
+  /** Build panel k's window and constants, without cutting it. */
+  function buildPanel(k) {
+    while (panels.length <= k) {
+      const start = panels.length ? starts[panels.length - 1] + panels[panels.length - 1].rows + gap : 0;
+      const p = makePanel(s, panels.length, cfg, cols, widthAt(start));
+      p.start = start;
+      p.rowStrips = [];
+      p.rastered = 0;
+      panels.push(p); starts.push(start);
     }
-    // The sky guarantee: open the faintest cells until enough of the row is
-    // open. Ties go to the cell nearer the middle, so a lane opens where a
-    // shot can use it rather than at the wall.
-    const mustOpen = Math.ceil(width * openShare);
-    if (width - solid < mustOpen) {
-      const order = [];
-      for (let i = 0; i < width; i++) if (cells[i]) order.push(i);
-      const mid = (width - 1) / 2;
-      order.sort((a, b) => (w[a] - w[b]) || (Math.abs(a - mid) - Math.abs(b - mid)) || (a - b));
-      for (let k = 0; k < order.length && width - solid < mustOpen; k++) {
-        cells[order[k]] = false; w[order[k]] = 0; solid--;
+    return panels[k];
+  }
+
+  /** Panel k, built and cut - synchronously if it has not been prepared. */
+  function panelAt(k) {
+    const p = buildPanel(k);
+    if (!p.labeled) {
+      rasterPanel(p, Infinity);
+      if (!p.cutter) p.cutter = cutPanelSteps(p);
+      while (!p.cutter.next().done) { /* every stage, now */ }
+      p.cutter = null;
+    }
+    return p;
+  }
+
+  /**
+   * Work ahead on the next panel for at most `budgetMs`, so that its cutting
+   * happens in the quiet between turns rather than on the turn that first
+   * needs it. Rasterising goes a row at a time and the cutting a stage at a
+   * time, so no single call runs long. Returns true when there is nothing
+   * left to prepare.
+   */
+  function prepare(budgetMs) {
+    const at = locate(dealt);
+    const k = at ? at.k + 1 : panels.length;
+    const p = buildPanel(k);
+    if (p.labeled) return true;
+    const t0 = now();
+    if (!rasterPanel(p, budgetMs)) return false;
+    if (!p.cutter) p.cutter = cutPanelSteps(p);
+    do {
+      if (p.cutter.next().done) { p.cutter = null; return true; }
+    } while (now() - t0 < budgetMs);
+    return false;
+  }
+
+  /** Which panel and picture row a world row belongs to; null for a gap row. */
+  function locate(R) {
+    let k = 0;
+    for (;;) {
+      const p = panelAt(k);
+      const start = starts[k];
+      if (R < start) return null;
+      if (R < start + p.rows) return { panel: p, k, j: p.rows - 1 - (R - start) };
+      k++;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // RASTER
+  // -------------------------------------------------------------------------
+
+  /** Rasterise world row R of panel p (picture row j): the smooth iteration
+   *  count and the ray angle of every pixel, at the row's render width. */
+  function rasterRow(p, R, j) {
+    const width = renderWidthAt(R), lo = leftEdgeAt(width);
+    const px = Math.max(1, Math.ceil(boardW / width));
+    const w = width * px, h = px;
+    const mu = new Float32Array(w * h);
+    const ang = new Uint16Array(w * h);
+    const c0 = lo - panelLo;
+    const v0 = p.top + j * p.dx;
+    const inv = 1 / px;
+    const ca = p.ca, sa = p.sa, cr = p.cr, ci = p.ci, maxIter = p.maxIter, isMandel = p.isMandel;
+    for (let k = 0; k < h; k++) {
+      const v = v0 + (k + 0.5) * inv * p.dx;
+      let idx = k * w;
+      for (let i = 0; i < w; i++, idx++) {
+        const u = p.u0 + (c0 + (i + 0.5) * inv) * p.dx;
+        const pr = u * ca - v * sa, pi = u * sa + v * ca;
+        const m = isMandel
+          ? escapeRay(0, 0, pr, pi, maxIter, rayIter)
+          : escapeRay(pr, pi, cr, ci, maxIter, rayIter);
+        mu[idx] = m;
+        ang[idx] = ((rayAngle / TAU + 1) % 1) * 65535;
       }
     }
-    return { cells, w, lo };
+    return { R, j, width, lo, px, w, h, mu, ang, id: new Int32Array(w * h), cellHas: new Uint8Array(width), pieceIds: new Set(), base: 0, panel: p };
+  }
+
+  // -------------------------------------------------------------------------
+  // THE CUTTING - pieces of the band
+  // -------------------------------------------------------------------------
+
+  /** Union-find with path halving over a panel's pixels. */
+  function find(parent, x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+
+  /** Rasterise the panel's rows, bottom first, within a time budget. True
+   *  when every row has a strip. */
+  function rasterPanel(p, budgetMs) {
+    const t0 = budgetMs === Infinity ? 0 : now();
+    while (p.rastered < p.rows) {
+      if (budgetMs !== Infinity && p.rastered > 0 && now() - t0 >= budgetMs) return false;
+      const j = p.rows - 1 - p.rastered;
+      const R = p.start + p.rastered;
+      const st = rasterRow(p, R, j);
+      p.rowStrips.push(st);
+      p.rastered++;
+    }
+    return true;
+  }
+
+  function now() {
+    return (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
+      ? performance.now() : Date.now();
+  }
+
+  /**
+   * Cut the band of one panel into pieces, one stage per yield.
+   *
+   * Every band pixel is labelled by (shell, sector): the shell is the integer
+   * iteration band it lies in past the threshold, the sector is a slice of
+   * the ray angle. Neighbouring pixels of one label join; a region larger
+   * than the target is re-cut with twice as many sectors, as many times as
+   * it takes; a region smaller than the floor joins its longest neighbour.
+   * What is left is the pieces.
+   */
+  function* cutPanelSteps(p) {
+    const T = p.T;
+    const rowStrips = p.rowStrips;
+    let total = 0;
+    for (const st of rowStrips) {
+      st.base = total;
+      total += st.w * st.h;
+      strips.set(st.R, st);
+    }
+    p.rowStrips = null;
+    // Panel-wide arrays over every pixel, indexed strip.base + local.
+    const inBand = new Uint8Array(total);
+    const shell = new Uint8Array(total);
+    const level = new Uint8Array(total);
+    const parent = new Int32Array(total);
+    const angAll = new Uint16Array(total);
+    const pxOf = new Float32Array(total);      // 1/px^2: the pixel's area in cells^2
+    for (const st of rowStrips) {
+      const b = st.base, n = st.w * st.h, area = 1 / (st.px * st.px);
+      for (let i = 0; i < n; i++) {
+        const m = st.mu[i];
+        const g = b + i;
+        parent[g] = g;
+        pxOf[g] = area;
+        angAll[g] = st.ang[i];
+        if (m >= T && m !== Infinity) {
+          inBand[g] = 1;
+          const sh = Math.floor((m - T) / shellW);
+          shell[g] = sh > 255 ? 255 : sh;
+        }
+      }
+    }
+
+    yield;
+    const sectorOf = (g, L) => (angAll[g] * sectors0 * (1 << L)) >>> 16;
+    const same = (a, b, L) => shell[a] === shell[b] && sectorOf(a, L) === sectorOf(b, L);
+
+    /** Join neighbours of one level and label, within and across strips. */
+    function unite(L) {
+      for (let si = 0; si < rowStrips.length; si++) {
+        const st = rowStrips[si];
+        const w = st.w, h = st.h, b = st.base;
+        for (let k = 0; k < h; k++) {
+          const row = b + k * w;
+          for (let i = 0; i < w; i++) {
+            const g = row + i;
+            if (!inBand[g] || level[g] !== L) continue;
+            if (i + 1 < w) {
+              const q = g + 1;
+              if (inBand[q] && level[q] === L && same(g, q, L)) join(g, q);
+            }
+            if (k + 1 < h) {
+              const q = g + w;
+              if (inBand[q] && level[q] === L && same(g, q, L)) join(g, q);
+            }
+          }
+        }
+        // The strip ABOVE this one on screen is the next world row, whose
+        // bottom pixel row touches this strip's top pixel row.
+        const up = rowStrips[si + 1];
+        if (!up) continue;
+        for (let i = 0; i < w; i++) {
+          const g = b + i;
+          if (!inBand[g] || level[g] !== L) continue;
+          const u = st.lo + (i + 0.5) / st.px;
+          const xi = Math.floor((u - up.lo) * up.px);
+          if (xi < 0 || xi >= up.w) continue;
+          const q = up.base + (up.h - 1) * up.w + xi;
+          if (inBand[q] && level[q] === L && same(g, q, L)) join(g, q);
+        }
+      }
+    }
+    function join(a, b) {
+      const ra = find(parent, a), rb = find(parent, b);
+      if (ra !== rb) parent[rb] = ra;
+    }
+
+    const areaOf = new Float32Array(total);   // area per root, valid after a pass
+    function measure(L) {
+      areaOf.fill(0);
+      for (let g = 0; g < total; g++) if (inBand[g] && level[g] === L) areaOf[find(parent, g)] += pxOf[g];
+    }
+
+    for (let L = 0; L <= maxLevel; L++) {
+      unite(L);
+      yield;
+      if (L === maxLevel) break;
+      measure(L);
+      let big = 0;
+      for (let g = 0; g < total; g++) {
+        if (!inBand[g] || level[g] !== L) continue;
+        if (areaOf[find(parent, g)] > maxArea) { level[g] = L + 1; big++; }
+      }
+      if (!big) break;
+      for (let g = 0; g < total; g++) if (level[g] === L + 1) parent[g] = g;
+    }
+
+    // --- merge the small into the large -------------------------------------
+    yield;
+    areaOf.fill(0);
+    for (let g = 0; g < total; g++) if (inBand[g]) areaOf[find(parent, g)] += pxOf[g];
+    if (minArea > 0) {
+      // Border length between a small region and each neighbour, then the
+      // longest neighbour wins it. Done over the pixels of small regions only.
+      const border = new Map();     // rootSmall -> Map(rootOther -> count)
+      const neighbours = (st, k, i, cb) => {
+        const w = st.w, h = st.h, g = st.base + k * w + i;
+        if (i > 0) cb(g - 1);
+        if (i + 1 < w) cb(g + 1);
+        if (k > 0) cb(g - w);
+        if (k + 1 < h) cb(g + w);
+        const si = rowStrips.indexOf(st);
+        if (k === 0 && rowStrips[si + 1]) {
+          const up = rowStrips[si + 1];
+          const xi = Math.floor((st.lo + (i + 0.5) / st.px - up.lo) * up.px);
+          if (xi >= 0 && xi < up.w) cb(up.base + (up.h - 1) * up.w + xi);
+        }
+        if (k === h - 1 && si > 0) {
+          const dn = rowStrips[si - 1];
+          const xi = Math.floor((st.lo + (i + 0.5) / st.px - dn.lo) * dn.px);
+          if (xi >= 0 && xi < dn.w) cb(dn.base + xi);
+        }
+      };
+      for (const st of rowStrips) {
+        const w = st.w, h = st.h;
+        for (let k = 0; k < h; k++) for (let i = 0; i < w; i++) {
+          const g = st.base + k * w + i;
+          if (!inBand[g]) continue;
+          const r = find(parent, g);
+          if (areaOf[r] >= minArea) continue;
+          let m = border.get(r);
+          if (!m) { m = new Map(); border.set(r, m); }
+          neighbours(st, k, i, (q) => {
+            if (!inBand[q]) return;
+            const rq = find(parent, q);
+            if (rq === r) return;
+            m.set(rq, (m.get(rq) || 0) + 1);
+          });
+        }
+      }
+      // Smallest first, so a speck joins a neighbour before that neighbour
+      // is itself absorbed.
+      const smalls = [...border.keys()].sort((a, b) => (areaOf[a] - areaOf[b]) || (a - b));
+      for (const r of smalls) {
+        const m = border.get(r);
+        let best = -1, bestN = 0;
+        for (const [rq, n] of m) {
+          const root = find(parent, rq);
+          if (root === find(parent, r)) continue;
+          if (n > bestN || (n === bestN && root < best)) { best = root; bestN = n; }
+        }
+        if (best < 0) continue;
+        const ra = find(parent, r);
+        parent[ra] = best;
+        areaOf[best] += areaOf[ra];
+      }
+      // A speck that found no neighbour to join is dust, not a block.
+      for (let g = 0; g < total; g++) {
+        if (!inBand[g]) continue;
+        if (areaOf[find(parent, g)] < minArea * 0.5) inBand[g] = 0;
+      }
+    }
+
+    // --- ids and piece records --------------------------------------------
+    yield;
+    const idOfRoot = new Map();
+    const recs = [];
+    for (const st of rowStrips) {
+      const w = st.w, h = st.h, b = st.base, px = st.px, R = st.R;
+      const area = 1 / (px * px);
+      for (let k = 0; k < h; k++) {
+        for (let i = 0; i < w; i++) {
+          const g = b + k * w + i;
+          if (!inBand[g]) continue;
+          const r = find(parent, g);
+          let id = idOfRoot.get(r);
+          let rec;
+          if (id === undefined) {
+            id = nextId++;
+            idOfRoot.set(r, id);
+            rec = {
+              id, panel: p.index, area: 0, wsum: 0, musum: 0, n: 0, usum: 0, hsum: 0,
+              rowLo: Infinity, rowHi: -Infinity, umin: Infinity, umax: -Infinity,
+              box: new Map(),          // R -> [x0, x1, y0, y1] in that strip's pixels (x1, y1 exclusive)
+              anchorU: 0, anchorH: 0, insR: 0,
+            };
+            pieces.set(id, rec);
+            recs.push(rec);
+          } else rec = pieces.get(id);
+          st.id[g - b] = id;
+          st.pieceIds.add(id);
+          st.cellHas[Math.floor(i / px)] = 1;
+          const u = st.lo + (i + 0.5) / px;
+          rec.area += area;
+          rec.n++;
+          rec.wsum += depthOf(st.mu[g - b], p) * area;
+          rec.musum += st.mu[g - b] * area;
+          rec.usum += u * area;
+          // Height above the bottom edge of world row R's band, in rows;
+          // resolved against the piece's own bottom row later.
+          rec.hsum += (R + 1 - (k + 0.5) / px) * area;
+          if (R < rec.rowLo) rec.rowLo = R;
+          if (R > rec.rowHi) rec.rowHi = R;
+          if (u < rec.umin) rec.umin = u;
+          if (u > rec.umax) rec.umax = u;
+          let bx = rec.box.get(R);
+          if (!bx) { bx = [i, i + 1, k, k + 1]; rec.box.set(R, bx); }
+          else {
+            if (i < bx[0]) bx[0] = i; if (i + 1 > bx[1]) bx[1] = i + 1;
+            if (k < bx[2]) bx[2] = k; if (k + 1 > bx[3]) bx[3] = k + 1;
+          }
+        }
+      }
+    }
+
+    // --- the sky guarantee ------------------------------------------------
+    //
+    // A strip more than `maxFill` band across its dealt width is a wall; the
+    // faintest pieces standing in it give way until it is not. The picture
+    // under the field is untouched; only where a piece stands changes.
+    yield;
+    if (maxFill > 0 && maxFill < 1) {
+      for (const st of rowStrips) {
+        const vw = widthAt(st.R), vlo = leftEdgeAt(vw);
+        const x0 = Math.max(0, (vlo - st.lo) * st.px), x1 = Math.min(st.w, (vlo + vw - st.lo) * st.px);
+        const window = Math.max(1, (x1 - x0) * st.h);
+        const fillOf = () => {
+          let n = 0;
+          for (let k = 0; k < st.h; k++) for (let i = x0; i < x1; i++) if (st.id[k * st.w + i]) n++;
+          return n / window;
+        };
+        let guard = 0;
+        while (fillOf() > maxFill && guard++ < 64) {
+          let faint = null;
+          for (const id of st.pieceIds) {
+            const rec = pieces.get(id);
+            if (!rec) continue;
+            const d = rec.wsum / Math.max(1e-9, rec.area);
+            if (!faint || d < faint.d || (d === faint.d && id < faint.id)) faint = { id, d };
+          }
+          if (!faint) break;
+          erase(faint.id);
+        }
+      }
+    }
+
+    // --- finish the records -------------------------------------------------
+    yield;
+    for (const rec of recs) {
+      if (!pieces.has(rec.id)) continue;
+      const a = Math.max(1e-9, rec.area);
+      rec.depth = rec.wsum / a;
+      rec.mu = rec.musum / a;
+      rec.cu = rec.usum / a;
+      // The bottom edge of the piece: the lowest pixel row it has in its
+      // lowest world row.
+      const bx = rec.box.get(rec.rowLo);
+      const stLo = strips.get(rec.rowLo);
+      rec.bottom = rec.rowLo + 1 - bx[3] / stLo.px;         // world y of its lowest edge
+      rec.hc = rec.hsum / a - rec.bottom;                  // centroid height above it, rows
+      rec.r0 = bx[3] / stLo.px - 1;                        // screen row of that edge when rowLo is at row 0
+      rec.c0 = Math.floor(rec.umin); rec.c1 = Math.ceil(rec.umax);
+      rec.rows = rec.rowHi - rec.rowLo + 1;
+      // Weight for the health share: area, and how deep into the band.
+      rec.w = rec.area * (0.15 + 0.85 * rec.depth);
+      anchorOf(rec);
+      delete rec.wsum; delete rec.musum; delete rec.usum; delete rec.hsum;
+    }
+    p.labeled = true;
+  }
+
+  /** Remove a piece from every strip it stands in. */
+  function erase(id) {
+    const rec = pieces.get(id);
+    if (!rec) return;
+    for (const [R, bx] of rec.box) {
+      const st = strips.get(R);
+      if (!st) continue;
+      for (let k = bx[2]; k < bx[3]; k++) for (let i = bx[0]; i < bx[1]; i++) {
+        const g = k * st.w + i;
+        if (st.id[g] === id) st.id[g] = 0;
+      }
+      st.pieceIds.delete(id);
+    }
+    pieces.delete(id);
+  }
+
+  /**
+   * Where a piece's number goes: the pixel furthest from its edge, and how far
+   * that is. A chamfer distance over the piece's own pixels, per strip, with
+   * the strip edges treated as open where the piece continues.
+   */
+  function anchorOf(rec) {
+    let best = -1, bu = rec.cu, bh = rec.hc, bpx = 1;
+    for (const [R, bx] of rec.box) {
+      const st = strips.get(R);
+      if (!st) continue;
+      const W = bx[1] - bx[0], H = bx[3] - bx[2];
+      if (W <= 0 || H <= 0) continue;
+      const INF = 1e6;
+      const d = new Float32Array(W * H);
+      const up = strips.get(R + 1), dn = strips.get(R - 1);
+      for (let k = 0; k < H; k++) for (let i = 0; i < W; i++) {
+        const g = (bx[2] + k) * st.w + (bx[0] + i);
+        if (st.id[g] !== rec.id) { d[k * W + i] = 0; continue; }
+        // A pixel on the strip's top or bottom row is interior if the piece
+        // carries on in the neighbouring strip, and an edge otherwise.
+        let edge = false;
+        if (bx[2] + k === 0) edge = !(up && continues(up, st, bx[0] + i, rec.id, up.h - 1));
+        if (bx[2] + k === st.h - 1) edge = edge || !(dn && continues(dn, st, bx[0] + i, rec.id, 0));
+        d[k * W + i] = edge ? 0.5 : INF;
+      }
+      // Forward and backward passes.
+      for (let k = 0; k < H; k++) for (let i = 0; i < W; i++) {
+        const o = k * W + i;
+        if (d[o] === 0) continue;
+        let v = d[o];
+        v = Math.min(v, i > 0 ? d[o - 1] + 1 : 1, k > 0 ? d[o - W] + 1 : v);
+        if (i === 0 || i === W - 1) v = Math.min(v, 1);
+        d[o] = v;
+      }
+      for (let k = H - 1; k >= 0; k--) for (let i = W - 1; i >= 0; i--) {
+        const o = k * W + i;
+        if (d[o] === 0) continue;
+        let v = d[o];
+        v = Math.min(v, i + 1 < W ? d[o + 1] + 1 : 1, k + 1 < H ? d[o + W] + 1 : v);
+        d[o] = v;
+      }
+      for (let k = 0; k < H; k++) for (let i = 0; i < W; i++) {
+        const v = d[k * W + i] / st.px;
+        if (v > best) {
+          best = v;
+          bu = st.lo + (bx[0] + i + 0.5) / st.px;
+          bh = (R + 1 - (bx[2] + k + 0.5) / st.px) - rec.bottom;
+          bpx = st.px;
+        }
+      }
+    }
+    rec.insR = Math.max(0, best);
+    rec.anchorU = bu;
+    rec.anchorH = bh;
+    rec.anchorPx = bpx;
+  }
+
+  /** Whether strip `other` holds piece `id` at the column pixel i of strip
+   *  `st`, on its pixel row k. */
+  function continues(other, st, i, id, k) {
+    const xi = Math.floor((st.lo + (i + 0.5) / st.px - other.lo) * other.px);
+    if (xi < 0 || xi >= other.w) return false;
+    return other.id[k * other.w + xi] === id;
+  }
+
+  // -------------------------------------------------------------------------
+  // PLACEMENT - where each dealt row is on screen
+  // -------------------------------------------------------------------------
+
+  function placement() {
+    if (!placementDirty && rowAtScreen) return rowAtScreen;
+    rowAtScreen = new Map();
+    for (const [R, d] of dealtRows) {
+      const sr = steps - d.r0;
+      // Rows dealt in the same step share a screen row; the one dealt last is
+      // the one whose pieces are there.
+      const had = rowAtScreen.get(sr);
+      if (had === undefined || R > had) rowAtScreen.set(sr, R);
+    }
+    placementDirty = false;
+    return rowAtScreen;
+  }
+
+  // -------------------------------------------------------------------------
+  // COLLISION
+  // -------------------------------------------------------------------------
+
+  // Scratch for probe(), indexed by piece id so the hot loop touches no Map.
+  let hitN = new Int32Array(1024), hitU = new Float64Array(1024), hitR = new Float64Array(1024);
+  let touched = new Int32Array(256);
+  function growScratch() {
+    const n = Math.max(1024, nextId + 256);
+    if (hitN.length >= n) return;
+    hitN = new Int32Array(n); hitU = new Float64Array(n); hitR = new Float64Array(n);
+  }
+
+  /**
+   * A body against the pieces.
+   *
+   * @param {number} u    body centre, world column (continuous)
+   * @param {number} rr   body centre, screen row (continuous, 0 at the top of the field)
+   * @param {number} rad  body radius in cells
+   * @returns {null|{block, nx, ny, depth}}  the living piece it overlaps most,
+   *   the unit normal pointing out of that piece (screen sense: +y down), and
+   *   how far along it the body must move to be clear, in cells
+   */
+  function probe(u, rr, rad) {
+    const place = placement();
+    const cLo = Math.floor(u - rad), cHi = Math.floor(u + rad);
+    const sLo = Math.floor(rr - rad), sHi = Math.floor(rr + rad);
+    // Fast path: is any band pixel in reach at all.
+    let any = false;
+    for (let sr = sLo; sr <= sHi && !any; sr++) {
+      const R = place.get(sr);
+      if (R === undefined) continue;
+      const st = strips.get(R);
+      if (!st) continue;
+      for (let c = cLo; c <= cHi; c++) {
+        const cc = c - st.lo;
+        if (cc >= 0 && cc < st.width && st.cellHas[cc]) { any = true; break; }
+      }
+    }
+    if (!any) return null;
+
+    if (hitN.length <= nextId) growScratch();
+    let nt = 0;
+    let bestId = 0, bestN = 0;
+    for (let sr = sLo; sr <= sHi; sr++) {
+      const R = place.get(sr);
+      if (R === undefined) continue;
+      const st = strips.get(R);
+      if (!st) continue;
+      const px = st.px, w = st.w, h = st.h;
+      const tx = (u - st.lo) * px, ty = (rr - sr) * px, rt = rad * px + 0.5;
+      const k0 = Math.max(0, Math.ceil(ty - rt - 0.5)), k1 = Math.min(h - 1, Math.floor(ty + rt - 0.5));
+      for (let k = k0; k <= k1; k++) {
+        const dy = (k + 0.5) - ty;
+        const span = rt * rt - dy * dy;
+        if (span < 0) continue;
+        const half = Math.sqrt(span);
+        const i0 = Math.max(0, Math.ceil(tx - half - 0.5)), i1 = Math.min(w - 1, Math.floor(tx + half - 0.5));
+        const row = k * w;
+        for (let i = i0; i <= i1; i++) {
+          const id = st.id[row + i];
+          if (!id) continue;
+          const b = live[id];
+          if (!b || b.dead || !(b.hp > 0)) continue;
+          if (hitN[id] === 0) {
+            if (nt >= touched.length) { const t = new Int32Array(touched.length * 2); t.set(touched); touched = t; }
+            touched[nt++] = id;
+            hitU[id] = 0; hitR[id] = 0;
+          }
+          const n = ++hitN[id];
+          hitU[id] += st.lo + (i + 0.5) / px;
+          hitR[id] += sr + (k + 0.5) / px;
+          if (n > bestN || (n === bestN && id > bestId)) { bestN = n; bestId = id; }
+        }
+      }
+    }
+    let nx = 0, ny = 0;
+    if (bestId) { nx = u - hitU[bestId] / bestN; ny = rr - hitR[bestId] / bestN; }
+    for (let t = 0; t < nt; t++) hitN[touched[t]] = 0;
+    if (!bestId) return null;
+    let len = Math.hypot(nx, ny);
+    if (len < 1e-9) { nx = 0; ny = -1; len = 1; }
+    nx /= len; ny /= len;
+    // How far along the normal the body must move to clear every pixel of
+    // that piece it overlaps: for each pixel at offset t from the centre the
+    // clearing distance is sqrt(r^2 - perp^2) - along, and the largest wins.
+    let depth = 0;
+    for (let sr = sLo; sr <= sHi; sr++) {
+      const R = place.get(sr);
+      if (R === undefined) continue;
+      const st = strips.get(R);
+      if (!st) continue;
+      const px = st.px, w = st.w, h = st.h;
+      const tx = (u - st.lo) * px, ty = (rr - sr) * px, rt = rad * px + 0.5;
+      const rc = rt / px;
+      const k0 = Math.max(0, Math.ceil(ty - rt - 0.5)), k1 = Math.min(h - 1, Math.floor(ty + rt - 0.5));
+      for (let k = k0; k <= k1; k++) {
+        const dy = (k + 0.5) - ty;
+        const span = rt * rt - dy * dy;
+        if (span < 0) continue;
+        const half = Math.sqrt(span);
+        const i0 = Math.max(0, Math.ceil(tx - half - 0.5)), i1 = Math.min(w - 1, Math.floor(tx + half - 0.5));
+        const row = k * w;
+        for (let i = i0; i <= i1; i++) {
+          if (st.id[row + i] !== bestId) continue;
+          const txu = (st.lo + (i + 0.5) / px) - u, tyr = (sr + (k + 0.5) / px) - rr;
+          const along = -(txu * nx + tyr * ny);
+          const perp2 = txu * txu + tyr * tyr - along * along;
+          const need = Math.sqrt(Math.max(0, rc * rc - perp2)) - along;
+          if (need > depth) depth = need;
+        }
+      }
+    }
+    return { block: live[bestId], nx, ny, depth };
+  }
+
+  // -------------------------------------------------------------------------
+  // DEALING
+  // -------------------------------------------------------------------------
+
+  /**
+   * The pieces of row R and the open cells of its dealt width.
+   *
+   * Only a piece that touches the columns on screen when the row arrives is
+   * dealt. A strip is rasterised wider than the view, so that the pull-back
+   * has picture to reveal beside the rows already on screen - but a piece
+   * standing entirely out there would be a block no body can reach until it
+   * is nearly at the line, so what the pull-back reveals beside an old row
+   * is the picture, not blocks.
+   */
+  function dealRow(R, width) {
+    const lo = leftEdgeAt(width);
+    const at = locate(R);
+    const out = [], open = [];
+    const st = strips.get(R);
+    if (at && st) {
+      for (const id of st.pieceIds) {
+        const rec = pieces.get(id);
+        if (!rec || rec.rowLo !== R) continue;
+        if (rec.umax <= lo || rec.umin >= lo + width) continue;
+        out.push({
+          id, c: Math.floor(rec.cu), r: rec.r0, w: rec.w, R,
+          cu: rec.cu, hc: rec.hc, box: { c0: rec.c0, c1: rec.c1, R0: rec.rowLo, R1: rec.rowHi + 1 },
+          area: rec.area, mu: rec.mu, depth: rec.depth,
+        });
+      }
+      out.sort((a, b) => (a.cu - b.cu) || (a.id - b.id));
+      // A marker goes where the middle of a cell is clear of the picture, so
+      // a body can reach it and nothing is drawn over the lace.
+      for (let c = lo; c < lo + width; c++) {
+        const cc = c - st.lo;
+        if (cc < 0 || cc >= st.width) continue;
+        if (!st.cellHas[cc]) { open.push({ c, r: 0 }); continue; }
+        const x0 = Math.floor((cc + 0.25) * st.px), x1 = Math.ceil((cc + 0.75) * st.px);
+        const y0 = Math.floor(0.25 * st.px), y1 = Math.ceil(0.75 * st.px);
+        let clear = true;
+        for (let k = y0; k < y1 && clear; k++) for (let i = x0; i < x1; i++) if (st.id[k * st.w + i]) { clear = false; break; }
+        if (clear) open.push({ c, r: 0 });
+      }
+    } else {
+      for (let c = lo; c < lo + width; c++) open.push({ c, r: 0 });
+    }
+    return { R, width, lo, pieces: out, open };
+  }
+
+  /** Forget strips and pieces that can no longer be on screen. */
+  function prune() {
+    const keepFrom = dealt - 200;
+    if (strips.size < 260) return;
+    for (const [R, st] of strips) {
+      if (R >= keepFrom) continue;
+      for (const id of st.pieceIds) {
+        const rec = pieces.get(id);
+        if (rec && rec.rowHi < keepFrom) { pieces.delete(id); liveById.delete(id); live[id] = undefined; }
+      }
+      strips.delete(R);
+      dealtRows.delete(R);
+    }
+    placementDirty = true;
   }
 
   return {
@@ -395,41 +1035,23 @@ export function createFractalSource(seed, opts) {
      *  pull back to meet it. */
     width() { return widthAt(dealt); },
 
-    /** Deal the next row: booleans across the current width, plus weights. */
+    /** Deal the next row: its pieces and its open cells. */
     nextRow() {
       const width = widthAt(dealt);
       const R = dealt++;
-      const out = crop(R, width);
-      // THE BACKSTOP. A row that is solid across the view is a wall; two in a
-      // row is a wall being built. The third gives up its lightest cell, so
-      // there is always a way past while the rest is being broken. On the
-      // pictures shipped here it fires rarely, which is the point.
-      if (out.cells.every(Boolean)) {
-        if (++solidRun > maxSolidRun) {
-          let at = 0;
-          for (let i = 1; i < width; i++) if (out.w[i] < out.w[at]) at = i;
-          out.cells[at] = false; out.w[at] = 0;
-          solidRun = 0;
-        }
-      } else solidRun = 0;
-      dealtRows.set(R, { width, lo: out.lo, r0: steps });
-      return Object.assign(out.cells, { w: out.w, R, lo: out.lo });
+      locate(R);                       // builds and labels the panel if needed
+      const row = dealRow(R, width);
+      dealtRows.set(R, { width, lo: row.lo, r0: steps });
+      placementDirty = true;
+      prune();
+      return row;
     },
 
-    /** The board stepped down a row. Called by the mode's arrival so the
-     *  picture can be placed under rows that have no blocks left. */
-    stepped() { steps++; },
+    /** The board stepped down a row. */
+    stepped() { steps++; placementDirty = true; },
 
-    /** Rows still to come at the width they will be dealt at, top first,
-     *  without dealing them. */
-    upcoming(n) {
-      const out = [];
-      for (let i = 0; i < Math.max(0, n | 0); i++) {
-        const R = dealt + i;
-        out.push(crop(R, widthAt(R)).cells);
-      }
-      return out;
-    },
+    /** The whole field handed back n rows of headroom. */
+    lift(n) { steps -= Math.max(0, n | 0); placementDirty = true; },
 
     /** Rows this turn should deal, so the field descends at a steady pace in
      *  pixels whatever the size of a cell. */
@@ -455,26 +1077,53 @@ export function createFractalSource(seed, opts) {
       return { R, width: d.width, lo: d.lo, r0: d.r0, panel: at ? at.panel : null, j: at ? at.j : -1 };
     },
 
+    /** The living block standing on a piece, or null. */
+    bind(b) {
+      const rec = pieces.get(b.id);
+      if (!rec) return false;
+      b.cu = rec.cu; b.hc = rec.hc;
+      b.box = { c0: rec.c0, c1: rec.c1, R0: rec.rowLo, R1: rec.rowHi + 1 };
+      b.insR = rec.insR; b.anchorU = rec.anchorU; b.anchorH = rec.anchorH;
+      b.area = rec.area; b.mu = rec.mu; b.depth = rec.depth;
+      liveById.set(b.id, b);
+      live[b.id] = b;
+      return true;
+    },
+    unbind(id) { liveById.delete(id); live[id] = undefined; },
+    alive(id) {
+      const b = liveById.get(id);
+      return b && !b.dead && b.hp > 0 ? b : null;
+    },
+    /** Every row's screen position this instant: Map screenRow -> R. */
+    placement,
+    probe,
+
     /** The panel that owns row R, or null in a gap. Builds it if needed. */
     panelOf(R) { const at = locate(R); return at ? at.panel : null; },
     locate,
     panelAt,
     widthAt,
-    rowOf,
+    renderWidthAt,
+    stripOf(R) { return strips.get(R) || null; },
+    pieceOf(id) { return pieces.get(id) || null; },
+    /** Work ahead on the next panel within a time budget; see prepare(). */
+    prepare,
+    /** Restore after a save: rows are replayed with nextRow(); this puts the
+     *  step counter where one step per row would have left it. */
+    resync() { steps = Math.max(0, dealt - 1); dealtRows.forEach((d, R) => { d.r0 = R; }); placementDirty = true; },
 
     get dealt() { return dealt; },
     get steps() { return steps; },
-    /** Restore after a save: rows are replayed with nextRow(); this puts the
-     *  step counter where one step per row would have left it. */
-    resync() { steps = Math.max(0, dealt - 1); dealtRows.forEach((d, R) => { d.r0 = R; }); },
+    get pieceCount() { return pieces.size; },
+    get liveCount() { return liveById.size; },
 
     ladder: ladder.slice(),
     rungRows,
     cols,
     panelLo,
-    samples,
     config: cfg,
     seed: s,
+    depthOf: (mu, p) => depthOf(mu, p),
     names: JULIA.map(j => j.name).concat(['mandelbrot']),
   };
 }

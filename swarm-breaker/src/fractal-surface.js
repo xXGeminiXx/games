@@ -1,31 +1,34 @@
 // ===========================================================================
-// FRACTAL SURFACE - the picture itself, painted through the blocks
+// FRACTAL SURFACE - the picture itself, and the pieces standing on it
 //
-// src/fractal.js decides which cells are blocks. This draws what the blocks
-// are made of, and it is not a colour per cell: every row of the field is
-// rendered as a STRIP of the escape-time picture at the size its cells have on
-// screen, and a block is a window onto that strip. A sixty-five pixel cell at
-// the start of a run therefore shows sixty-five pixels of spiral, and the
-// blocks read as pieces of one picture rather than as squares in a grid.
+// src/fractal.js decides what the pieces are. This draws them, and it draws
+// nothing square. Every dealt row of the field is a STRIP of the escape-time
+// picture rendered at the size its cells had when it was dealt, and two
+// things are painted from it:
 //
-// Two hooks, both called by the block layer in src/visual.js:
+//   the GHOST  the whole picture, dim, under everything - every dealt row
+//              still on screen, pieces or not. The sky between the arms is
+//              where the swarm goes, and it should look like sky, not like a
+//              hole in the picture. A piece that is gone leaves the ghost.
 //
-//   ghost   the whole picture, dim, drawn under the field - every row that has
-//           been dealt and is still on screen, blocks or not. The sky between
-//           the arms is where the swarm goes, and it should look like sky,
-//           not like a hole in the picture.
+//   the LIVING the pixels of every piece still standing, bright, with the
+//              piece's own outline traced round it in the dark of the void -
+//              or in a kind's colour when the piece is something other than a
+//              number, or in the hot colour when it is about to reach the
+//              line. A piece wearing down darkens toward the void.
 //
-//   paint   the living blocks' fills: the same strips, bright, clipped to the
-//           cells that still stand. A block wearing down darkens; a block gone
-//           leaves the dim ghost behind it, so a cleared field is the picture
-//           faded, not the picture deleted.
+// A piece's health number, where there is room for one, sits on the piece
+// with no plate under it: ink with a dark rim, at the pixel furthest from the
+// piece's edge. Below a size there is no number, because the picture is the
+// information at that size.
 //
-// A strip is rendered once, the first time it is needed, at the cell size the
-// row was dealt at. The view only ever pulls back, so a strip is only ever
-// drawn smaller than it was rendered, never blurred by being enlarged.
+// The living layer of a strip is rebuilt only when something on it changed -
+// a piece struck, a piece gone, a piece nearing the line - so a frame is a
+// handful of image draws, not a walk over every pixel.
 // ===========================================================================
 
 import { CONFIG } from '../config.js';
+import { formatTight } from './visual.js';
 
 function parseHex(css) {
   const s = String(css || '').trim().replace('#', '');
@@ -57,6 +60,8 @@ export function buildRamp(stops, size) {
   return lut;
 }
 
+const FONT = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+
 /**
  * @param {object} source   the field source from src/fractal.js
  * @param {object} [opts]
@@ -66,20 +71,29 @@ export function createFractalSurface(source, opts) {
   const o = opts || {};
   const cfg = Object.assign({}, CONFIG.fractal || {}, source && source.config || {});
   const doc = o.document || (typeof document !== 'undefined' ? document : null);
+  const pal = CONFIG.palette || {};
 
-  const boardW = CONFIG.board.width;
   const ramp = buildRamp(cfg.ramp, 512);
   const RAMP_N = ramp.length / 3;
   const inner = parseHex(cfg.inside || '#05060f');
   const cycle = Math.max(2, Number(cfg.cycle) || 24);
+  const phase = Number.isFinite(Number(cfg.phase)) ? Number(cfg.phase) : 0.14;
   const ghostAlpha = Math.min(1, Math.max(0, Number(cfg.ghost) || 0.24));
   const wearAlpha = Math.min(1, Math.max(0, Number(cfg.wear) || 0.6));
-  const void_ = parseHex(CONFIG.palette.void);
+  const outlineA = Math.min(1, Math.max(0, Number.isFinite(Number(cfg.outline)) ? Number(cfg.outline) : 0.6));
+  const threatRows = Math.max(0.5, Number(cfg.threatRows) || 2.5);
+  const hazeShare = Math.min(1, Math.max(0, Number(cfg.haze)));
+  const numeralMin = Math.max(8, Number(cfg.numeralMin) || 22);
+  const void_ = parseHex(pal.void || '#05060f');
+  const hot = parseHex(pal.hot || '#ff5c46');
+  const inkCss = pal.ink || '#e6e9ef';
+  const voidCss = pal.void || '#05060f';
 
-  const strips = new Map();     // R -> { cv, px, width, lo } or null for a gap row
-  let canDraw = null;           // whether this document can make an image at all
+  const layers = new Map();     // R -> { ghost, live, pic, keys: Map(id -> key), w, h, px, lo, width } or null
+  const born = new Map();       // R -> alpha, easing in over the first quarter second
+  let canDraw = null;
+  let gradHaze = null, hazeH = 0, hazeKey = '';
 
-  /** An offscreen surface, or null where the document cannot provide one. */
   function makeCanvas(w, h) {
     try {
       if (!doc || typeof doc.createElement !== 'function') return null;
@@ -94,185 +108,259 @@ export function createFractalSurface(source, opts) {
     } catch (e) { return null; }
   }
 
-  /** Render row R's strip. Null for a row with no picture (a gap) or where
-   *  nothing can be drawn. */
-  function render(R) {
-    const info = source.rowInfo(R);
-    if (!info || !info.panel) return null;
-    const p = info.panel;
-    const px = Math.max(1, Math.ceil(boardW / info.width));
-    const w = info.width * px, h = px;
-    const made = makeCanvas(w, h);
-    if (!made) { canDraw = false; return null; }
+  /** The picture's colour at a smooth iteration count, relative to a panel's threshold. */
+  function colourAt(mu, T, cyc, out, at) {
+    if (mu === Infinity) { out[at] = inner[0]; out[at + 1] = inner[1]; out[at + 2] = inner[2]; return; }
+    let t = (mu - T) / cyc + phase;
+    t -= Math.floor(t);
+    const q = (t * (RAMP_N - 1)) | 0;
+    out[at] = ramp[q * 3]; out[at + 1] = ramp[q * 3 + 1]; out[at + 2] = ramp[q * 3 + 2];
+  }
+
+  /** Build a row's layers from its strip: the picture, the ghost, the empty living layer. */
+  function build(R) {
+    const st = source.stripOf(R);
+    if (!st) return null;
+    const w = st.w, h = st.h;
+    const g = makeCanvas(w, h);
+    if (!g) { canDraw = false; return null; }
     canDraw = true;
-    const data = made.img.data;
-    // The picture column this strip starts at, in panel cells.
-    const c0 = info.lo - source.panelLo;
-    const v0 = p.top + info.j * p.dx;
-    // The ramp starts at the sky and is never shifted: the sky of every panel
-    // is the same dark, so a new panel arriving reads as more picture and not
-    // as a lighter sheet laid over the top of the field. Variety between
-    // panels comes from the sets themselves and a slightly different band
-    // spacing.
-    const cyc = cycle * (0.85 + 0.3 * (((p.index * 7919) % 13) / 12));
-    const inv = 1 / px;
-    for (let k = 0; k < h; k++) {
-      const v = v0 + (k + 0.5) * inv * p.dx;
-      let idx = k * w * 4;
-      for (let i = 0; i < w; i++, idx += 4) {
-        const u = p.u0 + (c0 + (i + 0.5) * inv) * p.dx;
-        const mu = p.iter(u, v);
-        if (mu === Infinity) {
-          data[idx] = inner[0]; data[idx + 1] = inner[1]; data[idx + 2] = inner[2];
-        } else {
-          let t = mu / cyc;
-          t -= Math.floor(t);
-          const q = (t * (RAMP_N - 1)) | 0;
-          data[idx] = ramp[q * 3]; data[idx + 1] = ramp[q * 3 + 1]; data[idx + 2] = ramp[q * 3 + 2];
-        }
-        data[idx + 3] = 255;
-      }
+    const pic = new Uint8ClampedArray(w * h * 3);
+    const T = st.panel.T;
+    const cyc = cycle * (0.85 + 0.3 * (((st.panel.index * 7919) % 13) / 12));
+    const d = g.img.data;
+    for (let i = 0, a = 0, q = 0; i < w * h; i++, a += 3, q += 4) {
+      colourAt(st.mu[i], T, cyc, pic, a);
+      d[q] = pic[a]; d[q + 1] = pic[a + 1]; d[q + 2] = pic[a + 2]; d[q + 3] = 255;
     }
-    made.ctx.putImageData(made.img, 0, 0);
-    return { cv: made.cv, px, width: info.width, lo: info.lo };
+    g.ctx.putImageData(g.img, 0, 0);
+    const l = makeCanvas(w, h);
+    if (!l) { canDraw = false; return null; }
+    return { R, st, ghost: g.cv, live: l, pic, keys: new Map(), w, h, px: st.px, lo: st.lo, width: st.width, dirty: true };
   }
 
-  function stripOf(R) {
-    if (strips.has(R)) return strips.get(R);
-    const s = render(R);
-    // A row with no picture is remembered as such; a document that cannot
-    // draw is not, so nothing accumulates where nothing can be shown.
-    if (s || canDraw !== false) strips.set(R, s);
-    return s;
+  function layerOf(R) {
+    if (layers.has(R)) return layers.get(R);
+    const l = build(R);
+    if (l || canDraw !== false) layers.set(R, l);
+    return l;
   }
 
-  /** Forget strips that can no longer be on screen. */
-  function prune(keepFrom) {
-    if (strips.size < 96) return;
-    for (const R of strips.keys()) if (R < keepFrom) strips.delete(R);
+  /** The state of a piece that the living layer depends on, as one string. */
+  function keyOf(b, rowsTall) {
+    if (!b || b.dead || !(b.hp > 0)) return 'x';
+    const integ = b.max > 0 ? Math.max(0, Math.min(1, b.hp / b.max)) : 1;
+    const wornQ = Math.round((1 - integ) * 8);
+    const edge = b.r + 1;
+    const th = Math.max(0, Math.min(1, 1 - (rowsTall - edge) / threatRows));
+    const thQ = th > 0.66 ? 2 : th > 0.02 ? 1 : 0;
+    return wornQ + ':' + thQ + ':' + (b.tint || '');
   }
 
   /**
-   * Where each dealt row sits this frame, in screen rows. Anchored on a
-   * living block when there is one - blocks ease during a descent and the
-   * picture has to move with them - and on the step count otherwise.
+   * Repaint the living layer of one row from its strip: the pixels of every
+   * standing piece, shaded by wear, with the piece's outline traced round it.
    */
-  function placeRows(frame) {
-    const cell = frame.cell;
-    const dealt = source.dealt;
-    const stepsNow = source.steps;
-    // A row's screen row is the steps taken since it was dealt. Rows dealt in
-    // the same step - a field re-asked while the board was empty - share one,
-    // which is exactly where their blocks are.
-    const rowOf = (info) => stepsNow - info.r0;
-    // The anchor: a living block with a known row. Its cell top is the truth
-    // this frame - blocks ease during a descent and are lifted by effects -
-    // and every other row is a whole number of cells from it.
-    let anchorY = 0, anchorRow = 0, anchored = false;
-    for (let i = 0; i < frame.n; i++) {
-      const b = frame.blocks[i];
-      if (!b || b.R === undefined) continue;
-      const info = source.rowInfo(b.R);
-      if (!info) continue;
-      anchorY = frame.cellY[i]; anchorRow = rowOf(info); anchored = true;
-      break;
+  function repaint(L, rowsTall) {
+    const st = L.st, w = L.w, h = L.h, ids = st.id, pic = L.pic;
+    const ctx = L.live.ctx, img = L.live.img, d = img.data;
+    const up = source.stripOf(R_of(L) + 1), dn = source.stripOf(R_of(L) - 1);
+    // Per piece shading, resolved once.
+    const shade = new Map();
+    for (const id of st.pieceIds) {
+      const b = source.alive(id);
+      if (!b) continue;
+      const integ = b.max > 0 ? Math.max(0, Math.min(1, b.hp / b.max)) : 1;
+      const worn = (1 - integ) * wearAlpha;
+      const edgeRow = b.r + 1;
+      const th = Math.max(0, Math.min(1, 1 - (rowsTall - edgeRow) / threatRows));
+      let edge;
+      if (th > 0.66) edge = hot;
+      else if (b.tint) edge = parseHex(b.tint);
+      else edge = void_;
+      const edgeA = th > 0.66 ? 0.9 : b.tint ? 0.95 : outlineA;
+      shade.set(id, { worn, edge, edgeA });
     }
-    const rows = [];
-    const lowest = frame.floor + cell;
-    for (let R = dealt - 1; R >= 0; R--) {
-      const info = source.rowInfo(R);
-      if (!info) continue;
-      const rr = rowOf(info);
-      const y = anchored ? anchorY + (rr - anchorRow) * cell : frame.top + rr * cell + frame.off;
-      if (y > lowest) break;
-      if (y + cell < frame.top - cell) continue;
-      rows.push({ R, y, info });
+    for (let k = 0; k < h; k++) {
+      for (let i = 0; i < w; i++) {
+        const g = k * w + i, q = g * 4;
+        const id = ids[g];
+        const sh = id ? shade.get(id) : undefined;
+        if (!sh) { d[q + 3] = 0; continue; }
+        // Edge: a neighbour that is not this piece. Across the strip's top
+        // and bottom the neighbour strip is consulted where it exists.
+        let edge = false;
+        if (i > 0 && ids[g - 1] !== id) edge = true;
+        else if (i + 1 < w && ids[g + 1] !== id) edge = true;
+        else if (k > 0 && ids[g - w] !== id) edge = true;
+        else if (k + 1 < h && ids[g + w] !== id) edge = true;
+        else if (k === 0 && up) edge = !holds(up, st, i, id, up.h - 1);
+        else if (k === h - 1 && dn) edge = !holds(dn, st, i, id, 0);
+        const a = g * 3;
+        let r = pic[a], gg = pic[a + 1], bb = pic[a + 2];
+        if (sh.worn > 0) {
+          r += (void_[0] - r) * sh.worn; gg += (void_[1] - gg) * sh.worn; bb += (void_[2] - bb) * sh.worn;
+        }
+        if (edge) {
+          const e = sh.edge, ea = sh.edgeA;
+          r += (e[0] - r) * ea; gg += (e[1] - gg) * ea; bb += (e[2] - bb) * ea;
+        }
+        d[q] = r; d[q + 1] = gg; d[q + 2] = bb; d[q + 3] = 255;
+      }
     }
-    // Oldest first, so where two rows share a screen row the one dealt last
-    // is the one that shows - it is the one whose blocks are there.
-    rows.reverse();
-    prune(dealt - 160);
-    return rows;
+    ctx.putImageData(img, 0, 0);
+    L.dirty = false;
   }
 
-  function drawStrip(ctx, strip, x, y, cell) {
-    ctx.drawImage(strip.cv, 0, 0, strip.cv.width, strip.cv.height, x, y, strip.width * cell, cell);
+  function R_of(L) { return L.R; }
+
+  function holds(other, st, i, id, k) {
+    const xi = Math.floor((st.lo + (i + 0.5) / st.px - other.lo) * other.px);
+    if (xi < 0 || xi >= other.w) return true;
+    return other.id[k * other.w + xi] === id;
+  }
+
+  /** Forget layers that can no longer be on screen. */
+  function prune(keepFrom) {
+    if (layers.size < 96) return;
+    for (const R of layers.keys()) if (R < keepFrom) { layers.delete(R); born.delete(R); }
+  }
+
+  function hazeFor(ctx, top, floor) {
+    const key = top + ':' + floor;
+    if (gradHaze && hazeKey === key) return gradHaze;
+    hazeKey = key;
+    hazeH = (floor - top) * 0.62;
+    try {
+      gradHaze = ctx.createLinearGradient(0, top, 0, top + hazeH);
+      gradHaze.addColorStop(0, 'rgba(' + void_[0] + ',' + void_[1] + ',' + void_[2] + ',0.62)');
+      gradHaze.addColorStop(1, 'rgba(' + void_[0] + ',' + void_[1] + ',' + void_[2] + ',0)');
+    } catch (e) { gradHaze = null; }
+    return gradHaze;
   }
 
   return {
     /** Cells narrower than this carry no health number; the picture is the
-     *  information at that size. */
-    minNumeral: Math.max(8, Number(cfg.numeralMin) || 22),
-    /** Numerals get a dark plate: the picture underneath can be any colour. */
-    backing: true,
-    /** No column grid, no seams below this cell size: a mesh over a picture. */
-    seamMin: Math.max(0, Number(cfg.seamMin) || 26),
-    frameMin: Math.max(0, Number(cfg.frameMin) || 20),
-    /** How much of the aerial haze the picture takes. Distance still costs
-     *  contrast, but a picture washed to nothing at the top is not a picture. */
-    haze: Math.min(1, Math.max(0, Number(cfg.haze))),
+     *  information at that size. Kept for the tools that ask. */
+    minNumeral: numeralMin,
+    haze: hazeShare,
+    /** The picture's colour for a piece, as a CSS string, for debris. */
+    shadeOf(b) {
+      if (!b || !Number.isFinite(b.mu)) return null;
+      const st = source.stripOf(b.R);
+      const T = st ? st.panel.T : 0;
+      const out = new Uint8ClampedArray(3);
+      colourAt(b.mu, T, cycle, out, 0);
+      return 'rgb(' + Math.min(255, out[0] + 40) + ',' + Math.min(255, out[1] + 40) + ',' + Math.min(255, out[2] + 40) + ')';
+    },
 
-    ghost(ctx, frame) {
+    /**
+     * Draw the whole field: ghost, living pieces, haze, numerals.
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {object} frame  { cell, origin, top, floor, width, off, rowsTall, dt, blocks }
+     */
+    draw(ctx, frame) {
       if (!ctx || canDraw === false) return;
-      const rows = placeRows(frame);
-      if (!rows.length) return;
+      const cell = frame.cell, origin = frame.origin, top = frame.top, floor = frame.floor, W = frame.width;
+      const off = frame.off || 0;
+      const rowsTall = frame.rowsTall;
+      const dt = Number.isFinite(frame.dt) ? frame.dt : 1 / 60;
+      const place = source.placement();
+      const rows = [];
+      for (const [sr, R] of place) {
+        const y = top + sr * cell + off;
+        if (y > floor + cell || y + cell < top - cell) continue;
+        rows.push({ sr, R, y });
+      }
+      rows.sort((a, b) => a.sr - b.sr);
+      prune(source.dealt - 160);
+
       ctx.save();
       ctx.beginPath();
-      ctx.rect(0, frame.top, frame.width, frame.floor - frame.top);
+      ctx.rect(0, top, W, floor - top);
       ctx.clip();
+
+      // The ghost: the whole picture, dim.
       ctx.globalAlpha = ghostAlpha;
       for (const row of rows) {
-        const strip = stripOf(row.R);
-        if (!strip) continue;
-        drawStrip(ctx, strip, frame.origin + strip.lo * frame.cell, row.y, frame.cell);
+        const L = layerOf(row.R);
+        if (!L) continue;
+        ctx.drawImage(L.ghost, 0, 0, L.w, L.h, origin + L.lo * cell, row.y, L.width * cell, cell);
+      }
+
+      // The living pieces.
+      for (const row of rows) {
+        const L = layerOf(row.R);
+        if (!L) continue;
+        // Anything about a standing piece changed since the layer was painted?
+        let dirty = L.dirty;
+        if (!dirty) {
+          for (const id of L.st.pieceIds) {
+            const b = source.alive(id);
+            const key = b ? keyOf(b, rowsTall) : 'x';
+            if (L.keys.get(id) !== key) { dirty = true; break; }
+          }
+        }
+        if (dirty) {
+          repaint(L, rowsTall);
+          for (const id of L.st.pieceIds) {
+            const b = source.alive(id);
+            L.keys.set(id, b ? keyOf(b, rowsTall) : 'x');
+          }
+        }
+        let a = born.get(row.R);
+        if (a === undefined) a = 0;
+        a = Math.min(1, a + dt / 0.25);
+        born.set(row.R, a);
+        ctx.globalAlpha = a;
+        ctx.drawImage(L.live.cv, 0, 0, L.w, L.h, origin + L.lo * cell, row.y, L.width * cell, cell);
+      }
+      ctx.globalAlpha = 1;
+
+      // Atmospheric perspective, before the numerals and never over them.
+      if (hazeShare > 0) {
+        const gh = hazeFor(ctx, top, floor);
+        if (gh) {
+          ctx.globalAlpha = hazeShare;
+          ctx.fillStyle = gh; ctx.fillRect(0, top, W, hazeH);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // Numerals: ink with a dark rim, no plate, on pieces with room for one.
+      const list = frame.blocks || [];
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let font = '';
+      for (let i = 0; i < list.length; i++) {
+        const b = list[i];
+        if (!b || b.id === undefined || !(b.hp > 0) || b.dead) continue;
+        const room = (b.insR || 0) * 2 * cell;
+        if (room < numeralMin) continue;
+        const txt = formatTight(b.hp);
+        if (!txt) continue;
+        const size = txt.length <= 3 ? 14 : txt.length === 4 ? 12 : 10;
+        if (room < size * 0.9) continue;
+        const f = '600 ' + size + 'px ' + FONT;
+        if (f !== font) { ctx.font = f; font = f; }
+        const x = origin + b.anchorU * cell;
+        const y = top + (b.r + 1 - b.anchorH) * cell + off;
+        if (y < top - size || y > floor + size) continue;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = voidCss;
+        ctx.strokeText(txt, x, y + 0.5);
+        ctx.fillStyle = inkCss;
+        ctx.fillText(txt, x, y + 0.5);
       }
       ctx.restore();
     },
 
-    paint(ctx, frame) {
-      if (!ctx || canDraw === false) return;
-      const cell = frame.cell;
-      // Group the living blocks by the row they came from.
-      const byRow = new Map();
-      for (let i = 0; i < frame.n; i++) {
-        const b = frame.blocks[i];
-        if (!b || b.R === undefined) continue;
-        let g = byRow.get(b.R);
-        if (!g) { g = []; byRow.set(b.R, g); }
-        g.push(i);
-      }
-      for (const [R, idx] of byRow) {
-        const strip = stripOf(R);
-        if (!strip) continue;
-        // One clip per row, one image per row. Every block in a row was born
-        // together, so the row's fade-in is the first block's.
-        ctx.save();
-        ctx.beginPath();
-        let y = frame.cellY[idx[0]];
-        for (const i of idx) {
-          ctx.rect(frame.cellX[i], frame.cellY[i], cell, cell);
-          if (frame.cellY[i] < y) y = frame.cellY[i];
-        }
-        ctx.clip();
-        ctx.globalAlpha = Math.min(1, frame.alpha[idx[0]]);
-        drawStrip(ctx, strip, frame.origin + strip.lo * cell, y, cell);
-        ctx.restore();
-        // Wear darkens the cell toward the void. Done after the clip is gone,
-        // one rectangle per damaged block only.
-        for (const i of idx) {
-          const worn = 1 - frame.integ[i];
-          if (worn < 0.04) continue;
-          ctx.fillStyle = 'rgba(' + void_[0] + ',' + void_[1] + ',' + void_[2] + ',' + (worn * wearAlpha).toFixed(3) + ')';
-          ctx.fillRect(frame.cellX[i], frame.cellY[i], cell, cell);
-        }
-      }
-    },
-
-    /** Blocks the given row has, for tools. */
-    stripOf,
-    render,
+    /** For tools: the layers built so far, and the strip of a row. */
+    layerOf,
     ramp,
-    get strips() { return strips.size; },
+    get strips() { return layers.size; },
   };
 }
 
