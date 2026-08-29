@@ -19,7 +19,7 @@ export function createEconomy(cfg, rngLike = Math.random) {
     upgrades: Object.fromEntries(Object.keys(E.upgrades).map((u) => [u, 0])),
     pressure: Object.fromEntries(K.map((k) => [k, 0])),
     island: 1,
-    islandsLeft: 0,
+    islandsVisited: 0,   // how many islands have been worked, counting the first
     lifetime: 0,                     // funds earned ever
     playtime: 0,
     avail: Object.fromEntries(K.map((k) => [k, 0.5])),   // last richness within range, 0..1
@@ -110,7 +110,7 @@ export function createEconomy(cfg, rngLike = Math.random) {
       do: () => {
         if (!spend(castOffCost())) return false;
         state.island += 1;
-        state.islandsLeft += 1;
+        state.islandsVisited += 1;
         state.remaining = 1;
         for (const k of K) { state.pressure[k] *= 0.5; state.avail[k] = 0.5; }
         return true;
@@ -130,7 +130,7 @@ export function createEconomy(cfg, rngLike = Math.random) {
 
   const snapshot = () => JSON.parse(JSON.stringify({
     funds: state.funds, drones: state.drones, specialists: state.specialists, upgrades: state.upgrades,
-    pressure: state.pressure, island: state.island, islandsLeft: state.islandsLeft, lifetime: state.lifetime,
+    pressure: state.pressure, island: state.island, islandsVisited: state.islandsVisited, lifetime: state.lifetime,
     playtime: state.playtime, avail: state.avail, remaining: state.remaining, flags: state.flags,
   }));
 
@@ -142,7 +142,9 @@ export function createEconomy(cfg, rngLike = Math.random) {
     for (const k of K) { state.specialists[k] = num(snap.specialists && snap.specialists[k], 0); state.pressure[k] = num(snap.pressure && snap.pressure[k], 0); state.avail[k] = num(snap.avail && snap.avail[k], 0.5); }
     for (const u in E.upgrades) state.upgrades[u] = Math.min(E.upgrades[u].max, num(snap.upgrades && snap.upgrades[u], 0));
     state.island = Math.max(1, num(snap.island, 1));
-    state.islandsLeft = num(snap.islandsLeft, 0);
+    // Saves written before this was named for what it counts still carry the
+    // old field, so either spelling is accepted on the way in.
+    state.islandsVisited = num(snap.islandsVisited, num(snap.islandsLeft, 0));
     state.lifetime = num(snap.lifetime, 0);
     state.playtime = num(snap.playtime, 0);
     state.remaining = num(snap.remaining, 1);
