@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fall Line</title>
+<style>
+  /* Colours arrive from config.js as custom properties; the values here are
+     only what the page shows before that file has run. */
+  :root{
+    --void:#dcd5c2; --paper:#ece6d6; --panel:#f5f0e4; --rule:#c9c0ad; --ink:#2a2620; --dim:#6e6656;
+    --quiet:#a69d8a; --ore:#8c5a1c; --hot:#b23a2a; --good:#3d7a4c; --melt:#2c6ca6;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--paper);color:var(--ink)}
+  body{
+    font:13px/1.4 var(--sans); font-variant-numeric:tabular-nums lining-nums;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  h2{
+    font:600 11px/1 var(--serif); letter-spacing:.08em; text-transform:uppercase; color:var(--ore);
+    margin:0 0 7px;
+  }
+  button{
+    font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--ink);
+    padding:3px 10px; cursor:pointer; border-radius:3px; line-height:1.3;
+  }
+  button:hover:not(:disabled){background:var(--paper)}
+  button:disabled{opacity:.4;cursor:default}
+  button.on{background:var(--ink);color:var(--panel)}
+  button b{font-weight:600}
+  button i{font-style:normal;color:var(--dim);margin-left:6px;font-size:11px}
+  button.on i{color:var(--rule)}
+  button.locked{border-style:dashed;border-color:var(--quiet);color:var(--dim)}
+  button.poor b{color:var(--dim)}
+
+  /* The title rule across the top. */
+  header{
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px;
+    padding:8px 18px 7px; border-bottom:1px solid var(--rule); flex:0 0 auto; background:var(--paper);
+  }
+  #brand{display:flex;align-items:baseline;gap:14px}
+  #brand b{font:600 20px/1 var(--serif); letter-spacing:.02em; white-space:nowrap}
+  #brand span{font:italic 12px/1 var(--serif); color:var(--dim); white-space:nowrap}
+  #tools{display:flex;gap:6px}
+  #tools button{font-size:11px;padding:2px 9px}
+
+  /* The field takes everything between the title and the tray. The cards sit
+     in the corners the diamond leaves empty. */
+  #field{flex:1 1 auto;min-height:0;position:relative;overflow:hidden;background:var(--void)}
+  #view{display:block;width:100%;height:100%;cursor:crosshair}
+  #hint{
+    position:absolute; left:50%; top:8px; transform:translateX(-50%); max-width:60%;
+    font:italic 12px/1.3 var(--serif); color:var(--dim); text-align:center;
+    pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .card{
+    position:absolute; width:250px; max-height:46%; overflow:auto;
+    background:rgba(245,240,228,.93); border:1px solid var(--rule); border-radius:4px;
+    padding:9px 12px 10px; font-size:12px;
+  }
+  .card.tl{left:10px;top:10px}
+  .card.tr{right:10px;top:10px}
+  .card.bl{left:10px;bottom:10px;max-height:none;width:auto;min-width:250px}
+  .card.br{right:10px;bottom:10px}
+  .card p{margin:0}
+
+  /* Instruments. */
+  #stats{display:flex;gap:16px;margin-bottom:8px}
+  #stats .stat b{display:block;font:600 19px/1.1 var(--serif);color:var(--ink)}
+  #stats .stat span{font:10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+  #stats #ore{color:var(--ore)}
+  #stats #hearth.low{color:var(--hot)}
+  #clock{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  #speed{display:flex;gap:3px}
+  #speed button{padding:2px 7px;font-size:11px}
+  #call{border-color:var(--melt);color:var(--melt);font-weight:600;min-width:170px;text-align:center}
+  #call:disabled{opacity:.55}
+
+  /* Ground and the selected work. */
+  .row2{display:flex;gap:6px}
+  .row2 button{flex:1 1 0}
+  #earthcost{color:var(--dim);margin:6px 0 10px;min-height:14px;font-size:11px}
+  #selinfo{color:var(--dim);line-height:1.45;margin-bottom:7px;white-space:pre-line}
+
+  /* The Melt's forecast and the log. */
+  #forecast{line-height:1.45;white-space:pre-line}
+  #forecast .ink{color:var(--ink)}
+  #forecast .trait{color:var(--melt)}
+  #forecast .new{color:var(--ore);font-weight:600}
+  #forecast .dim{color:var(--dim)}
+  #log{font-size:11px;color:var(--dim);line-height:1.5;white-space:pre-line}
+  #log .ink{color:var(--ink)}
+
+  /* The tray of works along the bottom. */
+  #tray{
+    flex:0 0 auto; display:flex; align-items:center; gap:12px;
+    padding:8px 18px 9px; border-top:1px solid var(--rule); background:var(--paper);
+  }
+  #tray h2{margin:0;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px}
+  #build{display:flex;gap:8px;flex-wrap:wrap}
+  #build button{
+    display:flex; flex-direction:column; align-items:center; gap:2px; width:76px; padding:5px 4px 4px;
+    text-align:center;
+  }
+  #build button svg{width:22px;height:22px;display:block}
+  #build button b{font:600 12px/1.1 var(--serif)}
+  #build button i{margin:0;font-size:10px}
+  #build button.on svg *{stroke:var(--panel)}
+  #build button svg *{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linejoin:round}
+  #build button.locked svg *{stroke:var(--quiet)}
+
+  /* Awards live in the help card. */
+  #awards{display:flex;flex-direction:column;gap:2px;font-size:12px;margin-top:6px}
+  #awards .award{color:var(--quiet)}
+  #awards .award.won{color:var(--ink)}
+  #awards .award i{font-style:normal;color:var(--quiet);margin-left:6px;font-size:11px}
+  #awards .award.won i{color:var(--dim)}
+
+  .box{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(42,38,32,.45); z-index:5;
+  }
+  .box[hidden]{display:none!important}
+  .box .bcard{
+    width:min(600px,92%); max-height:88%; overflow:auto; background:var(--panel);
+    border:1px solid var(--ink); border-radius:4px; padding:20px 26px 18px;
+  }
+  .bcard h3{margin:0 0 10px;font:600 20px/1 var(--serif)}
+  .bcard p{margin:0 0 7px;color:var(--dim);line-height:1.5;font-size:13px}
+  .bcard p.ink{color:var(--ink)}
+  .bcard h2{margin-top:14px}
+  .bcard .actions{margin-top:14px;display:flex;gap:8px}
+</style>
+</head>
+<body>
+<header>
+  <div id="brand"><b id="title">Fall Line</b><span id="tagline"></span></div>
+  <div id="tools">
+    <button id="help">Help</button>
+    <button id="newrun">New run</button>
+    <button id="export">Export</button>
+    <button id="import">Import</button>
+  </div>
+</header>
+
+<div id="field">
+  <canvas id="view"></canvas>
+  <div id="hint"></div>
+
+  <aside id="logcard" class="card tl">
+    <h2 id="p-log">Log</h2>
+    <div id="log"></div>
+  </aside>
+
+  <aside id="meltcard" class="card tr">
+    <h2 id="p-melt">The Melt</h2>
+    <div id="forecast"></div>
+  </aside>
+
+  <aside id="inst" class="card bl">
+    <div id="stats">
+      <div class="stat"><b id="ore">0</b><span id="lbl-ore">Ore</span></div>
+      <div class="stat"><b id="hearth">0</b><span id="lbl-hearth">Hearth</span></div>
+      <div class="stat"><b id="surge">0</b><span id="lbl-surge">Surge</span></div>
+      <div class="stat"><b id="best">0</b><span id="lbl-best">Best</span></div>
+    </div>
+    <div id="clock">
+      <div id="speed"></div>
+      <button id="pause">Pause</button>
+      <button id="call">Call the surge</button>
+    </div>
+  </aside>
+
+  <aside id="groundcard" class="card br">
+    <h2 id="p-earth">Earthworks</h2>
+    <div class="row2"><button id="raise">Raise</button><button id="cut">Cut</button></div>
+    <div id="earthcost"></div>
+    <h2 id="p-selected">Selected</h2>
+    <div id="selinfo"></div>
+    <div class="row2"><button id="upgrade">Upgrade</button><button id="sell">Sell</button></div>
+  </aside>
+
+  <div id="helpbox" class="box" hidden>
+    <div class="bcard">
+      <h3 id="helptitle">Fall Line</h3>
+      <div id="helplines"></div>
+      <h2 id="p-awards">Awards</h2>
+      <div id="awards"></div>
+      <div class="actions"><button id="helpclose">Close</button></div>
+    </div>
+  </div>
+  <div id="overbox" class="box" hidden>
+    <div class="bcard">
+      <h3 id="overtitle">The hearth is out</h3>
+      <div id="overtext"></div>
+      <div class="actions"><button id="overnew">New run</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="tray">
+  <h2 id="p-build">Build</h2>
+  <div id="build"></div>
+</div>
+
+<script type="module">
+  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=4';
+  import { createGame } from './src/game.js?v=4';
+
+  applyIdentity(document);
+  if (appliedOverrides.length) console.log('config overrides:', appliedOverrides.join(' '));
+
+  const game = createGame({
+    doc: document,
+    win: window,
+    canvas: document.getElementById('view'),
+    cfg: CONFIG,
+    storage: window.localStorage,
+    now: () => performance.now(),
+  });
+  game.start();
+  window.fallLine = game;
+</script>
+</body>
+</html>
