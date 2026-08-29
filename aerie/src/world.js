@@ -1,8 +1,8 @@
 // The island as textures: height and moisture, what the land can hold, and
 // what is left of it. The CPU keeps one copy of the height (for the camera
 // and for clicks) and reads a small summary of the richness once a second.
-import { fullscreen, target, pingpong, bindScreen } from './gl.js?v=5';
-import { rng } from './rng.js?v=5';
+import { fullscreen, target, pingpong, bindScreen } from './gl.js?v=6';
+import { rng } from './rng.js?v=6';
 
 export function createWorld(gl, cfg, S) {
   const F = cfg.world.field;

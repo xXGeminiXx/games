@@ -11,7 +11,7 @@
 // a headless test can drive a camera by calling move() directly.
 // ---------------------------------------------------------------------------
 
-import { m4, v3, clamp } from './mat.js?v=5';
+import { m4, v3, clamp } from './mat.js?v=6';
 
 export function flyCamera({ position = [0, 2, 5], yaw = 0, pitch = 0, fov = 60, near = 0.05, far = 500, speed = 6, sensitivity = 0.0025, damping = 8 } = {}) {
   const cam = {
@@ -83,6 +83,7 @@ export function flyCamera({ position = [0, 2, 5], yaw = 0, pitch = 0, fov = 60, 
     window.addEventListener('keydown', kd);
     window.addEventListener('keyup', ku);
     window.addEventListener('blur', blur);
+    const touchAction = el.style.touchAction;
     el.style.touchAction = 'none';
     return () => {
       el.removeEventListener('pointerdown', down);
@@ -91,6 +92,10 @@ export function flyCamera({ position = [0, 2, 5], yaw = 0, pitch = 0, fov = 60, 
       window.removeEventListener('keydown', kd);
       window.removeEventListener('keyup', ku);
       window.removeEventListener('blur', blur);
+      el.style.touchAction = touchAction;
+      // A key held down at the moment of detach would otherwise stay held for
+      // the life of the camera, and it would keep flying with nobody at it.
+      cam.keys.clear();
     };
   };
 
@@ -134,12 +139,14 @@ export function orbitCamera({ target = [0, 0, 0], distance = 10, yaw = 0.6, pitc
     el.addEventListener('pointermove', mv);
     window.addEventListener('pointerup', up);
     el.addEventListener('wheel', wheel, { passive: false });
+    const touchAction = el.style.touchAction;
     el.style.touchAction = 'none';
     return () => {
       el.removeEventListener('pointerdown', down);
       el.removeEventListener('pointermove', mv);
       window.removeEventListener('pointerup', up);
       el.removeEventListener('wheel', wheel);
+      el.style.touchAction = touchAction;
     };
   };
 

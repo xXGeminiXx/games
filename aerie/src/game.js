@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=5';
-import { fill } from '../content.js?v=5';
-import { makeShaders } from './shaders.js?v=5';
-import { createWorld } from './world.js?v=5';
-import { createDrones } from './drones.js?v=5';
-import { createView } from './view.js?v=5';
-import { createEconomy } from './economy.js?v=5';
-import { createSave, createPrefs } from './save.js?v=5';
-import { createUI } from './ui.js?v=5';
-import { createControls } from './controls.js?v=5';
-import { createQuality } from './quality.js?v=5';
-import { createPerfLog } from './perflog.js?v=5';
-import { loop, createGL } from './gl.js?v=5';
-import { rng } from './rng.js?v=5';
-import { fmt, duration } from './numbers.js?v=5';
+import { withOverrides, applyIdentity } from '../config.js?v=6';
+import { fill } from '../content.js?v=6';
+import { makeShaders } from './shaders.js?v=6';
+import { createWorld } from './world.js?v=6';
+import { createDrones } from './drones.js?v=6';
+import { createView } from './view.js?v=6';
+import { createEconomy } from './economy.js?v=6';
+import { createSave, createPrefs } from './save.js?v=6';
+import { createUI } from './ui.js?v=6';
+import { createControls } from './controls.js?v=6';
+import { createQuality } from './quality.js?v=6';
+import { createPerfLog } from './perflog.js?v=6';
+import { loop, createGL } from './gl.js?v=6';
+import { rng } from './rng.js?v=6';
+import { fmt, duration } from './numbers.js?v=6';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
