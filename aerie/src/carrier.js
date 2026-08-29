@@ -14,8 +14,8 @@
 // parts into one indexed mesh with a colour per vertex, so the whole ship is
 // a single draw call however many pieces it is made of.
 // ---------------------------------------------------------------------------
-import { shapes } from './gl.js?v=3';
-import { hexToRgb } from './palette.js?v=3';
+import { shapes } from './gl.js?v=4';
+import { hexToRgb } from './palette.js?v=4';
 
 // A part is { shape, off, size, rot, col, lit }. rot is radians about x, y, z
 // applied in that order. lit is how much the piece glows from inside: 0 is

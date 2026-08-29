@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=3';
+import { oklch } from './src/palette.js?v=4';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 3,             // the ?v= tag every import carries; bump on every src change
+    build: 4,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 

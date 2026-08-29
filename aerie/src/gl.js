@@ -91,7 +91,9 @@ export function program(gl, vertSrc, fragSrc, { transformFeedback = null } = {})
   gl.deleteShader(vs);
   gl.deleteShader(fs);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error('program failed to link: ' + gl.getProgramInfoLog(p));
+    const log = gl.getProgramInfoLog(p);
+    gl.deleteProgram(p);
+    throw new Error('program failed to link: ' + log);
   }
   const uniforms = {};
   const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
@@ -125,6 +127,8 @@ export function program(gl, vertSrc, fragSrc, { transformFeedback = null } = {})
         case gl.INT: case gl.BOOL: u.size > 1 ? gl.uniform1iv(u.loc, v) : gl.uniform1i(u.loc, v); break;
         case gl.INT_VEC2: gl.uniform2iv(u.loc, v); break;
         case gl.INT_VEC3: gl.uniform3iv(u.loc, v); break;
+        case gl.INT_VEC4: gl.uniform4iv(u.loc, v); break;
+        case gl.UNSIGNED_INT: u.size > 1 ? gl.uniform1uiv(u.loc, v) : gl.uniform1ui(u.loc, v); break;
         case gl.FLOAT_MAT3: gl.uniformMatrix3fv(u.loc, false, v); break;
         case gl.FLOAT_MAT4: gl.uniformMatrix4fv(u.loc, false, v); break;
         case gl.SAMPLER_2D: case gl.SAMPLER_3D: case gl.SAMPLER_CUBE: case gl.INT_SAMPLER_2D: case gl.UNSIGNED_INT_SAMPLER_2D: {
@@ -139,7 +143,7 @@ export function program(gl, vertSrc, fragSrc, { transformFeedback = null } = {})
     }
   };
 
-  return { program: p, uniforms, attribs, set, use: () => gl.useProgram(p) };
+  return { program: p, uniforms, attribs, set, use: () => gl.useProgram(p), dispose: () => gl.deleteProgram(p) };
 }
 
 // ---- the full-screen pass -------------------------------------------------
@@ -167,6 +171,7 @@ export function fullscreen(gl, fragSrc) {
       prog.set(values);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
+    dispose: () => { gl.deleteVertexArray(vao); prog.dispose(); },
   };
 }
 
@@ -274,15 +279,20 @@ export function vao(gl, prog, { attribs, index = null }) {
     gl.vertexAttribPointer(loc, a.size, a.type || gl.FLOAT, a.normalized || false, a.stride || 0, a.offset || 0);
     if (a.divisor) gl.vertexAttribDivisor(loc, a.divisor);
   }
-  let indexCount = 0;
+  let indexCount = 0, ib = null;
   if (index) {
-    const ib = gl.createBuffer();
+    ib = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.STATIC_DRAW);
     indexCount = index.length;
   }
   gl.bindVertexArray(null);
-  return { vao: v, indexCount, indexType: index instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
+  return {
+    vao: v, indexCount, indexType: index instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT,
+    // Frees the vertex array and the index buffer it built. The attribute
+    // buffers were handed in by the caller and stay the caller's to free.
+    dispose: () => { gl.deleteVertexArray(v); if (ib) gl.deleteBuffer(ib); },
+  };
 }
 
 // ---- a few shapes, as {positions, normals, indices} ----------------------
