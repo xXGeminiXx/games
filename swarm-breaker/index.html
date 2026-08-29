@@ -190,6 +190,38 @@
   #resume{display:none}
   #resume.on{display:block}
 
+  /* THE BOARD, AND WHAT A ROW IS ALLOWED TO SAY ABOUT ITSELF.
+     Three states, three colours, and a word beside each - never a colour on
+     its own, because a colour is not readable to everyone and none of this is
+     worth a thing if the player cannot tell what it means. A mismatch is
+     amber, not red: it is a note, not an accusation. */
+  #boards{border-top:1px solid var(--line); padding-top:10px}
+  .bdhead{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--dim);
+  }
+  #bdnote{margin:4px 0 8px; color:var(--dim); font-size:10px; line-height:1.4}
+  #bdlist{display:flex; flex-direction:column; gap:4px}
+  .bdrow{
+    display:flex; align-items:baseline; gap:8px; padding:5px 8px;
+    border:1px solid var(--line); background:var(--panel); font-size:12px;
+  }
+  .bdrow .rk{color:var(--dim); font-variant-numeric:tabular-nums; min-width:2ch}
+  .bdrow .who{
+    flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .bdrow .dp{color:var(--pickup); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .bdrow .st{
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.07em;
+    padding:1px 5px; border:1px solid var(--line); white-space:nowrap; color:var(--dim);
+  }
+  .bdrow .st.checked{color:#7fd39b; border-color:#2f5c42}
+  .bdrow .st.differs{color:#e0b24a; border-color:#5c4a1f}
+  .bdrow.mine{border-color:var(--swarm)}
+  .bdrow.mine .who{color:var(--swarm)}
+  #bdcheck{margin-top:6px}
+  #bdempty{color:var(--dim); font-size:10.5px; margin:0}
+
   /* awards */
   #awards{border-top:1px solid var(--line); padding-top:10px}
   .awhead{
@@ -211,7 +243,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="e688bde176fa">
+<meta name="build" content="c7d881d4de7e">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -303,6 +335,13 @@
     <span class="lbl" id="lbl-mode">mode</span>
     <div id="modelist"></div>
 
+    <div id="boards">
+      <div class="bdhead"><span id="bdtitle">board</span><span id="bdscope"></span></div>
+      <p id="bdnote"></p>
+      <div id="bdlist"></div>
+      <button id="bdcheck" hidden>check the top runs</button>
+    </div>
+
     <div id="awards">
       <div class="awhead"><span id="awtitle">awards</span><span id="awcount"></span></div>
       <p id="awnote"></p>
@@ -348,17 +387,20 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=11';
-import { createJuice } from './src/juice.js?v=11';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=11';
-import { createBlockKinds } from './src/blocks.js?v=11';
-import { safeRows } from './src/arrival.js?v=11';
-import { createAwards } from './src/awards.js?v=11';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=11';
-import { createLeaderboard } from './src/leaderboard.js?v=11';
-import * as Tiers from './src/tiers.js?v=11';
-import { createOnboarding } from './src/onboarding.js?v=11';
-import { createVisual } from './src/visual.js?v=11';
+         storageKey, offerCost, applyIdentity } from './config.js?v=12';
+import { createJuice } from './src/juice.js?v=12';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=12';
+import { createBlockKinds } from './src/blocks.js?v=12';
+import { safeRows } from './src/arrival.js?v=12';
+import { createAwards } from './src/awards.js?v=12';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=12';
+import { createLeaderboard } from './src/leaderboard.js?v=12';
+import * as Tiers from './src/tiers.js?v=12';
+import { createOnboarding } from './src/onboarding.js?v=12';
+import { createVisual } from './src/visual.js?v=12';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=12';
+import { seedForSync, today as utcToday } from './src/daily.js?v=12';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=12';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -409,6 +451,28 @@ function easeView(dt){
 // rows several at a time so its descent keeps pace - see fractal.descentPx.
 let ROWS_TURN = 1;
 
+// QUIET is on while replayRun() is driving the simulation. It turns off
+// everything a run does BESIDES simulate: no saving, no awards, no banners, no
+// shop repaint, no leaderboard submission. The simulation itself is untouched,
+// which is the whole point - a replay has to be the same code or it proves
+// nothing.
+let QUIET = false;
+
+// What this run wrote down: the seed, and per turn the direction fired and
+// anything bought before the shot. See src/verify.js.
+let rec = null;
+
+// The UTC date when this run is the day's run, null otherwise. A daily run
+// takes its seed from the date rather than the clock, so everybody who plays
+// today plays the same field.
+let DAILY = null;
+
+// How many blocks each turn took down, in order. The run's fingerprint is
+// built from this and the final numbers, so two runs that end on the same
+// depth by different routes do not collide. Filled by endTurn(), which is the
+// one place a turn is actually over, and reset by fresh().
+let turnKills = [];
+
 // What the field looks like is the field's business. A mode that carries a
 // SURFACE - a picture the blocks are cut from - hands it to the block layer,
 // which then paints through the blocks instead of drawing materials, and the
@@ -450,7 +514,18 @@ const SPEED = CONFIG.swarm.speed;
 const SUBSTEPS = CONFIG.swarm.substeps;
 
 // All impact feedback lives here: trails, shatter, damage numbers, shake.
-const juice = createJuice({
+// `let`, not `const`: replayRun() swaps this for a silent stub while it drives
+// the simulation, so a replay spawns no particles and shakes no screen.
+//
+// ONLY THIS ONE. `look` below stays real, and that is not an oversight: it was
+// stubbed first and the replay threw, because damage() asks look.materialFor
+// for the colour to break a block in. The colour goes nowhere the simulation
+// can see it - straight into juice.destroy, which is the stub - but it is READ
+// on the collision path, and a stub that answers undefined there is a crash
+// rather than a slower replay. look holds no per body state and allocates
+// nothing per contact, so leaving it real costs nothing and removes a whole
+// class of divergence between a run and a replay of it.
+let juice = createJuice({
   width: W, height: H, floorY: FLOOR,
   trailColor: CONFIG.palette.swarm,
   shake: CONFIG.feel.shake,
@@ -507,7 +582,14 @@ function fresh(){
     field: null,
   };
   S.mode = MODE;
-  S.seed = (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
+  // A normal run takes a seed nobody chose. THE DAY'S RUN TAKES THE DAY.
+  // seedForSync hashes the UTC date with the game's name, so every player on
+  // the same calendar day descends the same field and their depths are
+  // comparable without anything being coordinated.
+  S.seed = DAILY
+    ? seedForSync(DAILY, 'swarm-breaker').hi
+    : (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
+  S.daily = DAILY;
   S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
   // A field that deals a SEQUENCE - the figure field, the picture field - is
   // restored by replaying it, so its source is kept where a save can reach it.
@@ -520,6 +602,13 @@ function fresh(){
   retarget(S.field.widens ? latticeAt(0) : CONFIG.board.cols);
   CELL = cellT; ORIGIN = originT;
   juice.clear();
+  // A run records itself from its first turn. A replay does not record: it is
+  // playing a log back, and a recorder inside it would be writing down what it
+  // was just told.
+  turnKills = [];
+  rec = QUIET ? null : createRunLog({
+    seed: S.seed, mode: S.mode, tier: S.tier, build: String(CONFIG.dev.build), daily: DAILY,
+  });
   // seed a couple of rows so the field is never empty on turn one
   addRow(); step(); addRow();
   paintShop();
@@ -670,6 +759,10 @@ function step(){
 // swarm line, and it is fractional because the field is not a whole number of
 // cells tall. The eased cell size is the right one to measure with - it is the
 // geometry currently on screen, and it never moves while a shot is in flight.
+// Every save point goes through here so a replay has exactly one thing to
+// switch off rather than four call sites to keep in step.
+function mark(){ if (!QUIET) store.mark(); }
+
 function view(){
   return {
     blocks: S.rows,
@@ -760,14 +853,25 @@ function aimDir(){
 }
 
 function fire(){
-  if (S.firing || S.dead) return;
   const a = aimDir();
   if (!a) return;
-  S.dir = { x: a.x, y: a.y };
+  fireDir(a.x, a.y);
+}
+
+// The shot itself, given the direction the simulation will actually use -
+// after the aim clamp, because that is the number the run is played with.
+// A replay calls this with the recorded direction; recording it here rather
+// than in fire() means the log holds what the simulation consumed and not
+// what the finger asked for.
+function fireDir(dx, dy){
+  if (S.firing || S.dead) return false;
+  S.dir = { x: dx, y: dy };
   S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
   S.turnKills = 0;
-  store.mark();
+  if (rec) rec.fire(dx, dy, CELL, ORIGIN);
+  mark();
   juice.launch(S.origin, FLOOR - R, S.dir.x, S.dir.y);
+  return true;
 }
 
 function endTurn(){
@@ -782,6 +886,7 @@ function endTurn(){
   //
   // It has to have been EARNED this turn. A board that was already empty when
   // the shot was taken is not a clear, it is a turn with nothing in it.
+  turnKills.push(S.turnKills | 0);
   if (S.rows.length === 0 && S.turnKills > 0 && !pastFinish()) perfectClear();
   // Belt and braces. The fuse and the floor already account for every sprayed
   // body; this makes "only for that turn" true by construction rather than by
@@ -811,7 +916,7 @@ function endTurn(){
   // run, so they are checked where they change.
   checkAwards();
   if (S.field.arrival.lost(view())) return die();
-  store.mark();
+  mark();
   paintShop();
 }
 
@@ -854,13 +959,18 @@ function endingWord(){
 function die(){
   S.dead = true;
   checkAwards();
+  if (QUIET) return;
   document.getElementById('overtitle').textContent = endingWord();
   recordBest();
-  store.mark();
+  recordDailyBest();
+  mark();
+  // The run posts what it wrote down about itself. A run with no log, or one
+  // that outgrew the cap, posts exactly what it always did and reads as
+  // unchecked on the board - nothing is withheld and nothing is penalised.
   board.finish({
     tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold,
     doctrine: 'none', endless: !!S.endless,
-  });
+  }, { claim: runClaim(), daily: S.daily || null });
   document.getElementById('overdepth').textContent = S.depth;
   document.getElementById('overballs').textContent = S.balls;
   document.getElementById('over').classList.add('on');
@@ -1480,6 +1590,7 @@ const moments = [];
  * @param {string} colour palette colour carrying the meaning
  */
 function moment(title, note, colour){
+  if (QUIET) return;
   // A pile of banners is noise. The newest one is the one that matters, and
   // anything still on screen is pushed along rather than fought with.
   if (moments.length >= 3) moments.shift();
@@ -1597,6 +1708,32 @@ function paintBulk(){
   }
 }
 
+/**
+ * Buy `n` of an offer, in order, and answer how many were actually bought.
+ *
+ * Each one is bought in turn rather than multiplied, because an offer can
+ * change what the next of it costs or does - clearing a row changes the row
+ * underneath it - and the price is re-read every time.
+ *
+ * A run writes down the PRESS and the number that press actually bought, so a
+ * replay reproduces the same sequence at the same points rather than trusting
+ * that the essence worked out the same way twice.
+ */
+function purchase(id, n){
+  const o = OFFERS.find(x => x.id === id);
+  if (!o) return 0;
+  let bought = 0;
+  for (let i = 0; i < (n | 0); i++){
+    const price = o.cost(S.depth);
+    if (S.gold < price) break;
+    S.gold -= price;
+    o.buy();
+    bought++;
+  }
+  if (bought && rec) rec.buy(id, bought);
+  return bought;
+}
+
 /** How many of this offer a press would buy, and what that costs. */
 function bulkFor(offer){
   const each = offer.cost(S.depth);
@@ -1606,6 +1743,7 @@ function bulkFor(offer){
 }
 
 function paintShop(){
+  if (QUIET) return;
   const el = document.getElementById('shop');
   el.classList.add('on');
   el.innerHTML = '';
@@ -1634,15 +1772,8 @@ function paintShop(){
       // Each one is bought in turn rather than multiplied, because an offer
       // can change what the next of it costs or does - clearing a row changes
       // the row underneath it - and the price is re-read every time.
-      let bought = 0;
-      for (let i = 0; i < n; i++){
-        const price = o.cost(S.depth);
-        if (S.gold < price) break;
-        S.gold -= price;
-        o.buy();
-        bought++;
-      }
-      if (bought){ store.mark(); paintShop(); }
+      const bought = purchase(o.id, n);
+      if (bought){ mark(); paintShop(); }
     };
     el.appendChild(b);
   });
@@ -1686,7 +1817,11 @@ registerMigration(1, 2, (data) => {
   };
 });
 
-const board = createLeaderboard({ defaultTier: CONFIG.difficulty.defaultTier });
+const board = createLeaderboard({
+  defaultTier: CONFIG.difficulty.defaultTier,
+  endpoint: (CONFIG.boards && CONFIG.boards.endpoint) || '',
+  allowedHosts: (CONFIG.boards && CONFIG.boards.allowedHosts) || undefined,
+});
 
 // The one thing that survives a run. Nothing in here changes how the game
 // plays - see src/awards.js for why that is the point.
@@ -1713,7 +1848,8 @@ function earned(a){
 /** Fold the run in and announce anything new. Safe to call at any moment: the
  *  history only ever takes maximums and unions, so checking twice cannot double
  *  count and checking early cannot lose anything. */
-function checkAwards(){ awards.check(runStats(), earned); }
+// A replayed run is not a run anybody played, so it earns nothing.
+function checkAwards(){ if (QUIET) return; awards.check(runStats(), earned); }
 
 const store = createSave({
   key: storageKey('run'),
@@ -1880,6 +2016,8 @@ function paintMenu(){
     b.onclick = () => startRun(id);
     list.appendChild(b);
   });
+  paintDaily(list);
+  paintBoard();
   // Only offer to go back to a run there is something to go back to.
   const live = !!S && !S.dead && S.depth > 1;
   document.getElementById('resume').classList.toggle('on', live);
@@ -1912,7 +2050,165 @@ function paintAwards(){
 }
 
 /** Begin a run on a given field. Remembered, so a reload comes back here. */
-function startRun(id){
+// ---------------------------------------------------------------------------
+// THE BOARD, IN THE MENU
+//
+// Three states per row and nothing else. UNCHECKED is not a suspicion, it is
+// the ordinary state of a row nobody has looked at yet. CHECKED BY N means
+// that many other players replayed the run in their own browsers and reached
+// the same result. DOES NOT REPLAY means somebody did not, and the row keeps
+// its place, its depth and its order - because the likely reason is an older
+// build, not a lie.
+//
+// Every state is a WORD as well as a colour. Nothing here is announced by a
+// sound, and nothing is announced by colour alone.
+// ---------------------------------------------------------------------------
+
+let boardRows = [];
+let myPlayerId = '';
+
+function boardScope(){
+  const st = board.status();
+  if (!st.configured) return CONFIG.text.boardLocal || 'your runs on this device';
+  return st.crew ? (CONFIG.text.boardCrew || 'crew ') + st.crew : (CONFIG.text.boardOpen || 'everyone');
+}
+
+/**
+ * Rows to draw. With a board configured these are the shared ones; with none,
+ * this device's own runs, which need no server and are the whole feature for
+ * anybody who never sets one up.
+ */
+function boardEntries(){
+  const st = board.status();
+  const rows = st.configured ? board.board(TIER) : board.personal(TIER, 10);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function paintBoard(){
+  const list = document.getElementById('bdlist');
+  if (!list) return;
+  document.getElementById('bdscope').textContent = boardScope();
+  document.getElementById('bdnote').textContent =
+    CONFIG.text.boardNote || 'A run can be replayed by anyone. Rows say whether anybody has.';
+  list.innerHTML = '';
+
+  boardRows = boardEntries();
+  if (!boardRows.length){
+    const p = document.createElement('p');
+    p.id = 'bdempty';
+    p.textContent = CONFIG.text.boardEmpty || 'No runs yet. Finish one and it lands here.';
+    list.appendChild(p);
+    return;
+  }
+
+  boardRows.forEach((e, i) => {
+    const state = entryState(e);
+    const row = document.createElement('div');
+    row.className = 'bdrow' + (myPlayerId && e.playerId === myPlayerId ? ' mine' : '');
+    row.title = stateNote(e);
+
+    const rk = document.createElement('span');
+    rk.className = 'rk'; rk.textContent = String(i + 1);
+
+    const who = document.createElement('span');
+    who.className = 'who'; who.textContent = e.name || (CONFIG.text.boardYou || 'you');
+
+    const dp = document.createElement('span');
+    dp.className = 'dp'; dp.textContent = (CONFIG.text.menuBestLabel || 'depth') + ' ' + (e.depth | 0);
+
+    const st = document.createElement('span');
+    st.className = 'st' + (state === STATE.witnessed ? ' checked' : state === STATE.mismatch ? ' differs' : '');
+    st.textContent = stateLabel(e, CONFIG.text.boardStates || {});
+
+    row.append(rk, who, dp, st);
+    list.appendChild(row);
+  });
+
+  const check = document.getElementById('bdcheck');
+  if (check) check.hidden = !board.status().configured;
+}
+
+/**
+ * Replay the top rows that this device has not checked and post what it found.
+ *
+ * THE PEERS DO THE PROCESSING. The server never replays anything - it has ten
+ * milliseconds of CPU and a replay is seconds - so verification is other
+ * players' browsers doing a few seconds of work while they read the board.
+ * A run is never its own witness, so this skips this device's own rows.
+ */
+async function checkBoard(){
+  const btn = document.getElementById('bdcheck');
+  if (btn) { btn.disabled = true; btn.textContent = CONFIG.text.boardChecking || 'replaying...'; }
+  let done = 0;
+  try {
+    myPlayerId = await board.playerId();
+    for (const e of boardRows.slice(0, 5)){
+      if (!e.hasLog || !e.runHash || !e.playerId || e.playerId === myPlayerId) continue;
+      const log = await board.runLog(TIER, { playerId: e.playerId });
+      if (!log) continue;
+      const r = replayRun({ log });
+      if (!r.ok) continue;
+      await board.witness(TIER, e, r.hash === e.runHash ? 'match' : 'mismatch');
+      done++;
+    }
+    await board.refresh(TIER, { force: true });
+  } catch (err) {
+    // A board that cannot be reached is not an error the player has to act on.
+  }
+  if (btn) { btn.disabled = false; btn.textContent = CONFIG.text.boardCheck || 'check the top runs'; }
+  paintBoard();
+  return done;
+}
+
+/**
+ * THE DAY'S RUN. One row under the modes.
+ *
+ * There is no timer on it, nothing expires, and nothing is lost by ignoring it
+ * for a week. It is a field everybody who plays today descends, so a depth on
+ * it means something next to somebody else's, and that is the entire feature.
+ */
+function paintDaily(list){
+  const t = CONFIG.text;
+  const day = utcToday();
+  const best = dailyBest(day, TIER);
+  const b = document.createElement('button');
+  b.className = 'mode daily' + (DAILY === day ? ' playing' : '');
+  b.innerHTML =
+    '<span class="head">'
+    + '<span><span class="nm">' + (t.dailyName || "today's field") + '</span> '
+    + '<span class="tell">' + day + '</span></span>'
+    + '<span class="best">' + (best ? (t.menuBestLabel || 'best depth') + ' ' + best : (t.menuNoBest || '')) + '</span>'
+    + '</span>'
+    + '<span class="blurb">' + (t.dailyBlurb || 'The same field for everyone, every day. No timer, nothing to miss.') + '</span>';
+  b.onclick = () => startRun(DEFAULT_MODE, { daily: true });
+  list.appendChild(b);
+}
+
+// The personal board keeps one best per day, so yesterday's is still there
+// tomorrow and a day that was missed is simply absent.
+const dailyKey = (day, tier) => storageKey('daily.' + day + '.' + tier);
+function dailyBest(day, tier){
+  try {
+    const v = parseInt(localStorage.getItem(dailyKey(day, tier)), 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch (e) { return 0; }
+}
+function recordDailyBest(){
+  if (!S || !S.daily) return;
+  try {
+    if (S.depth > dailyBest(S.daily, S.tier)) {
+      localStorage.setItem(dailyKey(S.daily, S.tier), String(S.depth));
+    }
+  } catch (e) {}
+}
+
+function startRun(id, opts){
+  // THE DAY'S RUN PINS THE FIELD, NOT THE PLAYER'S TIME.
+  // The mode is pinned too: a seed alone does not make two runs comparable if
+  // one of them is descending a different kind of field. The tier is left
+  // alone, because the boards are already kept per tier.
+  DAILY = (opts && opts.daily) ? utcToday() : null;
+  if (DAILY) id = DEFAULT_MODE;
   MODE = normaliseMode(id);
   try { localStorage.setItem(storageKey('mode'), MODE); } catch (e) {}
   document.getElementById('over').classList.remove('on');
@@ -1934,8 +2230,143 @@ document.getElementById('overmodes').onclick = () => {
   openMenu();
 };
 document.getElementById('resume').onclick = closeMenu;
+(() => {
+  const b = document.getElementById('bdcheck');
+  if (b) b.onclick = () => { checkBoard(); };
+})();
 
 function restart(){ document.getElementById('over').classList.remove('on'); closeMenu(); fresh(); }
+
+// ---------------------------------------------------------------------------
+// REPLAY
+//
+// The same simulation, driven from a written down run instead of from a
+// finger. This is what makes a board entry checkable: anybody looking at the
+// board can run this over somebody else's log in their own browser and see
+// whether they reach the same result.
+//
+// It is the SAME CODE. fresh(), purchase(), fireDir(), sim() and endTurn() are
+// the functions the live game uses, called in the order the log records. There
+// is no second engine to drift away from the first, which is the only way a
+// replay can prove anything at all.
+//
+// What it borrows it puts back. Every module level thing the game keeps
+// between turns is saved, swapped for the replay's own, and restored in a
+// finally - so a witness check running over somebody else's run cannot
+// disturb the run the player is in the middle of.
+// ---------------------------------------------------------------------------
+
+/** Everything a replay must not do for real, made silent by reflection so a
+ *  method added to juice later is stubbed without anyone remembering to come
+ *  back here. Non-function properties are kept as they are. */
+function silence(real){
+  const out = {};
+  for (const k in real) out[k] = typeof real[k] === 'function' ? (() => {}) : real[k];
+  return out;
+}
+
+/**
+ * Replay a written down run and answer what it reached.
+ *
+ * @returns {{ok:boolean, reason?:string, depth:number, swarm:number,
+ *            essence:number, doctrine:string, hash:string, turns:number,
+ *            kills:number[]}}
+ */
+function replayRun(input){
+  const log = input && input.log ? input.log : input;
+  const bad = validateLog(log);
+  if (bad) return { ok: false, reason: bad };
+
+  // A replay is bounded. A log is somebody else's data, and a witness check
+  // runs in a tab a player is trying to read a board in.
+  const budget = Math.max(1000, (input && input.stepBudget) | 0 || 6000000);
+  let steps = 0;
+
+  const saved = {
+    S, MODE, TIER, DAILY, ROWS_TURN, COLS, CELL, ORIGIN, cellT, originT,
+    cellIndex, indexDirty, rec, QUIET, juice, turnKills,
+  };
+  let result;
+  try {
+    QUIET = true;
+    juice = silence(saved.juice);
+    MODE = normaliseMode(log.mode);
+    TIER = log.tier;
+    DAILY = log.daily || null;
+    fresh();
+    // fresh() derives the seed from the clock unless the run was a daily. A
+    // replay is neither: it is told the seed, so the field is rebuilt from
+    // the number the run actually used.
+    if (S.seed !== (log.seed >>> 0)) {
+      S.seed = log.seed >>> 0;
+      DAILY = log.daily || null;
+      rebuildFrom(S.seed);
+    }
+
+    let over = false;
+    for (const t of log.turns){
+      for (const [id, n] of (t.b || [])) purchase(id, n);
+      // The view the shot was aimed against, restored before the shot rather
+      // than eased into: the ease runs on wall time and a replay has none.
+      CELL = t.v[0]; ORIGIN = t.v[1];
+      if (!fireDir(t.d[0], t.d[1])) { over = true; break; }
+      while (S.firing){
+        if (++steps > budget) return { ok: false, reason: 'the replay ran past its step budget' };
+        sim();
+      }
+      if (S.dead) { over = true; break; }
+    }
+
+    result = {
+      ok: true,
+      depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none',
+      turns: log.turns.length, kills: turnKills.slice(), steps, ended: over,
+      hash: runHashOf({ depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none', kills: turnKills }),
+    };
+  } finally {
+    S = saved.S; MODE = saved.MODE; TIER = saved.TIER; DAILY = saved.DAILY;
+    ROWS_TURN = saved.ROWS_TURN; COLS = saved.COLS; CELL = saved.CELL; ORIGIN = saved.ORIGIN;
+    cellT = saved.cellT; originT = saved.originT;
+    cellIndex = saved.cellIndex; indexDirty = saved.indexDirty;
+    rec = saved.rec; QUIET = saved.QUIET; juice = saved.juice;
+    turnKills = saved.turnKills;
+  }
+  return result;
+}
+
+/** Rebuild the field and the block kinds from a seed the run is being told,
+ *  which is what a replay does and a save restore already did. */
+function rebuildFrom(seed){
+  S.field = createField(S.mode, seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
+  S.form = S.field.dealsSequence ? S.field.source : null;
+  S.kinds = createBlockKinds(seed, { lattice: S.field.lattice !== false });
+  S.rows = []; S.drops = []; S.live = []; S.dealt = 0; S.depth = 1;
+  S.balls = Tiers.tierOf(S.tier).supply.start; S.gold = 0;
+  S.owed = { ball: 0, gold: 0 };
+  S.power = CONFIG.swarm.startingPower; S.gain = CONFIG.swarm.startingGain;
+  S.origin = W / 2; S.nextOrigin = null; S.dead = false;
+  S.endless = false; S.won = false; S.clears = 0; S.streak = 0; S.turnKills = 0;
+  ROWS_TURN = 1;
+  turnKills = [];
+  bindField();
+  retarget(S.field.widens ? latticeAt(0) : CONFIG.board.cols);
+  CELL = cellT; ORIGIN = originT;
+  addRow(); step(); addRow();
+}
+
+/** What this run is claiming, for the board. Computed from the run as it was
+ *  played, never from a replay of it: if the two ever disagree that is a real
+ *  mismatch and the whole point is that somebody gets to see it. */
+function runClaim(){
+  if (!rec) return null;
+  const log = rec.log();
+  return {
+    log,
+    runHash: runHashOf({ depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none', kills: turnKills }),
+    build: String(CONFIG.dev.build),
+    daily: S.daily || null,
+  };
+}
 
 // --- loop -------------------------------------------------------------------
 
@@ -2041,7 +2472,19 @@ fresh();
 const resumed = store.load();
 store.start();
 // A handle for tools that drive the page: the live run and the view.
-if (typeof window !== 'undefined') window.game = { get state(){ return S; }, get cell(){ return CELL; }, get origin(){ return ORIGIN; } };
+if (typeof window !== 'undefined') window.game = {
+  get state(){ return S; }, get cell(){ return CELL; }, get origin(){ return ORIGIN; },
+  // The verification surface. `replay` is what a witness runs over somebody
+  // else's log; `claim` is what this run would post; `fire` and `buy` are how
+  // a driver plays a run without a pointer.
+  replay: replayRun,
+  claim: runClaim,
+  get log(){ return rec ? rec.log() : null; },
+  fire: (x, y) => fireDir(x, y),
+  buy: (id, n) => purchase(id, n),
+  step: () => sim(),
+  board,
+};
 // A player with a run in progress is dropped back into it; anyone else is
 // asked what they want to play.
 if (!(resumed && resumed.ok && resumed.found)) openMenu();

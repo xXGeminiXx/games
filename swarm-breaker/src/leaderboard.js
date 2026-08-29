@@ -87,6 +87,13 @@
 
 
 /** Bumped when the stored shape changes in a way old data cannot survive. */
+// Verification. A board entry may carry a written down run and a signature
+// over what it claims; other players replay it and post signed verdicts. None
+// of this is required - a board with no logs at all still works exactly as it
+// did, and every entry simply reads UNVERIFIED.
+import { identity as deviceIdentity, verify as verifySignature } from './identity.js?v=12';
+import { canonicalRun, canonicalWitness, logHash as logHashOf, entryState, STATE } from './verify.js?v=12';
+
 const STORAGE_VERSION = 1;
 
 const KEYS = {
@@ -367,6 +374,21 @@ export function createLeaderboard(config = {}) {
 
   const scopeKey = (tier, crew) => `${crew || 'open'}|${tier}`;
 
+  // ONE KEY PER DEVICE, MADE ON DEMAND.
+  //
+  // It is created the first time a run is posted and never before, so a player
+  // who never types a name never generates one. The player id is the hash of
+  // its public key, which is what lets a board tell "the same person as last
+  // week" from "somebody who typed the same name" without an account.
+  let identityPromise = null;
+  function device() {
+    if (!identityPromise) {
+      identityPromise = deviceIdentity({ appId: 'swarm-breaker' })
+        .catch(() => null);   // no WebCrypto: the run posts unsigned and reads UNVERIFIED
+    }
+    return identityPromise;
+  }
+
   function emit() {
     for (const fn of listeners) {
       try {
@@ -483,6 +505,14 @@ export function createLeaderboard(config = {}) {
         doctrine: normalized.doctrine,
         endless: normalized.endless,
         assisted: normalized.assisted,
+        // A local run carries the same shape a remote row does, so the board
+        // renderer is one piece of code rather than two that drift.
+        build: run && run.build ? String(run.build).slice(0, 16) : '',
+        runHash: run && /^[0-9a-f]{16}$/.test(run.runHash || '') ? run.runHash : '',
+        hasLog: Boolean(run && run.hasLog),
+        truncated: Boolean(run && run.truncated),
+        witnesses: 0,
+        mismatch: 0,
         at: Date.now(),
       };
 
@@ -624,6 +654,42 @@ export function createLeaderboard(config = {}) {
         assisted: normalized.assisted,
       };
       if (crew) payload.crew = crew;
+      if (opts.daily) payload.daily = String(opts.daily);
+
+      // THE CLAIM, IF THERE IS ONE.
+      //
+      // A run that wrote itself down posts the log, the hash it reached, and a
+      // signature over both. Anything missing here is not an error: the run
+      // posts as it always did and the board shows it as unchecked. A
+      // truncated log is deliberately NOT signed as checkable - there is
+      // nothing complete to replay.
+      const claim = opts.claim;
+      if (claim && claim.log && claim.runHash && !claim.log.truncated) {
+        const id = await device();
+        if (id) {
+          const signed = {
+            tier: normalized.tier,
+            mode: claim.log.mode,
+            seed: claim.log.seed,
+            depth: normalized.depth,
+            swarmLog: normalized.swarmLog,
+            essenceLog: normalized.essenceLog,
+            build: claim.build,
+            playerId: id.playerId,
+            runHash: claim.runHash,
+            logHash: logHashOf(claim.log),
+          };
+          payload.build = claim.build;
+          payload.playerId = id.playerId;
+          payload.pubKey = id.publicKey;
+          payload.runHash = claim.runHash;
+          payload.logHash = signed.logHash;
+          payload.mode = claim.log.mode;
+          payload.seed = claim.log.seed;
+          payload.log = claim.log;
+          payload.sig = await id.sign(canonicalRun(signed));
+        }
+      }
 
       const result = await request('POST', '/api/board', payload);
       if (!result.ok) {
@@ -656,6 +722,64 @@ export function createLeaderboard(config = {}) {
         improved: Boolean(data.improved),
       };
     }, { ok: false, reason: 'error', rank: null });
+  }
+
+  /**
+   * Fetch one entry's written down run, so it can be replayed.
+   * Answers null when there is nothing to replay, which is most rows.
+   */
+  function runLog(tier, opts = {}) {
+    return guardAsync(async () => {
+      if (!configured() || !readOnline()) return null;
+      const query = { tier: slug(tier, TIER_PATTERN, settings.defaultTier), player: String(opts.playerId || '') };
+      const crew = crewFor(opts);
+      if (crew) query.crew = crew;
+      const result = await request('GET', '/api/log', null, query);
+      return (result.ok && result.data && result.data.log) ? result.data.log : null;
+    }, null);
+  }
+
+  /**
+   * Post a verdict about somebody else's run.
+   *
+   * A witness is a player whose browser replayed an entry and either reached
+   * the same result or did not. Both verdicts are posted, because a board that
+   * only ever hears agreement is not evidence of anything.
+   *
+   * NOBODY WITNESSES THEMSELVES. A run's own device is refused here rather
+   * than at the Worker, so the pointless request is never made either.
+   */
+  function witness(tier, entry, verdict, opts = {}) {
+    return guardAsync(async () => {
+      if (!configured() || !readOnline()) return { ok: false, reason: 'offline' };
+      if (!entry || !entry.playerId || !entry.runHash) return { ok: false, reason: 'nothing-to-witness' };
+      if (verdict !== 'match' && verdict !== 'mismatch') return { ok: false, reason: 'bad-verdict' };
+      const id = await device();
+      if (!id) return { ok: false, reason: 'no-identity' };
+      if (id.playerId === entry.playerId) return { ok: false, reason: 'own-run' };
+
+      const crew = crewFor(opts);
+      const signed = {
+        tier: slug(tier, TIER_PATTERN, settings.defaultTier),
+        crew: crew || '',
+        entryId: entry.playerId,
+        entryHash: entry.runHash,
+        verdict,
+        witnessId: id.playerId,
+      };
+      const body = { ...signed, pubKey: id.publicKey, sig: await id.sign(canonicalWitness(signed)) };
+      const result = await request('POST', '/api/witness', body);
+      if (!result.ok) return { ok: false, reason: result.reason };
+      return { ok: true, counted: Boolean(result.data && result.data.counted), witnesses: result.data && result.data.witnesses };
+    }, { ok: false, reason: 'error' });
+  }
+
+  /** This device's player id, or '' when it has none yet. */
+  function playerId() {
+    return guardAsync(async () => {
+      const id = await device();
+      return id ? id.playerId : '';
+    }, '');
   }
 
   /**
@@ -882,6 +1006,12 @@ export function createLeaderboard(config = {}) {
     },
     configured,
     consent,
+    // verification
+    runLog,
+    witness,
+    playerId,
+    entryState,
+    STATE,
     status() {
       return guard(() => {
         const gate = consent();
@@ -1063,6 +1193,16 @@ function readEntry(raw) {
     endless: Boolean(raw.endless),
     assisted: Boolean(raw.assisted),
     at: clampInt(raw.at, 0, Number.MAX_SAFE_INTEGER, 0),
+    // The verification half. A board that has never seen a log answers zeros
+    // here and every row reads UNVERIFIED, which is what it was before any of
+    // this existed.
+    build: typeof raw.build === 'string' ? raw.build.slice(0, 16) : '',
+    runHash: /^[0-9a-f]{16}$/.test(raw.runHash) ? raw.runHash : '',
+    playerId: typeof raw.playerId === 'string' && raw.playerId.length === 43 ? raw.playerId : '',
+    hasLog: Boolean(raw.hasLog),
+    truncated: Boolean(raw.truncated),
+    witnesses: clampInt(raw.witnesses, 0, 1e6, 0),
+    mismatch: clampInt(raw.mismatch, 0, 1e6, 0),
   };
 }
 

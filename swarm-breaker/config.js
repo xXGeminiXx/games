@@ -109,6 +109,30 @@ export const CONFIG = {
     // it says so here - directly above the rows, where it is read before they
     // are clicked rather than at the bottom of a card that scrolls.
     menuModeLabel:  'pick a mode to start',
+    // THE BOARD. Every state is a word as well as a colour, and none of them
+    // is an accusation: a run that does not replay keeps its place and the
+    // likeliest reason is that it was played on an older build.
+    boardTitle: 'board',
+    boardLocal: 'your runs on this device',
+    boardOpen: 'everyone',
+    boardCrew: 'crew ',
+    boardYou: 'you',
+    boardNote: 'A finished run writes itself down, so anybody can replay it. A row says whether anybody has.',
+    boardEmpty: 'No runs yet. Finish one and it lands here.',
+    boardCheck: 'check the top runs',
+    boardChecking: 'replaying...',
+    boardStates: {
+      unverified: 'unchecked',
+      witnessed: 'checked by N',
+      mismatch: 'does not replay',
+      unverifiedNote: 'Nobody has replayed this run yet.',
+      witnessedNote: 'N other players replayed this run and got the same result.',
+      mismatchNote: 'Someone replayed this run and reached a different result. Usually that means it was played on an older build. It keeps its place.',
+      truncatedNote: 'This run was too long to write down, so nobody can replay it. It keeps its place.',
+      noLogNote: 'This run posted no replay, so there is nothing to check. It keeps its place.',
+    },
+    dailyName: "today's field",
+    dailyBlurb: 'The same field for everyone, every day. No timer, nothing to miss.',
     menuBestLabel:  'best depth',
     menuNoBest:     'not yet played',
     menuHint:       'esc reopens this  \u00b7  drag to aim, release to fire',
@@ -971,6 +995,19 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   // DEV - switches that only matter while tuning
   // -------------------------------------------------------------------------
+  // THE BOARD'S SERVER, OR NO SERVER AT ALL.
+  //
+  // Empty is a complete and supported setup, not a broken one: with no
+  // endpoint the game makes NO network call whatsoever, the board panel shows
+  // this device's own runs, and every row reads unchecked. Fill this in only
+  // after the Worker is deployed - see docs/LEADERBOARD.md for the four steps.
+  boards: {
+    endpoint: '',
+    // Remote boards only run on hosts named here, so a fork served from
+    // anywhere else keeps its own runs and never calls this Worker.
+    allowedHosts: ['localhost', '127.0.0.1', 'xxgeminixx.github.io'],
+  },
+
   dev: {
     // THE CACHE BUSTER, WRITTEN DOWN.
     //
@@ -980,7 +1017,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 11,
+    build: 12,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
