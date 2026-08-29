@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Foxfire</title>
+<style>
+  /* Colours arrive from config.js as custom properties; the values here are
+     only what the page shows before that file has run. */
+  :root{
+    --void:#07090a; --panel:#0c1011; --rule:#1a2220; --ink:#d5dcd7; --dim:#6a7873;
+    --quiet:#414d49; --sugar:#d9b35a; --mineral:#7fa6c4; --glow:#7ff2b0; --hot:#c8553d;
+    --good:#7fd39a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--void);color:var(--ink)}
+  body{
+    font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums; display:flex; flex-direction:column; overflow:hidden;
+  }
+  button{
+    font:inherit; color:var(--ink); background:transparent; border:1px solid var(--rule);
+    padding:3px 9px; cursor:pointer; border-radius:2px; letter-spacing:.02em;
+  }
+  button:hover:not(:disabled){border-color:var(--dim)}
+  button:disabled{opacity:.35;cursor:default}
+  button b{font-weight:500}
+  button i{font-style:normal;color:var(--dim);margin-left:8px;font-size:11px}
+  h2{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--dim);margin:0 0 8px}
+
+  /* The top line. */
+  header{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px 20px; flex-wrap:wrap;
+    padding:12px 22px 8px; border-bottom:1px solid var(--rule);
+  }
+  #brand b{font-size:15px;font-weight:600;letter-spacing:.04em}
+  #brand span{color:var(--quiet);margin-left:14px;font-size:11px}
+  #stats{display:flex;gap:10px 24px;flex-wrap:wrap}
+  #stats .stat b{display:block;font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  #stats .stat span{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+  #stats #sugar{color:var(--sugar)} #stats #minerals{color:var(--mineral)} #stats #tips{color:var(--glow)}
+
+  /* Two columns: the books on the left, the floor on the right. */
+  main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;min-height:0}
+  #books{overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;border-right:1px solid var(--rule)}
+  #field{display:flex;flex-direction:column;min-height:0;min-width:0}
+  #floor{flex:1 1 auto;position:relative;min-height:150px}
+  #floor canvas{display:block;width:100%;height:100%}
+  #fieldhint{position:absolute;left:14px;top:10px;color:var(--quiet);font-size:11px;pointer-events:none}
+  #traits-panel{border-top:1px solid var(--rule);padding:10px 18px 8px;flex:0 0 auto;max-height:46%;overflow-y:auto}
+  #traits{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1px 22px}
+
+  /* The log: newest on top, fading down. */
+  #log{margin:0 0 12px;min-height:44px}
+  #log p{margin:0 0 2px;color:var(--ink)}
+  #log p:nth-child(n+2){color:var(--dim)}
+  #log p:nth-child(n+4){color:var(--quiet)}
+  #log p:nth-child(n+6){display:none}
+
+  .panel{border-top:1px solid var(--rule);padding:12px 0 10px}
+  .lbl{color:var(--dim);margin-right:8px;font-size:11px}
+  #hand button{padding:5px 14px}
+  #hand #handline{color:var(--dim);margin-left:12px}
+  #tips-panel .acts{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+  #tipline{color:var(--dim);font-size:12px}
+
+  /* The trees. */
+  #trees{border-collapse:collapse;width:100%;table-layout:fixed}
+  #trees th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--quiet);text-align:left;padding:0 6px 4px 0}
+  #trees th:nth-child(1){width:126px} #trees th:nth-child(2){width:44px} #trees th:nth-child(3){width:60px}
+  #trees th:nth-child(4){width:62px} #trees th:nth-child(5){width:62px} #trees th:nth-child(6){width:62px}
+  #trees td{padding:3px 5px 3px 0;vertical-align:middle;border-top:1px solid var(--rule);font-size:12px;overflow:hidden;white-space:nowrap}
+  #trees td.kind b{display:block;font-weight:500}
+  #trees td.kind small{display:block;color:var(--quiet);font-size:10px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #trees td.sent{color:var(--mineral)} #trees td.got{color:var(--sugar)}
+  #trees td.rate.sat{color:var(--hot)} #trees td.rate.cold{color:var(--mineral)}
+  #trees td.weight{white-space:nowrap}
+  #trees td.weight button.w{padding:0 6px;line-height:16px;font-size:11px}
+  #trees td.weight .wv{display:inline-block;width:16px;text-align:center}
+  #trees td.policy button{padding:0 6px;line-height:16px;font-size:10px;margin-right:3px}
+  #trees td.policy button.on{border-color:var(--sugar);color:var(--sugar)}
+  #treesnote{color:var(--quiet);font-size:11px;margin:4px 0 0}
+
+  /* The year. */
+  #season-panel{border-left:2px solid var(--rule);padding-left:12px}
+  #season-panel.season-0{border-left-color:var(--good)}
+  #season-panel.season-1{border-left-color:var(--sugar)}
+  #season-panel.season-2{border-left-color:var(--hot)}
+  #season-panel.season-3{border-left-color:var(--mineral)}
+  #season-name{font-size:14px;font-weight:600}
+  #season-left{color:var(--dim);margin-left:10px;font-size:11px}
+  #season-track{height:2px;background:var(--rule);margin-top:8px;width:100%}
+  #season-bar{display:block;height:2px;background:var(--dim);width:0}
+
+  /* Reach. */
+  #reach-panel .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  #reach-panel #beyond{border-color:var(--glow);color:var(--glow)}
+  #reachline,#beyondline,#belowline{color:var(--dim);font-size:12px;margin:0 0 4px}
+
+  /* Traits and the genome: one line each. */
+  .rrow{display:grid;grid-template-columns:216px 1fr auto;align-items:center;gap:8px;margin:0 0 2px;min-width:0}
+  .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .line{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .lv{color:var(--quiet);font-size:10px}
+
+  /* Fruiting. */
+  #spores-panel{border-left:2px solid var(--glow);padding-left:12px}
+  #spores-note{margin:0 0 8px;color:var(--dim)}
+  #spores-held{margin:0 0 8px;color:var(--glow);font-size:12px}
+  #fruit{border-color:var(--glow);color:var(--glow);padding:4px 12px;margin-bottom:10px}
+  #p-genome{margin-top:6px}
+  #genome{display:grid;gap:2px}
+  #genome .rrow button.rite{border-color:var(--rule)}
+
+  footer{
+    display:flex;gap:10px;align-items:center;padding:6px 22px;border-top:1px solid var(--rule);
+    color:var(--quiet);font-size:11px;
+  }
+  footer button{padding:1px 8px;font-size:11px;color:var(--dim)}
+  footer #saved{margin-left:auto}
+
+  @media (max-width:1200px){
+    .rrow{grid-template-columns:196px 1fr auto}
+    #brand span{display:none}
+  }
+  @media (max-height:700px){
+    #log p:nth-child(n+4){display:none}
+    #log{margin-bottom:8px;min-height:0}
+    .panel{padding:8px 0 6px}
+    h2{margin-bottom:5px}
+  }
+  @media (max-width:760px){
+    body{overflow:auto}
+    main{display:flex;flex-direction:column}
+    #field{order:-1;border-bottom:1px solid var(--rule)}
+    #floor{height:240px;flex:none}
+    #traits-panel{max-height:none;overflow:visible}
+    #traits{grid-template-columns:1fr}
+    #books{border-right:0;overflow:visible;padding:12px 14px}
+    header{padding:10px 14px 6px;flex-wrap:wrap}
+    #stats{gap:14px;flex-wrap:wrap}
+    /* The table keeps its shape and scrolls inside its own panel; the page
+       itself never scrolls sideways. */
+    #trees-panel{overflow-x:auto}
+    #trees{table-layout:auto;min-width:500px}
+    #trees th:nth-child(n){width:auto}
+    /* On a phone there is no room beside a button for the line that says what
+       it does, so the line goes underneath it instead of being cut off. */
+    .rrow{grid-template-columns:1fr auto;grid-template-areas:"name lv" "line line";row-gap:1px;margin-bottom:7px}
+    .rrow button.rite{grid-area:name}
+    .rrow .lv{grid-area:lv}
+    .rrow .line{grid-area:line;white-space:normal;overflow:visible}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div id="brand"><b id="title">Foxfire</b><span id="tagline"></span></div>
+  <div id="stats">
+    <div class="stat" id="st-sugar"><b id="sugar">0</b><span id="lbl-sugar">sugar</span></div>
+    <div class="stat" id="st-income" hidden><b id="income">0</b><span id="lbl-income">sugar/s</span></div>
+    <div class="stat" id="st-minerals" hidden><b id="minerals">0</b><span id="lbl-minerals">minerals/s</span></div>
+    <div class="stat" id="st-tips" hidden><b id="tips">0</b><span id="lbl-tips">tips</span></div>
+    <div class="stat" id="st-area" hidden><b id="area">0</b><span id="lbl-area">ground</span></div>
+    <div class="stat" id="st-level" hidden><b id="level">0</b><span id="lbl-level">reach</span></div>
+  </div>
+</header>
+<main>
+  <section id="books">
+    <div id="log"></div>
+    <div id="hand" class="panel"><button id="reach">Reach</button><span id="handline"></span></div>
+    <div id="tips-panel" class="panel" hidden>
+      <h2 id="p-tips">the tips</h2>
+      <div class="acts"><button id="buy-tip">Grow a tip</button><button id="buy-tips-max">Max</button></div>
+      <p id="tipline"></p>
+    </div>
+    <div id="trees-panel" class="panel" hidden>
+      <h2 id="p-trees">the trees</h2>
+      <table id="trees"></table>
+      <p id="treesnote"></p>
+    </div>
+    <div id="season-panel" class="panel" hidden>
+      <h2 id="p-season">the year</h2>
+      <span id="season-name"></span><span id="season-left"></span>
+      <div id="season-track"><span id="season-bar"></span></div>
+    </div>
+    <div id="reach-panel" class="panel" hidden>
+      <h2 id="p-reach">reach</h2>
+      <p id="reachline"></p>
+      <div class="acts"><button id="extend">Extend</button><button id="beyond" hidden>Go beyond</button></div>
+      <p id="beyondline"></p>
+      <p id="belowline" hidden></p>
+    </div>
+    <div id="spores-panel" class="panel" hidden>
+      <h2 id="p-spores">fruiting</h2>
+      <p id="spores-note"></p>
+      <button id="fruit" hidden>Fruit</button>
+      <p id="spores-held"></p>
+      <h2 id="p-genome" hidden>what the spore carries</h2>
+      <div id="genome" hidden></div>
+    </div>
+  </section>
+  <section id="field">
+    <div id="floor"><canvas id="v"></canvas><div id="fieldhint">the floor</div></div>
+    <div id="traits-panel" hidden><h2 id="p-traits">traits</h2><div id="traits"></div></div>
+  </section>
+</main>
+<footer>
+  <button id="export">export</button>
+  <button id="import">import</button>
+  <button id="reset">start over</button>
+  <span id="saved"></span>
+</footer>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Foxfire. One spore on a dead log; then the forest.
+//
+// This file only wires the page to the game. Everything the game is lives in
+// src/, every number lives in config.js, and every sentence lives in
+// content.js.
+// ---------------------------------------------------------------------------
+import { CONFIG, applyIdentity } from './config.js?v=1';
+import { createGame } from './src/game.js?v=1';
+
+applyIdentity(document);
+
+const game = createGame({
+  doc: document,
+  win: window,
+  canvas: document.getElementById('v'),
+  cfg: CONFIG,
+  storage: window.localStorage,
+});
+
+// The footer: a save that can leave, a save that can arrive, and a clean slate.
+document.getElementById('export').addEventListener('click', () => {
+  const str = game.exportSave();
+  const done = (ok) => game.ui.savedNote(ok ? 'save copied' : 'copy this: ' + str.slice(0, 24) + '...');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt('your save', str); done(false); });
+  } else {
+    window.prompt('your save', str);
+    done(false);
+  }
+});
+document.getElementById('import').addEventListener('click', () => {
+  const str = window.prompt('paste a save');
+  if (!str) return;
+  try { game.importSave(str); } catch (e) { game.ui.savedNote(String(e.message || e)); }
+});
+
+// Two presses to do anything that cannot be undone.
+const armed = (id, sure, plain, fn) => {
+  let on = false;
+  const b = document.getElementById(id);
+  b.addEventListener('click', () => {
+    if (!on) { on = true; b.textContent = sure; setTimeout(() => { on = false; b.textContent = plain; }, 4000); return; }
+    fn();
+  });
+};
+armed('reset', CONFIG.text.resetSure, CONFIG.text.reset, () => game.reset());
+armed('fruit', CONFIG.text.fruitSure, CONFIG.text.fruit, () => game.fruit());
+
+game.start();
+window.foxfire = game;
+</script>
+</body>
+</html>
