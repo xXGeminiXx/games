@@ -360,6 +360,12 @@ export const CONFIG = {
     sevenDigit: 7,
     spinSeconds: 1.6,
     holdSeconds: 1.1,     // how long the result stays up
+    // How many more sets of drums can turn at once, arranged around the centre
+    // window. A spin that arrives while the centre is busy opens one of these
+    // instead of waiting in line, so what the gate bought is paid during the
+    // round rather than after the last ball has dropped. Past the ring a spin
+    // waits, so no run can cover the face in windows.
+    around: 6,
     // The published odds. A real cabinet prints these on the glass and this
     // one shows them on the plaque, because a machine that hides its odds and
     // a machine that advertises them are not the same kind of object.

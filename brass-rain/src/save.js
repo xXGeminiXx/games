@@ -18,10 +18,10 @@
 //   another program wrote, and none of those may stop the game from starting.
 // ---------------------------------------------------------------------------
 
-import { serializeBends, restoreBends } from './board.js?v=4';
-import { serializeBalls, restoreBalls } from './physics.js?v=4';
-import { serializeFloor, restoreFloor } from './floor.js?v=4';
-import { serializeQuality } from './quality.js?v=4';
+import { serializeBends, restoreBends } from './board.js?v=5';
+import { serializeBalls, restoreBalls } from './physics.js?v=5';
+import { serializeFloor, restoreFloor } from './floor.js?v=5';
+import { serializeQuality } from './quality.js?v=5';
 
 export function saveKey(cfg) { return cfg.identity.storagePrefix + ':save'; }
 
@@ -50,7 +50,20 @@ export function serialize(cfg, game) {
       time: run.time,
       over: run.over,
       fever: { ...run.fever },
-      reel: { ...run.reel, digits: Array.from(run.reel.digits) },
+      // The windows turning beside the centre are not written down one by
+      // one: they go back on the queue, so a run resumes owing exactly the
+      // spins it owed and none of them is lost to a reload.
+      reel: {
+        ...run.reel,
+        digits: Array.from(run.reel.digits),
+        around: undefined,
+        plan: undefined,
+        spinning: false,
+        // A spin still turning when the game was put down goes back on the
+        // queue with the rest, so it is turned again rather than resumed
+        // halfway through a decision that was not written down.
+        queued: run.reel.queued + run.reel.around.length + (run.reel.spinning ? 1 : 0),
+      },
       fittings: run.fittings.slice(),
       mods: { ...run.mods },
       stats: { ...run.stats },
@@ -125,6 +138,7 @@ export function restoreRun(cfg, run, obj) {
     run.reel.spinning = !!obj.reel.spinning;
     run.reel.t = num(obj.reel.t, 0);
     run.reel.queued = int(obj.reel.queued, 0);
+    run.reel.around.length = 0;
     run.reel.holdT = num(obj.reel.holdT, 0);
     run.reel.result = typeof obj.reel.result === 'string' ? obj.reel.result : null;
     if (Array.isArray(obj.reel.digits)) {

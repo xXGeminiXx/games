@@ -11,21 +11,21 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=4';
+import { loadConfig } from '../config.js?v=5';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=4';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=5';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=4';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=4';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=4';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=4';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=4';
-import { rng as makeRng } from './rng.js?v=4';
-import { offerCabinets } from './cabinets.js?v=4';
-import * as Save from './save.js?v=4';
+         handMult, restoreFloor } from './floor.js?v=5';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=5';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=5';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=5';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=5';
+import { rng as makeRng } from './rng.js?v=5';
+import { offerCabinets } from './cabinets.js?v=5';
+import * as Save from './save.js?v=5';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -46,8 +46,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=4');
-  const metaModule = await optional('./meta.js?v=4');
+  const catalogue = await optional('./fittings.js?v=5');
+  const metaModule = await optional('./meta.js?v=5');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -722,6 +722,11 @@ export function view(game) {
     flashes: game.out.flashes,
     marks: game.out.marks,
     reels: run.reel.spinning || run.reel.holdT > 0 ? run.reel.digits : null,
+    // The sets turning beside the centre one, each with the ring position it
+    // opened in so the picture stays put while it is being read.
+    reelsAround: run.reel.around.length
+      ? run.reel.around.filter(r => r.spinning || r.holdT > 0).map(r => ({ digits: r.digits, slot: r.slot }))
+      : null,
     t: run.time,
   };
 }

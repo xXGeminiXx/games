@@ -22,18 +22,18 @@
 // description of what to draw, and it touches nothing else on the page.
 // ---------------------------------------------------------------------------
 
-import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=4';
-import { createColours } from './colours.js?v=4';
-import { fitBoard, clipTransform, lampPosition, reelRect } from './layout.js?v=4';
-import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=4';
+import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=5';
+import { createColours } from './colours.js?v=5';
+import { fitBoard, clipTransform, lampPosition, reelRect } from './layout.js?v=5';
+import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=5';
 import {
   packPins, packPockets, packRails, packFlashes, packReels, packArc,
-  medianPinRadius, POCKET_KINDS, POCKET_TONES, FLASH_KINDS,
-} from './board-geom.js?v=4';
+  medianPinRadius, POCKET_KINDS, POCKET_TONES, FLASH_KINDS, REEL_WINDOWS,
+} from './board-geom.js?v=5';
 import {
   INSTANCE_VS, RAIL_VS, BALL_VS, GROUND_FS, PIN_FS, BALL_FS, BALL_SHADOW_FS,
   RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, COMPOSITE_FS,
-} from './shaders.js?v=4';
+} from './shaders.js?v=5';
 
 // The unit quad every instance is stamped from, as a triangle strip so no
 // index buffer is needed.
@@ -208,7 +208,10 @@ export function createScene(canvas, cfg) {
     res.pocketInst = instanceBuffer(64 * 32);
     res.railInst = instanceBuffer(256 * 32);
     res.flashInst = instanceBuffer(FLASH_CAP * 32);
-    res.reelInst = instanceBuffer(4 * 32);
+    // Room for the centre window and the whole ring around it, allocated once,
+    // so a frame with seven sets turning uploads into a buffer that is already
+    // the right size.
+    res.reelInst = instanceBuffer(REEL_WINDOWS * 4 * 32);
 
     res.ballCap = 2048;
     res.ballX = instanceBuffer(res.ballCap * 4);
@@ -498,10 +501,10 @@ export function createScene(canvas, cfg) {
 
     // The window is part of the machine and is always on the face. Only what
     // is showing in it comes and goes.
-    reelScratch = packReels(view.reels, reel, reelScratch ? reelScratch.data : null);
+    reelScratch = packReels(view.reels, reel, reelScratch ? reelScratch.data : null, view.reelsAround);
     gl.bindBuffer(gl.ARRAY_BUFFER, res.reelInst.buf);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, reelScratch.data, 0, 4 * 8);
-    drawInstances(res.reel, 4);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, reelScratch.data, 0, reelScratch.count * 8);
+    drawInstances(res.reel, reelScratch.count);
 
     // ---- the glass and the frame, at full resolution ------------------------
     bindScreen(gl);

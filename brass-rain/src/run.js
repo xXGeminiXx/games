@@ -13,10 +13,10 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=4';
-import { createBoard, pocket } from './board.js?v=4';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=4';
-import { fire, hasHook } from './hooks.js?v=4';
+import { rng as makeRng } from './rng.js?v=5';
+import { createBoard, pocket } from './board.js?v=5';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=5';
+import { fire, hasHook } from './hooks.js?v=5';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -74,7 +74,10 @@ export function createRun(cfg, seed, meta, fitted) {
     lent: 0,              // balls the counter put in to cover this round
 
     fever: { active: false, ballsLeft: 0, chain: 0, mult: 1, t: 0, spent: 0 },
-    reel: { spinning: false, t: 0, queued: 0, digits: [0, 0, 0], result: null, holdT: 0 },
+    // The centre window, plus whatever is turning beside it. A second spin
+    // used to wait for the first, which pushed its payout past the end of the
+    // round; it now opens its own window around the centre one.
+    reel: { spinning: false, t: 0, queued: 0, digits: [0, 0, 0], result: null, holdT: 0, around: [] },
 
     fittings: [],
     mods: baseMods(),
@@ -245,6 +248,7 @@ export function startRound(state, n) {
   state.reel.spinning = false;
   state.reel.queued = 0;
   state.reel.result = null;
+  state.reel.around.length = 0;
   // Both counts move together. Keeping the round's total and its paid share
   // over different rounds is how a chart ends up saying more balls paid than
   // were ever launched.
@@ -546,48 +550,100 @@ function steerTo(state, idx, want) {
   b.age[idx] = 0;
 }
 
+/**
+ * Everything turning right now: the centre window first, then whatever opened
+ * beside it. A set that has finished and finished being read leaves the ring.
+ */
 function stepReels(state, dt, out) {
-  const cfg = state.cfg;
   const reel = state.reel;
 
-  if (reel.holdT > 0) {
-    reel.holdT -= dt;
-    if (reel.holdT <= 0) { reel.result = null; reel.holdT = 0; }
+  // Start what is owed before anything moves, so a spin bought this frame
+  // turns this frame rather than a frame late.
+  startSpins(state);
+
+  stepOneReel(state, reel, dt, out);
+  for (let i = reel.around.length - 1; i >= 0; i--) {
+    const r = reel.around[i];
+    stepOneReel(state, r, dt, out);
+    if (!r.spinning && r.holdT <= 0) reel.around.splice(i, 1);
   }
+}
 
-  if (!reel.spinning && reel.queued > 0 && reel.holdT <= 0) {
-    reel.queued = Math.max(0, reel.queued - 1);
-    reel.spinning = true;
-    reel.t = 0;
-    state.stats.spins++;
+/**
+ * Hands every owed spin a set of drums. The centre window is used first
+ * because it is the one the machine is built around; past that a spin opens
+ * its own window rather than queueing behind the centre, which is what used to
+ * leave a round paying itself out long after the last ball had dropped.
+ *
+ * The ring is finite, so a machine bought into spinning constantly still has a
+ * bounded number of windows and the rest wait as they always did.
+ */
+function startSpins(state) {
+  const reel = state.reel;
+  const most = Math.max(0, Math.floor(state.cfg.reels.around));
+  while (reel.queued > 0) {
+    if (!reel.spinning && reel.holdT <= 0) {
+      begin(state, reel);
+    } else if (reel.around.length < most) {
+      const made = { slot: freeSlot(reel, most), spinning: false, t: 0, digits: [0, 0, 0], result: null, holdT: 0 };
+      reel.around.push(made);
+      begin(state, made);
+    } else {
+      break;
+    }
   }
-  if (!reel.spinning) return;
+}
 
-  reel.t += dt;
-  // The digits keep moving while the reels are spinning, which is the only
-  // honest way to show that something undecided is happening.
-  const spin = cfg.reels.spinSeconds;
-  for (let i = 0; i < 3; i++) {
-    const settle = spin * (0.55 + i * 0.2);
-    if (reel.t < settle) reel.digits[i] = Math.floor(state.rng.next() * cfg.reels.digits);
-  }
-  if (reel.t < spin) return;
+function begin(state, reel) {
+  state.reel.queued = Math.max(0, state.reel.queued - 1);
+  reel.spinning = true;
+  reel.t = 0;
+  reel.result = null;
+  reel.holdT = 0;
+  reel.plan = planSpin(state, reel);
+  state.stats.spins++;
+}
 
-  reel.spinning = false;
-  reel.holdT = cfg.reels.holdSeconds;
-
-  const chance = matchChance(state);
-  let matched = state.rng.next() < chance;
+/**
+ * What this spin will land on, decided before the drums start coming to rest.
+ *
+ * The outcome used to be worked out after all three had stopped, and the faces
+ * were then written over with it - so a player could watch three fives settle
+ * and be shown a nine, a five and a nine instead. That is the moment they are
+ * watching hardest, and it was the one moment the machine was not telling them
+ * the truth.
+ *
+ * Deciding here means each drum comes to rest on the face it actually landed
+ * on, and the last one to stop is the answer. Two sevens with the third still
+ * turning is then a real near miss rather than a picture about to be replaced.
+ * None of the odds move: the same draws happen, in the same numbers.
+ */
+function planSpin(state, reel) {
+  const cfg = state.cfg;
+  let matched = state.rng.next() < matchChance(state);
   let symbol = Math.floor(state.rng.next() * cfg.reels.digits);
   let feverLen = 0, feverMult = 0;
+
+  const faces = () => {
+    if (matched) return [symbol, symbol, symbol];
+    // A miss is drawn honestly and shown exactly as it fell. Three of a kind
+    // would be a match, so it is redrawn rather than dressed up as one.
+    const d = [0, 0, 0];
+    do {
+      for (let i = 0; i < 3; i++) d[i] = Math.floor(state.rng.next() * cfg.reels.digits);
+    } while (d[0] === d[1] && d[1] === d[2]);
+    return d;
+  };
+  let digits = faces();
 
   // One face on the strip is the seven, the way a cabinet has one. It is named
   // rather than numbered so a part can ask for it by name, which is how the
   // catalogue is written.
   const named = (d) => (d === cfg.reels.sevenDigit ? 'seven' : d);
+  const before = matched;
   const spinCtx = moment(state, 'onReelSpin', {
     spin: {
-      reels: [reel.digits[0], reel.digits[1], reel.digits[2]],
+      reels: [digits[0], digits[1], digits[2]],
       reach: !matched, reachSymbol: named(symbol), matched, symbol: named(symbol),
       respins: 0, respin: false, feverLen: 0, feverMult: 0,
     },
@@ -601,24 +657,61 @@ function stepReels(state, dt, out) {
     if (Number.isFinite(sp.feverMult) && sp.feverMult > 0) feverMult = sp.feverMult;
     // A part may buy one more turn of the reels, and exactly one, so no
     // arrangement of parts can leave the drums turning forever.
-    if (sp.respin) { reel.queued = Math.min(8, reel.queued + 1); }
+    if (sp.respin) { state.reel.queued = Math.min(8, state.reel.queued + 1); }
+    // A part that changed the answer changes the faces with it, before any of
+    // them has been shown.
+    if (matched !== before || matched) digits = faces();
   }
 
-  if (matched) {
-    reel.digits[0] = reel.digits[1] = reel.digits[2] = symbol;
-    reel.result = 'match';
-    startFever(state, out, feverLen, feverMult);
-    return;
+  const two = digits[0] === digits[1] || digits[1] === digits[2] || digits[0] === digits[2];
+  return { digits, matched, result: matched ? 'match' : (two ? 'near' : 'miss'), feverLen, feverMult };
+}
+
+/** The lowest ring position nothing is using, so the pattern fills in evenly. */
+function freeSlot(reel, most) {
+  for (let s = 1; s <= most; s++) {
+    let taken = false;
+    for (const r of reel.around) if (r.slot === s) { taken = true; break; }
+    if (!taken) return s;
   }
-  // No match. The digits are then drawn honestly and shown exactly as they
-  // fell. Two of three comes up about a quarter of the time on its own; it is
-  // never arranged, and the machine gains nothing from the player seeing it.
-  do {
-    for (let i = 0; i < 3; i++) reel.digits[i] = Math.floor(state.rng.next() * cfg.reels.digits);
-  } while (reel.digits[0] === reel.digits[1] && reel.digits[1] === reel.digits[2]);
-  const two = reel.digits[0] === reel.digits[1] || reel.digits[1] === reel.digits[2] || reel.digits[0] === reel.digits[2];
-  reel.result = two ? 'near' : 'miss';
-  if (two) logLine(state, 'reel', cfg.text.reelMiss);
+  return 1;
+}
+
+/** One turn of one set of drums, wherever on the face it is. */
+function stepOneReel(state, reel, dt, out) {
+  const cfg = state.cfg;
+
+  if (reel.holdT > 0) {
+    reel.holdT -= dt;
+    if (reel.holdT <= 0) { reel.result = null; reel.holdT = 0; }
+  }
+  if (!reel.spinning) return;
+  // A spin restored from a save has no plan behind it, so it gets one rather
+  // than settling onto nothing.
+  if (!reel.plan) reel.plan = planSpin(state, reel);
+
+  reel.t += dt;
+  const spin = cfg.reels.spinSeconds;
+  for (let i = 0; i < 3; i++) {
+    const settle = spin * (0.55 + i * 0.2);
+    // Still turning: the face is a blur, which is the honest way to show that
+    // this drum has not decided yet. Stopped: the face it landed on, and it
+    // does not change again.
+    reel.digits[i] = reel.t < settle
+      ? Math.floor(state.rng.next() * cfg.reels.digits)
+      : reel.plan.digits[i];
+  }
+  if (reel.t < spin) return;
+
+  reel.spinning = false;
+  reel.holdT = cfg.reels.holdSeconds;
+  reel.result = reel.plan.result;
+  if (reel.plan.matched) {
+    startFever(state, out, reel.plan.feverLen, reel.plan.feverMult, reel.plan.digits[0]);
+  } else if (reel.plan.result === 'near') {
+    logLine(state, 'reel', cfg.text.reelMiss);
+  }
+  reel.plan = null;
 }
 
 /** The chance the reels agree, as the plaque advertises it. */
@@ -631,12 +724,18 @@ export function continueChance(state) {
   return Math.min(0.95, state.cfg.fever.continueChance + state.mods.continueBonus);
 }
 
-export function startFever(state, out, lenOverride, multOverride) {
+/**
+ * Opens a fever. `symbol` is the face the drums agreed on, and it is passed in
+ * rather than read off the centre window, because the set that matched may be
+ * one of the windows turning beside it.
+ */
+export function startFever(state, out, lenOverride, multOverride, symbol) {
   const cfg = state.cfg;
   const f = state.fever;
   const chaining = f.active;
   f.active = true;
-  const fev = { balls: Math.max(1, cfg.fever.balls + state.mods.feverBalls), mult: 1, symbol: state.reel.digits[0], seven: false, openings: [] };
+  const face = Number.isFinite(symbol) ? symbol : state.reel.digits[0];
+  const fev = { balls: Math.max(1, cfg.fever.balls + state.mods.feverBalls), mult: 1, symbol: face, seven: false, openings: [] };
   const before = f.ballsLeft;
   if (Number.isFinite(lenOverride) && lenOverride > 0) fev.balls = lenOverride;
   if (Number.isFinite(multOverride) && multOverride > 0) fev.mult = multOverride;
@@ -690,7 +789,8 @@ function checkRoundEnd(state) {
     // Every one of these is a "nothing is still happening" test, so every one
     // of them is written as at-or-below rather than exactly-equal. A counter
     // that drifts past zero must still read as finished.
-    if (state.balls.n <= 0 && state.reel.queued <= 0 && !state.reel.spinning && state.reel.holdT <= 0) {
+    if (state.balls.n <= 0 && state.reel.queued <= 0 && !state.reel.spinning && state.reel.holdT <= 0
+        && state.reel.around.length <= 0) {
       state.phase = state.won >= state.quota ? PHASE_SHOP : PHASE_OVER;
       if (state.phase === PHASE_OVER) {
         state.over = true;

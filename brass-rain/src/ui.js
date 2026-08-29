@@ -15,12 +15,12 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=4';
-import { createScene } from './render/scene.js?v=4';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=4';
-import { num, count, duration, mult, pct, fill } from './format.js?v=4';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=4';
-import { nailPos } from './board.js?v=4';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=5';
+import { createScene } from './render/scene.js?v=5';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=5';
+import { num, count, duration, mult, pct, fill } from './format.js?v=5';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=5';
+import { nailPos } from './board.js?v=5';
 
 const SPEEDS = [1, 2, 4];
 
@@ -56,6 +56,10 @@ export async function boot(doc) {
 
   // -------------------------------------------------------------------
   function wire() {
+    // Pressing anything is about to change what the card describes, and the
+    // page can scroll out from under a card that is pinned to the pointer.
+    doc.addEventListener('pointerdown', hideTip, true);
+    doc.addEventListener('scroll', hideTip, true);
     on(el.pull, 'click', () => game.pull());
     on(el.auto, 'click', () => game.setAuto(!game.run.auto));
     on(el.speed, 'click', () => {
@@ -188,6 +192,9 @@ export async function boot(doc) {
 
   // ---- painting ------------------------------------------------------
   function paint(r) {
+    // Every frame, so a card whose part was bolted in or sold closes on the
+    // next one rather than waiting for a pointer event that can never arrive.
+    checkTip();
     el.roundNo.textContent = r.round;
     // Which cabinet this is. The whole point of walking the row is that the
     // machine in front of you is a particular machine, so it says which.
@@ -524,6 +531,7 @@ export async function boot(doc) {
         el.tip.appendChild(g);
       }
       el.tip.hidden = false;
+      tipOwner = node;
       place(e || lastPoint, node);
     };
     node.addEventListener('pointerenter', show);
@@ -534,6 +542,7 @@ export async function boot(doc) {
   }
 
   let lastPoint = null;
+  let tipOwner = null;
   function place(e, node) {
     const box = el.tip.getBoundingClientRect();
     const pad = 12;
@@ -555,7 +564,25 @@ export async function boot(doc) {
     el.tip.style.top = Math.max(pad, y) + 'px';
   }
 
-  function hideTip() { el.tip.hidden = true; }
+  function hideTip() { el.tip.hidden = true; tipOwner = null; }
+
+  // The card belongs to whatever the pointer is over, and that thing can go
+  // away underneath it in two different ways. Bolting a part in rebuilds the
+  // bench, so the offer the pointer was resting on stops existing; starting the
+  // round hides the bench, so a bolted-in part is still on the page but is no
+  // longer on screen. Neither one reports the pointer leaving, so the card was
+  // never told to go and hung over the board for the rest of the run.
+  //
+  // Rather than remember to close it everywhere either of those can happen, the
+  // card checks the one thing that has to be true for it to be open: the thing
+  // it describes is still visible. getClientRects is empty for a node that has
+  // been removed, for one inside a hidden panel, and for one collapsed to
+  // nothing, which is every way this has gone wrong. It is measured only while
+  // the card is actually open, so it costs nothing the rest of the time.
+  function checkTip() {
+    if (!el.tip || el.tip.hidden) return;
+    if (!tipOwner || !tipOwner.isConnected || !tipOwner.getClientRects().length) hideTip();
+  }
 
   /**
    * A part's sentence, with the numbers it would actually produce.

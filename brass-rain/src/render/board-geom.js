@@ -258,23 +258,40 @@ export function packArc(rail, into) {
  * `digits` is the three number array the view carries, or nothing at all when
  * the window is dark, in which case the drums are packed blank.
  */
-export function packReels(digits, rect, into) {
-  const data = ensureFloats(into, 4 * STRIDE);
-  data[0] = rect.x;
-  data[1] = rect.y;
-  data[2] = rect.w * 0.5;
-  data[3] = rect.h * 0.5;
+// Where a second, third or seventh set of drums sits when more than one is
+// turning at once. Offsets are in multiples of the window itself, so the
+// pattern holds its shape on any size of board, and no two windows touch: the
+// ones beside each other are more than a window apart across, and the ones
+// above and below are more than a window apart down.
+//
+// The order fills the ring evenly rather than sweeping round it, so two
+// windows sit above and below the centre and four sit at its corners.
+export const REEL_RING = [
+  [0, -1.35], [0, 1.35],
+  [-1.18, -0.72], [1.18, -0.72],
+  [-1.18, 0.72], [1.18, 0.72],
+];
+
+/** How many windows can be on the face at once, the centre one included. */
+export const REEL_WINDOWS = REEL_RING.length + 1;
+
+/** One window: the brass frame, then the three drums inside it. */
+function packOneReel(data, at, digits, rect) {
+  data[at] = rect.x;
+  data[at + 1] = rect.y;
+  data[at + 2] = rect.w * 0.5;
+  data[at + 3] = rect.h * 0.5;
   const lit = !!(digits && digits.length === 3);
-  data[4] = 0;
-  data[5] = 0;
-  data[6] = 1;
-  data[7] = lit ? 1 : 0;
+  data[at + 4] = 0;
+  data[at + 5] = 0;
+  data[at + 6] = 1;
+  data[at + 7] = lit ? 1 : 0;
   // Drums sit inside the frame with the brass surround left showing.
   const inset = Math.min(rect.w, rect.h) * 0.10;
   const drumW = (rect.w - inset * 2) / 3;
   const drumH = rect.h - inset * 2;
   for (let i = 0; i < 3; i++) {
-    const o = (i + 1) * STRIDE;
+    const o = at + (i + 1) * STRIDE;
     const raw = Math.floor(Number(digits && digits[i]) || 0);
     data[o] = rect.x - rect.w * 0.5 + inset + drumW * (i + 0.5);
     data[o + 1] = rect.y;
@@ -287,5 +304,34 @@ export function packReels(digits, rect, into) {
     data[o + 6] = 0;
     data[o + 7] = 0;
   }
-  return { data, count: 4 };
+  return at + 4 * STRIDE;
+}
+
+/**
+ * The reel windows. `digits` is the centre one and is always drawn, because
+ * the window is part of the machine whether or not anything is showing in it.
+ * `around` is what else is turning: each entry carries its own digits and the
+ * ring position it opened in, so a window stays where it is while it is read.
+ *
+ * The buffer is always sized for a full ring, so a busy frame never reallocates
+ * and a quiet one costs the same as it always did.
+ */
+export function packReels(digits, rect, into, around) {
+  const data = ensureFloats(into, REEL_WINDOWS * 4 * STRIDE);
+  let at = packOneReel(data, 0, digits, rect);
+  let drawn = 1;
+  const extra = Array.isArray(around) ? around : [];
+  for (const w of extra) {
+    if (drawn >= REEL_WINDOWS) break;
+    const slot = Math.max(1, Math.floor(Number(w && w.slot) || 1));
+    const off = REEL_RING[(slot - 1) % REEL_RING.length];
+    at = packOneReel(data, at, w && w.digits, {
+      x: rect.x + off[0] * rect.w,
+      y: rect.y + off[1] * rect.h,
+      w: rect.w,
+      h: rect.h,
+    });
+    drawn++;
+  }
+  return { data, count: drawn * 4 };
 }
