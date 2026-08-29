@@ -80,6 +80,22 @@ export function createEconomy(cfg, rngLike = Math.random) {
 
   // ---- costs and purchases ----
   const hireCost = () => E.hireBase * Math.pow(E.hireGrowth * Math.pow(E.hangarDiscount, level('hangars')), state.drones - cfg.drones.start);
+  // The price of the next drone times a ratio, again and again, so the price
+  // of n of them is a geometric series rather than n times anything. Summed in
+  // closed form: a player buying ten thousand should not wait for a loop.
+  const hireRatio = () => E.hireGrowth * Math.pow(E.hangarDiscount, level('hangars'));
+  const hireCostN = (n) => {
+    if (!(n > 0)) return 0;
+    const r = hireRatio(), first = hireCost();
+    return r === 1 ? first * n : first * (Math.pow(r, n) - 1) / (r - 1);
+  };
+  /** The most that can be afforded right now, from the same series solved for n. */
+  const hireMax = () => {
+    const r = hireRatio(), first = hireCost();
+    if (!(first > 0) || state.funds < first) return 0;
+    if (r === 1) return Math.floor(state.funds / first);
+    return Math.max(0, Math.floor(Math.log(1 + (state.funds * (r - 1)) / first) / Math.log(r)));
+  };
   const wingCost = () => {
     let c = 0, n = state.drones;
     for (let i = 0; i < E.wingSize; i++) { c += E.hireBase * Math.pow(E.hireGrowth * Math.pow(E.hangarDiscount, level('hangars')), n - cfg.drones.start); n++; }
@@ -92,7 +108,17 @@ export function createEconomy(cfg, rngLike = Math.random) {
   const spend = (c) => { if (state.funds < c) return false; state.funds -= c; return true; };
 
   const actions = {
-    hire: { cost: hireCost, can: () => state.funds >= hireCost(), do: () => { if (!spend(hireCost())) return false; state.drones += 1; return true; } },
+    hire: {
+      cost: (n) => hireCostN(Math.max(1, n | 0)),
+      max: hireMax,
+      can: (n) => { const k = Math.max(1, n | 0); return k > 0 && state.funds >= hireCostN(k); },
+      do: (n) => {
+        const k = Math.max(1, n | 0);
+        if (!(k > 0) || !spend(hireCostN(k))) return false;
+        state.drones += k;
+        return true;
+      },
+    },
     wing: { cost: wingCost, can: () => level('hangars') >= 1 && state.funds >= wingCost(), do: () => { if (level('hangars') < 1 || !spend(wingCost())) return false; state.drones += E.wingSize; return true; } },
     specialist: {
       cost: specialistCost,

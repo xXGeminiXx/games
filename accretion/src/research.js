@@ -149,6 +149,14 @@ export const PAY = Object.freeze({
   merge: 2,             // two things touching, times one plus the rung of what they fell into
   promote: 8,           // a rung climbed, times the rung - for the first few of each kind only,
   promoteFirst: 12,     // because late in a run every seed that lands climbs three rungs at once
+  // ...but never nothing. A field with no star has no income except what its
+  // own events pay, and a field that has climbed every rung a dozen times has
+  // spent that. Reached with the mass ceiling in hand and fusion unbought, a
+  // run then earns exactly zero for ever and cannot be clicked either: it is
+  // over without ending. The residual is small enough that the first dozen of
+  // a rung are still where promotion income lives, and large enough that a
+  // working field always climbs toward the next thing it can buy.
+  promoteResidual: 0.4,
   ignite: 60,           // first light
   giant: 40,            // a star leaving the main sequence
   nebula: 120,          // a planetary nebula
@@ -305,8 +313,9 @@ export function onEvent(s, ev) {
     case 'promote': {
       const key = 'promote' + (ev.rung | 0);
       s.counts[key] = (s.counts[key] || 0) + 1;
-      if (s.counts[key] > PAY.promoteFirst) return 0;
-      return pay(s, PAY.promote * Math.max(1, ev.rung || 1));
+      const rung = Math.max(1, ev.rung || 1);
+      if (s.counts[key] > PAY.promoteFirst) return pay(s, PAY.promoteResidual * rung);
+      return pay(s, PAY.promote * rung);
     }
     case 'ignite': return pay(s, PAY.ignite);
     case 'giant': return pay(s, PAY.giant);

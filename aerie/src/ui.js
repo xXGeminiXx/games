@@ -1,14 +1,15 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=11';
-import { fill } from '../content.js?v=11';
+import { fmt, rate, count, pct } from './numbers.js?v=12';
+import { fill } from '../content.js?v=12';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
   const K = cfg.kindOrder;
   const el = {
     funds: $('funds'), income: $('income'), drones: $('drones'), working: $('working'),
-    hire: $('hire'), hireCost: $('hire-cost'), wing: $('wing'), wingCost: $('wing-cost'),
+    hire: $('hire'), hireCost: $('hire-cost'), hireLabel: $('hire-label'),
+    bulk: $('bulk'), wing: $('wing'), wingCost: $('wing-cost'),
     hold: $('hold'), holdRows: $('hold-rows'), fleet: $('fleet'), specialists: $('specialists'), specRows: $('spec-rows'),
     carrier: $('carrier'), upRows: $('up-rows'), voyage: $('voyage'), island: $('island'), remaining: $('remaining'),
     castOff: $('castoff'), castOffCost: $('castoff-cost'), log: $('log'), anchorHint: $('anchor-hint'),
@@ -44,7 +45,42 @@ export function createUI(doc, cfg, content, eco, on) {
     upRows[u].querySelector('button').addEventListener('click', () => on.upgrade(u));
   }
   if (el.rangeRow) el.rangeRow.title = content.hints.range;
-  el.hire.addEventListener('click', on.hire);
+  // How many a press buys. Remembered, because a player who has decided to
+  // buy a thousand at a time has decided it for the rest of the run.
+  let bulk = cfg.bulk.start;
+  const bulkButtons = [];
+  if (el.bulk) {
+    for (const n of cfg.bulk.steps) {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.textContent = n === 0 ? (content.labels.bulkMax || 'max') : ('x' + count(n));
+      b.addEventListener('click', () => { bulk = n; paintBulk(); paintHire(); });
+      el.bulk.appendChild(b);
+      bulkButtons.push({ n, b });
+    }
+  }
+  const paintBulk = () => {
+    for (const { n, b } of bulkButtons) b.setAttribute('aria-pressed', String(n === bulk));
+  };
+  /**
+   * The hire button, and which quantities are within reach. Called both from
+   * the frame update and the moment a quantity is chosen - without the second,
+   * the button keeps the old count and its old price until the next tick, so
+   * choosing a thousand appears to do nothing.
+   */
+  const paintHire = () => {
+    if (!el.hire) return;
+    const many = bulkCount();
+    if (el.hireCost) el.hireCost.textContent = fmt(eco.actions.hire.cost(many));
+    if (el.hireLabel) el.hireLabel.textContent = many === 1 ? L.hire : fill(L.hireMany, { n: count(many) });
+    el.hire.disabled = !eco.actions.hire.can(many);
+    for (const { n, b } of bulkButtons) b.disabled = n !== 0 && !eco.actions.hire.can(n);
+  };
+  paintBulk();
+  /** How many the next press would buy: the chosen number, or all that is affordable. */
+  const bulkCount = () => (bulk === 0 ? Math.max(1, eco.actions.hire.max()) : bulk);
+
+  el.hire.addEventListener('click', () => { on.hire(bulkCount()); paintHire(); });
   el.wing.addEventListener('click', on.wing);
   el.castOff.addEventListener('click', on.castOff);
   el.exportBtn.addEventListener('click', on.exportSave);
@@ -134,8 +170,9 @@ export function createUI(doc, cfg, content, eco, on) {
     el.drones.textContent = count(s.drones);
     const y = eco.yields();
     el.working.textContent = view.active < s.drones ? fill(L.shown, { n: count(view.active) }) : '';
-    el.hireCost.textContent = fmt(eco.hireCost());
-    el.hire.disabled = !eco.actions.hire.can();
+    // A step nobody can reach yet is dimmed rather than hidden, so the row
+    // does not change shape as funds climb.
+    paintHire();
     show(el.wing, eco.level('hangars') >= cfg.reveal.wingsAtHangars);
     el.wing.querySelector('b').textContent = fill(L.hireWing, { n: cfg.economy.wingSize });
     el.wingCost.textContent = fmt(eco.wingCost());
@@ -202,5 +239,5 @@ export function createUI(doc, cfg, content, eco, on) {
     show(el.voyage, flags.voyage);
   };
 
-  return { el, log, update, reveal, show, showQuality, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
+  return { el, log, update, reveal, get bulk() { return bulk; }, show, showQuality, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
 }

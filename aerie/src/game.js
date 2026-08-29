@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=11';
-import { fill } from '../content.js?v=11';
-import { makeShaders } from './shaders.js?v=11';
-import { createWorld } from './world.js?v=11';
-import { createDrones } from './drones.js?v=11';
-import { createView } from './view.js?v=11';
-import { createEconomy } from './economy.js?v=11';
-import { createSave, createPrefs } from './save.js?v=11';
-import { createUI } from './ui.js?v=11';
-import { createControls } from './controls.js?v=11';
-import { createQuality } from './quality.js?v=11';
-import { createPerfLog } from './perflog.js?v=11';
-import { loop, createGL } from './gl.js?v=11';
-import { rng } from './rng.js?v=11';
-import { fmt, duration } from './numbers.js?v=11';
+import { withOverrides, applyIdentity } from '../config.js?v=12';
+import { fill } from '../content.js?v=12';
+import { makeShaders } from './shaders.js?v=12';
+import { createWorld } from './world.js?v=12';
+import { createDrones } from './drones.js?v=12';
+import { createView } from './view.js?v=12';
+import { createEconomy } from './economy.js?v=12';
+import { createSave, createPrefs } from './save.js?v=12';
+import { createUI } from './ui.js?v=12';
+import { createControls } from './controls.js?v=12';
+import { createQuality } from './quality.js?v=12';
+import { createPerfLog } from './perflog.js?v=12';
+import { loop, createGL } from './gl.js?v=12';
+import { rng } from './rng.js?v=12';
+import { fmt, duration } from './numbers.js?v=12';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -65,7 +65,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
 
   // ---- the interface ----
   const actions = {
-    hire: () => { if (eco.actions.hire.do()) { syncFleet(); if (eco.state.drones === cfg.drones.start + 1) ui.log(content.log.firstHire); else ui.log(fill(content.log.hire, { n: eco.state.drones })); } },
+    hire: (n) => {
+      const many = Math.max(1, n | 0);
+      if (!eco.actions.hire.do(many)) return;
+      syncFleet();
+      // One drone is a moment worth naming; a wing of them is a fleet figure.
+      if (eco.state.drones === cfg.drones.start + 1) ui.log(content.log.firstHire);
+      else if (many === 1) ui.log(fill(content.log.hire, { n: eco.state.drones }));
+      else ui.log(fill(content.log.hireMany, { n: fmt(many), total: fmt(eco.state.drones) }));
+    },
     wing: () => { if (eco.actions.wing.do()) { syncFleet(); ui.log(fill(content.log.wing, { n: cfg.economy.wingSize })); } },
     specialist: (k) => { if (eco.actions.specialist.do(k)) { syncFleet(); ui.log(fill(content.log.specialist, { kind: content.kinds[k] })); } },
     upgrade: (u) => { if (eco.actions.upgrade.do(u)) { ui.log(fill(content.log.upgrade, { name: cfg.economy.upgrades[u].name, n: eco.level(u) })); if (u === 'hangars') cfg.carrier.scale = 1 + 0.06 * eco.level('hangars'); } },

@@ -28,6 +28,18 @@
   .row:first-child{border-top:0}
   .row .k{flex:1 1 auto;text-transform:capitalize}
   .row .v{min-width:56px;text-align:right}
+  /* How many a purchase buys. The chosen one is the only lit thing in the row,
+     so the row reads as one setting rather than six buttons. */
+  #bulkrow{gap:6px}
+  .bulk-label{flex:1 1 auto;color:var(--dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  #bulk{display:flex;gap:4px}
+  #bulk button{
+    font:inherit;font-size:11px;padding:2px 7px;cursor:pointer;
+    background:transparent;color:var(--dim);
+    border:1px solid color-mix(in oklab,var(--rule) 70%,transparent);border-radius:2px;
+  }
+  #bulk button:hover{color:var(--ink)}
+  #bulk button[aria-pressed="true"]{color:var(--void);background:var(--accent);border-color:var(--accent)}
   .row .v.dim{color:var(--dim)}.row .v.good{color:var(--good)}.row .v.bad{color:var(--bad)}
   button{font:inherit;color:var(--ink);background:color-mix(in oklab,var(--glass) 60%,#fff);border:1px solid var(--rule);padding:5px 10px;cursor:pointer;border-radius:2px;text-align:left;flex:1 1 auto;display:flex;justify-content:space-between;gap:10px;transition:transform .12s,border-color .12s}
   button:hover:not(:disabled){border-color:var(--accent)}
@@ -78,7 +90,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="890d1658dff8">
+<meta name="build" content="0dce69072070">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -143,7 +155,11 @@
   <div class="card" id="fleet">
     <h2 data-t="sections.fleet">Fleet</h2>
     <div class="stat"><span data-t="labels.drones">drones</span><span><span id="drones">3</span> <span class="dim" id="working"></span></span></div>
-    <div class="row"><button id="hire" class="big"><b data-t="labels.hire">hire a drone</b><i id="hire-cost"></i></button></div>
+    <div class="row" id="bulkrow">
+      <span class="bulk-label" data-t="labels.buyHowMany">how many</span>
+      <span id="bulk"></span>
+    </div>
+    <div class="row"><button id="hire" class="big"><b id="hire-label" data-t="labels.hire">hire a drone</b><i id="hire-cost"></i></button></div>
     <div class="row"><button id="wing" hidden><b>hire a wing</b><i id="wing-cost"></i></button></div>
     <div id="specialists" hidden>
       <h2 style="margin-top:8px" data-t="sections.specialists">Specialists</h2>
@@ -184,9 +200,9 @@
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=11';
-  import { CONTENT } from './content.js?v=11';
-  import { createGame } from './src/game.js?v=11';
+  import { CONFIG } from './config.js?v=12';
+  import { CONTENT } from './content.js?v=12';
+  import { createGame } from './src/game.js?v=12';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

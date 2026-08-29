@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=11';
+import { oklch } from './src/palette.js?v=12';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 11,             // the ?v= tag every import carries; bump on every src change
+    build: 12,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -40,6 +40,10 @@ export const CONFIG = {
     ice:    { name: 'ice',    where: 'above the snowline',    basePrice: 16, rate: 0.28 },
   },
   kindOrder: ['timber', 'fish', 'ore', 'ice'],
+
+  // How many a purchase buys at once. `0` is the max the funds allow, worked
+  // out from the price series rather than by trying one at a time.
+  bulk: { steps: [1, 10, 100, 1000, 10000, 0], start: 1 },
 
   drones: {
     start: 3,             // drones on a new save
