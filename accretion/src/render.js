@@ -3064,6 +3064,12 @@ class Renderer {
     if (!world || !p0 || !(p0.k > 0)) return out;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    // The middle of a bounding box is not where the matter is. One body flung
+    // out on a hyperbolic path drags a corner of the box halfway across the
+    // field, and the box's midpoint follows it, so the frame ends up aimed at
+    // empty space between the subject and its escapee. The centre of mass does
+    // not move when something light leaves, which is what a frame wants.
+    let wsum = 0, wx = 0, wy = 0;
     // The same box drawn around the MATTER rather than around the light it
     // throws. Framing wants the lit one; the pan bound wants this one.
     let sminX = Infinity, sminY = Infinity, smaxX = -Infinity, smaxY = -Infinity;
@@ -3113,6 +3119,11 @@ class Renderer {
         if (sx + q > smaxX) smaxX = sx + q;
         if (sy - q < sminY) sminY = sy - q;
         if (sy + q > smaxY) smaxY = sy + q;
+        // Weight by the light a thing throws rather than by its mass, because
+        // this is a picture: the frame should sit where the visible subject is.
+        // Radius is the only size the renderer has, and it stands in for that.
+        const wgt = Math.max(1e-9, (b.r || 0) * (b.r || 0));
+        wsum += wgt; wx += sx * wgt; wy += sy * wgt;
         out.n++;
       }
     }
@@ -3130,7 +3141,10 @@ class Renderer {
     // axis by that axis' share of the short one lets a wide field spend the
     // width it has been given instead of being framed as though the screen were
     // square, which would waste a third of it on any ordinary display.
-    const mx = (minX + maxX) * 0.5, my = (minY + maxY) * 0.5;
+    // Aim at the weighted middle when there is one, and fall back to the box
+    // only when nothing carried any weight at all.
+    const mx = wsum > 0 ? wx / wsum : (minX + maxX) * 0.5;
+    const my = wsum > 0 ? wy / wsum : (minY + maxY) * 0.5;
     const s = Math.min(this.w, this.h);
     const rx = (maxX - minX) * 0.5 * (s / Math.max(this.w, 1));
     const ry = (maxY - minY) * 0.5 * (s / Math.max(this.h, 1));
