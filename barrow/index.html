@@ -202,8 +202,139 @@
   input[type="range"] { min-height: 28px; }
 }
 </style>
+<!-- plays:start -->
+<script>
+(function () {
+  // Counts one play, once, and then stays quiet. See games-plays/README.md for
+  // what is stored on the other end, which is a total and nothing else.
+  var END = 'https://games-plays.xxgeminixx.workers.dev', GAME = 'barrow';
+  if (!END || !window.fetch) return;
+
+  // A build being served off this machine is a build being worked on. Counting
+  // it would mean the numbers are mostly whoever made the game.
+  var h = location.hostname;
+  if (!h || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || location.protocol === 'file:') return;
+  if (location.search.indexOf('nocount') >= 0) return;
+
+  // Without storage there is no way to tell a first play from a fifth, and a
+  // counter that cannot tell would count every reload. Undercounting by the
+  // browsers that block storage is a wrong number; counting every reload is a
+  // meaningless one, so this browser is simply not counted.
+  var KEY = '__plays', all;
+  try {
+    all = JSON.parse(localStorage.getItem(KEY) || '{}');
+    if (!all || typeof all !== 'object') all = {};
+    localStorage.setItem(KEY, JSON.stringify(all));
+  } catch (e) { return; }
+
+  var me = all[GAME] || (all[GAME] = {});
+  var day = new Date().toISOString().slice(0, 10);
+  var carried = Number(me.owed) || 0;   // seconds played on earlier visits, never reported
+  var played = 0;                       // seconds this page has been watched
+  var touched = false;                  // somebody has actually done something
+  var sending = false;
+
+  var HOLD = 10;        // seconds of real attention before a play is a play
+  var RETRY = 60;       // and how long to wait before asking again if that failed
+  var TOPUP = 120;      // seconds worth carrying home at the end of a visit
+  var HOUR = 3600000;
+
+  // Every game on this site shares one key, and a game can be open in two tabs
+  // at once - an idle game is meant to be left open. A page that writes the
+  // whole object back writes what it read when it loaded, which erases what
+  // another tab recorded in the meantime. Erasing a game's record makes its
+  // next play look like a new player, so the headline number is the one that
+  // inflates. Take the freshest record for this game, and never move it back.
+  function sync() {
+    var now;
+    try { now = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { now = null; }
+    if (!now || typeof now !== 'object') now = {};
+    var kept = now[GAME] || {};
+    if (kept.day && (!me.day || kept.day > me.day)) me.day = kept.day;
+    if (kept.back) me.back = 1;
+    if (kept.top && (!me.top || kept.top > me.top)) me.top = kept.top;
+    now[GAME] = me;
+    all = now;
+    return now;
+  }
+
+  function save() {
+    try { var now = sync(); me.owed = carried + played; localStorage.setItem(KEY, JSON.stringify(now)); } catch (e) {}
+  }
+
+  function post(body, beacon) {
+    var text = JSON.stringify(body);
+    // text/plain is a content type the browser is allowed to send without
+    // asking the server for permission first, so one request does the job.
+    if (beacon && navigator.sendBeacon) {
+      try { return navigator.sendBeacon(END + '/api/play', new Blob([text], { type: 'text/plain' })); } catch (e) { return false; }
+    }
+    return fetch(END + '/api/play', {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text, keepalive: true
+    });
+  }
+
+  // The play itself: sent once per day, carrying whatever time was never
+  // reported before it.
+  function report() {
+    sync();                                // another tab may have already done it
+    if (sending || me.day === day) return;
+    sending = true;
+    var owed = carried + played;
+    var body = {
+      game: GAME,
+      session: true,
+      first: !me.day,                                 // this browser has never played it
+      returning: Boolean(me.day && !me.back),         // played before, and this is the first day back
+      seconds: owed
+    };
+    post(body).then(function (r) {
+      sending = false;
+      if (!r || !r.ok) return;                        // try again on the next visit
+      if (body.returning) me.back = 1;
+      me.day = day;
+      carried -= owed;                                // exactly what was reported, no more
+      save();
+    }).catch(function () { sending = false; });
+  }
+
+  // Time played after the day's report, handed over when the page goes away.
+  // The clock is cleared before the request rather than after, because this
+  // one cannot be confirmed: losing a few minutes is a smaller lie than
+  // counting them twice.
+  function topup() {
+    sync();
+    var owed = carried + played;
+    if (owed < TOPUP || me.day !== day) return;
+    if (me.top && Date.now() - me.top < HOUR) return;
+    me.top = Date.now();
+    carried -= owed;
+    save();
+    post({ game: GAME, session: false, first: false, returning: false, seconds: owed }, true);
+  }
+
+  var mark = 0;
+  setInterval(function () {
+    if (document.hidden) return;
+    played++;
+    // A report that failed is worth trying again, but not every second: a
+    // counter must never turn one unreachable server into a request per
+    // second per open tab.
+    if (touched && played >= HOLD && (played - HOLD) % RETRY === 0) report();
+    if (++mark >= 15) { mark = 0; save(); }
+  }, 1000);
+
+  var note = function () { touched = true; };
+  ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(function (t) {
+    addEventListener(t, note, { once: true, passive: true, capture: true });
+  });
+  addEventListener('pagehide', topup);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); topup(); } });
+})();
+</script>
+<!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="1f2cd20470ad">
+<meta name="build" content="8e455e17527b">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');

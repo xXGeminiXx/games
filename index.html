@@ -126,6 +126,9 @@
 })();
 </script>
 <!-- build-watch:end -->
+<!-- plays:start -->
+<meta name="plays" content="https://games-plays.xxgeminixx.workers.dev">
+<!-- plays:end -->
 </head>
 <body>
 <main>
@@ -136,13 +139,25 @@
   <div id="grid"></div>
   <p id="none" hidden>Nothing matches that.</p>
   <footer>
-    No game here sends anything anywhere, and none of them load an image while you play -
-    every one of them draws itself. The pictures on this page are screenshots of them running.
-    Saves live in the browser that made them.
+    Each game adds one to a counter the first time you play it, so the ones people actually play
+    can be listed first. That is a number going up and nothing else: no account, no cookie, no
+    identifier, nothing about how you played, and nothing that can be traced back to you. Beyond
+    that no game here sends anything anywhere, and none of them load an image while you play -
+    every one of them draws itself. Saves live in the browser that made them.
   </footer>
 </main>
 
 <script>
+// How the games are ordered.
+//
+//   'listed'  the order written below, which is a person's choice
+//   'played'  the ones people actually play first, over the last 30 days
+//
+// The counter has to be deployed and switched on for 'played' to have anything
+// to say; until then it falls back to the order below on its own, so setting
+// this early costs nothing.
+const ORDER = 'played';
+
 // Everything the page shows. Add a game by adding a line, and drop a 16:10
 // screenshot of it in preview/ under the same name.
 const GAMES = [
@@ -268,11 +283,48 @@ const tiles = GAMES.map((g) => {
 
   a.append(img, body);
   grid.appendChild(a);
-  return { el: a, hay: (g.name + ' ' + g.line).toLowerCase() };
+  return { el: a, name: g.dir || g.href, hay: (g.name + ' ' + g.line).toLowerCase() };
 });
 
 // Remember what was on the page, so the next visit can mark what was added.
 try { localStorage.setItem('seen', JSON.stringify(GAMES.map((g) => g.dir || g.href))); } catch (e) { /* no store, no markers */ }
+
+// Put the most played first, when that is what has been asked for.
+//
+// The tiles are built and shown in the written order first and moved
+// afterwards, because a page that waits on a request before drawing anything
+// is a slower page for a detail nobody asked to wait for. The last order that
+// arrived is remembered, so a second visit is already in it and nothing moves
+// while it is being read.
+function reorder(names) {
+  const at = {};
+  tiles.forEach((t) => { at[t.name] = t.el; });
+  for (const name of names) {
+    if (at[name]) grid.appendChild(at[name]);
+  }
+  // A game the counter has never heard of keeps its place at the end rather
+  // than disappearing: one published an hour ago has no plays yet.
+  for (const t of tiles) if (names.indexOf(t.name) < 0) grid.appendChild(t.el);
+}
+
+if (ORDER === 'played') {
+  let last = [];
+  try { last = JSON.parse(localStorage.getItem('played') || '[]'); } catch (e) { last = []; }
+  if (last.length) reorder(last);
+
+  const where = document.querySelector('meta[name="plays"]');
+  const endpoint = where && where.getAttribute('content');
+  if (endpoint && window.fetch) {
+    fetch(endpoint + '/api/counts')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || !d.order || !d.order.length) return;
+        reorder(d.order);
+        try { localStorage.setItem('played', JSON.stringify(d.order)); } catch (e) { /* not remembered, asked again next time */ }
+      })
+      .catch(() => { /* the written order is a perfectly good order */ });
+  }
+}
 
 // The filter appears only once there are enough games that reading them all
 // is a chore. Below that it would be furniture.
