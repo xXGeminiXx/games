@@ -77,6 +77,24 @@
     border-top:1px solid var(--line);
   }
   #shop.on{display:flex}
+  /* How many a press buys. It only appears once a run has more essence than
+     one of anything costs, so an opening board is not asked to think about it.
+     The chosen number is the only lit thing in the row, so the bar reads as one
+     setting rather than five more buttons to press. */
+  #bulkbar{
+    width:100%; max-width:520px; display:flex; align-items:center; gap:6px;
+    padding:5px 12px 0; font-size:11px;
+  }
+  #bulkbar[hidden]{display:none}
+  #bulklabel{color:var(--dim); letter-spacing:.1em; text-transform:uppercase}
+  #bulk{display:flex; gap:4px; margin-left:auto}
+  #bulk button{
+    font:inherit; font-size:11px; padding:2px 7px; cursor:pointer; border-radius:2px;
+    background:transparent; color:var(--dim); border:1px solid var(--line);
+  }
+  #bulk button:hover:not(:disabled){color:var(--ink)}
+  #bulk button[aria-pressed="true"]{color:var(--bg); background:var(--accent); border-color:var(--accent)}
+  #bulk button:disabled{opacity:.35; cursor:default}
   /* Four offers across a phone leaves each about 80px, and the second line -
      the price and what it buys, which is the whole basis of the choice - is
      cut off mid-word. Below that width the row becomes two columns, which
@@ -188,7 +206,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="801012e0dce9">
+<meta name="build" content="1eef4100dac2">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -244,6 +262,7 @@
 
 <div id="stage"><canvas id="c" width="520" height="620"></canvas></div>
 
+<div id="bulkbar" hidden><span id="bulklabel">buy</span><span id="bulk"></span></div>
 <div id="shop"></div>
 
 <footer>
@@ -323,17 +342,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=8';
-import { createJuice } from './src/juice.js?v=8';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=8';
-import { createBlockKinds } from './src/blocks.js?v=8';
-import { safeRows } from './src/arrival.js?v=8';
-import { createAwards } from './src/awards.js?v=8';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=8';
-import { createLeaderboard } from './src/leaderboard.js?v=8';
-import * as Tiers from './src/tiers.js?v=8';
-import { createOnboarding } from './src/onboarding.js?v=8';
-import { createVisual } from './src/visual.js?v=8';
+         storageKey, offerCost, applyIdentity } from './config.js?v=9';
+import { createJuice } from './src/juice.js?v=9';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=9';
+import { createBlockKinds } from './src/blocks.js?v=9';
+import { safeRows } from './src/arrival.js?v=9';
+import { createAwards } from './src/awards.js?v=9';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=9';
+import { createLeaderboard } from './src/leaderboard.js?v=9';
+import * as Tiers from './src/tiers.js?v=9';
+import { createOnboarding } from './src/onboarding.js?v=9';
+import { createVisual } from './src/visual.js?v=9';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1421,12 +1440,57 @@ const OFFERS = CONFIG.economy.offers
     buy: () => EFFECTS[o.id](o),
   }));
 
+// How many one press buys. `0` means every one the essence allows.
+let bulkPick = 1;
+const BULK_STEPS = [1, 10, 100, 1000, 0];
+let bulkBuilt = false;
+
+function paintBulk(){
+  const bar = document.getElementById('bulkbar');
+  const box = document.getElementById('bulk');
+  if (!bar || !box) return;
+  if (!bulkBuilt){
+    bulkBuilt = true;
+    for (const n of BULK_STEPS){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.n = String(n);
+      b.textContent = n === 0 ? 'max' : ('x' + n);
+      b.onclick = () => { bulkPick = n; paintShop(); };
+      box.appendChild(b);
+    }
+  }
+  // The cheapest thing on the board decides whether buying in bulk is a
+  // question worth putting on screen at all.
+  const cheapest = Math.min(...OFFERS.map(o => o.cost(S.depth)));
+  bar.hidden = !(S.gold >= cheapest * 2);
+  for (const b of box.children){
+    const n = Number(b.dataset.n);
+    b.setAttribute('aria-pressed', String(n === bulkPick));
+    b.disabled = n !== 0 && S.gold < cheapest * n;
+  }
+}
+
+/** How many of this offer a press would buy, and what that costs. */
+function bulkFor(offer){
+  const each = offer.cost(S.depth);
+  if (!(each > 0)) return { n: 0, cost: 0, each };
+  const n = bulkPick === 0 ? Math.floor(S.gold / each) : bulkPick;
+  return { n: Math.max(0, n), cost: n * each, each };
+}
+
 function paintShop(){
   const el = document.getElementById('shop');
   el.classList.add('on');
   el.innerHTML = '';
+  paintBulk();
   OFFERS.forEach(o => {
-    const c = o.cost(S.depth);
+    const bulk = bulkFor(o);
+    const n = bulk.n, each = bulk.each;
+    // Nothing affordable still has to show a price, and the honest one is what
+    // a single costs. A zero there reads as free.
+    const c = n < 1 ? each : bulk.cost;
+    const many = n > 1;
     const b = document.createElement('button');
     b.className = 'buy';
     // The PRICE goes on the second line with the description, not beside the
@@ -1434,12 +1498,26 @@ function paintShop(){
     // characters wide - "conscript" and a three digit price do not both fit,
     // and what got clipped was the price, which is the half a player is
     // actually reading.
-    b.innerHTML = `${o.name}<small><b>${c}</b> &middot; ${o.desc}</small>`;
+    b.innerHTML = `${o.name}${many ? ' x' + n : ''}<small><b>${c}</b> &middot; ${o.desc}</small>`;
     // The whole sentence, for anyone who hovers. The second line is terse
     // because it shares fifteen characters with the price.
-    b.title = `${o.name}: ${o.long} (${c})`;
-    b.disabled = S.gold < c || S.firing;
-    b.onclick = () => { if (S.gold >= c){ S.gold -= c; o.buy(); store.mark(); paintShop(); } };
+    b.title = many ? `${o.name} x${n}: ${o.long} (${each} each, ${c} in all)`
+                   : `${o.name}: ${o.long} (${c})`;
+    b.disabled = n < 1 || S.gold < c || S.firing;
+    b.onclick = () => {
+      // Each one is bought in turn rather than multiplied, because an offer
+      // can change what the next of it costs or does - clearing a row changes
+      // the row underneath it - and the price is re-read every time.
+      let bought = 0;
+      for (let i = 0; i < n; i++){
+        const price = o.cost(S.depth);
+        if (S.gold < price) break;
+        S.gold -= price;
+        o.buy();
+        bought++;
+      }
+      if (bought){ store.mark(); paintShop(); }
+    };
     el.appendChild(b);
   });
 }
