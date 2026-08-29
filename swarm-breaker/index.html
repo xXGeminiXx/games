@@ -253,17 +253,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=5';
-import { createJuice } from './src/juice.js?v=5';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=5';
-import { createBlockKinds } from './src/blocks.js?v=5';
-import { safeRows } from './src/arrival.js?v=5';
-import { createAwards } from './src/awards.js?v=5';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=5';
-import { createLeaderboard } from './src/leaderboard.js?v=5';
-import * as Tiers from './src/tiers.js?v=5';
-import { createOnboarding } from './src/onboarding.js?v=5';
-import { createVisual } from './src/visual.js?v=5';
+         storageKey, offerCost, applyIdentity } from './config.js?v=6';
+import { createJuice } from './src/juice.js?v=6';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=6';
+import { createBlockKinds } from './src/blocks.js?v=6';
+import { safeRows } from './src/arrival.js?v=6';
+import { createAwards } from './src/awards.js?v=6';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=6';
+import { createLeaderboard } from './src/leaderboard.js?v=6';
+import * as Tiers from './src/tiers.js?v=6';
+import { createOnboarding } from './src/onboarding.js?v=6';
+import { createVisual } from './src/visual.js?v=6';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -310,6 +310,20 @@ function easeView(dt){
   if (Math.abs(cellT - CELL) < 0.01) CELL = cellT;
   if (Math.abs(originT - ORIGIN) < 0.01) ORIGIN = originT;
 }
+// Rows the field is dealing this turn. One, except in a field that deals thin
+// rows several at a time so its descent keeps pace - see fractal.descentPx.
+let ROWS_TURN = 1;
+
+// What the field looks like is the field's business. A mode that carries a
+// SURFACE - a picture the blocks are cut from - hands it to the block layer,
+// which then paints through the blocks instead of drawing materials, and the
+// column grid goes with it: a grid over a picture is a mesh.
+function bindField(){
+  look.setSurface(S.field.surface || null);
+  look.setGrid(!S.field.surface);
+  indexDirty = true;
+}
+
 // Seconds a newly placed block spends announcing itself. See markArrivals.
 const ARRIVAL_FLASH = Math.max(0, Number(CONFIG.feel.arrivalFlash) || 0);
 
@@ -397,10 +411,13 @@ function fresh(){
   S.mode = MODE;
   S.seed = (Math.floor(performance.now()) ^ 0x5bf03635) >>> 0;
   S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
-  // The formation source is the fractal mode's own; nothing else has one.
-  S.form = S.field.key === 'fractal' ? S.field.source : null;
+  // A field that deals a SEQUENCE - the figure field, the picture field - is
+  // restored by replaying it, so its source is kept where a save can reach it.
+  S.form = S.field.dealsSequence ? S.field.source : null;
   S.kinds = createBlockKinds(S.seed);
   S.dealt = 0;
+  ROWS_TURN = 1;
+  bindField();
   // A field that does not widen sits at the starting width for the whole run.
   retarget(S.field.widens ? latticeAt(0) : CONFIG.board.cols);
   CELL = cellT; ORIGIN = originT;
@@ -412,9 +429,10 @@ function fresh(){
 
 // --- field ------------------------------------------------------------------
 
-function addRow(){
+function addRow(extra){
   const d = S.depth;
   if (!Tiers.spawnsRowAt(S.tier, d, tmode())) return;
+  indexDirty = true;
 
   // The width is known before the field is, which is how the view learns it has
   // to pull back. A field that never widens answers the same number forever,
@@ -450,23 +468,35 @@ function addRow(){
   // shared among them - see economy.rowBlocks. A field that places one block at
   // a time gives the whole number to each of them, because that is what the
   // ladder was tuned against.
+  //
+  // The share is BY WEIGHT when the field gives its cells one - the picture
+  // field does, so the pale edge of a set is many soft cells and the dark body
+  // is fewer hard ones - and equal otherwise, which is exactly what it was. A
+  // field may also name its own bounds and its own budget per row; the
+  // defaults are the economy's.
   const n = blocks.length;
-  const share = (S.field.sharesHealth && n > 0)
-    ? Math.min(CONFIG.economy.rowShareMax,
-        Math.max(CONFIG.economy.rowShareMin, CONFIG.economy.rowBlocks / n))
+  const tierHp = Tiers.healthNumber(S.tier, d, tmode());
+  const bounds = S.field.shareBounds || { min: CONFIG.economy.rowShareMin, max: CONFIG.economy.rowShareMax };
+  const budget = S.field.budget ? S.field.budget(ROWS_TURN) : CONFIG.economy.rowBlocks;
+  let sumW = 0;
+  for (const cell of blocks) sumW += cell.w > 0 ? cell.w : 1;
+  const shareOf = (cell) => (S.field.sharesHealth && n > 0)
+    ? Math.min(bounds.max, Math.max(bounds.min, budget * (cell.w > 0 ? cell.w : 1) / sumW))
     : 1;
-  const hp = Math.max(1, Math.round(Tiers.healthNumber(S.tier, d, tmode()) * share));
   // A few blocks in a hundred are something other than a number. Which ones is
   // decided from the seed and the block's own position, never from where it
   // came in the loop, so a field is the same field every time it is built.
   for (const cell of blocks){
     const k = S.kinds.rollFor(d, cell.c);
+    const hp = Math.max(1, Math.round(tierHp * shareOf(cell)));
     // Most kinds are payouts and carry the health the tier asked for. The ones
     // that are obstacles rather than rewards say so, and stand there after the
     // pass that cleared everything around them.
     const bhp = k ? Math.max(1, Math.round(hp * S.kinds.healthScale(k))) : hp;
     const b = { c: cell.c, r: cell.r, hp: bhp, max: bhp };
     if (k) b.k = k;
+    // The row a picture cell was cut from. Its face is looked up by it.
+    if (cell.R !== undefined) b.R = cell.R;
     // A block that arrives at the top edge announces itself by sliding in from
     // it. One that appears in the middle of the board has no motion to be
     // noticed by, so it is given a flash instead - see markArrivals.
@@ -476,8 +506,13 @@ function addRow(){
 
   // The resupply line is the difficulty. Starve it and the angle has to choose
   // between damage and collection; keep it full and it never has to.
-  if (Tiers.spawnsPickupAt(S.tier, d, tmode())) S.owed.ball++;
-  if (Tiers.spawnsWindfallAt(S.tier, d)) S.owed.gold++;
+  // Rolled once a TURN. A field that deals several rows in a turn does not get
+  // several rolls for it; the tier's generosity is per depth, and depth is the
+  // turn.
+  if (!extra){
+    if (Tiers.spawnsPickupAt(S.tier, d, tmode())) S.owed.ball++;
+    if (Tiers.spawnsWindfallAt(S.tier, d)) S.owed.gold++;
+  }
   placeDrops(open, d);
 }
 
@@ -513,6 +548,7 @@ function placeDrops(open, d){
 
 function step(){
   if (!Tiers.fieldDescends(S.tier, S.depth, tmode())) return;
+  indexDirty = true;
   // Whether anything moves at all is the arrival's answer. A descending field
   // steps the whole board down a row; a field that fills leaves it exactly
   // where it is, and the slide animation is not run for a slide that did not
@@ -653,7 +689,13 @@ function endTurn(){
   // The run rolls into the endless ramp instead, checked here so the crossing
   // happens BEFORE the row is asked for and the field never misses a turn.
   if (!S.endless && pastFinish()) outlast();
+  // A field whose rows are thin deals several in a turn, so the descent keeps
+  // its pace in pixels rather than slowing to a crawl as the view pulls back.
+  // Each one steps the board exactly as a turn does; the tier is asked at the
+  // same depth for all of them, and the supply is rolled once.
+  ROWS_TURN = S.field.rowsPerTurn ? Math.max(1, S.field.rowsPerTurn() | 0) : 1;
   addRow();
+  for (let i = 1; i < ROWS_TURN; i++){ step(); addRow(true); }
   // Lose when the field has reached the player. WHAT that means belongs to
   // the arrival: a field that descends reaches them by crossing the swarm
   // line, a field that fills reaches them by running out of room.
@@ -828,62 +870,119 @@ function takeMarker(j){
   S.drops.splice(j, 1);
 }
 
-function hitBlocks(b){
-  for (let i = S.rows.length - 1; i >= 0; i--){
+// --- collision ---------------------------------------------------------------
+//
+// A body against the field. Two paths to the same answer:
+//
+// THE SCAN walks every block from the last placed to the first and takes the
+// first one the body is inside and not already leaving. It is the rule the
+// game was built on and it is what every mode with a few dozen blocks runs.
+//
+// THE INDEX is for a field of small cells - the picture field can stand a
+// thousand blocks - where scanning them all for every body on every substep
+// is what would make a big swarm crawl. Blocks are bucketed by cell, the body
+// asks only the cells around it, and the candidates are tried IN THE SCAN'S
+// ORDER, so the two paths pick the same block in the same situation. It is
+// rebuilt lazily whenever the board changes.
+const INDEX_ABOVE = Math.max(8, CONFIG.swarm.indexAbove | 0 || 64);
+let cellIndex = null;
+let indexDirty = true;
+
+function buildIndex(){
+  cellIndex = new Map();
+  for (let i = 0; i < S.rows.length; i++){
     const bl = S.rows[i];
-    // Insets are a share of the cell rather than a fixed three pixels, so a
-    // block keeps its proportions as the view pulls back and the gutter does
-    // not swallow the block at the far end of the ladder.
-    const pad = CELL * 0.046;
-    const bx = xOf(bl.c) + pad, by = TOP + bl.r * CELL + pad;
-    const bw = CELL - pad * 2, bh = CELL - pad * 2;
-    if (b.x + R < bx || b.x - R > bx + bw || b.y + R < by || b.y - R > by + bh) continue;
-
-    const ox = Math.min(b.x + R - bx, bx + bw - (b.x - R));
-    const oy = Math.min(b.y + R - by, by + bh - (b.y - R));
-
-    // An axis the ball is already leaving must not be reflected. Without this
-    // the substep after a resolution reads as a fresh contact, flips the ball
-    // back and displaces it INTO the block it was escaping.
-    const mx = bx + bw / 2, my = by + bh / 2;
-    const awayX = (b.x <= mx && b.vx < 0) || (b.x >= mx && b.vx > 0);
-    const awayY = (b.y <= my && b.vy < 0) || (b.y >= my && b.vy > 0);
-    if (awayX && awayY) continue;
-
-    // Choose the axis by TIME to clear, not by depth. Depth alone picks the
-    // shallower overlap even when the ball is barely moving along it - which is
-    // how a near-vertical ball in the six-pixel gutter between two columns had
-    // its negligible horizontal speed flipped and carried straight on through
-    // the block, for as long as the block had health to spend.
-    const sx = Math.abs(b.vx), sy = Math.abs(b.vy);
-    const tx = (!awayX && sx > 1e-6) ? ox / sx : Infinity;
-    const ty = (!awayY && sy > 1e-6) ? oy / sy : Infinity;
-    if (tx === Infinity && ty === Infinity) continue;
-
-    if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
-    else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
-
-    // It touched something, so its run at the ceiling is no longer clean.
-    b.clean = false;
-    const nx = b.vx, ny = b.vy;
-    const m = look.materialFor(bl.max).mat;
-    const shade = `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
-    bl.hp -= S.power;
-    juice.hit(b.x, b.y, S.power, nx, ny);
-    if (bl.hp <= 0){
-      juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
-      S.rows.splice(i, 1);
-      S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
-      S.turnKills = (S.turnKills || 0) + 1;
-      if (bl.k){
-        // Breaking one is how a player finds out what it does, so breaking one
-        // is what the record is of.
-        if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
-        applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2, bl);
-      }
-    }
-    return;
+    bl.i = i;
+    const key = bl.c + ',' + bl.r;
+    const list = cellIndex.get(key);
+    if (list) list.push(bl); else cellIndex.set(key, [bl]);
   }
+  indexDirty = false;
+}
+
+function hitBlocks(b){
+  if (S.rows.length > INDEX_ABOVE) return hitBlocksIndexed(b);
+  for (let i = S.rows.length - 1; i >= 0; i--){
+    if (strike(b, S.rows[i], i)) return;
+  }
+}
+
+function hitBlocksIndexed(b){
+  if (indexDirty || !cellIndex) buildIndex();
+  const c0 = Math.floor((b.x - ORIGIN) / CELL), r0 = Math.floor((b.y - TOP) / CELL);
+  const reach = Math.ceil((R + 1) / CELL);
+  const found = [];
+  for (let dr = -reach; dr <= reach; dr++){
+    for (let dc = -reach; dc <= reach; dc++){
+      const list = cellIndex.get((c0 + dc) + ',' + (r0 + dr));
+      if (!list) continue;
+      for (const bl of list) if (!bl.dead) found.push(bl);
+    }
+  }
+  if (!found.length) return;
+  found.sort((p, q) => q.i - p.i);
+  for (const bl of found){
+    if (strike(b, bl, -1)) return;
+  }
+}
+
+// One body against one block. True if the body struck it.
+function strike(b, bl, i){
+  // Insets are a share of the cell rather than a fixed three pixels, so a
+  // block keeps its proportions as the view pulls back and the gutter does
+  // not swallow the block at the far end of the ladder.
+  const pad = CELL * 0.046;
+  const bx = xOf(bl.c) + pad, by = TOP + bl.r * CELL + pad;
+  const bw = CELL - pad * 2, bh = CELL - pad * 2;
+  if (b.x + R < bx || b.x - R > bx + bw || b.y + R < by || b.y - R > by + bh) return false;
+
+  const ox = Math.min(b.x + R - bx, bx + bw - (b.x - R));
+  const oy = Math.min(b.y + R - by, by + bh - (b.y - R));
+
+  // An axis the ball is already leaving must not be reflected. Without this
+  // the substep after a resolution reads as a fresh contact, flips the ball
+  // back and displaces it INTO the block it was escaping.
+  const mx = bx + bw / 2, my = by + bh / 2;
+  const awayX = (b.x <= mx && b.vx < 0) || (b.x >= mx && b.vx > 0);
+  const awayY = (b.y <= my && b.vy < 0) || (b.y >= my && b.vy > 0);
+  if (awayX && awayY) return false;
+
+  // Choose the axis by TIME to clear, not by depth. Depth alone picks the
+  // shallower overlap even when the ball is barely moving along it - which is
+  // how a near-vertical ball in the six-pixel gutter between two columns had
+  // its negligible horizontal speed flipped and carried straight on through
+  // the block, for as long as the block had health to spend.
+  const sx = Math.abs(b.vx), sy = Math.abs(b.vy);
+  const tx = (!awayX && sx > 1e-6) ? ox / sx : Infinity;
+  const ty = (!awayY && sy > 1e-6) ? oy / sy : Infinity;
+  if (tx === Infinity && ty === Infinity) return false;
+
+  if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
+  else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
+
+  // It touched something, so its run at the ceiling is no longer clean.
+  b.clean = false;
+  const nx = b.vx, ny = b.vy;
+  const m = look.materialFor(bl.max).mat;
+  const shade = `hsl(${m.h} ${m.s}% ${m.l + 14}%)`;   // the block's own material, lifted so debris reads against the field
+  bl.hp -= S.power;
+  juice.hit(b.x, b.y, S.power, nx, ny);
+  if (bl.hp <= 0){
+    juice.destroy(bx + bw / 2, by + bh / 2, shade, nx, ny);
+    const at = i >= 0 ? i : S.rows.indexOf(bl);
+    if (at >= 0) S.rows.splice(at, 1);
+    bl.dead = true;
+    indexDirty = true;
+    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    S.turnKills = (S.turnKills || 0) + 1;
+    if (bl.k){
+      // Breaking one is how a player finds out what it does, so breaking one
+      // is what the record is of.
+      if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
+      applyBlockEffect(S.kinds.effectOf(bl.k), bx + bw / 2, by + bh / 2, bl);
+    }
+  }
+  return true;
 }
 
 // A special block is marked at its EDGE and never across its middle. The health
@@ -973,6 +1072,7 @@ function applyBlockEffect(e, x, y, src){
     const n = e.lift | 0;
     for (const b of S.rows) b.r = Math.max(0, b.r - n);
     for (const p of S.drops) p.r = Math.max(0, p.r - n);
+    indexDirty = true;
     juice.destroy(W / 2, TOP + CELL, CONFIG.palette.force, 0, -1);
   }
 
@@ -1003,6 +1103,7 @@ function sweep(list){
     S.turnKills = (S.turnKills || 0) + 1;
   }
   S.rows = S.rows.filter(b => !gone.has(b));
+  indexDirty = true;
 }
 
 // What a splinter leaves behind. The pieces go in free cells beside where the
@@ -1032,6 +1133,7 @@ function splinter(src, spec){
     S.rows.push({ c, r, hp, max: hp, pop: S.field.arrival.moves ? undefined : 1 });
     placed++;
   }
+  indexDirty = true;
 }
 
 // Bodies thrown out of a block in every direction. They break blocks and
@@ -1349,7 +1451,8 @@ const store = createSave({
     owed: { ball: S.owed.ball, gold: S.owed.gold },
     power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
     clears: S.clears | 0, streak: S.streak | 0, kindsSeen: (S.kindsSeen || []).slice(),
-    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k })),
+    // A picture block keeps the row it was cut from, or it comes back faceless.
+    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k, R: b.R })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind, t: p.t })),
     // A sprayed body belongs to the turn it was thrown in, and a save is taken
     // between turns, so only the swarm is worth writing down.
@@ -1371,12 +1474,17 @@ const store = createSave({
     S.mode = MODE;
     S.seed = v.seed >>> 0;
     S.field = createField(S.mode, S.seed, { cols: CONFIG.board.cols, formation: FORM_OPTS });
-    S.form = S.field.key === 'fractal' ? S.field.source : null;
+    S.form = S.field.dealsSequence ? S.field.source : null;
     S.kinds = createBlockKinds(S.seed);
     // A field that deals a sequence has no way to be asked for row N, so it is
     // restored by replaying it up to where the run had got to.
     S.dealt = v.dealt | 0;
-    if (S.form) for (let i = 0; i < S.dealt; i++) S.form.nextRow();
+    if (S.form) {
+      for (let i = 0; i < S.dealt; i++) S.form.nextRow();
+      if (typeof S.form.resync === 'function') S.form.resync();
+    }
+    ROWS_TURN = 1;
+    bindField();
     // The view is wherever the field says it is, and arrives there rather than
     // easing across from the starting width.
     retarget(S.field.width());
@@ -1468,6 +1576,9 @@ function paintMenu(){
   list.innerHTML = '';
   MODE_IDS.forEach(id => {
     const m = modeOf(id) || { id, name: id, tell: '', blurb: '' };
+    // A mode can be playable without being offered - kept so a save started
+    // on it still runs, not so a menu grows a row nobody asked for.
+    if (m.hidden) return;
     const best = bestDepth(id, TIER);
     const b = document.createElement('button');
     b.className = 'mode' + (id === MODE ? ' playing' : '');

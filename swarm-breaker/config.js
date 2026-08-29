@@ -120,11 +120,24 @@ export const CONFIG = {
       {
         id: 'fractal',
         name: 'fractal',
+        tell: 'you are inside the set',
+        blurb: 'Julia sets and the Mandelbrot set, dealt downward a row at a '
+             + 'time. You start close in, a few big blocks with a spiral '
+             + 'cutting through them, and the view pulls back until the whole '
+             + 'set is on the screen and the blocks are its pixels. Pale lace '
+             + 'breaks easily; the dark rim does not.',
+      },
+      {
+        // The earlier fractal field - whole geometric constructions (gasket,
+        // mesh, Cantor bars, canopy) dealt on a widening lattice. Kept
+        // playable but off the menu; a save started on it still runs on it.
+        id: 'figures',
+        name: 'figures',
+        hidden: true,
         tell: 'whole figures, dealt downward',
         blurb: 'A complete construction is built first - gasket, mesh, Cantor '
              + 'bars, canopy - then dealt one row at a time so it assembles as '
-             + 'it falls. The field widens to give the figures room. Rougher, '
-             + 'and still being worked on.',
+             + 'it falls. The field widens to give the figures room.',
       },
       {
         id: 'bloom',
@@ -197,6 +210,125 @@ export const CONFIG = {
     // that it is a warning rather than an announcement of something the player
     // has already lost.
     warnAt: 0.72,
+  },
+
+  // -------------------------------------------------------------------------
+  // FRACTAL - the field that is a picture of a set
+  //
+  // Julia sets and the Mandelbrot set, laid onto the lattice (src/fractal.js)
+  // and painted at pixel resolution through the blocks (src/fractal-surface.js).
+  // The view pulls back over the run: cells shrink from sixty-five pixels to
+  // about eleven, and the picture that a handful of blocks were pieces of
+  // comes into view whole.
+  // -------------------------------------------------------------------------
+  fractal: {
+    // THE PAN-OUT. Columns the lattice climbs through, one rung every
+    // `rungRows` rows dealt, holding the last rung for the rest of the run.
+    // The widest rung is also the width every panel is fitted to, so the
+    // widest view shows a whole picture. Forty-eight is a 10.8px cell, just
+    // wider than a body, so a one-cell hole in the filigree is still a hole a
+    // body can find.
+    ladder: [8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48],
+    rungRows: 6,
+
+    // HOW FAST THE FIELD COMES DOWN, in pixels per turn. One row a turn at a
+    // sixty-five pixel cell; six rows a turn at an eleven pixel one. Rows are
+    // thinner as the view pulls back, so without this the descent would slow
+    // to a crawl exactly when the picture is biggest - the field would go from
+    // a metronome to a still life. Held at roughly a starting cell.
+    descentPx: 60,
+
+    // Health per row, as a multiple of the tier's block number, shared among
+    // the row's blocks by weight (see `economy.rowBlocks` for the idea).
+    // `turnScale` says how that scales when several rows arrive in one turn:
+    // 0 keeps the whole TURN at one row's worth, 1 gives every row the full
+    // amount, and 0.3 is near the low end so a six-row turn is about 1.7
+    // rows' worth - a wide turn is heavier than a narrow one, not six times.
+    //
+    // TWO, MEASURED. At four (the figure field's number) with the rows open,
+    // every tier above shallows died at the same depth whether the bot aimed
+    // or not - health per turn, not walls, was ending runs. Swept at 2, 2.6
+    // and 3.2 over ten runs a cell with tools/mode-sim.js: two is the one
+    // where aiming is rewarded on every tier (x2.4 shallows, x3.2 swell,
+    // x1.7 undertow, x1.6 maelstrom) and the aiming bot reaches the wide rungs
+    // where the picture is. It plays easier than the main field on the low
+    // tiers and level with it on the top one, which for a field that exists
+    // to be seen is the right way round.
+    rowBudget: 2,
+    turnScale: 0.3,
+    // Bounds on one block's share of the tier number. Far below the figure
+    // field's, because a dense picture row is forty cells and each should be
+    // a chip, not a pillar.
+    shareMin: 0.02,
+    shareMax: 2,
+
+    // Escape-time iteration cap. Deep enough that the sixty-five pixel cells
+    // at the start still show structure near the boundary.
+    maxIter: 240,
+    // Samples per cell edge for the mass test (4 = sixteen points a cell), and
+    // the share of them that must be past the threshold for a cell to be a
+    // block.
+    samples: 4,
+    massShare: 0.35,
+    // Share of a panel's window that becomes blocks. The threshold is chosen
+    // per panel to hit this, so a thin dendrite and a fat rabbit are equally
+    // playable.
+    massTarget: 0.32,
+    // The near band: iteration counts below this share of the cap are sky, no
+    // matter what the target asks for.
+    nearShare: 0.05,
+    // EVERY ROW KEEPS THIS SHARE OF ITS WIDTH OPEN. A narrow view of the
+    // middle of a dense set is halo from edge to edge, and a solid row is a
+    // wall the swarm strikes once and leaves. The cells that give way are the
+    // row's faintest - the outer halo, read as the sky it looks like. The
+    // main field's rows are about five eighths open; this is denser than that
+    // on purpose, and measured rather than guessed.
+    openShare: 0.34,
+    // Consecutive solid rows allowed before one gives up its faintest cell.
+    // With the share above this is a backstop that should never fire.
+    maxSolidRun: 2,
+    // Bounding-box scan resolution and the margin around the set.
+    scan: 140,
+    margin: 0.06,
+    // Rows a panel may span, and empty rows between panels.
+    minRows: 20,
+    maxRows: 64,
+    gap: 1,
+    // Every Nth panel is the Mandelbrot set stood on end; the rest are Julia
+    // sets from the curated list in src/fractal.js.
+    mandelbrotEvery: 3,
+
+    // THE PICTURE. A cyclic ramp over the smooth iteration count, `cycle`
+    // iterations per pass, so the bands tighten toward the boundary the way an
+    // escape-time picture does. Dark sky in the game's own void rather than
+    // the cyan of a poster, because the swarm is cyan and has to stay the
+    // brightest cool thing on screen; the set keeps the blue, violet and pale
+    // lilac of the reference.
+    ramp: [
+      [0.00, '#0b1030'],
+      [0.14, '#1a3aa8'],
+      [0.30, '#5b5cf0'],
+      [0.45, '#b48cff'],
+      [0.55, '#f1e6ff'],
+      [0.66, '#c26cf0'],
+      [0.80, '#3a2c9e'],
+      [1.00, '#0b1030'],
+    ],
+    inside: '#05060f',      // the interior of the set
+    cycle: 24,
+    // The picture under the empty cells, and how far a worn block darkens.
+    ghost: 0.24,
+    wear: 0.6,
+    // Share of the field's aerial haze the picture takes. The main field
+    // fades its far rows to almost nothing; a picture washed out at the top is
+    // just less picture, so it takes less.
+    haze: 0.45,
+    // Cells narrower than this carry no health number - the plate would cover
+    // more picture than it explains. Seams and corner frames stop at their own
+    // sizes, below which they are a mesh over a picture.
+    numeralMin: 22,
+    seamMin: 26,
+    frameMin: 20,
   },
 
   // -------------------------------------------------------------------------
@@ -468,6 +600,13 @@ export const CONFIG = {
     // Collision is checked this many times per frame. Lower it and a fast body
     // can pass through a block; raise it and the cost per body climbs.
     substeps: 3,
+
+    // Above this many blocks on the board, collision looks blocks up by cell
+    // instead of scanning the whole list for every body on every substep. The
+    // two give the same answer; the lookup is what keeps a field of a
+    // thousand small cells (the picture field) from crawling under a big
+    // swarm. The main field never has this many.
+    indexAbove: 64,
 
     // THE FLATTEST SHOT THE LAUNCHER WILL TAKE, in degrees above horizontal.
     //

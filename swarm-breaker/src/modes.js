@@ -22,11 +22,17 @@
 //             automaton whose rule changes with depth. The field the game was
 //             built around and the one it is tuned for.
 //
-//   fractal   A whole construction is built first - a gasket, a mesh, a Cantor
-//             set, a canopy - and then dealt downward a row at a time, so the
-//             shape assembles on screen as it descends. The constructions are
-//             exact only at particular widths, so the field widens as the run
-//             goes on and the view pulls back to match.
+//   fractal   The field is an escape-time picture - Julia sets and the
+//             Mandelbrot set - fixed in world space and dealt downward a row
+//             at a time. A block is a cell where the set has mass, its face is
+//             the picture at pixel resolution, and the view pulls back over
+//             the run until the whole set is on screen. src/fractal.js and
+//             src/fractal-surface.js.
+//
+//   figures   The field this mode used to be: a whole geometric construction -
+//             a gasket, a mesh, a Cantor set, a canopy - built first and dealt
+//             downward, on a lattice that widens between figures. Off the menu
+//             but still playable, so a save started on it still runs.
 //
 //   bloom     Nothing descends. Blocks accrete onto the mass already on the
 //             board and stay where they land, and the run ends when the board
@@ -39,6 +45,8 @@
 import { CONFIG, leftEdgeAt } from '../config.js';
 import { createPatternSource } from './patterns.js';
 import { createFormationSource } from './formations.js';
+import { createFractalSource } from './fractal.js';
+import { createFractalSurface } from './fractal-surface.js';
 import { createBloomSource } from './bloom.js';
 import { arrivalOf } from './arrival.js';
 
@@ -126,11 +134,78 @@ const BUILDERS = {
   },
 
   fractal(seed, opts) {
-    const src = createFormationSource(seed, opts && opts.formation);
+    const src = createFractalSource(seed, opts && opts.fractal);
+    // The ordinary descent, except that the source is told about every step.
+    // The picture has to be drawn under rows whose blocks are all gone, and
+    // the step count is the only thing that says where those rows are.
+    const base = arrivalOf('descend');
+    const arrival = Object.assign({}, base, {
+      advance(view) {
+        const moved = base.advance(view);
+        if (moved) src.stepped();
+        return moved;
+      },
+    });
+    const cfg = src.config;
+    const budgetBase = cfg.rowBudget > 0 ? Number(cfg.rowBudget) : CONFIG.economy.rowBlocks;
+    const turnScale = Math.min(1, Math.max(0, Number(cfg.turnScale) || 0));
     return {
       key: 'fractal',
+      arrival,
+      widens: true,
+      dealsSequence: true,
+      sharesHealth: true,
+      // One block's share of the tier number is bounded far more loosely than
+      // the figure field's: a picture row can be forty cells, each a chip.
+      shareBounds: {
+        min: cfg.shareMin > 0 ? Number(cfg.shareMin) : CONFIG.economy.rowShareMin,
+        max: cfg.shareMax > 0 ? Number(cfg.shareMax) : CONFIG.economy.rowShareMax,
+      },
+      /** Health one row is worth, as a multiple of the tier number, when `k`
+       *  rows arrive in the same turn. See config fractal.turnScale. */
+      budget(k) {
+        const n = Math.max(1, k | 0);
+        return budgetBase * Math.pow(n, turnScale) / n;
+      },
+      /** Rows this turn deals, so the field keeps its pace in pixels. */
+      rowsPerTurn() { return src.rowsPerTurn(); },
+      // The width is known before the row is, which is how the view learns it
+      // has to pull back. It can change on any row here; the picture is fixed
+      // in world columns, so a wider row is more of the same picture.
+      width() { return src.width(); },
+      nextRow() { return src.nextRow(); },
+      arrive() {
+        const width = src.width();
+        const cells = src.nextRow();
+        const out = rowArrival(cells, width);
+        // Each block remembers the row it was cut from and how deep into the
+        // set it sits. The first places its face on the picture, the second
+        // decides its share of the row's health.
+        for (const b of out.blocks) {
+          b.R = cells.R;
+          b.w = cells.w[b.c - cells.lo];
+        }
+        return out;
+      },
+      preview(depth, n) {
+        return { rows: src.upcoming(n), lo: leftEdgeAt(src.width()) };
+      },
+      label() { return src.figure().name; },
+      signature() { return { name: src.figure().name, key: 'fractal' }; },
+      // What the blocks are made of. The block layer paints through this
+      // instead of drawing materials.
+      surface: createFractalSurface(src),
+      source: src,
+    };
+  },
+
+  figures(seed, opts) {
+    const src = createFormationSource(seed, opts && opts.formation);
+    return {
+      key: 'figures',
       arrival: arrivalOf('descend'),
       widens: true,
+      dealsSequence: true,
       sharesHealth: true,
       // The width is known before the row is, which is how the view learns it
       // has to pull back. A figure never changes width part way through.

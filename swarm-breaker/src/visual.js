@@ -248,6 +248,7 @@ export const REGIME_HUES = {
   opening: 208, sierpinski: 264, mirror: 196, interference: 178,
   growth: 128, gliders: 92, weave: 40, chaos: 10, slabs: 26,
   lattice: 204, cathedral: 282, cantor: 238, reef: 158,
+  fractal: 232,
 };
 
 /**
@@ -290,6 +291,7 @@ const REGIME_SIGS = {
   interference: 'wavefronts', growth: 'branch', gliders: 'chevrons',
   weave: 'weave', chaos: 'static', slabs: 'bands', lattice: 'lattice',
   cathedral: 'ribs', cantor: 'cantor', reef: 'reef',
+  fractal: 'none',
 };
 
 const SIG_NAMES = [
@@ -466,6 +468,10 @@ function createTones() {
 // stays cheap to rasterise.
 
 const SIGNATURES = {
+  /** Nothing at all. For a field that is its own picture and wants no scenery
+   *  arguing with it. */
+  none() {},
+
   /** Parallel drift, the quietest field there is. The opening looks like nothing. */
   drift(p, x, y, w, h, q) {
     const step = 30 + (1 - q) * 22;
@@ -749,6 +755,11 @@ export function createVisual(opts) {
   // close to. null means every block is judged by its own distance from the
   // line, which is what a descending field means by threat.
   let pressure = null;
+  // What the blocks are made of, when it is not a material. A surface paints
+  // the block fills itself (and the picture under them); see setSurface.
+  let surface = null;
+  // The column grid in the backdrop. A field that is a picture turns it off.
+  let gridOn = true;
   let regimeIndex = -1, handover = 0;
   let hue = REGIME_HUES.opening, hueTo = hue;
   let prevSigs = null, curSigs = sigsFor('opening');
@@ -783,11 +794,16 @@ export function createVisual(opts) {
   let frameId = 0;
 
   // Occupancy stamps for fusion. Cleared by generation rather than by wiping.
-  const OCC_ROWS = 40;
-  const occ = new Int32Array(COLS * OCC_ROWS);
+  // Indexed by SCREEN column (world column minus the left edge), because a
+  // widened field has world columns below zero. Reallocated when the lattice
+  // widens.
+  const OCC_ROWS = 64;
+  let OCC_W = COLS + 8;
+  let occ = new Int32Array(OCC_W * OCC_ROWS);
 
-  // Per-frame scratch, sized once. Nothing in the draw path allocates.
-  const CAPB = 320;
+  // Per-frame scratch, sized once. Nothing in the draw path allocates. Big
+  // enough for a field of eleven pixel cells.
+  const CAPB = 4096;
   const bx = new Float32Array(CAPB), by = new Float32Array(CAPB);
   const bw = new Float32Array(CAPB), bh = new Float32Array(CAPB);
   const bInt = new Float32Array(CAPB), bHit = new Float32Array(CAPB);
@@ -797,6 +813,10 @@ export function createVisual(opts) {
   const bSeed = new Int32Array(CAPB), bCol = new Int32Array(CAPB);
   const bRow = new Int32Array(CAPB);
   const bText = new Array(CAPB).fill('');
+  // The whole cell, before fusion insets, and the block itself - what a
+  // surface needs to paint through a block.
+  const bCX = new Float32Array(CAPB), bCY = new Float32Array(CAPB);
+  const bObj = new Array(CAPB).fill(null);
   let bN = 0;
 
   // --- cached device objects ----------------------------------------------
@@ -1117,14 +1137,16 @@ export function createVisual(opts) {
       lc.fillStyle = gradVoid ? rebuildVoid(lc) : PALETTE.void;
       lc.fillRect(0, 0, W, H);
       paintSignature(lc, curSigs, 0);
-      lc.strokeStyle = tone.a(PALETTE.rule, 0.55);
-      lc.lineWidth = 1;
-      lc.beginPath();
-      for (let c = 1; c < COLS; c++) {
-        const x = Math.round(c * CELL) + 0.5;
-        lc.moveTo(x, TOP); lc.lineTo(x, FLOOR);
+      if (gridOn) {
+        lc.strokeStyle = tone.a(PALETTE.rule, 0.55);
+        lc.lineWidth = 1;
+        lc.beginPath();
+        for (let c = 1; c < COLS; c++) {
+          const x = Math.round(c * CELL) + 0.5;
+          lc.moveTo(x, TOP); lc.lineTo(x, FLOOR);
+        }
+        lc.stroke();
       }
-      lc.stroke();
     });
 
     if (backdrop) ctx.drawImage(backdrop.cv, 0, 0);
@@ -1132,7 +1154,7 @@ export function createVisual(opts) {
       ctx.fillStyle = gradVoid;
       ctx.fillRect(0, 0, W, H);
       paintSignature(ctx, curSigs, 0);
-      drawGrid(ctx);
+      if (gridOn) drawGrid(ctx);
     }
 
     drawHandover(ctx);
@@ -1142,7 +1164,7 @@ export function createVisual(opts) {
 
   /** Identity of the current backdrop. Changes only when its inputs do. */
   function backdropKey() {
-    return 'bd|' + curSigs[0] + '|' + curSigs[1] + '|' + Math.round(hue / 15)
+    return 'bd|' + (gridOn ? 'g' : 'n') + '|' + curSigs[0] + '|' + curSigs[1] + '|' + Math.round(hue / 15)
       + '|' + Math.round(quality * 4) + '|' + sigWeight(regimeKey)
       + '|' + (W | 0) + 'x' + (H | 0)
       + '|' + (TOP | 0) + '|' + (FLOOR | 0) + '|' + COLS + '|' + Math.round(CELL);
@@ -1461,6 +1483,9 @@ export function createVisual(opts) {
 
     const off = (sliding ? ease(slide) - 1 : 0) * CELL;
     const rowsToFloor = (FLOOR - TOP) / CELL;
+    // The leftmost world column on screen. The lattice eases cell and origin
+    // together, so this is exact at rest and within a column mid-ease.
+    const LO = Math.round(-ORIGIN / CELL);
 
     // --- pass 0: identity, occupancy -------------------------------------
     for (let i = 0; i < list.length && bN < CAPB; i++) {
@@ -1509,6 +1534,9 @@ export function createVisual(opts) {
       const born = rec.birth > 0 ? ease(1 - rec.birth) : 1;
       by[idx] = y - (1 - born) * CELL * 0.5;
       bAl[idx] = born;
+      bCY[idx] = by[idx];
+      bCX[idx] = ORIGIN + rec.c * CELL;
+      bObj[idx] = b;
 
       // A descending field threatens BY COLUMN: the block one row off the line
       // is the one about to end the run, and the shadow it casts says which
@@ -1521,8 +1549,9 @@ export function createVisual(opts) {
         ? clamp(1 - (rowsToFloor - 1 - rec.r) / LOOK.threatRows, 0, 1)
         : pressure;
 
-      if (rec.r >= 0 && rec.r < OCC_ROWS && rec.c >= 0 && rec.c < COLS) {
-        occ[rec.r * COLS + rec.c] = frameId;
+      const sc = rec.c - LO;
+      if (rec.r >= 0 && rec.r < OCC_ROWS && sc >= 0 && sc < OCC_W) {
+        occ[rec.r * OCC_W + sc] = frameId;
       }
     }
 
@@ -1533,12 +1562,13 @@ export function createVisual(opts) {
     // squares into architecture - a wall reads as a wall, a scatter reads as a
     // scatter, and the shape the generator drew becomes visible.
     for (let i = 0; i < bN; i++) {
-      const c = bCol[i], r = bRow[i];
+      const c = bCol[i] - LO, r = bRow[i];
       let mask = 0;
-      if (c > 0 && r >= 0 && r < OCC_ROWS && occ[r * COLS + c - 1] === frameId) mask |= 1;
-      if (c < COLS - 1 && r >= 0 && r < OCC_ROWS && occ[r * COLS + c + 1] === frameId) mask |= 2;
-      if (r > 0 && occ[(r - 1) * COLS + c] === frameId) mask |= 4;
-      if (r + 1 < OCC_ROWS && occ[(r + 1) * COLS + c] === frameId) mask |= 8;
+      const inRow = r >= 0 && r < OCC_ROWS && c >= 0 && c < OCC_W;
+      if (inRow && c > 0 && occ[r * OCC_W + c - 1] === frameId) mask |= 1;
+      if (inRow && c < OCC_W - 1 && occ[r * OCC_W + c + 1] === frameId) mask |= 2;
+      if (inRow && r > 0 && occ[(r - 1) * OCC_W + c] === frameId) mask |= 4;
+      if (inRow && r + 1 < OCC_ROWS && occ[(r + 1) * OCC_W + c] === frameId) mask |= 8;
       bFuse[i] = mask;
 
       const n = (mask & 1 ? 1 : 0) + (mask & 2 ? 1 : 0) + (mask & 4 ? 1 : 0) + (mask & 8 ? 1 : 0);
@@ -1554,16 +1584,44 @@ export function createVisual(opts) {
       bh[i] = CELL - top - bot;
     }
 
-    drawScars(ctx);
-    drawFills(ctx);
-    drawSeams(ctx);
-    drawSignatureMarks(ctx);
-    drawCracks(ctx);
-    drawBezels(ctx);
+    if (surface) {
+      // The field is a picture. Its faint whole goes under everything, the
+      // living blocks are painted through, and the material passes - fills,
+      // surface marks - are its business rather than this layer's. Seams and
+      // frames stay while a cell is big enough for them to be joints and
+      // corners rather than a mesh laid over the picture.
+      const frame = {
+        n: bN, cellX: bCX, cellY: bCY, blocks: bObj, alpha: bAl, integ: bInt,
+        cell: CELL, origin: ORIGIN, top: TOP, floor: FLOOR, width: W, off,
+        rowsTall: rowsToFloor,
+      };
+      surface.ghost(ctx, frame);
+      drawScars(ctx);
+      surface.paint(ctx, frame);
+      if (CELL >= surface.seamMin) drawSeams(ctx);
+      drawCracks(ctx);
+      if (CELL >= surface.frameMin) drawBezels(ctx);
+    } else {
+      drawScars(ctx);
+      drawFills(ctx);
+      drawSeams(ctx);
+      drawSignatureMarks(ctx);
+      drawCracks(ctx);
+      drawBezels(ctx);
+    }
     drawRimLight(ctx);
 
     // Atmospheric perspective goes on before the numerals and never over them.
-    if (gradHaze) { ctx.fillStyle = gradHaze; ctx.fillRect(0, TOP, W, hazeH); }
+    // A surface says how much of it the picture takes.
+    if (gradHaze) {
+      const share = surface && Number.isFinite(surface.haze) ? surface.haze : 1;
+      if (share > 0) {
+        ctx.save();
+        ctx.globalAlpha = share;
+        ctx.fillStyle = gradHaze; ctx.fillRect(0, TOP, W, hazeH);
+        ctx.restore();
+      }
+    }
 
     drawThreat(ctx);
     drawNumerals(ctx);
@@ -1895,14 +1953,25 @@ export function createVisual(opts) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     let font = '';
+    // A surface can be any colour, so its numerals sit on a plate of void;
+    // and below a size the surface names, a cell carries no number at all -
+    // the picture is the information at that size.
+    const minPx = surface ? surface.minNumeral : 12;
+    const plate = !!(surface && surface.backing);
     for (let i = 0; i < bN; i++) {
       const txt = bText[i];
-      if (!txt || bw[i] < 12 || bh[i] < 12) continue;
+      if (!txt || bw[i] < minPx || bh[i] < minPx) continue;
       const size = txt.length <= 3 ? 14 : txt.length === 4 ? 12 : 10;
       const f = '600 ' + size + 'px ' + FONT;
       if (f !== font) { ctx.font = f; font = f; }
+      const cx = bx[i] + bw[i] / 2, cy = by[i] + bh[i] / 2;
+      if (plate) {
+        const pw = Math.min(bw[i] - 2, txt.length * size * 0.62 + 6), ph = Math.min(bh[i] - 2, size + 4);
+        ctx.fillStyle = tone.a(PALETTE.void, 0.62 * Math.min(1, bAl[i] * 1.7));
+        ctx.fillRect(cx - pw / 2, cy - ph / 2, pw, ph);
+      }
       ctx.fillStyle = tone.a(PALETTE.ink, Math.min(1, bAl[i] * 1.7));
-      ctx.fillText(txt, bx[i] + bw[i] / 2, by[i] + bh[i] / 2 + 0.5);
+      ctx.fillText(txt, cx, cy + 0.5);
     }
   }
 
@@ -2608,9 +2677,30 @@ export function createVisual(opts) {
    * one per frame.
    */
   function setLattice(cols, cell, origin) {
-    if (cols > 0) COLS = cols;
+    if (cols > 0 && cols !== COLS) {
+      COLS = cols;
+      if (COLS + 8 > OCC_W) { OCC_W = COLS + 8; occ = new Int32Array(OCC_W * OCC_ROWS); }
+    }
     CELL = cell > 0 ? cell : W / COLS;
     ORIGIN = Number.isFinite(origin) ? origin : 0;
+  }
+
+  /**
+   * What the blocks are made of, when it is not a material. A surface paints
+   * the block fills itself: `ghost(ctx, frame)` under the field, `paint(ctx,
+   * frame)` through the living blocks, plus the sizes at which numerals,
+   * seams and frames stop. Pass null to go back to materials.
+   */
+  function setSurface(s) {
+    surface = s && typeof s.paint === 'function' ? s : null;
+  }
+
+  /** The column grid in the backdrop. Off for a field that is a picture. */
+  function setGrid(on) {
+    const v = !!on;
+    if (v === gridOn) return;
+    gridOn = v;
+    layers.clear();
   }
 
   /** Detail multiplier, 0.25 (bare) to 1 (full). Pins auto-quality off. */
@@ -2655,7 +2745,7 @@ export function createVisual(opts) {
     // signals
     setDepth, setSwarm, setRegime, setFlight, setPressure, splash, descend, resolve,
     // control
-    clear, resize, setLattice, setQuality, setAutoQuality, setReducedMotion, stats,
+    clear, resize, setLattice, setSurface, setGrid, setQuality, setAutoQuality, setReducedMotion, stats,
     // helpers, exposed so a caller never has to reimplement them
     format, formatTight, materialFor, palette: PALETTE,
     get cell() { return CELL; },
