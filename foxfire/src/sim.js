@@ -19,18 +19,18 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=2';
-import { buildLevel, nearestOpen } from './world.js?v=2';
-import * as Tips from './tips.js?v=2';
-import * as Trees from './trees.js?v=2';
-import * as Tr from './traits.js?v=2';
-import * as Lv from './levels.js?v=2';
-import * as Sp from './spores.js?v=2';
-import * as Rv from './reveal.js?v=2';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=2';
-import { hash } from './rng.js?v=2';
-import * as Lore from './lore.js?v=2';
-import { fmtArea } from './numbers.js?v=2';
+import { CONFIG as DEFAULT } from '../config.js?v=3';
+import { buildLevel, nearestOpen } from './world.js?v=3';
+import * as Tips from './tips.js?v=3';
+import * as Trees from './trees.js?v=3';
+import * as Tr from './traits.js?v=3';
+import * as Lv from './levels.js?v=3';
+import * as Sp from './spores.js?v=3';
+import * as Rv from './reveal.js?v=3';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=3';
+import { hash } from './rng.js?v=3';
+import * as Lore from './lore.js?v=3';
+import { fmtArea } from './numbers.js?v=3';
 
 export const SAVE_VERSION = 1;
 

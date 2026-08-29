@@ -7,11 +7,11 @@
 // set, so the page grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=2';
-import * as Tr from './traits.js?v=2';
-import * as Sp from './spores.js?v=2';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=2';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=2';
+import * as Lore from './lore.js?v=3';
+import * as Tr from './traits.js?v=3';
+import * as Sp from './spores.js?v=3';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=3';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=3';
 
 const LOG_KEEP = 40;
 

@@ -11,8 +11,8 @@
 // would. That is what lets time away be caught up in coarse chunks.
 // ---------------------------------------------------------------------------
 
-import { nearestOpen } from './world.js?v=2';
-import { hash } from './rng.js?v=2';
+import { nearestOpen } from './world.js?v=3';
+import { hash } from './rng.js?v=3';
 
 /** A set with O(1) add, delete and random access, for the frontier. */
 export class IndexedSet {
@@ -55,6 +55,13 @@ export function makeTip(world, nodeId) {
  */
 export function step(state, world, rt, budget, search, reach) {
   if (!(budget > 0)) return 0;
+  // Nothing left to reach and nobody on the way to anything: the whole front
+  // waits, and a step costs nothing. A tip already travelling still arrives.
+  if (rt.frontier.size === 0) {
+    let moving = false;
+    for (let k = 0; k < state.tips.length; k++) if (state.tips[k].to >= 0) { moving = true; break; }
+    if (!moving) return 0;
+  }
   const nodes = world.nodes;
   const isReached = (id) => rt.reached.has(id);
   const isClaimed = (id) => rt.claimed.has(id);

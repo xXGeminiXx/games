@@ -7,9 +7,9 @@
 // word it differently.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=2';
-import { fill } from '../config.js?v=2';
-import { hash } from './rng.js?v=2';
+import { CONTENT } from '../content.js?v=3';
+import { fill } from '../config.js?v=3';
+import { hash } from './rng.js?v=3';
 
 function resolve(key) {
   let node = CONTENT.log;
