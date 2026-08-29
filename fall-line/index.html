@@ -73,6 +73,14 @@
   #stats .stat span{font:10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
   #stats #ore{color:var(--ore)}
   #stats #hearth.low{color:var(--hot)}
+  #stats #hearth.hit{color:var(--hot);transform:translateX(-1px)}
+  #build button.lit{border-color:var(--ore);box-shadow:inset 0 0 0 1px var(--ore)}
+  #build button.lit b{color:var(--ore)}
+  #log .new{color:var(--ink)}
+  #log .new::before{content:'';display:inline-block;width:4px;height:4px;margin:0 5px 2px 0;background:var(--ore)}
+  @media (prefers-reduced-motion: reduce){
+    #stats #hearth.hit{transform:none}
+  }
   #clock{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   #speed{display:flex;gap:3px}
   #speed button{padding:2px 7px;font-size:11px}
@@ -207,8 +215,8 @@
 </div>
 
 <script type="module">
-  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=4';
-  import { createGame } from './src/game.js?v=4';
+  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=5';
+  import { createGame } from './src/game.js?v=5';
 
   applyIdentity(document);
   if (appliedOverrides.length) console.log('config overrides:', appliedOverrides.join(' '));

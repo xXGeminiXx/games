@@ -6,14 +6,14 @@
 // writes the page, and this file decides when each of them happens.
 // ---------------------------------------------------------------------------
 
-import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=4';
-import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=4';
-import { countAlive } from './motes.js?v=4';
-import { kindDef, workAt, stats } from './works.js?v=4';
-import { createIso } from './render/iso.js?v=4';
-import { createGround } from './render/ground.js?v=4';
-import { createScene } from './render/scene.js?v=4';
-import { createUi } from './ui.js?v=4';
+import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=5';
+import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=5';
+import { countAlive } from './motes.js?v=5';
+import { kindDef, workAt, stats } from './works.js?v=5';
+import { createIso } from './render/iso.js?v=5';
+import { createGround } from './render/ground.js?v=5';
+import { createScene } from './render/scene.js?v=5';
+import { createUi } from './ui.js?v=5';
 
 export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const keyMeta = cfg.identity.storagePrefix + '.meta';
@@ -40,7 +40,14 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const tool = { type: null, kind: null };
   const hover = { cell: -1, tool: null, kind: null, ok: false, range: 0, height: 0 };
   let selectedId = 0;
-  const sceneState = { terrain: null, works: null, pool: null, fallLine: null, fallLines: null, fx: null, hover, selected: null, time: 0 };
+  const sceneState = { terrain: null, works: null, pool: null, fallLine: null, fallLines: null, fx: null, hover, selected: null, time: 0, reducedMotion: false };
+  try {
+    const mq = win.matchMedia ? win.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    if (mq) {
+      sceneState.reducedMotion = !!mq.matches;
+      if (mq.addEventListener) mq.addEventListener('change', (e) => { sceneState.reducedMotion = !!e.matches; });
+    }
+  } catch (e) { /* no media queries here */ }
 
   function bind() {
     sceneState.terrain = state.terrain;

@@ -328,10 +328,22 @@ export const CONFIG = {
   render: {
     tileWidthMax: 44,
     heightUnit: 0.36,      // height unit as a fraction of tile width
-    wallLeft: 0.6,         // brightness of the lower-left wall face
-    wallRight: 0.76,       // brightness of the lower-right wall face
-    // Top colours by height, 0 to maxHeight. Valley moss up to bare limestone.
-    bands: ['#5c7a60', '#6b8866', '#7f956d', '#96a277', '#aeb086', '#c6c09c', '#ddd8b8'],
+    wallLeft: 0.72,        // brightness of the lower-left wall face, side-on to the sun
+    wallRight: 0.58,       // brightness of the lower-right wall face, turned away from it
+    // Top colours by height, 0 to maxHeight: one hue family from valley moss
+    // up to bare limestone, stepped evenly in OKLCH so no band goes muddy.
+    bands: ['#476f48', '#627f56', '#7b8f65', '#95a076', '#adb189', '#c6c29d', '#ddd5b4'],
+    // The sun sits low in the upper left. A cell `slope` levels higher than
+    // the ground `k` cells toward it shades that ground; `drift` bends the
+    // shadow a little toward the top of the screen; shadowed tops lose a
+    // fifth of their lightness and lean toward `cool`, lit tops lean toward
+    // `warm`, the way a technical illustration shades.
+    sun: { slope: 1.0, reach: 6, drift: 0.35, shadow: 0.82, cool: '#517791', coolMix: 0.26, warm: '#f7dba1', warmMix: 0.05 },
+    ao: { step: 0.05 },    // lightness lost per grade of enclosure by higher ground
+    fade: { mix: 0.045 },  // how far each grade of distance fades toward the paper
+    grain: { alpha: 0.28, amount: 36 },  // the paper's tooth, one soft-light pass
+    flowSpeed: 14,         // pixels a second the road's dashes run downhill
+    workShadow: 0.32,      // alpha of the hard shadow under a standing work
     edge: '#2f2c26',
     edgeAlpha: 0.45,
     snow: '#f3f5f6',
@@ -381,7 +393,7 @@ export const CONFIG = {
   // ground colour, the paper the relief is drawn on.
   // -------------------------------------------------------------------------
   palette: {
-    void:  '#dcd5c2',
+    void:  '#d8d0bf',
     paper: '#ece6d6',
     panel: '#f5f0e4',
     rule:  '#c9c0ad',
@@ -401,7 +413,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 4,
+    build: 5,
   },
 };
 

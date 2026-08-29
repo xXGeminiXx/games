@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=4';
-import { format } from './economy.js?v=4';
-import { kindDef, costOf } from './works.js?v=4';
-import { idsOf } from './traits.js?v=4';
+import { fill } from '../config.js?v=5';
+import { format } from './economy.js?v=5';
+import { kindDef, costOf } from './works.js?v=5';
+import { idsOf } from './traits.js?v=5';
 
 const LOG_SHOWN = 8;
 
@@ -118,15 +118,34 @@ export function createUi(cfg, doc, win, api) {
   let awardsKey = '';
   let overShown = false;
 
+  // The ore figure runs up to its value instead of jumping, the hearth flashes
+  // when it is hit, and a tile lights the moment it becomes affordable: every
+  // event the player would otherwise have had to notice by ear has a visible
+  // twin. Timers here are in frames, since update runs once a frame.
+  let shownOre = -1;
+  let lastHearth = -1;
+  let hitFrames = 0;
+  const wasPoor = new Map();
+  const litFrames = new Map();
+
   function update() {
     const state = api.state();
     const meta = state.meta;
     const tool = api.tool();
     const hover = api.hover();
 
-    put(el.ore, format(Math.floor(state.ore)));
+    const ore = Math.floor(state.ore);
+    if (shownOre < 0 || Math.abs(ore - shownOre) < 1 || Math.abs(ore - shownOre) > 5000) shownOre = ore;
+    else shownOre += (ore - shownOre) * 0.25;
+    const oreText = Math.abs(ore - shownOre) < 1 ? ore : (ore > shownOre ? Math.floor(shownOre) : Math.ceil(shownOre));
+    put(el.ore, format(oreText));
+
     put(el.hearth, Math.max(0, Math.ceil(state.hearthHp)) + '/' + cfg.hearth.hp);
     setClass(el.hearth, 'low', state.hearthHp < cfg.hearth.hp * 0.3);
+    if (lastHearth >= 0 && state.hearthHp < lastHearth - 1e-6) hitFrames = 18;
+    lastHearth = state.hearthHp;
+    if (hitFrames > 0) hitFrames--;
+    setClass(el.hearth, 'hit', hitFrames > 0);
     put(el.surge, state.surge);
     put(el.best, meta.bestReached);
 
@@ -148,10 +167,17 @@ export function createUi(cfg, doc, win, api) {
     for (const { def, b, cost } of buildButtons) {
       const open = api.isUnlocked(def.id);
       const price = costOf(cfg, def, 1);
+      const poor = open && price > state.ore;
       setClass(b, 'locked', !open);
       setDisabled(b, !open);
       setClass(b, 'on', tool.type === 'build' && tool.kind === def.id);
-      setClass(b, 'poor', open && price > state.ore);
+      setClass(b, 'poor', poor);
+      // Becoming affordable is an event: the tile brightens for a moment.
+      if (open && wasPoor.get(def.id) === true && !poor) litFrames.set(def.id, 40);
+      wasPoor.set(def.id, poor);
+      const lit = (litFrames.get(def.id) || 0) - 1;
+      if (lit >= 0) litFrames.set(def.id, lit);
+      setClass(b, 'lit', lit > 0);
       put(cost, open ? price : fill(t.locked, { n: def.unlock }));
     }
     setClass(el.raise, 'on', tool.type === 'raise');
@@ -216,7 +242,14 @@ export function createUi(cfg, doc, win, api) {
     if (lk !== logKey) {
       logKey = lk;
       clear(el.log);
-      if (el.log) for (const l of shown) el.log.appendChild(make('div', l.cls === 'ink' ? 'ink' : '', l.text));
+      if (el.log) {
+        shown.forEach((l, k) => {
+          const row = make('div', l.cls === 'ink' ? 'ink' : '', l.text);
+          // The newest line is marked so the eye finds what just happened.
+          if (k === shown.length - 1) row.classList.add('new');
+          el.log.appendChild(row);
+        });
+      }
     }
 
     const ak = meta.awards.join(',');
