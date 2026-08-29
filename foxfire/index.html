@@ -5,218 +5,251 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Foxfire</title>
 <style>
-  /* Colours arrive from config.js as custom properties; the values here are
-     only what the page shows before that file has run. */
-  :root{
-    --void:#07090a; --panel:#0c1011; --rule:#1a2220; --ink:#d5dcd7; --dim:#6a7873;
-    --quiet:#414d49; --sugar:#d9b35a; --mineral:#7fa6c4; --glow:#7ff2b0; --hot:#c8553d;
-    --good:#7fd39a;
-  }
+  /* Every colour on this page is a custom property put here from the palette
+     in config.js, so a colour is written in one file and read in the other.
+     No value below is a literal. */
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--void);color:var(--ink)}
+  /* The page grows as the organism does, and everything not on it yet is
+     hidden. Said here because a rule below that gives an element a display of
+     its own would otherwise put it back on the page. */
+  [hidden]{display:none !important}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--loam);color:var(--ink)}
   body{
-    font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    font-variant-numeric:tabular-nums; display:flex; flex-direction:column; overflow:hidden;
+    font:14px/1.5 "Iowan Old Style","Palatino Linotype",Palatino,Charter,Georgia,serif;
+    font-variant-numeric:tabular-nums lining-nums;
+    -webkit-text-size-adjust:100%;
   }
-  button{
-    font:inherit; color:var(--ink); background:transparent; border:1px solid var(--rule);
-    padding:3px 9px; cursor:pointer; border-radius:2px; letter-spacing:.02em;
-  }
-  button:hover:not(:disabled){border-color:var(--dim)}
-  button:disabled{opacity:.35;cursor:default}
-  button b{font-weight:500}
-  button i{font-style:normal;color:var(--dim);margin-left:8px;font-size:11px}
-  h2{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--dim);margin:0 0 8px}
 
-  /* The top line. */
-  header{
-    display:flex; align-items:baseline; justify-content:space-between; gap:12px 20px; flex-wrap:wrap;
-    padding:12px 22px 8px; border-bottom:1px solid var(--rule);
-  }
-  #brand b{font-size:15px;font-weight:600;letter-spacing:.04em}
-  #brand span{color:var(--quiet);margin-left:14px;font-size:11px}
-  #stats{display:flex;gap:10px 24px;flex-wrap:wrap}
-  #stats .stat b{display:block;font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
-  #stats .stat span{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
-  #stats #sugar{color:var(--sugar)} #stats #minerals{color:var(--mineral)} #stats #tips{color:var(--glow)}
-
-  /* Two columns: the books on the left, the floor on the right. */
-  main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;min-height:0}
-  #books{overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;border-right:1px solid var(--rule)}
-  #field{display:flex;flex-direction:column;min-height:0;min-width:0}
-  #floor{flex:1 1 auto;position:relative;min-height:150px}
+  /* The floor: the whole window, behind everything. */
+  #floor{position:fixed;inset:0;z-index:0}
   #floor canvas{display:block;width:100%;height:100%}
-  #fieldhint{position:absolute;left:14px;top:10px;color:var(--quiet);font-size:11px;pointer-events:none}
-  #traits-panel{border-top:1px solid var(--rule);padding:10px 18px 8px;flex:0 0 auto;max-height:46%;overflow-y:auto}
-  #traits{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1px 22px}
 
-  /* The log: newest on top, fading down. */
-  #log{margin:0 0 12px;min-height:44px}
-  #log p{margin:0 0 2px;color:var(--ink)}
-  #log p:nth-child(n+2){color:var(--dim)}
-  #log p:nth-child(n+4){color:var(--quiet)}
-  #log p:nth-child(n+6){display:none}
+  /* The specimen label, pinned to the top left of the floor: two lines of
+     small text on paper, the way a tag is tied to a pressed specimen. */
+  #label{
+    position:absolute;left:18px;top:16px;max-width:min(56vw,460px);
+    background:var(--paper);color:var(--ink);border:1px solid var(--rule);
+    padding:6px 11px 7px;font-size:12px;line-height:1.4;pointer-events:none;
+  }
+  #label p{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #label #title{font-weight:600;letter-spacing:.01em}
+  #label i{font-style:normal;font-variant:small-caps;letter-spacing:.03em;color:var(--faded)}
+  #label span span{margin-left:.28em}
+  #label #st-level,#label #st-area,#label #st-minerals,#label #st-tips{margin-left:.7em}
+  /* The rate carries its unit rather than a word in front of it. */
+  #label #st-income{margin-left:.45em}
+  #label #st-income i{margin-left:0}
+  #label #sugar{color:var(--sugar)}
+  #label #income{color:var(--moss)}
+  #label #minerals{color:var(--mineral)}
 
-  .panel{border-top:1px solid var(--rule);padding:12px 0 10px}
-  .lbl{color:var(--dim);margin-right:8px;font-size:11px}
-  #hand button{padding:5px 14px}
-  #hand #handline{color:var(--dim);margin-left:12px}
-  #tips-panel .acts{display:flex;gap:6px;align-items:center;margin-bottom:6px}
-  #tipline{color:var(--dim);font-size:12px}
+  /* The journal: cream paper down the right, scrolling inside itself. */
+  #journal{
+    position:fixed;top:0;right:0;bottom:0;width:400px;z-index:2;
+    background:var(--paper);color:var(--ink);border-left:1px solid var(--rule);
+    overflow-y:auto;overflow-x:hidden;overflow-wrap:break-word;
+    padding:15px 18px 26px;
+  }
+  #tagline{margin:0 0 12px;font-style:italic;font-size:12.5px;color:var(--faded)}
+  .panel{margin:0 0 16px}
+  .panel:last-of-type{margin-bottom:0}
+  h2{
+    font-size:13.5px;font-weight:600;font-variant:small-caps;letter-spacing:.05em;
+    color:var(--ink);margin:0 0 6px;padding-bottom:3px;border-bottom:1px solid var(--rule);
+  }
+  p{margin:0}
+  .note{color:var(--faded);font-size:12.5px;margin-top:5px}
 
-  /* The trees. */
-  #trees{border-collapse:collapse;width:100%;table-layout:fixed}
-  #trees th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--quiet);text-align:left;padding:0 6px 4px 0}
-  #trees th:nth-child(1){width:126px} #trees th:nth-child(2){width:44px} #trees th:nth-child(3){width:60px}
-  #trees th:nth-child(4){width:62px} #trees th:nth-child(5){width:62px} #trees th:nth-child(6){width:62px}
-  #trees td{padding:3px 5px 3px 0;vertical-align:middle;border-top:1px solid var(--rule);font-size:12px;overflow:hidden;white-space:nowrap}
-  #trees td.kind b{display:block;font-weight:500}
-  #trees td.kind small{display:block;color:var(--quiet);font-size:10px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Paper labels. */
+  button{
+    font:inherit;font-size:13px;line-height:1.35;color:var(--ink);background:var(--paper);
+    border:1px solid var(--rule);border-color:color-mix(in srgb,var(--ink) 60%,transparent);
+    padding:2px 9px;cursor:pointer;border-radius:1px;
+  }
+  button:hover:not(:disabled),button:active:not(:disabled){background:var(--paper-deep)}
+  button:disabled{color:var(--faded);cursor:default}
+  button b{font-weight:500}
+  button i{font-style:normal;font-variant:small-caps;letter-spacing:.03em;color:var(--faded);margin-left:7px;font-size:12px}
+  button:disabled i{color:var(--faded)}
+  .acts{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 5px}
+
+  /* The entries: oldest at the top, the newest one at the foot of the page. */
+  #log{max-height:min(31vh,300px);overflow-y:auto;overflow-x:hidden;padding-right:5px}
+  #log p{margin:0 0 7px}
+  #log p:last-child{margin-bottom:0}
+  #log .mark{font-style:normal;font-variant:small-caps;letter-spacing:.04em;color:var(--faded);margin-right:.3em}
+
+  /* The hand. */
+  #hand{display:flex;align-items:baseline;gap:10px}
+  #handline{color:var(--faded);font-size:12.5px}
+  #tipline{color:var(--faded);font-size:12.5px}
+
+  /* The trees ledger. */
+  #trees-panel{overflow-x:auto}
+  #trees{border-collapse:collapse;width:100%;table-layout:fixed;font-size:12px}
+  #trees th{
+    font-size:10.5px;font-weight:600;font-variant:small-caps;letter-spacing:.04em;color:var(--faded);
+    text-align:left;padding:2px 3px 3px 0;background:var(--paper-deep);border-bottom:1px solid var(--rule);
+    white-space:nowrap;overflow:hidden;
+  }
+  #trees th:first-child{padding-left:4px}
+  #trees th:nth-child(1){width:94px} #trees th:nth-child(2){width:40px} #trees th:nth-child(3){width:44px}
+  #trees th:nth-child(4){width:44px} #trees th:nth-child(5){width:38px} #trees th:nth-child(6){width:46px}
+  #trees th:nth-child(7){width:58px}
+  /* The figures line up on their right, the way a ledger's do, which is also
+     what keeps one column's heading off the next one's. */
+  #trees th:nth-child(n+2):nth-child(-n+5),#trees td.size,#trees td.sent,#trees td.got,#trees td.rate{
+    text-align:right;padding-right:7px;
+  }
+  #trees td{
+    padding:4px 3px 4px 0;vertical-align:top;border-bottom:1px solid var(--rule);
+    overflow:hidden;white-space:nowrap;font-size:11.5px;
+  }
+  #trees td.kind{padding-left:4px}
+  #trees td.kind b{display:block;font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+  #trees td.kind small{display:block;color:var(--faded);font-size:10px;line-height:1.25;overflow:hidden;text-overflow:ellipsis}
   #trees td.sent{color:var(--mineral)} #trees td.got{color:var(--sugar)}
-  #trees td.rate.sat{color:var(--hot)} #trees td.rate.cold{color:var(--mineral)}
-  #trees td.weight{white-space:nowrap}
-  #trees td.weight button.w{padding:0 6px;line-height:16px;font-size:11px}
-  #trees td.weight .wv{display:inline-block;width:16px;text-align:center}
-  #trees td.policy button{padding:0 6px;line-height:16px;font-size:10px;margin-right:3px}
-  #trees td.policy button.on{border-color:var(--sugar);color:var(--sugar)}
-  #treesnote{color:var(--quiet);font-size:11px;margin:4px 0 0}
+  #trees td.rate{font-weight:700}
+  #trees td.rate.cold{color:var(--faded);font-weight:400}
+  /* The share: five ticks, filled up to the weight, clicked to set it. */
+  #trees td.weight button.tick{
+    width:7px;height:7px;padding:0;margin:2px 2px 0 0;border-radius:0;
+    border:1px solid var(--ink);background:var(--paper);vertical-align:middle;
+  }
+  #trees td.weight button.tick.on{background:var(--ink)}
+  #trees td.policy button{
+    display:block;font-size:10.5px;font-variant:small-caps;letter-spacing:.03em;
+    padding:0 5px;margin:0 0 3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  }
+  #trees td.policy button.on{border-color:var(--rust);color:var(--rust)}
+  #treesnote{color:var(--faded);font-size:12.5px;margin-top:5px}
 
-  /* The year. */
-  #season-panel{border-left:2px solid var(--rule);padding-left:12px}
-  #season-panel.season-0{border-left-color:var(--good)}
-  #season-panel.season-1{border-left-color:var(--sugar)}
-  #season-panel.season-2{border-left-color:var(--hot)}
-  #season-panel.season-3{border-left-color:var(--mineral)}
-  #season-name{font-size:14px;font-weight:600}
-  #season-left{color:var(--dim);margin-left:10px;font-size:11px}
-  #season-track{height:2px;background:var(--rule);margin-top:8px;width:100%}
-  #season-bar{display:block;height:2px;background:var(--dim);width:0}
+  /* The year: one ruled line, four marks, and the point we are at. */
+  #season-name{font-variant:small-caps;letter-spacing:.05em;font-size:14px}
+  #season-left{color:var(--faded);font-size:12.5px;margin-left:8px}
+  #season-track{position:relative;height:10px;margin-top:7px}
+  #season-track::before{content:"";position:absolute;left:0;right:0;top:5px;height:1px;background:var(--rule)}
+  #season-track .mk{position:absolute;top:2px;width:1px;height:7px;background:var(--rule)}
+  #season-track .mk:nth-of-type(1){left:0}
+  #season-track .mk:nth-of-type(2){left:25%}
+  #season-track .mk:nth-of-type(3){left:50%}
+  #season-track .mk:nth-of-type(4){left:75%}
+  #season-bar{
+    position:absolute;top:0;left:0;width:0;height:0;margin-left:-4px;
+    border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid var(--ink);
+  }
+  .season-2 #season-name,.season-2 #season-bar{color:var(--rust)}
+  .season-2 #season-bar{border-top-color:var(--rust)}
 
   /* Reach. */
-  #reach-panel .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
-  #reach-panel #beyond{border-color:var(--glow);color:var(--glow)}
-  #reachline,#beyondline,#belowline{color:var(--dim);font-size:12px;margin:0 0 4px}
+  #reachline,#beyondline,#belowline{color:var(--faded);font-size:12.5px;margin:0 0 5px}
+  #beyondline:empty,#belowline:empty{margin:0}
+  #beyond{border-color:var(--rust);color:var(--rust)}
 
-  /* Traits and the genome: one line each. */
-  .rrow{display:grid;grid-template-columns:216px 1fr auto;align-items:center;gap:8px;margin:0 0 2px;min-width:0}
-  .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .rrow .line{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .rrow .lv{color:var(--quiet);font-size:10px}
+  /* Traits and what the spore carries: a label, what it does, how far it has
+     gone. On a column this narrow the sentence sits under its own label. */
+  .rrow{
+    display:grid;grid-template-columns:1fr auto;grid-template-areas:"name lv" "line line";
+    gap:1px 8px;align-items:baseline;margin:0 0 9px;
+  }
+  .rrow button.rite{grid-area:name;justify-self:start;max-width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rrow .lv{grid-area:lv;color:var(--faded);font-size:11px;font-variant:small-caps;letter-spacing:.04em}
+  .rrow .line{grid-area:line;color:var(--faded);font-size:12.5px;line-height:1.35}
+  #genome{margin-top:2px}
 
   /* Fruiting. */
-  #spores-panel{border-left:2px solid var(--glow);padding-left:12px}
-  #spores-note{margin:0 0 8px;color:var(--dim)}
-  #spores-held{margin:0 0 8px;color:var(--glow);font-size:12px}
-  #fruit{border-color:var(--glow);color:var(--glow);padding:4px 12px;margin-bottom:10px}
-  #p-genome{margin-top:6px}
-  #genome{display:grid;gap:2px}
-  #genome .rrow button.rite{border-color:var(--rule)}
+  #spores-note{color:var(--faded);font-size:12.5px;margin-bottom:7px}
+  #spores-held{color:var(--moss);font-size:12.5px;margin-top:7px}
+  #fruit{border-color:var(--moss);color:var(--moss)}
 
-  footer{
-    display:flex;gap:10px;align-items:center;padding:6px 22px;border-top:1px solid var(--rule);
-    color:var(--quiet);font-size:11px;
-  }
-  footer button{padding:1px 8px;font-size:11px;color:var(--dim)}
-  footer #saved{margin-left:auto}
+  /* The desk drawer. */
+  #tools{display:flex;align-items:center;gap:7px;margin-top:18px;padding-top:10px;border-top:1px solid var(--rule)}
+  #tools button{font-size:12px;font-variant:small-caps;letter-spacing:.03em;padding:1px 8px}
+  #saved{margin-left:auto;color:var(--faded);font-size:12px}
 
-  @media (max-width:1200px){
-    .rrow{grid-template-columns:196px 1fr auto}
-    #brand span{display:none}
-  }
-  @media (max-height:700px){
-    #log p:nth-child(n+4){display:none}
-    #log{margin-bottom:8px;min-height:0}
-    .panel{padding:8px 0 6px}
-    h2{margin-bottom:5px}
-  }
+  /* A phone: the floor keeps the top third and the journal slides up over the
+     rest of it. Nothing is beside anything, so nothing can be cut off. */
   @media (max-width:760px){
-    /* One column that scrolls as a page: nothing here keeps a fixed height,
-       so a panel can never paint over the one below it. */
-    html,body{height:auto;min-height:100%}
-    body{overflow:auto}
-    main{display:flex;flex-direction:column;flex:none;min-height:0}
-    /* The picture first, the books under it, the traits last: the field is
-       dissolved so its two children can be ordered around the books. */
-    #field{display:contents}
-    #floor{order:-1;height:240px;flex:none;border-bottom:1px solid var(--rule)}
-    #books{flex:none;overflow:visible;order:0}
-    #traits-panel{order:1;max-height:none;overflow:visible;flex:none}
-    #traits{grid-template-columns:1fr}
-    #books{border-right:0;overflow:visible;padding:12px 14px}
-    header{padding:10px 14px 6px;flex-wrap:wrap}
-    #stats{gap:14px;flex-wrap:wrap}
-    /* The table keeps its shape and scrolls inside its own panel; the page
-       itself never scrolls sideways. */
-    #trees-panel{overflow-x:auto}
-    #trees{table-layout:auto;min-width:500px}
+    #journal{top:34vh;left:0;right:0;width:auto;border-left:0;border-top:1px solid var(--rule);padding:13px 14px 22px}
+    #label{left:11px;top:11px;max-width:calc(100% - 22px)}
+    #log{max-height:min(26vh,220px)}
     #trees th:nth-child(n){width:auto}
-    /* On a phone there is no room beside a button for the line that says what
-       it does, so the line goes underneath it instead of being cut off. */
-    .rrow{grid-template-columns:1fr auto;grid-template-areas:"name lv" "line line";row-gap:1px;margin-bottom:7px}
-    .rrow button.rite{grid-area:name}
-    .rrow .lv{grid-area:lv}
-    .rrow .line{grid-area:line;white-space:normal;overflow:visible}
+    #trees{table-layout:auto;min-width:340px}
+  }
+  @media (max-height:620px){
+    #log{max-height:150px}
+    .panel{margin-bottom:12px}
   }
 </style>
 </head>
 <body>
-<header>
-  <div id="brand"><b id="title">Foxfire</b><span id="tagline"></span></div>
-  <div id="stats">
-    <div class="stat" id="st-sugar"><b id="sugar">0</b><span id="lbl-sugar">sugar</span></div>
-    <div class="stat" id="st-income" hidden><b id="income">0</b><span id="lbl-income">sugar/s</span></div>
-    <div class="stat" id="st-minerals" hidden><b id="minerals">0</b><span id="lbl-minerals">minerals/s</span></div>
-    <div class="stat" id="st-tips" hidden><b id="tips">0</b><span id="lbl-tips">tips</span></div>
-    <div class="stat" id="st-area" hidden><b id="area">0</b><span id="lbl-area">ground</span></div>
-    <div class="stat" id="st-level" hidden><b id="level">0</b><span id="lbl-level">reach</span></div>
+<div id="floor">
+  <canvas id="v"></canvas>
+  <div id="label">
+    <p><b id="title"></b><span id="st-level" hidden><i id="lbl-level"></i><span id="level"></span></span><span id="st-area" hidden><i id="lbl-area"></i><span id="area"></span></span></p>
+    <p><span id="st-sugar"><i id="lbl-sugar"></i><span id="sugar">0</span></span><span id="st-income" hidden><span id="income"></span><i id="lbl-income"></i></span><span id="st-minerals" hidden><i id="lbl-minerals"></i><span id="minerals"></span></span><span id="st-tips" hidden><i id="lbl-tips"></i><span id="tips"></span></span></p>
   </div>
-</header>
-<main>
-  <section id="books">
+</div>
+
+<aside id="journal">
+  <p id="tagline"></p>
+
+  <section class="panel" id="entries-panel">
+    <h2 id="fieldhint"></h2>
     <div id="log"></div>
-    <div id="hand" class="panel"><button id="reach">Reach</button><span id="handline"></span></div>
-    <div id="tips-panel" class="panel" hidden>
-      <h2 id="p-tips">the tips</h2>
-      <div class="acts"><button id="buy-tip">Grow a tip</button><button id="buy-tips-max">Max</button></div>
-      <p id="tipline"></p>
-    </div>
-    <div id="trees-panel" class="panel" hidden>
-      <h2 id="p-trees">the trees</h2>
-      <table id="trees"></table>
-      <p id="treesnote"></p>
-    </div>
-    <div id="season-panel" class="panel" hidden>
-      <h2 id="p-season">the year</h2>
-      <span id="season-name"></span><span id="season-left"></span>
-      <div id="season-track"><span id="season-bar"></span></div>
-    </div>
-    <div id="reach-panel" class="panel" hidden>
-      <h2 id="p-reach">reach</h2>
-      <p id="reachline"></p>
-      <div class="acts"><button id="extend">Extend</button><button id="beyond" hidden>Go beyond</button></div>
-      <p id="beyondline"></p>
-      <p id="belowline" hidden></p>
-    </div>
-    <div id="spores-panel" class="panel" hidden>
-      <h2 id="p-spores">fruiting</h2>
-      <p id="spores-note"></p>
-      <button id="fruit" hidden>Fruit</button>
-      <p id="spores-held"></p>
-      <h2 id="p-genome" hidden>what the spore carries</h2>
-      <div id="genome" hidden></div>
-    </div>
   </section>
-  <section id="field">
-    <div id="floor"><canvas id="v"></canvas><div id="fieldhint">the floor</div></div>
-    <div id="traits-panel" hidden><h2 id="p-traits">traits</h2><div id="traits"></div></div>
+
+  <section class="panel" id="hand-panel">
+    <div id="hand"><button id="reach"></button><span id="handline"></span></div>
   </section>
-</main>
-<footer>
-  <button id="export">export</button>
-  <button id="import">import</button>
-  <button id="reset">start over</button>
-  <span id="saved"></span>
-</footer>
+
+  <section class="panel" id="tips-panel" hidden>
+    <h2 id="p-tips"></h2>
+    <div class="acts"><button id="buy-tip"></button><button id="buy-tips-max"></button></div>
+    <p id="tipline"></p>
+  </section>
+
+  <section class="panel" id="trees-panel" hidden>
+    <h2 id="p-trees"></h2>
+    <table id="trees"></table>
+    <p id="treesnote"></p>
+  </section>
+
+  <section class="panel" id="season-panel" hidden>
+    <h2 id="p-season"></h2>
+    <p><span id="season-name"></span><span id="season-left"></span></p>
+    <div id="season-track"><i class="mk"></i><i class="mk"></i><i class="mk"></i><i class="mk"></i><span id="season-bar"></span></div>
+  </section>
+
+  <section class="panel" id="reach-panel" hidden>
+    <h2 id="p-reach"></h2>
+    <p id="reachline"></p>
+    <div class="acts"><button id="extend"></button><button id="beyond" hidden></button></div>
+    <p id="beyondline"></p>
+    <p id="belowline" hidden></p>
+  </section>
+
+  <section class="panel" id="traits-panel" hidden>
+    <h2 id="p-traits"></h2>
+    <div id="traits"></div>
+  </section>
+
+  <section class="panel" id="spores-panel" hidden>
+    <h2 id="p-spores"></h2>
+    <p id="spores-note"></p>
+    <button id="fruit" hidden></button>
+    <p id="spores-held"></p>
+    <h2 id="p-genome" hidden></h2>
+    <div id="genome" hidden></div>
+  </section>
+
+  <div id="tools">
+    <button id="export"></button>
+    <button id="import"></button>
+    <button id="reset"></button>
+    <span id="saved"></span>
+  </div>
+</aside>
 
 <script type="module">
 // ---------------------------------------------------------------------------
@@ -226,8 +259,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=3';
-import { createGame } from './src/game.js?v=3';
+import { CONFIG, applyIdentity } from './config.js?v=4';
+import { createGame } from './src/game.js?v=4';
 
 applyIdentity(document);
 
@@ -239,19 +272,19 @@ const game = createGame({
   storage: window.localStorage,
 });
 
-// The footer: a save that can leave, a save that can arrive, and a clean slate.
+// The drawer: a save that can leave, a save that can arrive, and a clean slate.
 document.getElementById('export').addEventListener('click', () => {
   const str = game.exportSave();
-  const done = (ok) => game.ui.savedNote(ok ? 'save copied' : 'copy this: ' + str.slice(0, 24) + '...');
+  const done = (ok) => game.ui.savedNote(ok ? CONFIG.text.saveCopied : CONFIG.text.saveCopyThis + str.slice(0, 24) + '...');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt('your save', str); done(false); });
+    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt(CONFIG.text.savePrompt, str); done(false); });
   } else {
-    window.prompt('your save', str);
+    window.prompt(CONFIG.text.savePrompt, str);
     done(false);
   }
 });
 document.getElementById('import').addEventListener('click', () => {
-  const str = window.prompt('paste a save');
+  const str = window.prompt(CONFIG.text.savePaste);
   if (!str) return;
   try { game.importSave(str); } catch (e) { game.ui.savedNote(String(e.message || e)); }
 });

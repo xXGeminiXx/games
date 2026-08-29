@@ -19,18 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=3';
-import { buildLevel, nearestOpen } from './world.js?v=3';
-import * as Tips from './tips.js?v=3';
-import * as Trees from './trees.js?v=3';
-import * as Tr from './traits.js?v=3';
-import * as Lv from './levels.js?v=3';
-import * as Sp from './spores.js?v=3';
-import * as Rv from './reveal.js?v=3';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=3';
-import { hash } from './rng.js?v=3';
-import * as Lore from './lore.js?v=3';
-import { fmtArea } from './numbers.js?v=3';
+import { CONFIG as DEFAULT } from '../config.js?v=4';
+import { buildLevel, nearestOpen } from './world.js?v=4';
+import * as Tips from './tips.js?v=4';
+import * as Trees from './trees.js?v=4';
+import * as Tr from './traits.js?v=4';
+import * as Lv from './levels.js?v=4';
+import * as Sp from './spores.js?v=4';
+import * as Rv from './reveal.js?v=4';
+import * as Ev from './events.js?v=4';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=4';
+import { hash } from './rng.js?v=4';
+import * as Lore from './lore.js?v=4';
+import { fmtArea } from './numbers.js?v=4';
 
 export const SAVE_VERSION = 1;
 
@@ -64,6 +65,7 @@ export function freshState(cfg, seed) {
     litterYear: -1,
     seasonSeen: -1,
     milestones: { tips: 0, area: 0 },
+    events: Ev.freshEvents(),  // what the world is doing on its own
     log: [],               // the last lines said, newest first
   };
 }
@@ -93,6 +95,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     rt.income = { wood: 0, trade: 0, fell: 0, below: 0 };
     rt.carry = { produced: 0, capacity: 0, carried: 0 };
     rt.boost = {};
+    // -- events.js hook: ground another fungus holds, and what a hop into it
+    //    costs a tip. Read by Tips.step and by the hand.
+    Ev.runtime(state, cfg, rt);
   };
 
   const scale = () => Lv.scale(cfg, state.level);
@@ -119,17 +124,26 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const n = world.nodes[id];
     rt.reached.add(id);
     rt.frontier.add(id);
+    // -- events.js hook: ground contested off a rival stops being its the
+    //    moment the threads are in it.
+    if (rt.rival && rt.rival.has(id)) { rt.rival.delete(id); Ev.taken(state, id); }
     state.reached.push(id);
     if (fromId !== undefined && fromId !== null && fromId !== id) state.threads.push([fromId, id]);
     if (n.kind === 'wood') {
-      state.wood[id] = woodStockOf(n);
+      // -- events.js hook: a log that has already been through something keeps
+      //    what happened to it. A burnt one is in the books at nothing and is
+      //    not laid again; one the wind brought down holds what fell on it.
+      if (state.wood[id] === undefined) state.wood[id] = woodStockOf(n);
+      state.wood[id] += Ev.fallenStock(state, id);
     } else if (n.kind === 'soil') {
       rt.soil++;
       say('firstSoil', { thing: Lore.thing(state.level, 'soil') }, true);
     } else if (n.kind === 'root') {
       rt.roots++;
       const species = roster[n.sp];
-      state.trees[id] = Trees.newTree(n, species);
+      // -- events.js hook: a tree burnt to a snag is still standing there when
+      //    the threads come back to it, charred wood and all.
+      if (!state.trees[id]) state.trees[id] = Trees.newTree(n, species);
       if (state.weights[species.key] === undefined) state.weights[species.key] = cfg.trees.weightNew;
       say('firstRoot', { thing: Lore.thing(state.level, 'root') }, true);
     }
@@ -151,6 +165,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   if (state.tipCount === undefined) state.tipCount = state.tips.length;
+  // -- events.js hook: the world's own doings, put on any state that reaches
+  //    here without them, and dated from the seed.
+  Ev.ensure(state, cfg);
   if (!state.opened) {
     openOrigin();
     rebuild();
@@ -191,6 +208,14 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const season = seasonOf(cfg, state.t);
     const winter = season.index === WINTER;
 
+    // -- events.js hook: the world's own doings, before the tips move, since
+    //    a fire changes what there is to move over. `weather.soil` is the
+    //    share of its minerals the ground is giving this step.
+    const weather = Ev.step(state, cfg, {
+      world, roster, season, say, rebuild, lore: Lore, rt: () => rt,
+      search: cfg.tips.search + m.search,
+    });
+
     // The tips forage.
     const tipMult = (m.frost && winter) ? 1 : season.tips;
     Tips.step(state, world, rt, cfg.tips.speed * m.speed * tipMult * dt, cfg.tips.search + m.search, reachNode);
@@ -214,7 +239,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     state.totals.eaten += income.wood;
 
     // Soil gives minerals; so does everything folded away below.
-    mineralFlow += rt.soil * cfg.soil.rate * k * m.yield * dt;
+    mineralFlow += rt.soil * cfg.soil.rate * k * m.yield * weather.soil * dt;
     sugar += state.below.sugar * dt;
     income.below = state.below.sugar * dt;
 
@@ -280,6 +305,10 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // Each tree: drained, dying, dead and eaten, regrowing, or growing.
     for (const id in state.trees) {
       const tree = state.trees[id];
+      // -- events.js hook: a tree on ground the threads are no longer in - a
+      //    snag the fire left behind - is neither eaten nor tended until they
+      //    come back to it.
+      if (!rt.reached.has(+id)) continue;
       const sp = roster[tree.sp];
       if (tree.dead) {
         market[sp.key].dead++;
@@ -322,7 +351,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (season.index === AUTUMN && state.litterYear < season.year) {
       state.litterYear = season.year;
       const fall = cfg.wood.litterFall * cfg.wood.stockBase * k * season.litter;
-      for (const id in state.wood) state.wood[id] += fall * world.nodes[id].stock;
+      // -- events.js hook: litter only counts where the threads are, so a log
+      //    the fire took does not fill up again while it lies outside the reach.
+      for (const id in state.wood) if (rt.reached.has(+id)) state.wood[id] += fall * world.nodes[id].stock;
     }
     if (season.index !== state.seasonSeen) {
       const first = state.seasonSeen < 0;
@@ -405,7 +436,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     let target = -1, from = -1;
     for (let i = 0; i < rt.frontier.size && target < 0; i++) {
       const f = rt.frontier.at(i);
-      const id = nearestOpen(world, f, search, state.ring, isReached, isClaimed);
+      // -- events.js hook: the hand cannot help itself to ground a rival holds.
+      const id = nearestOpen(world, f, search, state.ring, isReached, isClaimed, Ev.rivalGuard(rt), false);
       if (id >= 0) { target = id; from = f; }
     }
     state.sugar += cfg.hand.sugar * k;
@@ -499,6 +531,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     state.wood = {};
     state.trees = {};
     state.relocations = 0;
+    // -- events.js hook: a burn and a rival belong to the ground that was just
+    //    folded away, and its node numbers mean something else up here.
+    Ev.levelChanged(state);
     world = buildLevel(cfg, state.seed, state.level);
     roster = Trees.rosterFor(cfg, state.level);
     openOrigin();

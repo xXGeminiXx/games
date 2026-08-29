@@ -7,16 +7,30 @@
 // word it differently.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=3';
-import { fill } from '../config.js?v=3';
-import { hash } from './rng.js?v=3';
+import { CONTENT } from '../content.js?v=4';
+import { fill } from '../config.js?v=4';
+import { hash } from './rng.js?v=4';
+import { TEXT as EVENTS } from './events.js?v=4';
 
-function resolve(key) {
-  let node = CONTENT.log;
+function walk(root, key) {
+  let node = root;
   for (const part of String(key).split('.')) {
     node = node ? node[part] : undefined;
   }
   return node;
+}
+
+// The log first, then what happens to the ground. An "events.<name>" key names
+// a pool under the events set; if the writing has none for it yet, the module
+// that says the line keeps a plain one of its own.
+function resolve(key) {
+  const inLog = walk(CONTENT.log, key);
+  if (inLog !== undefined) return inLog;
+  const parts = String(key).split('.');
+  if (parts.length === 2 && parts[0] === 'events') {
+    return (CONTENT.events && CONTENT.events[parts[1]]) || EVENTS[parts[1]];
+  }
+  return walk(CONTENT.events, key);
 }
 
 /** One line from a pool, filled. An unknown key comes back as the key itself. */

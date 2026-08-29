@@ -11,8 +11,8 @@
 // would. That is what lets time away be caught up in coarse chunks.
 // ---------------------------------------------------------------------------
 
-import { nearestOpen } from './world.js?v=3';
-import { hash } from './rng.js?v=3';
+import { nearestOpen } from './world.js?v=4';
+import { hash } from './rng.js?v=4';
 
 /** A set with O(1) add, delete and random access, for the frontier. */
 export class IndexedSet {
@@ -46,7 +46,8 @@ export function runtimeOf(state) {
 /** A new tip on the given node. */
 export function makeTip(world, nodeId) {
   const n = world.nodes[nodeId];
-  return { x: n.x, y: n.y, from: nodeId, to: -1 };
+  // events.js: `pay` is distance still owed for pushing into contested ground.
+  return { x: n.x, y: n.y, from: nodeId, to: -1, pay: 0 };
 }
 
 /**
@@ -67,6 +68,12 @@ export function step(state, world, rt, budget, search, reach) {
   const isClaimed = (id) => rt.claimed.has(id);
   const unclaimed = () => false;
   let arrivals = 0;
+  // events.js: ground another fungus holds is not free to take. A tip looks
+  // past it first and pushes into it only when there is nothing else beside
+  // it, and the hop costs this many times the distance.
+  const rival = rt.rival;
+  const isRival = (rival && rival.size) ? (id) => rival.has(id) : null;
+  const rivalCost = rt.rivalCost > 1 ? rt.rivalCost : 1;
 
   for (let k = 0; k < state.tips.length; k++) {
     const t = state.tips[k];
@@ -74,12 +81,21 @@ export function step(state, world, rt, budget, search, reach) {
     let hops = 0;
     while (left > 0 && hops < 256) {
       if (t.to < 0) {
-        const target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed);
+        let target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, false);
+        if (target < 0 && isRival) {
+          target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, true);
+          if (target >= 0) {
+            const n = nodes[target];
+            t.pay = (rivalCost - 1) * Math.sqrt((n.x - t.x) * (n.x - t.x) + (n.y - t.y) * (n.y - t.y));
+          }
+        }
         if (target < 0) {
           // Nothing free near here. If there is nothing open near here at all
           // the node is exhausted and the tip moves to the frontier; if the
           // open nodes are merely claimed by other tips, it waits its turn.
-          if (nearestOpen(world, t.from, search, state.ring, isReached, unclaimed) >= 0) break;
+          // Contested ground is not worth queueing behind: another tip is
+          // already paying its way in, so this one goes and finds work.
+          if (nearestOpen(world, t.from, search, state.ring, isReached, unclaimed, isRival, false) >= 0) break;
           rt.frontier.delete(t.from);
           if (rt.frontier.size === 0) break;
           const pick = hash(state.seed, 'relocate:' + k + ':' + state.relocations) % rt.frontier.size;
@@ -93,6 +109,14 @@ export function step(state, world, rt, budget, search, reach) {
         }
         t.to = target;
         rt.claimed.add(target);
+      }
+      // events.js: the distance owed for contested ground is paid first, out
+      // of the same budget, so a coarse step and a fine one pay the same.
+      if (t.pay > 0) {
+        const spend = Math.min(t.pay, left);
+        t.pay -= spend;
+        left -= spend;
+        if (!(left > 0)) break;
       }
       const n = nodes[t.to];
       const dx = n.x - t.x, dy = n.y - t.y;
@@ -120,6 +144,6 @@ export function step(state, world, rt, budget, search, reach) {
 export function gather(state, world, nodeId) {
   for (const t of state.tips) {
     const n = world.nodes[nodeId];
-    t.x = n.x; t.y = n.y; t.from = nodeId; t.to = -1;
+    t.x = n.x; t.y = n.y; t.from = nodeId; t.to = -1; t.pay = 0;
   }
 }

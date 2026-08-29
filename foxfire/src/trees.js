@@ -14,8 +14,8 @@
 // sent to a kind makes its trees grow faster. Both are traits.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=3';
-import { unit } from './rng.js?v=3';
+import { scale } from './levels.js?v=4';
+import { unit } from './rng.js?v=4';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {

@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=3';
-import { createSim, restoreSim, openedState } from './sim.js?v=3';
-import * as Save from './save.js?v=3';
-import * as Sp from './spores.js?v=3';
-import * as Lore from './lore.js?v=3';
-import { hash } from './rng.js?v=3';
-import { createUI } from './ui.js?v=3';
-import { createView } from './view.js?v=3';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=3';
+import { storageKey } from '../config.js?v=4';
+import { createSim, restoreSim, openedState } from './sim.js?v=4';
+import * as Save from './save.js?v=4';
+import * as Sp from './spores.js?v=4';
+import * as Lore from './lore.js?v=4';
+import { hash } from './rng.js?v=4';
+import { createUI } from './ui.js?v=4';
+import { createView } from './view.js?v=4';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=4';
 
 /**
  * @param {object} o
@@ -182,11 +182,25 @@ export function createGame(o) {
 
   // -- layout ---------------------------------------------------------------
 
+  /**
+   * The picture is the whole window, and the journal lies over one edge of
+   * it. The view is told how much of each edge is covered so it can keep the
+   * organism in the part that can be seen.
+   */
   const fit = () => {
     const host = canvas.parentNode;
-    const w = host && host.clientWidth ? host.clientWidth : (win.innerWidth || 600);
-    const h = host && host.clientHeight ? host.clientHeight : (win.innerHeight || 400);
-    view.resize(w, h, win.devicePixelRatio || 1);
+    const w = win.innerWidth || (host && host.clientWidth) || 600;
+    const h = win.innerHeight || (host && host.clientHeight) || 400;
+    const inset = { left: 0, right: 0, top: 0, bottom: 0 };
+    const journal = doc && doc.getElementById ? doc.getElementById('journal') : null;
+    const box = journal && typeof journal.getBoundingClientRect === 'function'
+      ? journal.getBoundingClientRect() : null;
+    if (box && box.width > 0 && box.height > 0) {
+      // Docked down one side on a wide window, along the foot on a narrow one.
+      if (box.width >= w - 1) inset.bottom = Math.max(0, Math.min(h, h - box.top));
+      else inset.right = Math.max(0, Math.min(w, box.width));
+    }
+    view.resize(w, h, win.devicePixelRatio || 1, inset);
   };
 
   const start = () => {
@@ -206,7 +220,10 @@ export function createGame(o) {
   const stop = () => { running = false; };
 
   if (win.addEventListener) {
-    win.addEventListener('resize', fit);
+    // A window that changes shape changes how much of the journal is on
+    // screen, so the entries are laid out again and the newest one stays at
+    // the foot of the page where it was.
+    win.addEventListener('resize', () => { fit(); ui.renderLog(); });
     win.addEventListener('pagehide', save);
     win.addEventListener('beforeunload', save);
     if (doc && doc.addEventListener) {

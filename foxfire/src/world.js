@@ -11,7 +11,7 @@
 // only has to remember which nodes have been reached.
 // ---------------------------------------------------------------------------
 
-import { hash, unit } from './rng.js?v=3';
+import { hash, unit } from './rng.js?v=4';
 
 /** Number of lattice cells inside a disc of the given radius. */
 export function cellsInDisc(radius) {
@@ -134,9 +134,13 @@ export function openedCount(world, ring) {
 /**
  * The nearest node to `from` that is open, unreached and unclaimed, within
  * `search` cells. Ties break on id so the choice is deterministic.
+ *
+ * events.js: `isRival` names ground another fungus holds. It is passed over
+ * like reached ground unless the caller asks for it with `takeRival`, which
+ * is how ground is contested rather than simply walked into.
  * @returns node id, or -1
  */
-export function nearestOpen(world, fromId, search, ring, isReached, isClaimed) {
+export function nearestOpen(world, fromId, search, ring, isReached, isClaimed, isRival, takeRival) {
   const from = world.nodes[fromId];
   if (!from) return -1;
   const span = Math.ceil(search);
@@ -150,6 +154,7 @@ export function nearestOpen(world, fromId, search, ring, isReached, isClaimed) {
       const n = world.nodes[id];
       if (n.ring > ring) continue;
       if (isReached(id) || isClaimed(id)) continue;
+      if (isRival && !takeRival && isRival(id)) continue;
       const dx = n.x - from.x, dy = n.y - from.y;
       const d = dx * dx + dy * dy;
       if (d > s2) continue;

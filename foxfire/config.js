@@ -45,14 +45,20 @@ export const CONFIG = {
   // LABELS - the short words on the furniture. Sentences live in content.js.
   // -------------------------------------------------------------------------
   text: {
+    // The words on the specimen label pinned to the floor. Each one sits in
+    // front of its figure, except the rate, which carries its unit behind it.
     stats: {
-      sugar:    'Sugar',
-      income:   'Sugar/s',
-      minerals: 'Minerals/s',
-      tips:     'Tips',
-      area:     'Ground',
-      level:    'Reach',
+      sugar:    'sugar',
+      income:   '/s',
+      minerals: 'minerals',
+      tips:     'tips',
+      area:     'ground',
+      level:    'reach',
     },
+    // The label's first line: where the organism is, after its name.
+    where:       '{level}, ring {ring} of {rings}',
+    whereClosed: '{level}, all {rings} rings',
+    gain:        '+',
 
     reach:       'Reach',
     reachTip:    'Push one thread out by hand',
@@ -63,9 +69,8 @@ export const CONFIG = {
     beyond:      'Go beyond',
     fruit:       'Fruit',
     fruitSure:   'Sure? This organism ends',
-    weightMore:  '+',
-    weightLess:  '-',
-    harvest:     ['Keep', 'Fell mature', 'Fell all'],
+    weightTip:   'The share of the minerals this kind is sent',
+    harvest:     ['Keep', 'Fell grown', 'Fell all'],
     harvestTip:  'What to do with the trees of this kind: milk them, fell the grown ones, or fell everything',
     nurture:     'Feed',
     nurtureTip:  'Send sugar to this kind so it grows faster',
@@ -75,7 +80,14 @@ export const CONFIG = {
     resetSure:   'Sure? Everything goes',
     bought:      'Held',
 
+    // Moving a save between browsers.
+    savePrompt:   'your save',
+    savePaste:    'paste a save',
+    saveCopied:   'save copied',
+    saveCopyThis: 'copy this: ',
+
     panels: {
+      entries: 'Field notes',
       tips:    'The tips',
       trees:   'The trees',
       season:  'The year',
@@ -85,8 +97,20 @@ export const CONFIG = {
       genome:  'What the spore carries',
     },
 
-    seasons: ['Spring', 'Summer', 'Autumn', 'Winter'],
-    fieldHint: 'the floor',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    // Every entry is written with the year and the season it was written in,
+    // and that mark is found again when the entry is drawn so it can be set
+    // in small capitals.
+    entryMark: 'Year {n}, {season}. ',
+    seasonLeft: '{left} left',
+
+    // How many trees of a kind there are, under its name in the ledger.
+    counts: {
+      one:   '1 tree',
+      many:  '{n} trees',
+      grown: '{n} grown',
+      dead:  '{n} dead',
+    },
 
     columns: {
       kind:     'Kind',
@@ -94,7 +118,8 @@ export const CONFIG = {
       size:     'Grown',
       sent:     'Sent',
       got:      'Pays',
-      rate:     'Per mineral',
+      rate:     'Price',
+      rateTip:  'What the next mineral sent to this kind fetches',
       weight:   'Share',
       policy:   'Policy',
     },
@@ -304,6 +329,100 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
+  // EVENTS - the world answering back
+  //
+  // Four things that happen to the organism rather than because of it: a
+  // drought, a windthrow, a fire, and another fungus with designs on the same
+  // ground. Each one is scheduled by hashing the seed with a counter and
+  // never rolled at the moment it lands, so a seed always brings the same
+  // weather at the same times, a save replays exactly, and an absence caught
+  // up in coarse chunks is the same run as one played through.
+  //
+  // None of them hands out a share of anything. The windthrow is the only one
+  // that gives, and it gives a number of seconds of the income the organism
+  // already makes - a small fraction of the gap between windthrows, so the
+  // income settles at a fixed multiple of the income without them rather than
+  // climbing off on its own.
+  // -------------------------------------------------------------------------
+  events: {
+    enabled: true,      // the lot of it: off, and the world stays quiet
+    // A gap between events of one kind is that kind's mean times a hashed
+    // number in 1 +/- this, and the first of a kind waits its earliest time
+    // plus up to this many means.
+    spread: 0.5,
+    // When one comes due and the ground cannot carry it - no logs in reach,
+    // too little reached to burn, nowhere for a rival to come up - it waits
+    // this many seconds and looks again.
+    retry: 60,
+
+    drought: {
+      enabled: true,
+      first: 900,       // earliest it can happen, in simulation seconds
+      mean: 2400,       // seconds between droughts, on average
+      // It begins with a season and ends with it, and only these seasons
+      // (spring and summer) can carry one.
+      seasons: [0, 1],
+      firstYear: 1,     // never in the organism's first year
+      minerals: 0.5,    // the share of its minerals dry soil still gives
+    },
+
+    windthrow: {
+      enabled: true,
+      first: 600,
+      mean: 1500,
+      logs: 5,          // how many logs the wind puts on the ground
+      // The wood it leaves, in seconds of the income the organism already
+      // makes, split across those logs. Well under the mean gap above, which
+      // is what keeps it from compounding.
+      seconds: 90,
+    },
+
+    fire: {
+      enabled: true,
+      first: 1800,
+      mean: 3600,
+      firstYear: 2,     // never in the first two years
+      width: 0.8,       // the wedge that burns, in radians
+      // The wedge starts this far out, as a share of the open reach, and
+      // runs from there to the edge of it.
+      radiusFrom: 0.3,
+      radiusTo: 0.75,
+      // A fire never takes more than this share of what has been reached; the
+      // wedge is narrowed by the factor below until it does not.
+      cap: 0.25,
+      narrow: 0.8,
+      narrowTries: 12,
+      // A living tree in the fire dies to a snag holding this many times the
+      // wood it would have left felled. Charred wood is rich, and it is the
+      // whole reason to go back into a burn.
+      burnBonus: 1.6,
+      markSeconds: 300, // how long the ground stays marked as burnt
+    },
+
+    rival: {
+      enabled: true,
+      first: 1500,
+      mean: 5400,
+      // It comes up past this share of the open reach, out in the ground the
+      // threads come to last, which is what gives it time to be anything.
+      edge: 0.75,
+      rate: 12,         // seconds per place it takes
+      search: 2.4,      // how far it looks for ground to take, in cells
+      // It can only come up where there is open ground nobody has reached, and
+      // a fast front leaves that open for seconds at a time, so it looks for
+      // its chance more often than the others do.
+      retry: 10,
+      maxPerStep: 32,   // most places it can take in one catch-up chunk
+      // A hop into ground it holds costs a tip this many times the distance.
+      // Pushing through another organism's threads is slow, and this is what
+      // decides how long it can hold anything against a big front.
+      cost: 12,
+      // It withers once it has taken nothing new for this long.
+      stallSeconds: 420,
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // TIME
   // -------------------------------------------------------------------------
   time: {
@@ -320,44 +439,189 @@ export const CONFIG = {
   view: {
     margin: 1.18,           // the camera fits the reach times this
     ease: 2.2,              // camera easing per second
-    tipsDrawn: 3000,        // at most this many tips are drawn; the count is shown
-    threadWidth: 1.0,
-    nodeRadius: 0.16,       // in cells
-    treeRadius: 0.30,       // in cells, at full size
-    tipRadius: 0.09,
-    glow: 0.55,
-    // Below this many screen pixels per cell the picture switches to mass:
-    // the glow around each node is dropped and unreached nodes become points.
+    pad: 1.5,               // cells of ground kept in view beyond the open reach
+    tipsDrawn: 1500,        // at most this many tips are drawn; the count is shown
+    // Below this many screen pixels per cell the picture drops its detail: a
+    // log loses its face and its grain, a canopy its shading.
     massBelow: 4.0,
-    // A wash over the ground per season, in the order spring, summer, autumn,
-    // winter, and how strong it is. The season is always readable from the
-    // picture, not only from the panel.
-    tint: ['#14301c', '#000000', '#3a2410', '#0c1a2e'],
-    tintAlpha: 0.22,
+    // How many shapes are kept stamped and ready. The floor holds hundreds of
+    // logs and trees among a handful of shapes, so each is drawn once and
+    // stamped; past this many the set is dropped and drawn again.
+    spriteCache: 240,
+    // Stamps are drawn at rungs of this ladder of sizes and scaled down to
+    // what is wanted, so an easing camera reuses them instead of drawing a new
+    // set every frame.
+    spriteStep: 1.25,
+
+    // THE FLOOR. Drawn once per season, camera scale, canvas size and level
+    // into an offscreen canvas and blitted, so a frame costs only the threads,
+    // the nodes and the tips.
+    floor: {
+      // The mottling of the loam, coarse to fine. `scale` is cells per
+      // feature; an octave finer than grainMin pixels on the screen is left
+      // out, because at that size it only averages back into the flat tone.
+      octaves: [
+        { scale: 9.0, alpha: 0.30 },
+        { scale: 2.6, alpha: 0.40 },
+        { scale: 0.7, alpha: 0.34 },
+      ],
+      grainMin: 5,          // pixels: finer than this an octave is not drawn
+      grainBroad: 0.5,      // an octave whose feature is wider than this share of the
+                            // canvas is not drawn; the view would sit inside one of them
+      grainMax: 90,         // pixels: no blob of ground tone is wider than this
+      mossScale: 6.5,       // cells per moss feature
+      mossThreshold: 0.54,  // moss grows where the noise is above this
+      litterLen: 0.26,      // one leaf mark, in cells
+      litterWide: 0.075,
+      litterMax: 5000,      // however wide the view, never more marks than this
+      dampRadius: 0.8,      // a damp patch of bare soil, in cells
+      scaleStep: 1.12,      // the floor is redrawn when the camera crosses one of these steps
+    },
+
+    // LOGS - dead wood, lying where it fell.
+    log: {
+      length: 1.6,          // in cells
+      width: 0.5,
+      face: 0.8,            // how far the pale face covers the bark under it
+      stages: 6,            // stages of being eaten a log is drawn in
+      grain: 3,             // grain lines along the face
+      snow: 0.34,           // the share of the width winter's snow covers
+    },
+
+    // TREES - canopy discs seen from above.
+    tree: {
+      radius: 0.85,         // a full grown canopy, in cells
+      min: 0.35,            // no canopy is drawn smaller than this, in cells
+      core: 0.5,            // the share of a canopy that is solid before its edge softens
+      vary: 0.4,            // how much one crown differs in width from the next
+      trunk: 0.22,          // the dark centre, as a share of the canopy
+      lift: 0.24,           // how far the lit side sits toward the top left
+      seedlingBelow: 0.16,  // a tree this small a share of its size is a seedling
+      snag: 5,              // bare branches on a dead tree
+    },
+
+    // THE LACE - the organism itself.
+    lace: {
+      width: 0.09,          // a thread, in cells
+      wave: 0.22,           // how far a thread bows off the straight line, in cells
+      alpha: 0.6,
+      fresh: 20,            // seconds a thread counts as newly grown
+      freshAlpha: 0.95,
+      freshGlow: 0.3,       // how much of the glow a newly grown thread carries
+      glowWidth: 4.5,       // the soft pass under a thread, as a multiple of its width
+      glowAlpha: 0.09,
+    },
+
+    // THE TIPS - short bright dashes at the front, never round dots.
+    tip: {
+      dash: 0.4,            // in cells
+      width: 0.13,
+      alpha: 0.9,
+      glow: 0.35,           // the tint of glow the front carries in daylight
+    },
+
+    // THE REACH - the bought ground is the lit clearing; past it, mist.
+    mist: {
+      max: 0.7,             // how thickly the unbought ground is veiled
+      rings: 1.6,           // rings of ground over which the mist thickens
+    },
+
+    // BEYOND - how slowly a folded level opens its new clearing.
+    fold: { seconds: 1.5 },
+
+    // THE SEASONS. A season is a set of overrides on the palette: which
+    // colours the litter takes, how thickly it lies, what the light washes
+    // over the floor, and how much the lace glows in it. Colours are named
+    // from the palette, which is the only place one is written. In the order
+    // spring, summer, autumn, winter.
+    seasons: [
+      { // spring - pale green litter and fresh moss
+        ground: 'loamLight', shade: 'damp',
+        litter: ['mossFloor', 'litter', 'seedling'],
+        litterPer: 3.0, litterAlpha: 0.42,
+        moss: 'mossFloor', mossAlpha: 0.52,
+        damp: 'damp', dampAlpha: 0.5,
+        wash: 'mossFloor', washAlpha: 0.06,
+        veil: 'mist', veilAlpha: 1,
+        frost: 'frost', frostPer: 0,
+        snow: 'snow', snowAlpha: 0,
+        lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
+      },
+      { // summer - deep green and brown
+        ground: 'loamLight', shade: 'damp',
+        litter: ['litter', 'mossFloor', 'bark'],
+        litterPer: 3.4, litterAlpha: 0.46,
+        moss: 'mossFloor', mossAlpha: 0.66,
+        damp: 'damp', dampAlpha: 0.5,
+        wash: 'mossFloor', washAlpha: 0.03,
+        veil: 'mist', veilAlpha: 1,
+        frost: 'frost', frostPer: 0,
+        snow: 'snow', snowAlpha: 0,
+        lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
+      },
+      { // autumn - rust and ochre litter, thick
+        ground: 'loamLight', shade: 'damp',
+        litter: ['rust', 'litter', 'woodPale'],
+        litterPer: 5.5, litterAlpha: 0.55,
+        moss: 'mossFloor', mossAlpha: 0.4,
+        damp: 'damp', dampAlpha: 0.5,
+        wash: 'rust', washAlpha: 0.09,
+        veil: 'mist', veilAlpha: 1,
+        frost: 'frost', frostPer: 0,
+        snow: 'snow', snowAlpha: 0,
+        lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
+      },
+      { // winter - dusk, frost on the litter, snow on the logs, the lace glows
+        ground: 'frost', shade: 'night',
+        litter: ['litter', 'frost', 'snow'],
+        litterPer: 2.0, litterAlpha: 0.32,
+        moss: 'mossFloor', mossAlpha: 0.28,
+        damp: 'night', dampAlpha: 0.5,
+        wash: 'night', washAlpha: 0.45,
+        veil: 'night', veilAlpha: 0.75,
+        frost: 'frost', frostPer: 0.85,
+        snow: 'snow', snowAlpha: 0.8,
+        lace: 'lace', laceAlpha: 0.5, glow: 'glow', glowAll: 0.45,
+      },
+    ],
   },
 
   // -------------------------------------------------------------------------
-  // PALETTE
+  // PALETTE - the only place a colour is written. See docs/IDENTITY.md.
+  //
+  // The journal is paper and ink. The floor is loam, litter, moss, bark and
+  // pale lace. A season is a set of overrides on these, in view.seasons.
   // -------------------------------------------------------------------------
   palette: {
-    void:    '#07090a',
-    panel:   '#0c1011',
-    rule:    '#1a2220',
-    ink:     '#d5dcd7',
-    dim:     '#6a7873',
-    quiet:   '#414d49',
-    sugar:   '#d9b35a',
-    mineral: '#7fa6c4',
-    glow:    '#7ff2b0',   // foxfire
-    thread:  '#3f9d72',
-    tip:     '#c9ffe0',
-    hot:     '#c8553d',
-    good:    '#7fd39a',
-    wood:    '#6b5340',
-    soil:    '#2e3a38',
-    tree:    '#3a7d4a',
-    dead:    '#55534c',
-    ground:  '#0a0d0d',
+    // the journal
+    paper:     '#efe7d6',
+    paperDeep: '#e2d7bf',
+    ink:       '#2b2621',
+    faded:     '#7a6f62',
+    rule:      '#c9bda6',
+    rust:      '#a8512b',
+    moss:      '#5f7a3d',
+    sugar:     '#9c6f1e',
+    mineral:   '#4f6b7c',
+    glow:      '#8ff0c0',
+    // the floor
+    loam:      '#6b5236',
+    loamLight: '#8a6d4b',
+    litter:    '#a07b4e',
+    mossFloor: '#4e6a35',
+    damp:      '#3f3a34',
+    bark:      '#4a3623',
+    woodPale:  '#c9a878',
+    lace:      '#f3ecd8',
+    // one canopy colour per roster species, in roster order
+    canopy: ['#9db36a', '#5c7a52', '#3f5f4a', '#7c8f4f', '#2f5548', '#6f7f3f',
+             '#527045', '#8b8a4a', '#3d6650', '#4f6f5b', '#5e5a3a', '#2c4e3e'],
+    dead:      '#8f8577',
+    seedling:  '#b7d38a',
+    snow:      '#e9eef2',
+    frost:     '#b9c7d6',
+    mist:      '#d8d2c2',
+    night:     '#1d2530',
   },
 
   // -------------------------------------------------------------------------
@@ -367,7 +631,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 3,
+    build: 4,
   },
 };
 
@@ -505,17 +769,17 @@ export function applyIdentity(doc) {
       root.style.setProperty(name, value);
     }
   };
-  setVar('--void',    p.void);
-  setVar('--panel',   p.panel);
-  setVar('--rule',    p.rule);
-  setVar('--ink',     p.ink);
-  setVar('--dim',     p.dim);
-  setVar('--quiet',   p.quiet);
-  setVar('--sugar',   p.sugar);
-  setVar('--mineral', p.mineral);
-  setVar('--glow',    p.glow);
-  setVar('--hot',     p.hot);
-  setVar('--good',    p.good);
+  setVar('--paper',      p.paper);
+  setVar('--paper-deep', p.paperDeep);
+  setVar('--ink',        p.ink);
+  setVar('--faded',      p.faded);
+  setVar('--rule',       p.rule);
+  setVar('--rust',       p.rust);
+  setVar('--moss',       p.moss);
+  setVar('--sugar',      p.sugar);
+  setVar('--mineral',    p.mineral);
+  setVar('--glow',       p.glow);
+  setVar('--loam',       p.loam);
 
   const byId = (id) => (typeof d.getElementById === 'function' ? d.getElementById(id) : null);
   const put = (id, value) => { const el = byId(id); if (el) el.textContent = value; };
@@ -539,20 +803,20 @@ export function applyIdentity(doc) {
   put('p-traits',     t.panels.traits);
   put('p-spores',     t.panels.spores);
   put('p-genome',     t.panels.genome);
-  put('fieldhint',    t.fieldHint);
+  put('fieldhint',    t.panels.entries);
 
   // The tab icon is drawn from the palette rather than shipped as a file, so a
   // recolour needs no asset and the game still has no binary dependencies.
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
-    '<rect width="32" height="32" fill="' + p.void + '"/>' +
+    '<rect width="32" height="32" fill="' + p.loam + '"/>' +
     '<path d="M16 16 L7 9 M16 16 L25 8 M16 16 L9 25 M16 16 L26 22 M7 9 L4 4 M25 8 L29 3" ' +
-    'stroke="' + p.thread + '" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+    'stroke="' + p.lace + '" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
     '<circle cx="16" cy="16" r="3" fill="' + p.glow + '"/>' +
-    '<circle cx="7" cy="9" r="1.4" fill="' + p.glow + '"/>' +
-    '<circle cx="25" cy="8" r="1.4" fill="' + p.glow + '"/>' +
-    '<circle cx="9" cy="25" r="1.4" fill="' + p.glow + '"/>' +
-    '<circle cx="26" cy="22" r="1.4" fill="' + p.glow + '"/>' +
+    '<circle cx="7" cy="9" r="1.4" fill="' + p.lace + '"/>' +
+    '<circle cx="25" cy="8" r="1.4" fill="' + p.lace + '"/>' +
+    '<circle cx="9" cy="25" r="1.4" fill="' + p.lace + '"/>' +
+    '<circle cx="26" cy="22" r="1.4" fill="' + p.lace + '"/>' +
     '</svg>';
   if (typeof d.querySelector === 'function' && typeof d.createElement === 'function') {
     let link = d.querySelector('link[rel="icon"]');

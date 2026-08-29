@@ -1,19 +1,24 @@
 // ---------------------------------------------------------------------------
-// The page: what the state looks like as words and buttons.
+// The page: what the state looks like as words and figures.
 //
-// Everything here reads the simulation and writes the document. Nothing here
-// changes the state: every button calls into `actions`, which the composition
-// root wires to the simulation. Panels are hidden until their reveal flag is
-// set, so the page grows as the organism does.
+// The window is the forest floor and the page is a field journal kept beside
+// it: a specimen label pinned to the floor carrying the figures, and a paper
+// column of entries, ledgers and labels down the side. Everything here reads
+// the simulation and writes the document. Nothing here changes the state:
+// every button calls into `actions`, which the composition root wires to the
+// simulation. Panels are hidden until their reveal flag is set, so the
+// journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=3';
-import * as Tr from './traits.js?v=3';
-import * as Sp from './spores.js?v=3';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=3';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=3';
+import * as Lore from './lore.js?v=4';
+import * as Tr from './traits.js?v=4';
+import * as Sp from './spores.js?v=4';
+import { fill } from '../config.js?v=4';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=4';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=4';
 
 const LOG_KEEP = 40;
+const SEASONS = 4;
 
 export function createUI(doc, sim, cfg, actions) {
   const T = cfg.text;
@@ -22,11 +27,11 @@ export function createUI(doc, sim, cfg, actions) {
   const text = (id, v) => { const e = el(id); if (e && e.textContent !== String(v)) e.textContent = String(v); };
   const state = sim.state;
 
-  // -- a button with a price beside it -----------------------------------------
+  // -- a paper label with a price on it ---------------------------------------
 
   const priced = (button, label, price, can) => {
     if (!button) return;
-    const want = label + '' + (price === null || price === undefined ? '' : price);
+    const want = label + '' + (price === null || price === undefined ? '' : price);
     if (button._want !== want) {
       button._want = want;
       button.textContent = '';
@@ -50,22 +55,50 @@ export function createUI(doc, sim, cfg, actions) {
   bind('extend', () => actions.extend());
   bind('beyond', () => actions.beyond());
 
-  // -- the log -----------------------------------------------------------------
+  // -- the entries -------------------------------------------------------------
+
+  // Every entry is written with the year and season in front of it, and the
+  // same template gives the pattern that finds that mark again when the entry
+  // is drawn, so the two can never fall out of step. An entry written before
+  // there were marks simply has none.
+  const markPattern = new RegExp('^' + T.entryMark
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace('\\{n\\}', '\\d+')
+    .replace('\\{season\\}', '[a-z]+'), 'i');
+
+  const markNow = () => {
+    const s = sim.season();
+    return fill(T.entryMark, { n: s.year + 1, season: T.seasons[s.index] });
+  };
 
   const renderLog = () => {
     const box = el('log');
     if (!box) return;
     box.textContent = '';
-    for (const line of state.log.slice(0, 8)) {
+    // The array is kept newest first, because that is what a save holds; the
+    // page reads the other way, the way a notebook is written.
+    for (let i = Math.min(state.log.length, LOG_KEEP) - 1; i >= 0; i--) {
+      const line = state.log[i];
       const p = doc.createElement('p');
-      p.textContent = line;
+      const m = markPattern.exec(line);
+      if (m) {
+        const mark = doc.createElement('em');
+        mark.className = 'mark';
+        mark.textContent = m[0].trim();
+        p.appendChild(mark);
+        p.appendChild(doc.createTextNode(line.slice(m[0].length)));
+      } else {
+        p.textContent = line;
+      }
       box.appendChild(p);
     }
+    // The newest entry is at the foot of the page, so that is where it opens.
+    if (typeof box.scrollHeight === 'number') box.scrollTop = box.scrollHeight;
   };
 
   const log = (line) => {
     if (!line) return;
-    state.log.unshift(line);
+    state.log.unshift(markNow() + line);
     if (state.log.length > LOG_KEEP) state.log.length = LOG_KEEP;
     renderLog();
   };
@@ -75,7 +108,38 @@ export function createUI(doc, sim, cfg, actions) {
     log(Lore.line(state.seed, event.key, event.values, event.salt));
   };
 
-  // -- the trees table -----------------------------------------------------------
+  // -- the specimen label ------------------------------------------------------
+
+  const renderLabel = (f, rate, info) => {
+    text('sugar', fmt(state.sugar));
+    show('st-income', !!f.tips);
+    text('income', (rate.sugar < 0 ? '' : T.gain) + fmtCoin(rate.sugar));
+    show('st-minerals', !!f.trees);
+    text('minerals', fmtRate(rate.minerals));
+    show('st-tips', !!f.tips);
+    text('tips', fmtCount(state.tipCount));
+
+    show('st-level', !!f.reach);
+    const last = state.ring >= cfg.world.rings;
+    text('level', fill(last ? T.whereClosed : T.where,
+      { level: info.name, ring: state.ring, rings: cfg.world.rings }));
+    show('st-area', !!f.reach);
+    const A = sim.area();
+    text('area', fmtArea(A));
+    const areaEl = el('st-area');
+    if (areaEl) areaEl.title = A >= LARGEST_ORGANISM_M2 ? Lore.ui('largestNote') : '';
+  };
+
+  // -- the trees ledger --------------------------------------------------------
+
+  const COLUMNS = ['kind', 'size', 'sent', 'got', 'rate', 'weight', 'policy'];
+
+  // What the player set, read from the state rather than from the market,
+  // which is only rebuilt when the simulation steps: a press has to show on
+  // the ledger at once, and two presses in the same tenth of a second have to
+  // count from what the first one left behind.
+  const weightOf = (key) => (state.weights[key] === undefined ? cfg.trees.weightNew : state.weights[key]);
+  const policyOf = (key) => state.harvest[key] || 0;
 
   const treeRows = new Map();
   const treeHead = () => {
@@ -83,9 +147,10 @@ export function createUI(doc, sim, cfg, actions) {
     if (!table || table._head) return;
     table._head = true;
     const tr = doc.createElement('tr');
-    for (const key of ['kind', 'size', 'sent', 'got', 'rate', 'weight', 'policy']) {
+    for (const key of COLUMNS) {
       const th = doc.createElement('th');
       th.textContent = T.columns[key];
+      if (key === 'rate') th.title = T.columns.rateTip;
       tr.appendChild(th);
     }
     table.appendChild(tr);
@@ -96,43 +161,44 @@ export function createUI(doc, sim, cfg, actions) {
     if (r) return r;
     const tr = doc.createElement('tr');
     const cells = {};
-    for (const key of ['kind', 'size', 'sent', 'got', 'rate', 'weight', 'policy']) {
+    for (const key of COLUMNS) {
       const td = doc.createElement('td');
       td.className = key;
       cells[key] = td;
       tr.appendChild(td);
     }
-    // Kind: the name, and a small line under it.
+    // Kind: the name, and how many of them under it.
     const name = doc.createElement('b');
     const note = doc.createElement('small');
     cells.kind.appendChild(name);
     cells.kind.appendChild(note);
-    // Share: minus, the weight, plus.
-    const less = doc.createElement('button');
-    less.className = 'w';
-    less.textContent = T.weightLess;
-    less.addEventListener('click', () => actions.setWeight(row.key, -1));
-    const w = doc.createElement('span');
-    w.className = 'wv';
-    const more = doc.createElement('button');
-    more.className = 'w';
-    more.textContent = T.weightMore;
-    more.addEventListener('click', () => actions.setWeight(row.key, +1));
-    cells.weight.appendChild(less);
-    cells.weight.appendChild(w);
-    cells.weight.appendChild(more);
+    // Share: one tick per point of weight. Clicking a tick sets the weight to
+    // it, and clicking the last filled tick lets the weight back down, so
+    // every value from none to all is one press away.
+    const ticks = [];
+    for (let i = 1; i <= cfg.trees.weightMax; i++) {
+      const tick = doc.createElement('button');
+      tick.className = 'tick';
+      tick.title = T.weightTip;
+      tick.addEventListener('click', () => {
+        const cur = weightOf(row.key);
+        actions.setWeight(row.key, (i === cur ? i - 1 : i) - cur);
+      });
+      cells.weight.appendChild(tick);
+      ticks.push(tick);
+    }
     // Policy: what to do with the trees, and whether to feed them.
     const pol = doc.createElement('button');
     pol.className = 'pol';
     pol.title = T.harvestTip;
-    pol.addEventListener('click', () => actions.setHarvest(row.key, (row.policy + 1) % 3));
+    pol.addEventListener('click', () => actions.setHarvest(row.key, (policyOf(row.key) + 1) % 3));
     const feed = doc.createElement('button');
     feed.className = 'feed';
     feed.title = T.nurtureTip;
     feed.addEventListener('click', () => actions.toggleNurture(row.key));
     cells.policy.appendChild(pol);
     cells.policy.appendChild(feed);
-    r = { tr, cells, name, note, w, pol, feed, row };
+    r = { tr, cells, name, note, ticks, pol, feed, row };
     treeRows.set(row.key, r);
     el('trees').appendChild(tr);
     return r;
@@ -156,25 +222,31 @@ export function createUI(doc, sim, cfg, actions) {
       r.tr.hidden = false;
       r.name.textContent = Lore.capital(row.name);
       const bits = [];
-      bits.push(row.count === 1 ? '1 tree' : row.count + ' trees');
-      if (row.mature > 0) bits.push(row.mature + ' grown');
-      if (row.dead > 0) bits.push(row.dead + ' ' + Lore.ui('treeDead'));
+      bits.push(row.count === 1 ? T.counts.one : fill(T.counts.many, { n: row.count }));
+      if (row.mature > 0) bits.push(fill(T.counts.grown, { n: row.mature }));
+      if (row.dead > 0) bits.push(fill(T.counts.dead, { n: row.dead }));
       r.note.textContent = bits.join(', ');
       r.note.title = r.note.textContent;
       const grown = row.count > 0 ? row.size / (row.count * row.max) : 0;
       r.cells.size.textContent = fmtPct(grown);
-      r.cells.sent.textContent = fmtCoin(row.sent) + '/s';
+      r.cells.sent.textContent = fmtRate(row.sent);
       r.cells.got.textContent = fmtRate(row.got);
       r.cells.rate.textContent = fmtCoin(row.marginal);
+      // Winter is read off the ledger as well as the floor: the price the
+      // trees will pay is dimmed for as long as they are shut down.
       r.cells.rate.title = winter ? Lore.ui(m.evergreen ? 'evergreenWinter' : 'winter') : '';
-      r.cells.rate.className = 'rate' + (winter ? ' cold' : (row.sat > 0.85 ? ' sat' : ''));
-      r.w.textContent = String(row.weight);
+      r.cells.rate.className = 'rate' + (winter ? ' cold' : '');
+      const weight = weightOf(row.key);
+      for (let i = 0; i < r.ticks.length; i++) {
+        r.ticks[i].className = 'tick' + (i < weight ? ' on' : '');
+      }
+      const policy = policyOf(row.key);
       r.pol.hidden = !m.fell;
-      r.pol.textContent = T.harvest[row.policy] || T.harvest[0];
-      r.pol.className = 'pol' + (row.policy ? ' on' : '');
+      r.pol.textContent = T.harvest[policy] || T.harvest[0];
+      r.pol.className = 'pol' + (policy ? ' on' : '');
       r.feed.hidden = !m.nurture;
       r.feed.textContent = T.nurture;
-      r.feed.className = 'feed' + (row.nurture ? ' on' : '');
+      r.feed.className = 'feed' + (state.nurture[row.key] ? ' on' : '');
     }
     for (const [key, r] of treeRows) {
       if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) r.tr.hidden = true;
@@ -196,12 +268,11 @@ export function createUI(doc, sim, cfg, actions) {
     const line = doc.createElement('span');
     line.className = 'line';
     line.textContent = Lore.trait(id).line;
-    line.title = Lore.trait(id).line;
     const lv = doc.createElement('span');
     lv.className = 'lv';
     box.appendChild(b);
-    box.appendChild(line);
     box.appendChild(lv);
+    box.appendChild(line);
     el('traits').appendChild(box);
     r = { box, b, lv };
     traitRows.set(id, r);
@@ -222,7 +293,7 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
-  // -- the genome -------------------------------------------------------------------
+  // -- what the spore carries ---------------------------------------------------
 
   const perkRows = new Map();
   const perkRow = (id) => {
@@ -236,12 +307,11 @@ export function createUI(doc, sim, cfg, actions) {
     const line = doc.createElement('span');
     line.className = 'line';
     line.textContent = Lore.genome(id).line;
-    line.title = Lore.genome(id).line;
     const lv = doc.createElement('span');
     lv.className = 'lv';
     box.appendChild(b);
-    box.appendChild(line);
     box.appendChild(lv);
+    box.appendChild(line);
     el('genome').appendChild(box);
     r = { box, b, lv };
     perkRows.set(id, r);
@@ -253,10 +323,8 @@ export function createUI(doc, sim, cfg, actions) {
     const g = sim.genome;
     const can = sim.canFruit();
     const n = sim.sporesNow();
-    const note = can ? Lore.ui('sporesNote', { n }) : '';
-    text('spores-note', note);
-    const held = g.spores > 0 ? Lore.ui('sporesHeld', { n: g.spores }) : '';
-    text('spores-held', held);
+    text('spores-note', can ? Lore.ui('sporesNote', { n }) : '');
+    text('spores-held', g.spores > 0 ? Lore.ui('sporesHeld', { n: g.spores }) : '');
     const fruit = el('fruit');
     if (fruit) { fruit.hidden = !can; fruit.disabled = !can; }
     show('p-genome', g.fruitings > 0 || g.spores > 0);
@@ -276,24 +344,9 @@ export function createUI(doc, sim, cfg, actions) {
   const render = () => {
     const f = state.flags;
     const rate = state.rate;
-    const m = sim.mods();
     const info = Lore.levelInfo(state.level);
 
-    // The top line.
-    text('sugar', fmt(state.sugar));
-    show('st-income', !!f.tips);
-    text('income', fmtRate(rate.sugar));
-    show('st-minerals', !!f.trees);
-    text('minerals', fmtCoin(rate.minerals) + '/s');
-    show('st-tips', !!f.tips);
-    text('tips', fmtCount(state.tipCount));
-    show('st-area', !!f.reach);
-    const A = sim.area();
-    text('area', fmtArea(A));
-    const areaEl = el('st-area');
-    if (areaEl) areaEl.title = A >= LARGEST_ORGANISM_M2 ? Lore.ui('largestNote') : '';
-    show('st-level', !!f.reach);
-    text('level', Lore.capital(info.name.replace(/^the /, '')) + ' ' + state.ring + '/' + cfg.world.rings);
+    renderLabel(f, rate, info);
 
     // The hand.
     text('handline', f.handDone ? Lore.ui('handDone') : Lore.ui('handIdle'));
@@ -317,14 +370,14 @@ export function createUI(doc, sim, cfg, actions) {
     show('trees-panel', !!f.trees);
     renderTrees();
 
-    // The year.
+    // The year: one ruled line, and where in it we are.
     show('season-panel', !!f.season);
     if (f.season) {
       const s = sim.season();
       text('season-name', T.seasons[s.index]);
-      text('season-left', Lore.ui('seasonLine', { name: T.seasons[s.index], left: fmtTime(s.left) }));
+      text('season-left', fill(T.seasonLeft, { left: fmtTime(s.left) }));
       const bar = el('season-bar');
-      if (bar && bar.style) bar.style.width = Math.round(s.frac * 100) + '%';
+      if (bar && bar.style) bar.style.left = (100 * (s.index + s.frac) / SEASONS).toFixed(2) + '%';
       const sp = el('season-panel');
       if (sp) sp.className = 'panel season-' + s.index;
     }
