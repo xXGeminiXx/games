@@ -64,7 +64,7 @@
   #ending .again:hover{color:var(--figure)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="772541d0be4c">
+<meta name="build" content="07a4e4559d7e">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -300,7 +300,7 @@ function seedWorld(wx, wy, opts) {
   // against an exponential ladder.
   const st = sim.stats ? sim.stats() : null;
   const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
-  if (held >= seed.massCeiling) { say(CONFIG.text.promptFull, 0); return; }
+  if (held >= seed.massCeiling) { say(CONFIG.text.promptFull, CONFIG.text.captionSeconds); return; }
   // The share is decided in ABSOLUTE units - the ladder and the ceiling live
   // there - but addBody takes the field's own CODE units, which the ledger
   // re-centres as the run grows. The conversion is asked of the field, which

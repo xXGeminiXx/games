@@ -7,18 +7,18 @@
 // calls the actions.
 // ---------------------------------------------------------------------------
 
-import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=5';
-import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=5';
-import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=5';
-import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=5';
-import { stepWorks } from './works.js?v=5';
-import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=5';
-import { clearBonus, callBonus } from './economy.js?v=5';
-import { checkAwards, awardDef } from './awards.js?v=5';
-import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=5';
-import { stream, hash } from './rng.js?v=5';
-import { idsOf } from './traits.js?v=5';
-import { fill } from '../config.js?v=5';
+import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=6';
+import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=6';
+import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=6';
+import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=6';
+import { stepWorks } from './works.js?v=6';
+import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=6';
+import { clearBonus, callBonus } from './economy.js?v=6';
+import { checkAwards, awardDef } from './awards.js?v=6';
+import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=6';
+import { stream, hash } from './rng.js?v=6';
+import { idsOf } from './traits.js?v=6';
+import { fill } from '../config.js?v=6';
 
 const LOG_KEEP = 40;
 
@@ -419,11 +419,12 @@ export function newRun(state, seed) {
 /** The lines the run-over card shows. */
 export function summary(state) {
   const { cfg, stats } = state;
+  const s = cfg.text.summary;
   return [
-    fill('{Surge} {n} reached.', { surge: cfg.text.surge, n: state.surge }),
-    fill('{held} surges held, {kills} {motes} killed, {ore} ore earned.', {
+    fill(s.reached, { surge: cfg.text.surge, n: state.surge }),
+    fill(s.tally, {
       held: stats.surgesHeld, kills: stats.kills, motes: cfg.text.motes, ore: Math.round(stats.oreEarned),
     }),
-    fill('{label}: surge {best}.', { label: cfg.text.best, best: state.meta.bestReached }),
+    fill(s.best, { best: state.meta.bestReached }),
   ];
 }

@@ -17,17 +17,18 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=6';
-import * as Mat from './materials.js?v=6';
-import * as Mk from './market.js?v=6';
-import * as H from './horde.js?v=6';
-import * as R from './rites.js?v=6';
-import * as Rv from './reveal.js?v=6';
-import * as Ch from './chambers.js?v=6';
-import * as Vi from './visitors.js?v=6';
-import * as Rb from './rebirth.js?v=6';
-import * as Lore from './lore.js?v=6';
-import { createGround } from './ground.js?v=6';
+import { CONFIG as DEFAULT } from '../config.js?v=7';
+import * as Mat from './materials.js?v=7';
+import * as Mk from './market.js?v=7';
+import * as H from './horde.js?v=7';
+import * as R from './rites.js?v=7';
+import * as Rv from './reveal.js?v=7';
+import * as Ch from './chambers.js?v=7';
+import * as Vi from './visitors.js?v=7';
+import * as Rb from './rebirth.js?v=7';
+import * as Lore from './lore.js?v=7';
+import { createGround } from './ground.js?v=7';
+import { fill } from '../config.js?v=7';
 
 export const SAVE_VERSION = 2;
 
@@ -347,7 +348,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         const words = layer.seam ? Lore.seam(layer.seam.id) : null;
         names.push(layer.name + (words ? ' (' + words.tag + ')' : ''));
       }
-      return 'below the face: ' + names.join(', ') + '.';
+      return fill(Lore.visitor('surveyor').reading, { name: names.join(', ') });
     },
   };
 
@@ -557,7 +558,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, buyRite, snapshot,
-    takeOffer, acceptVisitor, declineVisitor,
+    takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
     sealYield: () => Rb.yieldOf(state, cfg),
     canSeal: () => Rb.canSeal(state, cfg),

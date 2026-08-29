@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=8';
-import { fill } from '../content.js?v=8';
-import { makeShaders } from './shaders.js?v=8';
-import { createWorld } from './world.js?v=8';
-import { createDrones } from './drones.js?v=8';
-import { createView } from './view.js?v=8';
-import { createEconomy } from './economy.js?v=8';
-import { createSave, createPrefs } from './save.js?v=8';
-import { createUI } from './ui.js?v=8';
-import { createControls } from './controls.js?v=8';
-import { createQuality } from './quality.js?v=8';
-import { createPerfLog } from './perflog.js?v=8';
-import { loop, createGL } from './gl.js?v=8';
-import { rng } from './rng.js?v=8';
-import { fmt, duration } from './numbers.js?v=8';
+import { withOverrides, applyIdentity } from '../config.js?v=11';
+import { fill } from '../content.js?v=11';
+import { makeShaders } from './shaders.js?v=11';
+import { createWorld } from './world.js?v=11';
+import { createDrones } from './drones.js?v=11';
+import { createView } from './view.js?v=11';
+import { createEconomy } from './economy.js?v=11';
+import { createSave, createPrefs } from './save.js?v=11';
+import { createUI } from './ui.js?v=11';
+import { createControls } from './controls.js?v=11';
+import { createQuality } from './quality.js?v=11';
+import { createPerfLog } from './perflog.js?v=11';
+import { loop, createGL } from './gl.js?v=11';
+import { rng } from './rng.js?v=11';
+import { fmt, duration } from './numbers.js?v=11';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -58,8 +58,8 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   const syncFleet = () => drones.setFleet(eco.state.drones, eco.state.specialists, K);
   syncFleet();
   // the land the fleet worked while the tab was closed
-  if (offline && offline.seconds > 60) {
-    const strip = Math.min(0.85, offline.seconds / 3600 * 0.08 * Math.log10(10 + eco.state.drones));
+  if (offline && offline.worked > 60) {
+    const strip = Math.min(0.85, offline.worked / 3600 * 0.08 * Math.log10(10 + eco.state.drones));
     world.step(0, view.state.carrier, eco.range(), strip);
   }
 
@@ -82,10 +82,12 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       ui.log(content.log.arrive);
       persist();
     },
-    exportSave: () => { ui.el.saveBox.hidden = false; ui.el.saveBox.value = save.encode(snapshot()); ui.el.saveBox.select(); },
+    exportSave: () => { ui.el.saveBox.hidden = false; ui.el.saveBox.value = save.encode(snapshot()); ui.el.saveBox.select(); ui.log(content.log.exported); },
     importSave: () => {
       const s = ui.el.saveBox.hidden ? '' : ui.el.saveBox.value;
-      if (!s) { ui.el.saveBox.hidden = false; ui.el.saveBox.value = ''; ui.el.saveBox.focus(); return; }
+      // The first press opens an empty box; the second reads what was pasted
+      // into it, so the first press has to say what it is waiting for.
+      if (!s) { ui.el.saveBox.hidden = false; ui.el.saveBox.value = ''; ui.el.saveBox.focus(); ui.log(content.log.pasteSave); return; }
       const obj = save.decode(s);
       if (!obj || !obj.eco) { ui.log(content.log.badImport); return; }
       save.write(obj);
@@ -118,8 +120,11 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   ui.showQuality(quality.preset, quality.scale, 0);
   ui.showFold(prefs.get('folded', false));
   ui.reveal(flags);
-  ui.log(snap ? content.log.arrive : content.log.start);
-  if (offline && offline.seconds > 30) ui.log(fill(content.labels.offline, { time: duration(offline.seconds), funds: fmt(offline.earned) }));
+  ui.log(snap ? fill(content.log.resume, { n: eco.state.island }) : fill(content.log.start, { n: cfg.drones.start }));
+  if (offline && offline.worked > 30) {
+    ui.log(fill(content.labels.offline, { time: duration(offline.away), funds: fmt(offline.earned) }));
+    if (offline.capped) ui.log(fill(content.labels.offlineCapped, { worked: duration(offline.worked) }));
+  }
 
   const controls = createControls(cfg, {
     fly: (dx, dz) => view.fly(dx, dz),

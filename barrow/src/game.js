@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=6';
-import { createSim, restoreSim, openedState } from './sim.js?v=6';
-import * as Save from './save.js?v=6';
-import * as Rb from './rebirth.js?v=6';
-import * as Lore from './lore.js?v=6';
-import { hash } from './rng.js?v=6';
-import { createUI } from './ui.js?v=6';
-import { createView } from './view.js?v=6';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=6';
-import * as Mat from './materials.js?v=6';
+import { storageKey, fill } from '../config.js?v=7';
+import { createSim, restoreSim, openedState } from './sim.js?v=7';
+import * as Save from './save.js?v=7';
+import * as Rb from './rebirth.js?v=7';
+import * as Lore from './lore.js?v=7';
+import { hash } from './rng.js?v=7';
+import { createUI } from './ui.js?v=7';
+import { createView } from './view.js?v=7';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=7';
+import * as Mat from './materials.js?v=7';
 
 /**
  * @param {object} o
@@ -106,10 +106,15 @@ export function createGame(o) {
       if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more of them');
       if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + Lore.inline(cfg.text.stats.bones));
       if (r.gained.strata > 0) parts.push(r.gained.strata + (r.gained.strata === 1 ? ' layer' : ' layers'));
-      let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(r.elapsed) }, String(Math.floor(sim.state.t)));
+      // How long the player was gone, not how long the dead lasted: when the
+      // two differ, the tail below says where they stopped.
+      const gone = r.capped ? seconds : r.elapsed;
+      let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(gone) }, String(Math.floor(sim.state.t)));
       if (parts.length) line += ' ' + parts.join(', ') + '.';
-      if (r.gained.visits > 0) line += ' ' + (r.gained.visits === 1 ? 'somebody called at the gate.' : r.gained.visits + ' called at the gate.');
-      if (r.capped) line += ' they stopped after ' + fmtTime(r.elapsed) + '.';
+      // These are whole sentences after a full stop, so they take capitals
+      // like every other sentence the game writes.
+      if (r.gained.visits > 0) line += ' ' + (r.gained.visits === 1 ? 'Somebody called at the gate.' : r.gained.visits + ' called at the gate.');
+      if (r.capped) line += ' They stopped after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }
     return r;
@@ -148,7 +153,7 @@ export function createGame(o) {
   const save = () => {
     if (!storage || disposed) return false;
     const ok = Save.write(storage, KEY, sim.snapshot(), now());
-    if (!ok) ui.savedNote('could not save');
+    if (!ok) ui.savedNote('Could not save');
     return ok;
   };
 

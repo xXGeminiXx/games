@@ -57,7 +57,11 @@ export const CONFIG = {
       swarm:   'swarm',      // how many bodies fire each turn
       essence: 'essence',    // the currency
       pattern: 'pattern',    // which generator is drawing the field
-      fill:    'field',      // how much of the board is standing
+      // How much of the board is standing, shown as "16/32". The label has to
+      // name the MEASURE and not the thing measured - "field" reads as the
+      // name of the playfield, which is already what every other word on
+      // screen calls it, and leaves the fraction beside it unexplained.
+      fill:    'fill',
     },
 
     hintIdle:    'drag to aim · release to fire',
@@ -71,29 +75,54 @@ export const CONFIG = {
     aimLimit:    'limit',
 
     difficultyLabel: 'difficulty',
-    resetButton:     'reset',
+    // It abandons the run in progress and starts another one. It does not
+    // touch awards, best depths or the chosen mode, and RESET is the word
+    // players expect to mean exactly that - wiping everything they have.
+    resetButton:     'restart',
 
     // Shown when a block reaches the swarm line.
     overTitle:   'the swarm is overrun',
-    // Shown when a field that fills rather than descends runs out of room.
-    overFull:    'the field is sealed',
+    // Shown when a field that fills rather than descends runs out of room. It
+    // says FULL because that is the word the mode promises the player on the
+    // menu and the word its readout counts toward; a second word for the same
+    // event is a word the player has to translate.
+    overFull:    'the field is full',
     // Banner over the field the turn a run outlasts everything its tier had
-    // scripted. Nothing stops - this says so, and the run carries on.
-    crossTitle:  'you have outlasted the field',
-    crossNote:   'it comes forever now',
+    // scripted. Nothing stops - this says so, and the run carries on. The
+    // title is the same phrase the award for the same event uses, so one
+    // thing that happens has one name.
+    crossTitle:  'past the last row',
+    crossNote:   'harder now, and it never stops',
     overAgain:   'again',
     overDepth:   'depth',
     overSwarm:   'swarm',
-    overMenu:    'modes',
+    overMenu:    'menu',
 
-    // The mode screen.
+    // The mode screen. It carries the modes, the difficulty, the awards and
+    // the way back into a run, so the button that opens it says MENU rather
+    // than naming the one part of it a player happens to be looking for.
     menuPlay:       'play',
     menuResume:     'resume run',
-    menuButton:     'modes',
-    menuModeLabel:  'mode',
+    menuButton:     'menu',
+    // The label over the list of modes. This is the first screen anyone sees
+    // and nothing else on it says that picking a row is what starts a run, so
+    // it says so here - directly above the rows, where it is read before they
+    // are clicked rather than at the bottom of a card that scrolls.
+    menuModeLabel:  'pick a mode to start',
     menuBestLabel:  'best depth',
     menuNoBest:     'not yet played',
-    menuHint:       'esc opens this  \u00b7  drag to aim, release to fire',
+    menuHint:       'esc reopens this  \u00b7  drag to aim, release to fire',
+
+    // WHAT THE BRACKETS AROUND A BLOCK MEAN.
+    //
+    // A few blocks in a hundred carry four corner brackets in a colour, and
+    // the colour is the only thing that says what breaking one will do. That
+    // is a private vocabulary until it is written down somewhere the player
+    // can read it, and the moment before a run starts is the one moment they
+    // are reading rather than aiming.
+    menuKinds:      'bracketed blocks do something extra when they break: '
+                  + 'cyan grows the swarm, gold pays, violet breaks more than '
+                  + 'itself, green sharpens every hit for good, red is trouble.',
   },
 
   // -------------------------------------------------------------------------
@@ -111,16 +140,23 @@ export const CONFIG = {
 
     list: [
       {
+        // The id stays `swarm` because saves and stored bests are keyed on it.
+        // The NAME says what the field does, because the swarm is in all three
+        // modes and naming one of them after it tells a player nothing about
+        // which one they are picking.
         id: 'swarm',
-        name: 'swarm',
+        name: 'descent',
         tell: 'the main game',
-        blurb: 'Eight columns, one row at a time, drawn by an automaton that '
-             + 'changes its rule as you descend. Tuned, and the one to play.',
+        blurb: 'Eight columns, one row at a time. The rule drawing the field '
+             + 'changes as you go deeper, and the readout names the one '
+             + 'running now. The tuned one, and the one to play first.',
       },
       {
         id: 'fractal',
         name: 'fractal',
-        tell: 'you are inside the set',
+        // The old tell named the object; this one names the thing that plays
+        // differently, which is that the view keeps pulling back.
+        tell: 'a picture that pulls back',
         blurb: 'Julia sets and the Mandelbrot set, dealt downward a row at a '
              + 'time. You start close in, a few big blocks with a spiral '
              + 'cutting through them, and the view pulls back until the whole '
@@ -496,7 +532,9 @@ export const CONFIG = {
       // Clearing. The skill the game rewards most and teaches least.
       { id: 'clear-1',   track: 'clears',  at: 1,    name: 'nothing left',     note: 'clear a board to nothing' },
       { id: 'clear-15',  track: 'clears',  at: 15,   name: 'housekeeping',     note: 'clear 15 boards' },
-      { id: 'streak-3',  track: 'streak',  at: 3,    name: 'no purchase',      note: 'clear three boards in a row' },
+      // Named for what it counts. The old name was a climbing phrase that,
+      // in a game with a shop, read as an award for buying nothing.
+      { id: 'streak-3',  track: 'streak',  at: 3,    name: 'three clean',      note: 'clear three boards in a row' },
 
       // The vocabulary. Breaking a kind is how you find out what it does.
       { id: 'kinds-4',   track: 'kinds',   at: 4,    name: 'field notes',      note: 'break 4 kinds of special block' },
@@ -505,9 +543,13 @@ export const CONFIG = {
       // The rest of the run.
       { id: 'power-5',   track: 'power',   at: 5,    name: 'sharpened',        note: 'reach 5 damage a hit' },
       { id: 'rich-1000', track: 'essence', at: 1000, name: 'flush',            note: 'hold 1,000 essence in one run' },
-      { id: 'win-1',     track: 'wins',    at: 1,    name: 'past the last row',  note: 'outlast every row a tier has' },
-      { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'outlast a tier in three runs' },
-      { id: 'modes-3',   track: 'modes',   at: 3,    name: 'every water',      note: 'play all three fields' },
+      // TIER is what the ladder is called in the code and nowhere a player can
+      // see it. On screen it is the difficulty, so that is the word here.
+      { id: 'win-1',     track: 'wins',    at: 1,    name: 'past the last row',  note: 'outlast every row a difficulty has' },
+      { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'outlast a difficulty in three runs' },
+      // The ladder is the thing named after water - shallows to abyss - so an
+      // award for playing all three MODES could not be named after it.
+      { id: 'modes-3',   track: 'modes',   at: 3,    name: 'well travelled',   note: 'play all three modes' },
     ],
 
     // The banner over the field when one is won.
@@ -516,6 +558,12 @@ export const CONFIG = {
     // The menu heading, and what it says with none won yet.
     heading:  'awards',
     none:     'nothing yet',
+
+    // Under the heading. None of these grants anything, and a list of names
+    // with progress bars looks exactly like a list that does - so it says so
+    // once, where the list is read, rather than letting a player wonder what
+    // they are missing by not chasing them.
+    note:     'a record of what has happened. none of them changes how the game plays.',
   },
 
   // -------------------------------------------------------------------------
@@ -771,14 +819,24 @@ export const CONFIG = {
     // `desc` is the second line of the offer and shares it with the price,
     // in a button about fifteen characters wide - so it is terse. `long` is
     // the full sentence, shown on hover.
+    //
+    // TWO THINGS EVERY `long` HAS TO CARRY, because the terse line cannot.
+    // The first is the RATE - what has to happen for the number to apply, so
+    // "+2 essence" is not read as two essence handed over once. The second is
+    // HOW LONG IT LASTS: three of these hold for the rest of the run and one
+    // of them happens once and is spent. A run keeps nothing, so "for good"
+    // would be a promise the game does not make.
     offers: [
-      { id: 'ball',  name: 'conscript', desc: '+1 swarm',     long: 'one more body in the swarm, for good', base: 12, perDepth: 4,  amount: 1 },
-      { id: 'power', name: 'sharpen',   desc: '+1 damage',    long: 'every hit does one more damage',        base: 25, perDepth: 10, amount: 1 },
-      { id: 'gain',  name: 'harvest',   desc: '+2 per block', long: 'every block broken pays two more essence', base: 30, perDepth: 8,  amount: 2 },
+      { id: 'ball',  name: 'conscript', desc: '+1 swarm',   long: 'one more body in the swarm, for the rest of the run', base: 12, perDepth: 4,  amount: 1 },
+      { id: 'power', name: 'sharpen',   desc: '+1 damage',  long: 'every hit does one more damage, for the rest of the run', base: 25, perDepth: 10, amount: 1 },
+      // "+2 per block" left the unit open, next to an offer whose line reads
+      // "+1 damage" - so the number a player was buying could be read as
+      // damage. The line names the figure that moves; the rate is on hover.
+      { id: 'gain',  name: 'harvest',   desc: '+2 essence', long: 'every block broken pays two more essence, for the rest of the run', base: 30, perDepth: 8,  amount: 2 },
 
       // Priced by how much it actually removes, so clearing a wide row costs
       // more than clearing a thin one.
-      { id: 'clear', name: 'purge row', desc: 'lowest row',   long: 'destroy the lowest row on the board', base: 25, perDepth: 6,  amount: 1 },
+      { id: 'clear', name: 'purge row', desc: 'lowest row', long: 'clears the lowest row on the board right now. one use, not an upgrade', base: 25, perDepth: 6,  amount: 1 },
     ],
   },
 
@@ -879,12 +937,47 @@ export const CONFIG = {
 
     // Draws the wordless opening lesson for a player who has never fired.
     onboarding: true,
+
+    // THE PAGE AROUND THE BOARD.
+    //
+    // The canvas already carries a hue for whatever is being played - the wash
+    // behind the field, the backdrop geometry, the horizon - and it moves as a
+    // run descends from one generator to the next. The page around the canvas
+    // knew none of that and stayed one flat near-black, so the frame and the
+    // picture read as two images butted together, worst where the field is
+    // most coloured.
+    //
+    // These give the page the field's own hue at a lower lightness than the
+    // field's own wash, which is the whole trick: the frame belongs to the
+    // picture and the BOARD is still the brightest thing on the screen. The
+    // three lightnesses are the page, the raised surfaces on it (buttons, the
+    // mode rows) and the hairlines between them, in percent, and they keep the
+    // spacing the fixed palette had.
+    //
+    // Set to null to pin the page to palette.void and never touch it again.
+    // `sat` is used where the field only has a hue to give; `satMax` caps a
+    // field that names its own ground and names a vivid one. `page` is the
+    // page's lightness in percent for a field that only gave a hue, and
+    // `refShare` is the share of its own lightness taken from a field that
+    // named a colour. `panel` and `line` are LIFTS above whichever of those
+    // applies, so the chrome keeps the spacing the fixed palette had.
+    ground: { sat: 34, satMax: 50, page: 6, refShare: 0.7, panel: 3, line: 9.5 },
   },
 
   // -------------------------------------------------------------------------
   // DEV - switches that only matter while tuning
   // -------------------------------------------------------------------------
   dev: {
+    // THE CACHE BUSTER, WRITTEN DOWN.
+    //
+    // Every module import in index.html carries `?v=<n>`. A browser holding an
+    // old copy of a module against a new index.html is the one break that
+    // cannot be seen by loading the game locally, so the number is bumped on
+    // every release and every import carries the same one. This is that number
+    // and nothing reads it - it is here so the value has one place to be
+    // checked against.
+    build: 7,
+
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
     allowOverrides: true,
@@ -1074,7 +1167,10 @@ export function applyIdentity(doc) {
   put('lbl-difficulty', t.difficultyLabel);
   put('modes',          t.menuButton);
   put('resume',         t.menuResume);
+  put('lbl-mode',       t.menuModeLabel);
   put('menuhint',       t.menuHint);
+  put('menukinds',      t.menuKinds);
+  put('awnote',         CONFIG.awards.note);
 
   const byId = (id) => (typeof d.getElementById === 'function' ? d.getElementById(id) : null);
 

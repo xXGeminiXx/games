@@ -82,13 +82,31 @@ export function createGame(o) {
     boardDirty = true;
   }
 
+  /** How long thrown gas takes to cool before it can gather, at a setting. */
+  function coolSeconds(d) { return CONFIG.stellar.gasCoolSeconds * (1 - 0.85 * d); }
+
+  /** How many bodies arrive in one cloud, at a setting. */
+  function cloudBodies(d) { return Math.max(6, Math.round(G.cloudBodies * (0.2 + 0.8 * d))); }
+
+  /**
+   * WHAT A DIAL READS. A percentage of an unstated maximum says nothing: it
+   * tells a player where the handle is, which they can already see. Each dial
+   * prints the quantity it actually sets, in the unit that quantity has.
+   */
+  function dialReadout(key, v) {
+    switch (key) {
+      case 'infall': return (v * G.infallPerSecond).toFixed(1) + '/s';
+      case 'cycle': return Math.round(coolSeconds(v)) + 's';
+      case 'formation': return cloudBodies(v) + ' bodies';
+      default: return Math.round(v * 100) + '%';
+    }
+  }
+
   /** The stellar cycle law: thrown gas gathers again sooner. */
   function applyCycle() {
     const sim = getSim();
     if (!R.hasLaw(research, 'cycle')) return;
-    const d = R.dial(research, 'cycle');
-    const base = CONFIG.stellar.gasCoolSeconds;
-    sim.setStellar(Object.assign({}, sim.getStellar(), { gasCoolSeconds: base * (1 - 0.85 * d) }));
+    sim.setStellar(Object.assign({}, sim.getStellar(), { gasCoolSeconds: coolSeconds(R.dial(research, 'cycle')) }));
   }
 
   /** Re-apply everything a restored run had bought. */
@@ -188,7 +206,7 @@ export function createGame(o) {
         // Star formation: a whole cloud, each body standing for a share of
         // everything the field already represents.
         const d = R.dial(research, 'formation');
-        const nBodies = Math.max(6, Math.round(G.cloudBodies * (0.2 + 0.8 * d)));
+        const nBodies = cloudBodies(d);
         const p = stats && stats.population ? stats.population.m * Math.pow(10, stats.population.e) : 0;
         const pop = Math.max(1, Math.floor((p * G.popShare) / nBodies));
         seedCloud(cx + Math.cos(a) * r, cy + Math.sin(a) * r, nBodies, pop);
@@ -227,13 +245,25 @@ export function createGame(o) {
     return e;
   }
 
+  /**
+   * What stands in the price column. A node learned in an earlier universe is
+   * free and says so; a node with no price at all is not "known" and must not
+   * claim to be.
+   */
+  function costText(row) {
+    if (row.known) return T.known || 'known';
+    return row.cost > 0 ? fmt(row.cost) : '';
+  }
+
   function renderBoard() {
     boardDirty = false;
     if (!nodesEl) return;
     clear(nodesEl);
     clear(lawsEl);
     const rows = R.board(research);
-    if (eraEl) eraEl.textContent = research.era === 0 ? '' : R.era(research).name;
+    // Named the way the caption names it, so the heading reads as the chapter
+    // the run is in rather than as a title for the list under it.
+    if (eraEl) eraEl.textContent = research.era === 0 ? '' : (T.eraPrefix || '') + R.era(research).name;
     if (boardEl && boardEl.style) boardEl.style.display = research.era === 0 || closing ? 'none' : '';
     for (const row of rows) {
       const n = row.node;
@@ -241,9 +271,14 @@ export function createGame(o) {
       div.dataset.id = n.id;
       const head = make('div', 'head');
       head.appendChild(make('span', 'name', n.name));
-      head.appendChild(make('span', 'cost', row.cost === 0 ? (T.known || 'known') : fmt(row.cost)));
+      head.appendChild(make('span', 'cost', costText(row)));
       div.appendChild(head);
-      div.appendChild(make('div', 'line', row.open ? n.line : (T.needs || 'needs ') + R.node(n.needs).name));
+      // A locked row keeps its price AND says what it is waiting on, because
+      // the price and the prerequisite are two different reasons a row cannot
+      // be bought and a row that shows only one of them cannot be read. It
+      // keeps its description too: what a node does is the reason to want it.
+      div.appendChild(make('div', 'line', row.open ? n.line
+        : (T.needs || 'needs ') + R.node(n.needs).name + '. ' + n.line));
       if (row.open) div.addEventListener('click', () => { if (buy(n.id)) renderBoard(); });
       nodesEl.appendChild(div);
     }
@@ -255,7 +290,7 @@ export function createGame(o) {
         const div = make('div', 'law');
         const head = make('div', 'head');
         head.appendChild(make('span', 'name', n.name));
-        const val = make('span', 'cost', Math.round(R.dial(research, d.key) * 100) + '%');
+        const val = make('span', 'cost', dialReadout(d.key, R.dial(research, d.key)));
         head.appendChild(val);
         div.appendChild(head);
         const input = make('input');
@@ -264,10 +299,13 @@ export function createGame(o) {
         input.setAttribute('aria-label', d.label);
         input.addEventListener('input', () => {
           R.setDial(research, d.key, input.value);
-          val.textContent = Math.round(R.dial(research, d.key) * 100) + '%';
+          val.textContent = dialReadout(d.key, R.dial(research, d.key));
           if (id === 'cycle') applyCycle();
         });
         div.appendChild(input);
+        // A law arrives with a name and a handle and nothing else. One line
+        // says what the handle does, and it stays there for the rest of the run.
+        if (d.line) div.appendChild(make('div', 'line', d.line));
         lawsEl.appendChild(div);
       }
     }
@@ -333,17 +371,24 @@ export function createGame(o) {
       const c = research.counts;
       const lines = [
         (T.endingClass || 'it was') + ' ' + closing.name,
-        `${fmt(seeds)} ${T.endingSeeds || 'seeds'}, ${Math.round(elapsed / 60)} ${T.endingMinutes || 'minutes'}`,
+        `${fmt(seeds)} ${T.endingSeeds || 'seeds'}, ${spanOfPlay()}`,
         `${fmt((c.ignite || 0) + (c.second || 0))} ${T.endingStars || 'stars'}, ${fmt((c.nebula || 0) + (c.supernova || 0) + (c.collapse || 0) + (c.detonation || 0))} ${T.endingDeaths || 'deaths'}, ${fmt(c.remnant || 0)} ${T.endingRemnants || 'left behind'}`,
-        `${fmt(research.earned)} ${T.endingFlux || 'flux, all of it spent on knowing'}`,
+        `${fmt(research.earned)} ${T.endingFlux || 'flux earned'}`,
       ];
       for (const l of lines) endingEl.appendChild(make('div', 'line', l));
       const again = make('div', 'again', T.endingAgain || 'again, knowing what you know');
       again.addEventListener('click', () => newRun());
       endingEl.appendChild(again);
-      if (endingEl.style) endingEl.style.display = '';
+      if (endingEl.style) endingEl.style.display = 'flex';
     }
     save(true);
+  }
+
+  /** How long the run lasted, in a unit that is not zero. */
+  function spanOfPlay() {
+    return elapsed < 90
+      ? Math.max(1, Math.round(elapsed)) + ' ' + (T.endingSeconds || 'seconds')
+      : Math.round(elapsed / 60) + ' ' + (T.endingMinutes || 'minutes');
   }
 
   /** A new universe. What was learned is kept; nothing else crosses. */

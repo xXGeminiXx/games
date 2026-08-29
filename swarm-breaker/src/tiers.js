@@ -293,7 +293,7 @@ const LADDER = [
     id: 'shallows',
     name: 'shallows',
     blurb: 'the swarm is fed. learn what it does.',
-    tell: 'a pickup every row, and you open with five',
+    tell: 'the easiest. a pickup every row, and you open with five',
     requires: null,
     finish: 60,
     supply: { start: 5, grace: Infinity, floor: 1, windfall: 1 / 3 },
@@ -374,7 +374,7 @@ const LADDER = [
     id: 'abyss',
     name: 'abyss',
     blurb: 'two balls, one pickup in six rows. every angle is the only angle.',
-    tell: 'the field feeds you almost nothing, and never relents',
+    tell: 'the hardest. it feeds you almost nothing, and never relents',
     requires: 'maelstrom',
     finish: 90,
     // Same correction as maelstrom above, one rung meaner: enough of an opening

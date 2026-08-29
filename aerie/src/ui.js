@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=8';
-import { fill } from '../content.js?v=8';
+import { fmt, rate, count, pct } from './numbers.js?v=11';
+import { fill } from '../content.js?v=11';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
@@ -14,18 +14,27 @@ export function createUI(doc, cfg, content, eco, on) {
     castOff: $('castoff'), castOffCost: $('castoff-cost'), log: $('log'), anchorHint: $('anchor-hint'),
     exportBtn: $('export'), importBtn: $('import'), resetBtn: $('reset'), saveBox: $('savebox'), range: $('range'),
     fold: $('fold'), quality: $('quality'), rateOut: $('rate'), perfBtn: $('perf'), keysBtn: $('keys'), keyHelp: $('keyhelp'), keyRows: $('key-rows'), keyClose: $('keyclose'),
+    specWarn: $('spec-warn'), rangeRow: $('range-row'),
   };
   const L = content.labels;
+
+  // Every heading and static label in the page names its string in content
+  // with data-t, so a word is written once and the page cannot drift from it.
+  for (const node of doc.querySelectorAll('[data-t]')) {
+    const s = node.getAttribute('data-t').split('.').reduce((o, k) => (o == null ? o : o[k]), content);
+    if (typeof s === 'string') node.textContent = s;
+  }
 
   // ---- build the rows once ----
   const row = (parent, html) => { const d = doc.createElement('div'); d.className = 'row'; d.innerHTML = html; parent.appendChild(d); return d; };
   const holdRows = {}, specRows = {}, upRows = {};
   for (const k of K) {
     holdRows[k] = row(el.holdRows, `<span class="k">${content.kinds[k]}</span><span class="v" data-y></span><span class="v" data-p></span><span class="v dim" data-pct></span>`);
-    holdRows[k].title = cfg.kinds[k].where;
+    holdRows[k].title = fill(L.where, { kind: content.kinds[k], where: cfg.kinds[k].where });
   }
   for (const k of K) {
     specRows[k] = row(el.specRows, `<button data-spec="${k}"><b>${fill(L.specialist, { kind: content.kinds[k] })}</b><i data-cost></i></button><span class="v" data-n></span>`);
+    specRows[k].title = fill(content.hints.specialist, { kind: content.kinds[k], x: cfg.economy.specialistMult });
     specRows[k].querySelector('button').addEventListener('click', () => on.specialist(k));
   }
   for (const u in cfg.economy.upgrades) {
@@ -34,6 +43,7 @@ export function createUI(doc, cfg, content, eco, on) {
     upRows[u].title = U.does;
     upRows[u].querySelector('button').addEventListener('click', () => on.upgrade(u));
   }
+  if (el.rangeRow) el.rangeRow.title = content.hints.range;
   el.hire.addEventListener('click', on.hire);
   el.wing.addEventListener('click', on.wing);
   el.castOff.addEventListener('click', on.castOff);
@@ -61,8 +71,9 @@ export function createUI(doc, cfg, content, eco, on) {
   const showQuality = (name, scale, hz) => {
     for (const k in qualityBtns) qualityBtns[k].setAttribute('aria-pressed', String(k === name));
     if (!cfg.render.showRate) { el.rateOut.textContent = ''; return; }
-    const at = name === 'auto' ? fill(' at {pct} of full', { pct: Math.round(scale * 100) + '%' }) : '';
-    el.rateOut.textContent = hz > 0 ? fill(L.rate, { n: Math.round(hz) }) + at : '';
+    if (!(hz > 0)) { el.rateOut.textContent = ''; return; }
+    const vars = { n: Math.round(hz), pct: Math.round(scale * 100) + '%' };
+    el.rateOut.textContent = fill(name === 'auto' ? L.rateAuto : L.rate, vars);
   };
 
   // ---- folding the table away ---------------------------------------------
@@ -76,7 +87,6 @@ export function createUI(doc, cfg, content, eco, on) {
     el.anchorHint.textContent = folded ? L.hintFolded : L.hint;
   };
   el.fold.addEventListener('click', on.fold);
-  el.fold.title = content.hints.fold;
 
   // ---- the key list, printed from the same table the keyboard reads -------
   const printKey = (k) => (content.keyLabels[k] || (k.length === 1 ? k.toUpperCase() : k));
@@ -90,7 +100,7 @@ export function createUI(doc, cfg, content, eco, on) {
       const d = doc.createElement('div');
       d.className = 'krow';
       d.innerHTML = `<kbd></kbd><span></span>`;
-      d.querySelector('kbd').textContent = keys.map(printKey).join('  /  ');
+      d.querySelector('kbd').textContent = keys.map(printKey).join(L.keySep);
       d.querySelector('span').textContent = content.keyNames[action] || action;
       el.keyRows.appendChild(d);
     }
@@ -113,6 +123,8 @@ export function createUI(doc, cfg, content, eco, on) {
   };
 
   const show = (node, yes) => { if (node) node.hidden = !yes; };
+  // "timber", "timber and ice", "timber, fish and ice"
+  const list = (a) => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 
   // ---- refresh every visible number ----
   const update = (view) => {
@@ -121,15 +133,14 @@ export function createUI(doc, cfg, content, eco, on) {
     el.income.textContent = rate(eco.revenue());
     el.drones.textContent = count(s.drones);
     const y = eco.yields();
-    let working = 0;
-    for (const k of K) working += y[k] > 0 ? 1 : 0;
-    el.working.textContent = view.active < s.drones ? `${count(view.active)} shown` : '';
+    el.working.textContent = view.active < s.drones ? fill(L.shown, { n: count(view.active) }) : '';
     el.hireCost.textContent = fmt(eco.hireCost());
     el.hire.disabled = !eco.actions.hire.can();
     show(el.wing, eco.level('hangars') >= cfg.reveal.wingsAtHangars);
     el.wing.querySelector('b').textContent = fill(L.hireWing, { n: cfg.economy.wingSize });
     el.wingCost.textContent = fmt(eco.wingCost());
     el.wing.disabled = !eco.actions.wing.can();
+    const strandedKinds = [];
     for (const k of K) {
       const r = holdRows[k];
       r.querySelector('[data-y]').textContent = rate(y[k]);
@@ -147,10 +158,20 @@ export function createUI(doc, cfg, content, eco, on) {
       const left = s.avail[k];
       const n = s.specialists[k];
       const ne = sr.querySelector('[data-n]');
+      const stranded = !!(n && !(left > 0));
+      if (stranded) strandedKinds.push(content.kinds[k]);
       ne.textContent = n ? count(n) : '';
-      ne.className = 'v' + (n && !(left > 0) ? ' bad' : '');
-      ne.title = n && !(left > 0) ? L.workedOut : '';
+      ne.className = 'v' + (stranded ? ' bad' : '');
+      ne.title = stranded ? fill(L.workedOutOne, { kind: content.kinds[k] }) : '';
       sr.querySelector('button').disabled = !eco.actions.specialist.can(k);
+    }
+    // A tooltip is no use to a player who does not know to hover. Specialists
+    // are locked to one trade, so a trade with nothing left within reach earns
+    // them nothing at all until the carrier is moved, and that has to be said
+    // out loud where the specialists are bought.
+    if (el.specWarn) {
+      el.specWarn.hidden = strandedKinds.length === 0;
+      el.specWarn.textContent = strandedKinds.length ? fill(L.workedOut, { kinds: list(strandedKinds) }) : '';
     }
     for (const u in cfg.economy.upgrades) {
       const r = upRows[u];
@@ -161,6 +182,7 @@ export function createUI(doc, cfg, content, eco, on) {
     }
     el.island.textContent = fill(L.island, { n: s.island });
     el.remaining.textContent = pct(s.remaining);
+    el.castOff.querySelector('b').textContent = fill(L.castOff, { n: s.island + 1 });
     el.castOffCost.textContent = fmt(eco.castOffCost());
     el.castOff.disabled = !eco.actions.castOff.can();
     el.range.textContent = fmt(eco.range());

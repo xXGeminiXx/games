@@ -53,57 +53,58 @@ export const CONFIG = {
       minerals: 'minerals',
       tips:     'tips',
       area:     'ground',
-      level:    'reach',
+      level:    'on',
     },
     // The label's first line: where the organism is, after its name.
     where:       '{level}, ring {ring} of {rings}',
     whereClosed: '{level}, all {rings} rings',
     gain:        '+',
 
-    reach:       'Reach',
-    reachTip:    'Push one thread out by hand',
+    reach:       'Grow a thread',
+    reachTip:    'Pushes one thread out to the nearest place not yet reached',
     buyTip:      'Grow a tip',
     buyTipMax:   'Max',
     buyTipTip:   'A tip forages on its own for as long as the organism lives',
-    extend:      'Extend',
+    extend:      'Open the next ring',
     beyond:      'Go beyond',
     fruit:       'Fruit',
     fruitSure:   'Sure? This organism ends',
-    weightTip:   'The share of the minerals this kind is sent',
+    weightTip:   'How much of the mineral flow goes to this kind, set against the other kinds',
     harvest:     ['Keep', 'Fell grown', 'Fell all'],
-    harvestTip:  'What to do with the trees of this kind: milk them, fell the grown ones, or fell everything',
+    harvestTip:  'What to do with this kind: keep them trading, fell the grown ones, or fell every one',
     nurture:     'Feed',
+    nurtureOn:   'Feeding',
     nurtureTip:  'Send sugar to this kind so it grows faster',
     export:      'Export',
     import:      'Import',
     reset:       'Start over',
     resetSure:   'Sure? Everything goes',
-    bought:      'Held',
+    bought:      'Learned',
 
     // Instinct: the habits the organism can learn, what it says it last did,
     // and the share of the sugar it is not allowed to touch.
     instinct: {
-      names: { extend: 'Reach', tips: 'Front', beyond: 'Beyond' },
+      names: { extend: 'Open rings', tips: 'Grow tips', beyond: 'Go beyond' },
       hints: {
         extend: 'Open the next ring once the front has nothing left to reach',
         tips:   'Grow the front when the ground gives up more than the tips can carry',
-        beyond: 'Fold a finished level and begin on the one above it',
+        beyond: 'Go beyond a finished level without being asked. Left off, because ending a level is yours to decide',
       },
-      acted:  { extend: 'extended', tips: 'grew the front', beyond: 'went beyond' },
+      acted:  { extend: 'opened a ring', tips: 'grew the front', beyond: 'went beyond' },
       on:     'on',
       off:    'off',
       ago:    '{what}, {t} ago',
       idle:   'has done nothing yet',
       reserve:    'Reserve',
       reserves:   ['none', '1/4', '1/2', '3/4'],
-      reserveTip: 'The share of the sugar instinct will not spend',
+      reserveTip: 'The share of the sugar these habits will not spend',
     },
 
     // Moving a save between browsers.
-    savePrompt:   'your save',
-    savePaste:    'paste a save',
-    saveCopied:   'save copied',
-    saveCopyThis: 'copy this: ',
+    savePrompt:   'Copy this save',
+    savePaste:    'Paste a save',
+    saveCopied:   'Save copied',
+    saveCopyThis: 'Copy this: ',
 
     panels: {
       entries: 'Field notes',
@@ -133,15 +134,12 @@ export const CONFIG = {
     },
 
     columns: {
-      kind:     'Kind',
-      count:    'Trees',
-      size:     'Grown',
-      sent:     'Sent',
-      got:      'Pays',
+      size:     'Size',
+      sent:     'Minerals sent',
+      got:      'Sugar paid',
       rate:     'Price',
-      rateTip:  'What the next mineral sent to this kind fetches',
+      rateTip:  'Sugar the next mineral sent here would fetch. Send the minerals where this is highest',
       weight:   'Share',
-      policy:   'Policy',
     },
   },
 
@@ -783,7 +781,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 7,
+    build: 8,
   },
 };
 
@@ -949,6 +947,7 @@ export function applyIdentity(doc) {
   put('export',       t.export);
   put('import',       t.import);
   put('reset',        t.reset);
+  put('fruit',        t.fruit);
   put('p-tips',       t.panels.tips);
   put('p-trees',      t.panels.trees);
   put('p-season',     t.panels.season);

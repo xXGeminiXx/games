@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=6';
-import * as Mk from './market.js?v=6';
-import * as Lore from './lore.js?v=6';
-import { fill } from '../config.js?v=6';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=6';
+import { hash, unit, range, pick } from './rng.js?v=7';
+import * as Mk from './market.js?v=7';
+import * as Lore from './lore.js?v=7';
+import { fill } from '../config.js?v=7';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=7';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -125,6 +125,9 @@ export function build(api, i) {
   const words = Lore.visitor(kind);
   if (!words) return null;
   const say = (key, values) => fill(pick(words[key], seed, 'visit-line:' + i) || '', values);
+  // A caller's flavour, then what is actually on the table. A price on a
+  // button is worth nothing to a player who cannot see what it buys.
+  const offer = (values) => (words.offer ? ' ' + fill(words.offer, values) : '');
   const rec = { i, kind, name: words.name, born: state.t, expires: state.t + v.stay };
 
   if (kind === 'buyer') {
@@ -148,7 +151,7 @@ export function build(api, i) {
     const price = ref * v.bonecart.priceSeconds;
     if (!(price > 0)) return null;
     rec.data = { bones, price };
-    rec.text = say('lines');
+    rec.text = say('lines') + offer({ n: fmtCount(bones) });
     rec.take = words.take + ' (' + fmtCoin(price) + ')';
     rec.pass = words.pass;
     rec.cost = price;
@@ -159,7 +162,7 @@ export function build(api, i) {
     const seconds = range(seed, 'visit-share:' + i, v.gang.secondsMin, v.gang.secondsMax) * pay;
     const n = Math.max(v.gang.floor, Math.floor(api.growthOver(seconds)));
     rec.data = { n };
-    rec.text = say('lines');
+    rec.text = say('lines') + offer({ n: fmtCount(n) });
     rec.take = words.take;
     rec.pass = words.pass;
     return rec;
@@ -169,7 +172,7 @@ export function build(api, i) {
     const price = ref * v.reeve.seconds * Math.pow(v.reeve.priceGrowth, takenOf(state, 'reeve'));
     if (!(price > 0)) return null;
     rec.data = { price };
-    rec.text = say('lines');
+    rec.text = say('lines') + offer();
     rec.take = words.take + ' (' + fmtCoin(price) + ')';
     rec.pass = words.pass;
     rec.cost = price;
@@ -183,7 +186,7 @@ export function build(api, i) {
     const key = keys[hash(seed, 'visit-boon:' + i) % keys.length];
     const factor = range(seed, 'visit-factor:' + i, v.relic.boonMin, v.relic.boonMax);
     rec.data = { price, key, factor };
-    rec.text = say('lines');
+    rec.text = say('lines') + offer();
     rec.take = words.take + ' (' + fmtCoin(price) + ')';
     rec.pass = words.pass;
     rec.cost = price;
@@ -193,7 +196,7 @@ export function build(api, i) {
   if (kind === 'surveyor') {
     const price = ref * v.surveyor.seconds;
     rec.data = { price, reads: v.surveyor.reads };
-    rec.text = say('lines');
+    rec.text = say('lines') + offer({ n: v.surveyor.reads });
     rec.take = words.take + (price > 0 ? ' (' + fmtCoin(price) + ')' : '');
     rec.pass = words.pass;
     rec.cost = price;

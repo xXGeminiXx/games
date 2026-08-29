@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=5';
-import { format } from './economy.js?v=5';
-import { kindDef, costOf } from './works.js?v=5';
-import { idsOf } from './traits.js?v=5';
+import { fill } from '../config.js?v=6';
+import { format } from './economy.js?v=6';
+import { kindDef, costOf } from './works.js?v=6';
+import { idsOf } from './traits.js?v=6';
 
 const LOG_SHOWN = 8;
 
@@ -77,6 +77,8 @@ export function createUi(cfg, doc, win, api) {
     awardRows.push({ a, row });
   }
 
+  if (el.call && t.callHint) el.call.title = t.callHint;
+
   clear(el.helplines);
   if (el.helplines) for (const line of t.help) el.helplines.appendChild(make('p', '', line));
   put(el.helptitle, cfg.identity.name);
@@ -96,10 +98,10 @@ export function createUi(cfg, doc, win, api) {
   if (el.overnew) el.overnew.addEventListener('click', () => api.newRun());
   if (el.export) el.export.addEventListener('click', () => {
     const s = api.exportString();
-    if (win.prompt) win.prompt(t.export, s);
+    if (win.prompt) win.prompt(t.exportAsk || t.export, s);
   });
   if (el.import) el.import.addEventListener('click', () => {
-    const s = win.prompt ? win.prompt(t.import, '') : null;
+    const s = win.prompt ? win.prompt(t.importAsk || t.import, '') : null;
     if (s) api.importString(s);
   });
 
@@ -184,35 +186,38 @@ export function createUi(cfg, doc, win, api) {
     setClass(el.cut, 'on', tool.type === 'cut');
 
     // The earthworks line: the cost at the hovered cell for the active tool,
-    // otherwise the general prices.
+    // otherwise what the ground is for and what it costs.
     if ((tool.type === 'raise' || tool.type === 'cut') && hover.cell >= 0) {
       const p = api.preview(tool.type, null, hover.cell);
       const h = state.terrain.h[hover.cell];
-      if (p.reason === 'fixed') put(el.earthcost, 'This ground does not move.');
-      else put(el.earthcost, (tool.type === 'raise' ? t.raise : t.cut) + ': ' + p.cost + ' ore, ' + h + ' to ' + p.height + (p.ok ? '' : ' - not enough ore'));
+      if (p.reason === 'fixed') put(el.earthcost, immovable(state, tool.type, hover.cell));
+      else put(el.earthcost, (tool.type === 'raise' ? t.raise : t.cut) + ': height ' + h + ' to ' + p.height +
+        ', ' + p.cost + ' ore' + (p.ok ? '' : ' - not enough ore'));
     } else {
-      put(el.earthcost, t.raise + ' ' + cfg.economy.raiseBase + '+ ore a level, ' + t.cut.toLowerCase() + ' ' + cfg.economy.cutCost + ' ore.');
+      put(el.earthcost, fill(t.earthNote, { raise: cfg.economy.raiseBase, cut: cfg.economy.cutCost }));
     }
 
     const sel = api.selected();
     if (sel) {
       const def = kindDef(cfg, sel.kind);
       const s = api.workStats(sel);
+      const st = t.stats;
       const lines = [];
-      lines.push(def.name + ' - ' + fill(t.tier, { t: sel.tier }) + (s.buffed ? ' - lit' : ''));
-      if (s.dmg) lines.push('Damage ' + fmt1(s.dmg) + (s.rate ? ' x ' + fmt1(s.rate) + '/s' : ''));
-      if (s.burnDps) lines.push('Burns ' + fmt1(s.burnDps) + '/s for ' + fmt1(s.burnSeconds) + 's');
-      if (s.slow) lines.push('Slows ' + Math.round(s.slow * 100) + '% for ' + fmt1(s.slowSeconds) + 's');
-      if (s.pull) lines.push('Drags ' + fmt1(s.pull) + ' cells/s');
-      if (s.chain) lines.push('Chains ' + s.chain + ' times');
-      if (s.splash) lines.push('Bursts ' + fmt1(s.splash) + ' wide');
-      if (s.aura) lines.push('Lights works within ' + fmt1(s.aura));
+      lines.push(def.name + ' - ' + fill(t.tier, { t: sel.tier }) + (s.buffed ? ' - ' + t.boosted : ''));
+      if (s.dmg) lines.push(fill(s.rate ? st.damage : st.damageOnly, { dmg: fmt1(s.dmg), rate: fmt1(s.rate) }));
+      if (s.burnDps) lines.push(fill(st.burn, { dps: fmt1(s.burnDps), secs: fmt1(s.burnSeconds) }));
+      if (s.slow) lines.push(fill(st.slow, { pct: Math.round(s.slow * 100), secs: fmt1(s.slowSeconds) }));
+      if (s.pull) lines.push(fill(st.pull, { rate: fmt1(s.pull) }));
+      if (s.chain) lines.push(fill(st.chain, { n: s.chain }));
+      if (s.splash) lines.push(fill(st.splash, { r: fmt1(s.splash) }));
+      if (s.aura) lines.push(fill(st.aura, { r: fmt1(s.aura) }));
       const hg = state.terrain.h[sel.cell];
-      lines.push('Reach ' + fmt1(s.range) + (hg > 0 ? ' (high ground +' + Math.round(cfg.works.highGroundRange * hg * 100) + '%)' : ''));
-      lines.push('Kills ' + sel.kills + ', dealt ' + format(Math.round(sel.dealt)));
+      lines.push(fill(hg > 0 ? st.rangeHigh : st.range,
+        { r: fmt1(s.range), pct: Math.round(cfg.works.highGroundRange * hg * 100) }));
+      lines.push(fill(st.tally, { kills: sel.kills, dealt: format(Math.round(sel.dealt)) }));
       put(el.selinfo, lines.join('\n'));
       const next = sel.tier < cfg.works.maxTier ? costOf(cfg, def, sel.tier + 1) : null;
-      put(el.upgrade, next === null ? t.upgrade + ' - top' : t.upgrade + ' ' + next);
+      put(el.upgrade, next === null ? t.topTier : t.upgrade + ' ' + next);
       setDisabled(el.upgrade, next === null || next > state.ore || state.phase === 'over');
       put(el.sell, t.sell + ' +' + Math.floor(sel.spent * cfg.economy.sellRefund));
       setDisabled(el.sell, state.phase === 'over');
@@ -273,40 +278,62 @@ export function createUi(cfg, doc, win, api) {
     }
   }
 
+  /**
+   * Why a cell will not move. The run gives one reason for three different
+   * situations - ground that is fixed, ground already at the top, and ground
+   * already at the bottom - and each needs its own sentence, or a player at
+   * the valley floor goes looking for a rule that is not there.
+   */
+  function immovable(state, type, cell) {
+    const kind = state.terrain.kind[cell];
+    if (kind === 1) return fill(t.earthFixed, { where: t.snowline.toLowerCase() });
+    if (kind === 2) return fill(t.earthFixed, { where: t.hearth.toLowerCase() });
+    return type === 'raise' ? t.earthTop : t.earthLow;
+  }
+
   function hintText(state, tool, hover) {
     if (state.phase === 'over') return t.over;
+    const firstMinute = state.surge === 1 && state.phase === 'countdown';
     if (hover.cell < 0) {
       if (tool.type === 'build') {
         const def = kindDef(cfg, tool.kind);
         return def ? def.name + ': ' + def.line : '';
       }
-      if (tool.type === 'raise') return t.raise + ': click or drag on the ground. Right click to stop.';
-      if (tool.type === 'cut') return t.cut + ': click or drag on the ground. Right click to stop.';
-      if (state.surge === 1 && state.phase === 'countdown') return t.firstLine;
+      if (tool.type === 'raise' || tool.type === 'cut') {
+        return fill(t.toolHint, { tool: tool.type === 'raise' ? t.raise : t.cut });
+      }
+      if (firstMinute) return t.firstLine;
       return '';
     }
     const h = state.terrain.h[hover.cell];
     const kind = state.terrain.kind[hover.cell];
-    const where = kind === 1 ? t.snowline : kind === 2 ? t.hearth : 'height ' + h;
+    const where = kind === 1 ? t.snowline.toLowerCase() : kind === 2 ? t.hearth.toLowerCase() : 'height ' + h;
     if (tool.type === 'build') {
       const def = kindDef(cfg, tool.kind);
       const p = api.preview('build', tool.kind, hover.cell);
       if (!def) return '';
       if (p.reason === 'fixed') return def.name + ': not on the ' + where + '.';
-      if (p.reason === 'occupied') return def.name + ': something stands here.';
+      if (p.reason === 'occupied') return def.name + ': something already stands here.';
       if (p.reason === 'ore') return def.name + ': ' + p.cost + ' ore, you have ' + Math.floor(state.ore) + '.';
-      return def.name + ' here for ' + p.cost + ' ore on ' + where + (h > 0 ? ', reach +' + Math.round(cfg.works.highGroundRange * h * 100) + '%' : '') + '.';
+      return def.name + ' here for ' + p.cost + ' ore, on ' + where +
+        (h > 0 ? ', range +' + Math.round(cfg.works.highGroundRange * h * 100) + '%' : '') + '.';
     }
     if (tool.type === 'raise' || tool.type === 'cut') {
       const p = api.preview(tool.type, null, hover.cell);
-      if (p.reason === 'fixed') return 'The ' + where + ' does not move.';
-      return (tool.type === 'raise' ? t.raise : t.cut) + ' to ' + p.height + ' for ' + p.cost + ' ore' + (p.ok ? '.' : ' - not enough ore.');
+      if (p.reason === 'fixed') return immovable(state, tool.type, hover.cell);
+      return (tool.type === 'raise' ? t.raise : t.cut) + ' this cell to height ' + p.height +
+        ' for ' + p.cost + ' ore' + (p.ok ? '.' : ' - not enough ore.');
     }
     const w = api.workAt(hover.cell);
     if (w) {
       const def = kindDef(cfg, w.kind);
-      return def.name + ', ' + fill(t.tier, { t: w.tier }).toLowerCase() + ', on ' + where + '. Click to select.';
+      const chosen = api.selected();
+      const line = def.name + ', ' + fill(t.tier, { t: w.tier }).toLowerCase() + ', on ' + where + '.';
+      return chosen && chosen.id === w.id ? line : line + ' ' + t.clickToSelect;
     }
+    // Before the first surge the ground reading gives way to the one line that
+    // says what the ground is for.
+    if (firstMinute) return t.firstLine;
     return where.charAt(0).toUpperCase() + where.slice(1) + '.';
   }
 

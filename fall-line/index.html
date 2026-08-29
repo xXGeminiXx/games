@@ -143,7 +143,7 @@
   .bcard .actions{margin-top:14px;display:flex;gap:8px}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="a62c6c27b886">
+<meta name="build" content="4b46c9e10db6">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -223,13 +223,13 @@
     <div id="clock">
       <div id="speed"></div>
       <button id="pause">Pause</button>
-      <button id="call">Call the surge</button>
+      <button id="call">Call surge</button>
     </div>
   </aside>
 
   <aside id="groundcard" class="card br">
     <h2 id="p-earth">Earthworks</h2>
-    <div class="row2"><button id="raise">Raise</button><button id="cut">Cut</button></div>
+    <div class="row2"><button id="raise">Raise</button><button id="cut">Lower</button></div>
     <div id="earthcost"></div>
     <h2 id="p-selected">Selected</h2>
     <div id="selinfo"></div>
@@ -260,8 +260,8 @@
 </div>
 
 <script type="module">
-  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=5';
-  import { createGame } from './src/game.js?v=5';
+  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=6';
+  import { createGame } from './src/game.js?v=6';
 
   applyIdentity(document);
   if (appliedOverrides.length) console.log('config overrides:', appliedOverrides.join(' '));

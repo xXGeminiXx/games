@@ -2736,10 +2736,105 @@ export function createVisual(opts) {
     };
   }
 
+  // =========================================================================
+  // THE PAGE AROUND THE BOARD
+  // =========================================================================
+  //
+  // Everything above draws inside the canvas. This is the one thing that
+  // reaches outside it: the colours the page itself should be wearing while
+  // this field is on screen. The page is CSS and cannot see the hue the field
+  // is drawn at, so left alone it stays whatever it was authored as - which
+  // is a frame that belongs to a different picture the moment the field is
+  // strongly coloured.
+  //
+  // Returned as custom property names so the caller sets them and needs to
+  // know nothing about how a colour was arrived at. Values change only as the
+  // hue drifts, and the drift is slow, so the same object comes back for as
+  // long as it is still the right one.
+
+  const GROUND = (() => {
+    const g = CONFIG.feel && CONFIG.feel.ground;
+    if (!g) return null;
+    const n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    return {
+      sat: n(g.sat, 34), satMax: n(g.satMax, 50), refShare: n(g.refShare, 0.7),
+      page: n(g.page, 6), panel: n(g.panel, 3), line: n(g.line, 9.5),
+    };
+  })();
+
+  /** A css hex as hsl percentages. */
+  function hslOf(css) {
+    const c = tone.rgb(css);
+    if (!c) return null;
+    const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const l = (mx + mn) / 2;
+    if (mx === mn) return { h: hue, s: 0, l: l * 100 };
+    const d = mx - mn;
+    const sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    let h;
+    if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return { h: h * 60, s: sat * 100, l: l * 100 };
+  }
+
+  let shellKey = -1;
+  let shellVars = null;
+
+  /**
+   * The page's colours for whatever is being played right now.
+   *
+   * @param {string} [ref]  a colour the field is drawn on, if it names one.
+   *   Its hue and saturation are used instead of the regime's; a field that
+   *   paints its own picture knows what it sits on better than the hue the
+   *   backdrop is washed at does.
+   * @returns {Object|null} custom property name to value, or null when the
+   *   page should keep the palette it was given.
+   */
+  function shell(ref) {
+    if (!GROUND) return null;
+    const from = ref ? hslOf(ref) : null;
+    const h = from ? from.h : hue;
+    // A field's own ground can be far more saturated than a wash. Capped, or
+    // the page stops being quiet and starts being a colour.
+    const sat = from ? Math.min(GROUND.satMax, from.s) : GROUND.sat;
+    // A NAMED GROUND IS TAKEN AT A SHARE OF ITS OWN LIGHTNESS; a hue with no
+    // colour behind it is taken at the setting. Both land under the field they
+    // frame, which is the rule that matters: the page can share the picture's
+    // colour, and must never be the brightest thing on the screen.
+    const light = from ? from.l * GROUND.refShare : GROUND.page;
+    const key = Math.round(h / 2) * 4096 + Math.round(sat) * 32 + Math.round(light);
+    if (key === shellKey && shellVars) return shellVars;
+    // The saturation falls as the surface rises, so a button is closer to
+    // neutral than the ground it sits on and its border closer still. A panel
+    // carrying as much colour as the page behind it reads as a stain on it
+    // rather than as a raised surface. Their lightnesses are LIFTS above the
+    // page, so the chrome keeps its spacing whatever the ground turns out to
+    // be.
+    const page  = hslHex(h, sat, light);
+    const panel = hslHex(h, sat * 0.85, light + GROUND.panel);
+    const line  = hslHex(h, sat * 0.60, light + GROUND.line);
+    shellKey = key;
+    shellVars = {
+      '--bg': page,
+      '--panel': panel,
+      '--line': line,
+      // The two full screen covers. They are the page colour rather than a
+      // fixed near-black, or the moment one opens the whole window jumps back
+      // to a ground the game stopped using.
+      '--scrim': tone.a(page, 0.93),
+      '--scrim-strong': tone.a(page, 0.96),
+    };
+    return shellVars;
+  }
+
   return {
     // frame
     update, background, horizon, blocks, block, pickups, aim, bodies,
     launcher, swarmBand, foreground,
+    // the page around the frame
+    shell,
     // readout primitives
     readout, glyph, caption,
     // signals

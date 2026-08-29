@@ -10,12 +10,12 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=7';
-import * as Tr from './traits.js?v=7';
-import * as Sp from './spores.js?v=7';
-import { fill } from '../config.js?v=7';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=7';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=7';
+import * as Lore from './lore.js?v=8';
+import * as Tr from './traits.js?v=8';
+import * as Sp from './spores.js?v=8';
+import { fill } from '../config.js?v=8';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=8';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=8';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -293,7 +293,9 @@ export function createUI(doc, sim, cfg, actions) {
       r.pol.textContent = T.harvest[policy] || T.harvest[0];
       r.pol.className = 'pol' + (policy ? ' on' : '');
       r.feed.hidden = !m.nurture;
-      r.feed.textContent = T.nurture;
+      // A switch has to say which way it is thrown; the colour alone is not
+      // a word, and it is the only mark on the page that is not read.
+      r.feed.textContent = state.nurture[row.key] ? T.nurtureOn : T.nurture;
       r.feed.className = 'feed' + (state.nurture[row.key] ? ' on' : '');
       // The note: the mark first, then the figures behind it.
       r.mark.textContent = Lore.ui('treeBest', { season: seasonName(row.best) });
@@ -460,7 +462,11 @@ export function createUI(doc, sim, cfg, actions) {
     const g = sim.genome;
     const can = sim.canFruit();
     const n = sim.sporesNow();
-    text('spores-note', can ? Lore.ui('sporesNote', { n }) : '');
+    // Before it can fruit, the panel says what it is waiting for rather than
+    // standing empty under its own heading.
+    text('spores-note', can
+      ? Lore.ui('sporesNote', { n })
+      : Lore.ui('sporesNeeds', { level: Lore.levelInfo(cfg.spores.fromLevel).name }));
     text('spores-held', g.spores > 0 ? Lore.ui('sporesHeld', { n: g.spores }) : '');
     const fruit = el('fruit');
     if (fruit) { fruit.hidden = !can; fruit.disabled = !can; }
@@ -524,9 +530,9 @@ export function createUI(doc, sim, cfg, actions) {
     if (f.reach) {
       const total = sim.world.total;
       const last = state.ring >= cfg.world.rings;
-      text('reachline', last
-        ? Lore.ui('reachClosed', { level: Lore.capital(info.name) }) + ' ' + fmtCount(state.reached.length) + ' of ' + fmtCount(total) + ' reached.'
-        : Lore.ui('reachLine', { ring: state.ring, rings: cfg.world.rings, level: info.name, reached: fmtCount(state.reached.length), total: fmtCount(total) }));
+      const where = { ring: state.ring, rings: cfg.world.rings, level: last ? Lore.capital(info.name) : info.name,
+        reached: fmtCount(state.reached.length), total: fmtCount(total) };
+      text('reachline', Lore.ui(last ? 'reachClosed' : 'reachLine', where));
       const ext = el('extend');
       if (ext) {
         ext.hidden = last;

@@ -51,7 +51,7 @@ export const CONFIG = {
       horde:  'Horde',
       depth:  'Depth',
       income: 'Coin/s',
-      rem:    'Remembered',
+      rem:    'Remembrance',
     },
 
     dig:        'Dig',
@@ -63,14 +63,18 @@ export const CONFIG = {
     buyTip:     'Buy back a tenth of what the market holds, at the going price',
     raise:      'Raise',
     raiseMax:   'Max',
+    raiseTip:   'Raising costs bones. Each button shows its cost; Max shows how many would stand up',
     weightMore: '+',
     weightLess: '-',
+    weightMoreTip: 'Put more of the horde on this layer',
+    weightLessTip: 'Take some of the horde off this layer',
+    weightBarTip:  'How hard this layer is worked, and the share of the horde it takes',
     face:       'The face',
     faceLine:   'The floor of the deepest cut. Dig it through and the next layer opens.',
     export:     'Export',
     import:     'Import',
     reset:      'Start over',
-    resetSure:  'Sure? Everything goes',
+    resetSure:  'Sure? Even what you remember',
     bought:     'Held',
     take:       'Take it',
     pass:       'Pass',
@@ -86,22 +90,45 @@ export const CONFIG = {
       oaths:   'What you remember',
     },
 
+    // "Held" is what a rite that has been bought reads, so the units of a good
+    // on hand are stock. One word, one meaning.
     columns: {
       good:   'Good',
-      held:   'Held',
+      held:   'Stock',
       price:  'Price',
       demand: 'Demand',
     },
 
+    // What a room's offer moves, named the same way on both sides of a choice
+    // so the two can be compared. The figure beside it is worked out from the
+    // run as it stands when the room opens.
+    effects: {
+      dig:      'Dig speed',
+      bones:    'Bones found',
+      value:    'Prices',
+      face:     'Face speed',
+      absorb:   'Markets take',
+      soft:     'Bones raise more',
+      windfall: '{Coin} coin now',
+      diggers:  '{N} of the dead now',
+      rem:      '{N} remembrance at the seal',
+    },
+
     ledgerBase:  'Base {base}',
+    // Units the market takes over the time it needs to forget them, which is
+    // the flow it pays best for. It sits under the demand column, where a
+    // figure about the market's appetite belongs.
     ledgerTakes: '{absorb} / {t}',
-    // Appended after a figure and a dash, so these two stay lower case:
-    // "38% - saturated 1.7x" reads right and "38% - Saturated" does not.
-    ceilingLine: 'saturated {x}x',
-    lesserGoods: '{n} lesser goods',
+    ledgerTakesTip: 'What this market takes before the price buckles, and how long it needs to recover',
+    // Appended after a figure and a dash, so these three stay lower case:
+    // "38% - oversold 1.7x" reads right and "38% - Oversold" does not.
+    ceilingLine: 'oversold {x}x',
+    ceilingTip:  'More of this is being dug than the market will buy. The same horde on another layer earns more',
+    lesserGoods: '{n} older goods',
+    lesserTip:   'Everything still held from layers the dead have moved on from',
     lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
-    seamAhead:   'below {seam}',
+    seamAhead:   'next is {seam}',
   },
 
   // -------------------------------------------------------------------------
@@ -513,7 +540,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 6,
+    build: 7,
   },
 };
 
@@ -683,6 +710,7 @@ export function applyIdentity(doc) {
   put('p-market',   t.panels.market);
   put('p-rites',    t.panels.rites);
   put('p-visitor',  t.panels.visitor);
+  put('chamber-title', t.panels.chamber);
   put('p-seal',     t.panels.seal);
   put('p-oaths',    t.panels.oaths);
   put('fieldhint',  t.fieldHint);

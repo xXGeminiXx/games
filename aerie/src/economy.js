@@ -121,11 +121,17 @@ export function createEconomy(cfg, rngLike = Math.random) {
   // Offline: the last reading of the land, the fleet as it was, capped, in
   // steps so the price pressure integrates rather than spikes.
   const catchUp = (seconds) => {
-    const t = Math.min(E.offlineCap, Math.max(0, seconds));
+    const away = Math.max(0, seconds);
+    const t = Math.min(E.offlineCap, away);
     let earned = 0;
     const step = E.offlineStep;
     for (let s = 0; s < t; s += step) earned += tick(Math.min(step, t - s), null);
-    return { seconds: t, earned };
+    // Both times are handed back, not just the one that was paid for. A player
+    // gone two days who is told they were gone eight hours reads it as the game
+    // having quietly lost their time; they were away as long as they were away,
+    // and the fleet stopping before they came back is a separate fact worth
+    // saying out loud rather than hiding inside the first number.
+    return { worked: t, away, capped: away > t, earned };
   };
 
   const snapshot = () => JSON.parse(JSON.stringify({

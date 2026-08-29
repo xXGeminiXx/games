@@ -14,7 +14,7 @@
 // drawn on the field is the line that gets walked.
 // ---------------------------------------------------------------------------
 
-import { traitEffects, takenMultiplier } from './traits.js?v=5';
+import { traitEffects, takenMultiplier } from './traits.js?v=6';
 
 /** Bits cached on each mote at spawn, so the step never re-reads its traits. */
 export const MOTE_FLAG = { ignoreTerrain: 1, immuneSlow: 2, immunePull: 4, stopsChain: 8 };

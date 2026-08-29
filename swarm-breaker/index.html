@@ -9,6 +9,11 @@
     --bg:#08090c; --panel:#0e1016; --line:#1c2029;
     --ink:#e6e9ef; --dim:#7a828f; --hot:#ff5c46;
     --swarm:#5ad1ff; --block:#2a3040; --pickup:#ffc94a;
+    /* The two full screen covers. Written as variables because the ground
+       under them moves with the field, and a cover painted a fixed near-black
+       over a page that is no longer near-black is a visible seam of its own.
+       These are the starting values; the game keeps them in step from there. */
+    --scrim:rgba(8,9,12,.93); --scrim-strong:rgba(8,9,12,.96);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -88,7 +93,7 @@
      the offer that is never dimmed and never clipped. */
   .buy small b{color:var(--pickup); font-weight:600; font-size:11px}
   #over{
-    position:fixed; inset:0; background:rgba(8,9,12,.93); display:none;
+    position:fixed; inset:0; background:var(--scrim); display:none;
     flex-direction:column; align-items:center; justify-content:center; gap:14px;
   }
   #over.on{display:flex}
@@ -104,7 +109,7 @@
      child centres it the same way when there is room and refuses to overflow
      past the start edge when there is not. */
   #menu{
-    position:fixed; inset:0; background:rgba(8,9,12,.96); display:none;
+    position:fixed; inset:0; background:var(--scrim-strong); display:none;
     align-items:flex-start; justify-content:center; padding:20px;
     overflow-y:auto; overscroll-behavior:contain;
   }
@@ -118,9 +123,13 @@
   }
   .card .tag{margin:0; color:var(--dim); font-size:12px}
   .setting{display:flex; align-items:center; gap:10px}
-  .setting span{
+  .setting span,.lbl{
     font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.09em;
   }
+  /* The mode list has no control beside it, so its label stands alone. It sits
+     directly above the rows it names and carries the one thing a first run has
+     to be told: that clicking one of them is what starts the game. */
+  .lbl{display:block; margin-bottom:-6px}
   .setting select{max-width:none; flex:1}
   #modelist{display:flex; flex-direction:column; gap:8px}
   .mode{
@@ -139,6 +148,10 @@
   .mode .blurb{color:var(--dim); font-size:10.5px; margin-top:4px}
   .mode.playing{border-color:var(--swarm)}
   .mode.playing .nm{color:var(--swarm)}
+  /* What a bracket around a block means, and what an award is not. Both are
+     read once, before a run, so they are the quietest text on the screen. */
+  #menukinds{margin:0; color:var(--dim); font-size:10.5px; line-height:1.45}
+  #awnote{margin:-4px 0 8px; color:var(--dim); font-size:10px; line-height:1.4}
   #menufoot{
     display:flex; flex-direction:column; gap:10px; align-items:flex-start;
   }
@@ -167,7 +180,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="9ee454c71a34">
+<meta name="build" content="cb0c5fc5ccc9">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -228,8 +241,8 @@
 <footer>
   <span id="hint">drag to aim &middot; release to fire</span>
   <span class="row">
-    <button id="modes">modes</button>
-    <button id="reset">reset</button>
+    <button id="modes">menu</button>
+    <button id="reset">restart</button>
   </span>
 </footer>
 
@@ -238,7 +251,7 @@
   <div style="color:var(--dim)"><span id="over-lbl-depth">depth</span> <b id="overdepth">0</b> &middot; <span id="over-lbl-swarm">swarm</span> <b id="overballs">0</b></div>
   <span class="row">
     <button id="again">again</button>
-    <button id="overmodes">modes</button>
+    <button id="overmodes">menu</button>
   </span>
 </div>
 
@@ -254,12 +267,16 @@
       <select id="tier" title="difficulty"></select>
     </label>
 
+    <span class="lbl" id="lbl-mode">mode</span>
     <div id="modelist"></div>
 
     <div id="awards">
       <div class="awhead"><span id="awtitle">awards</span><span id="awcount"></span></div>
+      <p id="awnote"></p>
       <div id="awlist"></div>
     </div>
+
+    <p id="menukinds"></p>
 
     <div id="menufoot">
       <button id="resume">resume run</button>
@@ -298,17 +315,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=6';
-import { createJuice } from './src/juice.js?v=6';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=6';
-import { createBlockKinds } from './src/blocks.js?v=6';
-import { safeRows } from './src/arrival.js?v=6';
-import { createAwards } from './src/awards.js?v=6';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=6';
-import { createLeaderboard } from './src/leaderboard.js?v=6';
-import * as Tiers from './src/tiers.js?v=6';
-import { createOnboarding } from './src/onboarding.js?v=6';
-import { createVisual } from './src/visual.js?v=6';
+         storageKey, offerCost, applyIdentity } from './config.js?v=7';
+import { createJuice } from './src/juice.js?v=7';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=7';
+import { createBlockKinds } from './src/blocks.js?v=7';
+import { safeRows } from './src/arrival.js?v=7';
+import { createAwards } from './src/awards.js?v=7';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=7';
+import { createLeaderboard } from './src/leaderboard.js?v=7';
+import * as Tiers from './src/tiers.js?v=7';
+import { createOnboarding } from './src/onboarding.js?v=7';
+import { createVisual } from './src/visual.js?v=7';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1476,7 +1493,9 @@ function runStats(){
 /** An award, announced the same way everything else is: once, over the field,
  *  gone in a second and a half. Never a dialog and never a thing to dismiss. */
 function earned(a){
-  moment(a.name, CONFIG.awards.wonTitle, CONFIG.palette.trade);
+  // The name alone is a phrase with no referent - the note is the only thing
+  // that says which number was crossed to win it.
+  moment(a.name, CONFIG.awards.wonTitle + ' \u00b7 ' + a.note, CONFIG.palette.trade);
 }
 
 /** Fold the run in and announce anything new. Safe to call at any moment: the
@@ -1743,6 +1762,28 @@ function turnSteps(){
 }
 
 let shopT = 0, last = 0;
+// THE PAGE TAKES THE COLOUR OF THE FIELD.
+//
+// The canvas is drawn at a hue that belongs to whatever is being played and
+// drifts as a run passes from one generator to the next. The page around it is
+// CSS and learns none of that on its own, so the frame stays one flat ground
+// while the picture inside it changes - which reads as two images butted
+// together rather than one. The field decides the colours; this only puts them
+// where the page can see them, and only when they have actually moved.
+let shellWorn = null;
+function paintShell(){
+  // A field that paints its own picture says what it is drawn on; the rest
+  // are washed at the regime's hue and say nothing.
+  const v = look.shell(S.field && S.field.ground);
+  if (!v || v === shellWorn) return;
+  shellWorn = v;
+  // The headless harness supplies just enough document to boot the game, so
+  // every surface reached for out here has to be optional.
+  const root = document.documentElement && document.documentElement.style;
+  if (!root || typeof root.setProperty !== 'function') return;
+  for (const k in v) root.setProperty(k, v[k]);
+}
+
 function tick(now){
   const dt = last ? (now - last) / 1000 : 1 / 60;
   last = now;
@@ -1762,7 +1803,7 @@ function tick(now){
     for (let k = 0; k < n; k++){ sim(); if (!S.firing) break; }
     if (CONFIG.feel.onboarding) teach.update(dt, S);
   }
-  draw(); hud();
+  draw(); hud(); paintShell();
   if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
   requestAnimationFrame(tick);
 }

@@ -45,8 +45,10 @@ export const CONFIG = {
   // The game is close to wordless on purpose. These are all of them.
   // -------------------------------------------------------------------------
   text: {
-    // The figure in the corner, and what it is called.
-    massLabel: 'bound mass',
+    // The figure in the corner, and what it is called. It is the mass of
+    // everything in the field, and it is the figure the run's own ceiling is
+    // measured against, so what it is called has to be what is measured.
+    massLabel: 'total mass',
 
     // The line along the bottom. It says the least it can and then stops: the
     // first prompt, one nudge to repeat it, and then silence.
@@ -54,11 +56,14 @@ export const CONFIG = {
     promptSecond: 'again',
     promptDone:   '',
 
-    // Shown when the field has reached the top of the ladder and will take no
-    // more. The arc has an authored end designed for it; this is what stands in
-    // for that end until it is built.
-    promptFull:   'the field will take no more - it holds all the mass one run can carry. start over below to begin another.',
-    confirmAgain: 'Start over? This run and everything in it is thrown away.',
+    // Shown when the field holds as much mass as a run may hold and a click
+    // can add nothing. It names the control that gets out of it rather than
+    // pointing at a place on the screen, because a direction goes stale the
+    // moment anything moves.
+    promptFull:   'the field will take no more - it holds all the mass a run can carry. start over to begin a new one.',
+    // Starting over is not the ending: the ending keeps what was learned and
+    // this throws it away, so the question has to say so.
+    confirmAgain: 'Start over? This run and everything learned in it are thrown away.',
 
     // WHAT THE FIELD SAYS THE FIRST TIME IT MAKES SOMETHING. One line, along
     // the bottom, the first time each of these happens, then quiet. Keyed by
@@ -72,7 +77,7 @@ export const CONFIG = {
       star: 'first light',
       'red giant': 'the star swells: a red giant',
       'red supergiant': 'a red supergiant',
-      'planetary nebula': 'the envelope lifts off',
+      'planetary nebula': 'the star sheds its outer layers: a planetary nebula',
       supernova: 'supernova',
       collapse: 'the core gives way. the star goes dark from the inside',
       detonation: 'the white dwarf detonates',
@@ -90,8 +95,13 @@ export const CONFIG = {
     // era turns.
     fluxLabel: 'flux',
     known: 'known',
-    needs: 'after ',
-    boardAppears: 'something happened. the board is open',
+    // Printed before the name of the thing a locked row is waiting on. It is a
+    // requirement, not a running order, and the row still carries its price -
+    // which is the whole point: the two reasons a row cannot be bought have to
+    // read differently.
+    needs: 'needs ',
+    // The first line a player gets about the currency and the list it buys.
+    boardAppears: 'what happens in the field earns flux. flux buys the research above.',
     eraPrefix: 'the era of ',
 
     // THE ENDING. Said once, by the player's own hand.
@@ -99,11 +109,14 @@ export const CONFIG = {
     endingClass: 'it was',
     endingSeeds: 'seeds',
     endingMinutes: 'minutes',
+    // A run shorter than a minute rounded to "0 minutes", which reads as a
+    // fault rather than as a short run.
+    endingSeconds: 'seconds',
     endingStars: 'stars',
     endingDeaths: 'deaths',
     endingRemnants: 'left behind',
-    endingFlux: 'flux, all of it spent on knowing',
-    endingAgain: 'again, knowing what you know',
+    endingFlux: 'flux earned',
+    endingAgain: 'begin again, knowing what you know',
   },
 
   // -------------------------------------------------------------------------

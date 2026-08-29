@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=8';
+import { oklch } from './src/palette.js?v=11';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 8,             // the ?v= tag every import carries; bump on every src change
+    build: 11,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -78,10 +78,10 @@ export const CONFIG = {
     priceFloor: 0.22,     // fraction of base a price cannot fall below
     // carrier upgrades: [cost, growth, effect per level]
     upgrades: {
-      hold:    { name: 'hold',    base: 90,  growth: 2.1, effect: 0.35, max: 30, does: 'each level +35% yield' },
-      range:   { name: 'range',   base: 140, growth: 2.3, effect: 12,   max: 12, does: 'each level +12 range' },
-      engines: { name: 'engines', base: 120, growth: 2.2, effect: 0.18, max: 20, does: 'each level +18% drone speed' },
-      hangars: { name: 'hangars', base: 260, growth: 2.6, effect: 1,    max: 12, does: 'each level unlocks a wing per hire and cheaper hires' },
+      hold:    { name: 'hold',          base: 90,  growth: 2.1, effect: 0.35, max: 30, does: 'each level: +35% to everything the drones bring back' },
+      range:   { name: 'range',         base: 140, growth: 2.3, effect: 12,   max: 12, does: 'each level: +12 to how far from the carrier the drones will work' },
+      engines: { name: 'drone engines', base: 120, growth: 2.2, effect: 0.18, max: 20, does: 'each level: +18% drone speed, so every trip is quicker' },
+      hangars: { name: 'hangars',       base: 260, growth: 2.6, effect: 1,    max: 12, does: 'the first level lets you hire a wing of ten; every level slows how fast hires get more expensive' },
     },
     hangarDiscount: 0.94, // hire growth multiplier per hangar level (compounding)
     // casting off to the next island
@@ -146,11 +146,13 @@ export const CONFIG = {
     minDpr: 0,            // floor on the drawing buffer's pixel ratio
     quality: 'auto',      // the preset a new player starts on
     presets: {
-      auto:   { name: 'auto',   scale: 0.7,  dpr: 1.5, adapt: true,  hint: 'the sharpest picture this machine holds at the frame budget' },
-      low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels, and no more than one a page pixel; for a slow machine' },
-      normal: { name: 'normal', scale: 0.7,  dpr: 1.5, adapt: false, hint: 'about half the cost of high' },
-      high:   { name: 'high',   scale: 1.0,  dpr: 1.5, adapt: false, hint: 'the whole picture marched, one ray a pixel' },
-      extra:  { name: 'extra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'marched above the size of the window and sampled back down, which softens hard edges; costs a great deal and does nothing on a display that reports less than this' },
+      auto:   { name: 'auto',   scale: 0.7,  dpr: 1.5, adapt: true,  hint: 'picks the sharpest picture your machine can hold at 60 frames a second, and keeps checking' },
+      low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels; for a slow machine' },
+      normal: { name: 'normal', scale: 0.7,  dpr: 1.5, adapt: false, hint: 'a good picture on most machines, at about half the cost of high' },
+      high:   { name: 'high',   scale: 1.0,  dpr: 1.5, adapt: false, hint: 'the whole picture drawn at full resolution' },
+      // The stored name stays `extra` so a remembered choice survives; only
+      // what the button says has changed.
+      extra:  { name: 'ultra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'drawn larger than the window and shrunk back down, which softens hard edges. Costs a great deal, and does nothing on a display too coarse to show it' },
     },
     presetOrder: ['auto', 'low', 'normal', 'high', 'extra'],
     showRate: true,       // the frame rate beside the quality buttons
@@ -315,8 +317,11 @@ export function applyIdentity(cfg, doc) {
   if (root && root.style && root.style.setProperty) {
     for (const [k, v] of Object.entries(cfg.palette)) root.style.setProperty('--' + k, v);
   }
-  const brand = doc.getElementById && doc.getElementById('brand');
+  if (!doc.getElementById) return;
+  const brand = doc.getElementById('brand');
   if (brand) brand.textContent = cfg.identity.name;
+  const tagline = doc.getElementById('tagline');
+  if (tagline) tagline.textContent = cfg.identity.tagline;
 }
 
 export default CONFIG;

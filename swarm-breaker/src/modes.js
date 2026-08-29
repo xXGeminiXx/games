@@ -92,6 +92,28 @@ function rowArrival(cells, width) {
   return { blocks, open };
 }
 
+/**
+ * The darkest colour a colour ramp passes through - the ground its picture is
+ * drawn on. A field that names its own colours should not have to name this
+ * one a second time for the page around the board to match it.
+ *
+ * @param {Array} stops  [position, '#rrggbb'] pairs
+ * @returns {string|null}
+ */
+function rampGround(stops) {
+  if (!Array.isArray(stops) || !stops.length) return null;
+  let best = null, bestSum = Infinity;
+  for (const s of stops) {
+    const hex = String(Array.isArray(s) ? s[1] : s || '').trim().replace('#', '');
+    if (hex.length !== 6) continue;
+    const sum = parseInt(hex.slice(0, 2), 16) + parseInt(hex.slice(2, 4), 16)
+              + parseInt(hex.slice(4, 6), 16);
+    if (!Number.isFinite(sum) || sum >= bestSum) continue;
+    bestSum = sum; best = '#' + hex;
+  }
+  return best;
+}
+
 const BUILDERS = {
 
   swarm(seed, opts) {
@@ -192,6 +214,11 @@ const BUILDERS = {
       },
       label() { return src.figure().name; },
       signature() { return { name: src.figure().name, key: 'fractal' }; },
+      // THE COLOUR THIS FIELD IS DRAWN ON. The page outside the board takes
+      // its hue from here, so the frame belongs to the picture instead of
+      // being a second ground butted against it. Read off the ramp the
+      // picture is painted with, so the two can never disagree.
+      ground: rampGround(cfg.ramp),
       // What the blocks are made of. The block layer paints through this
       // instead of drawing materials.
       surface: createFractalSurface(src),

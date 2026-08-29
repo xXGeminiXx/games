@@ -93,6 +93,9 @@
   .offer{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
   .offer button{border-color:var(--deepink);text-align:left}
   .offer .line{color:var(--dim);font-size:11px}
+  /* What the offer is worth, in figures, beside the sentence that describes
+     it, so the two sides of a choice can be compared. */
+  .offer .line b{color:var(--bone);font-weight:500;margin-left:8px;white-space:nowrap}
 
   /* The market table. */
   #market-panel{padding-bottom:4px}
@@ -183,7 +186,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="f5f46fcc0f78">
+<meta name="build" content="ffbf35dfa665">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -244,35 +247,35 @@
   <section id="books">
     <div id="log"></div>
     <div id="chamber-panel" class="panel" hidden>
-      <h2 id="chamber-title">a chamber</h2>
+      <h2 id="chamber-title">A chamber</h2>
       <div id="chamber-text"></div>
       <div id="chamber-offers"></div>
     </div>
     <div id="visitor-panel" class="panel" hidden>
-      <h2 id="p-visitor">at the gate</h2>
+      <h2 id="p-visitor">At the gate</h2>
       <p id="visitor-text"></p>
       <div id="visitor-acts"></div>
     </div>
-    <div id="hand" class="panel"><button id="dig">dig</button><button id="sell" hidden>sell</button><span id="handline"></span></div>
-    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">the horde</h2><div id="raise"></div><div id="weights"></div></div>
-    <div id="market-panel" class="panel" hidden><h2 id="p-market">the market</h2><table id="market"></table></div>
+    <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
+    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">The horde</h2><div id="raise"></div><div id="weights"></div></div>
+    <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
-      <h2 id="p-seal">the seal</h2>
+      <h2 id="p-seal">The seal</h2>
       <p id="seal-note"></p>
       <div id="seal-acts"></div>
-      <h2 id="p-oaths">what you remember</h2>
+      <h2 id="p-oaths">What you remember</h2>
       <div id="oaths"></div>
     </div>
   </section>
   <section id="field">
-    <div id="hill"><canvas id="v"></canvas><div id="fieldhint">the surface</div></div>
-    <div id="rites-panel" hidden><h2 id="p-rites">rites</h2><div id="rites"></div></div>
+    <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
+    <div id="rites-panel" hidden><h2 id="p-rites">Rites</h2><div id="rites"></div></div>
   </section>
 </main>
 <footer>
-  <button id="export">export</button>
-  <button id="import">import</button>
-  <button id="reset">start over</button>
+  <button id="export">Export</button>
+  <button id="import">Import</button>
+  <button id="reset">Start over</button>
   <span id="saved"></span>
 </footer>
 
@@ -284,8 +287,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=6';
-import { createGame } from './src/game.js?v=6';
+import { CONFIG, applyIdentity } from './config.js?v=7';
+import { createGame } from './src/game.js?v=7';
 
 applyIdentity(document);
 
@@ -300,16 +303,16 @@ const game = createGame({
 // The footer: a save that can leave, a save that can arrive, and a clean slate.
 document.getElementById('export').addEventListener('click', () => {
   const str = game.exportSave();
-  const done = (ok) => game.ui.savedNote(ok ? 'save copied' : 'copy this: ' + str.slice(0, 24) + '...');
+  const done = (ok) => game.ui.savedNote(ok ? 'Save copied' : 'Copy this: ' + str.slice(0, 24) + '...');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt('your save', str); done(false); });
+    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt('Your save', str); done(false); });
   } else {
-    window.prompt('your save', str);
+    window.prompt('Your save', str);
     done(false);
   }
 });
 document.getElementById('import').addEventListener('click', () => {
-  const str = window.prompt('paste a save');
+  const str = window.prompt('Paste a save');
   if (!str) return;
   try { game.importSave(str); } catch (e) { game.ui.savedNote(String(e.message || e)); }
 });

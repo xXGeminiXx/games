@@ -555,7 +555,7 @@ const STRATA = [
   [17, 'nebula'], [18, 'cluster'], [20, 'arm'], [21, 'galaxy'],
   [23, 'group'], [24, 'supercluster'], [25, 'filament'], [26, 'web'],
   [27, 'horizon'], [29, 'universe'], [32, 'ensemble'], [35, 'manifold'],
-  [38, 'dimension'], [41, 'unbounded'],
+  [38, 'dimension'], [41, 'beyond'],
 ];
 
 const UNITS = [

@@ -44,6 +44,9 @@
   #log p:nth-child(n+2){color:var(--dim)}
   #log p:nth-child(n+4){opacity:.55}
   #log p:nth-child(n+6){display:none}
+  .note{margin:6px 0 0;font-size:12px}
+  .warn{color:var(--bad)}
+  .head .k{text-transform:none}
   #tools{display:flex;gap:6px;flex-wrap:wrap}
   #tools button{flex:0 0 auto;font-size:12px;padding:3px 8px}
   #savebox{width:100%;height:56px;font:11px ui-monospace,monospace;margin-top:6px;border:1px solid var(--rule);background:#fff}
@@ -75,7 +78,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="27232f501eb1">
+<meta name="build" content="890d1658dff8">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -123,64 +126,67 @@
 <body>
 <canvas id="c"></canvas>
 <div id="anchor-hint">W A S D to fly, drag to look, click the land to move the carrier, ? for keys</div>
-<button id="fold" title="hide the table" aria-label="hide the table" aria-expanded="true"><b>&rsaquo;</b></button>
+<button id="fold" title="hide the panel" aria-label="hide the panel" aria-expanded="true"><b>&rsaquo;</b></button>
 <div class="card" id="keyhelp" hidden>
-  <h2>Keys</h2>
+  <h2 data-t="sections.keys">Keys</h2>
   <div id="key-rows"></div>
-  <div class="row kclose" style="border-top:0"><button id="keyclose"><b>close</b><i>Esc</i></button></div>
+  <div class="row kclose" style="border-top:0"><button id="keyclose"><b data-t="labels.closeKeys">close</b><i>Esc</i></button></div>
 </div>
 <div id="table">
   <div class="card">
     <p id="brand">Aerie</p>
     <p id="tagline">A carrier over cold water. Your drones work the land.</p>
+    <h2 style="margin-top:10px" data-t="labels.funds">funds</h2>
     <div id="funds">0</div>
     <div id="income">0/s</div>
   </div>
   <div class="card" id="fleet">
-    <h2>Fleet</h2>
-    <div class="stat"><span>drones</span><span><span id="drones">3</span> <span class="dim" id="working"></span></span></div>
-    <div class="row"><button id="hire" class="big"><b>hire a drone</b><i id="hire-cost"></i></button></div>
+    <h2 data-t="sections.fleet">Fleet</h2>
+    <div class="stat"><span data-t="labels.drones">drones</span><span><span id="drones">3</span> <span class="dim" id="working"></span></span></div>
+    <div class="row"><button id="hire" class="big"><b data-t="labels.hire">hire a drone</b><i id="hire-cost"></i></button></div>
     <div class="row"><button id="wing" hidden><b>hire a wing</b><i id="wing-cost"></i></button></div>
     <div id="specialists" hidden>
-      <h2 style="margin-top:8px">Specialists</h2>
+      <h2 style="margin-top:8px" data-t="sections.specialists">Specialists</h2>
       <div id="spec-rows"></div>
+      <p class="note warn" id="spec-warn" hidden></p>
     </div>
   </div>
   <div class="card" id="hold" hidden>
-    <h2>Hold</h2>
-    <div class="row dim" style="border-top:0"><span class="k">kind</span><span class="v">per second</span><span class="v">price</span><span class="v">of base</span></div>
+    <h2 data-t="sections.hold">Market</h2>
+    <div class="row dim head" style="border-top:0"><span class="k" data-t="labels.goods">goods</span><span class="v" data-t="labels.yield">gathered</span><span class="v" data-t="labels.price">price</span><span class="v" data-t="labels.ofBase">demand</span></div>
     <div id="hold-rows"></div>
-    <p class="dim" style="margin:6px 0 0;font-size:12px">selling floods a market: prices fall with volume and recover with time</p>
+    <p class="dim note" data-t="hints.prices">Sell a lot of one good and demand for it falls, and the price with it. Demand comes back while you sell something else.</p>
   </div>
   <div class="card" id="carrier" hidden>
-    <h2>Carrier</h2>
-    <div class="stat"><span>range</span><span id="range"></span></div>
+    <h2 data-t="sections.carrier">Carrier</h2>
+    <div class="stat" id="range-row"><span data-t="labels.range">range</span><span id="range"></span></div>
     <div id="up-rows"></div>
   </div>
   <div class="card" id="voyage" hidden>
-    <h2>Voyage</h2>
-    <div class="stat"><span id="island">island 1</span><span><span class="dim">land remaining</span> <span id="remaining">100%</span></span></div>
+    <h2 data-t="sections.voyage">Voyage</h2>
+    <div class="stat"><span id="island">island 1</span><span><span class="dim" data-t="labels.richness">land remaining</span> <span id="remaining">100%</span></span></div>
     <div class="row"><button id="castoff" class="big"><b>cast off</b><i id="castoff-cost"></i></button></div>
-    <p class="dim" style="margin:6px 0 0;font-size:12px">leave this island for a richer one. Drones and upgrades come along.</p>
+    <p class="dim note" data-t="labels.castOffHint">Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You cannot come back.</p>
   </div>
   <div class="card">
-    <h2>Deck log</h2>
+    <h2 data-t="sections.log">Deck log</h2>
     <div id="log"></div>
     <div id="tools" style="margin-top:8px">
-      <button id="keys">keys</button><button id="perf">performance log</button><button id="export">export save</button><button id="import">import save</button><button id="reset">start over</button>
+      <button id="keys" data-t="labels.keys">keys</button><button id="perf" data-t="labels.perf">performance log</button><button id="export" data-t="labels.export">export save</button><button id="import" data-t="labels.import">import save</button><button id="reset" data-t="labels.reset">start over</button>
     </div>
     <textarea id="savebox" hidden spellcheck="false"></textarea>
   </div>
   <div class="card" id="view">
-    <h2>View</h2>
+    <h2 data-t="sections.view">View</h2>
+    <div class="dim" style="font-size:12px" data-t="labels.quality">detail</div>
     <div id="quality"></div>
     <div id="rate"></div>
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=8';
-  import { CONTENT } from './content.js?v=8';
-  import { createGame } from './src/game.js?v=8';
+  import { CONFIG } from './config.js?v=11';
+  import { CONTENT } from './content.js?v=11';
+  import { createGame } from './src/game.js?v=11';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

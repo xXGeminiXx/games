@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=7';
-import { createSim, restoreSim, openedState } from './sim.js?v=7';
-import * as Save from './save.js?v=7';
-import * as Sp from './spores.js?v=7';
-import * as Lore from './lore.js?v=7';
-import { hash } from './rng.js?v=7';
-import { createUI } from './ui.js?v=7';
-import { createView } from './view.js?v=7';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=7';
+import { storageKey } from '../config.js?v=8';
+import { createSim, restoreSim, openedState } from './sim.js?v=8';
+import * as Save from './save.js?v=8';
+import * as Sp from './spores.js?v=8';
+import * as Lore from './lore.js?v=8';
+import { hash } from './rng.js?v=8';
+import { createUI } from './ui.js?v=8';
+import { createView } from './view.js?v=8';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=8';
 
 /**
  * @param {object} o
@@ -87,13 +87,16 @@ export function createGame(o) {
     // seasons would bury the log, so the arrivals are folded into one line.
     const keep = r.events.filter(e => !/^season\./.test(e.key));
     tell(keep.slice(-6));
-    if (r.away && r.elapsed > 30) {
-      let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(r.elapsed) }, String(Math.floor(sim.state.t)));
+    if (r.away && seconds > 30) {
+      // The entry says how long the absence was, not how much of it was
+      // worked: a player who was gone a week is told a week, and then told
+      // where the organism ran out.
+      let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(seconds) }, String(Math.floor(sim.state.t)));
+      if (r.capped) line += ' ' + Lore.ui('awayCapped', { t: fmtTime(r.elapsed) });
       const parts = [];
       if (r.gained.sugar > 0.5) parts.push(fmt(r.gained.sugar) + ' ' + Lore.inline(cfg.text.stats.sugar));
-      if (r.gained.reached > 0) parts.push(fmtCount(r.gained.reached) + ' places reached');
+      if (r.gained.reached > 0) parts.push(Lore.ui('awayPlaces', { n: fmtCount(r.gained.reached) }));
       if (parts.length) line += ' ' + parts.join(', ') + '.';
-      if (r.capped) line += ' The organism stopped after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }
     return r;
@@ -132,7 +135,7 @@ export function createGame(o) {
   const save = () => {
     if (!storage || disposed) return false;
     const ok = Save.write(storage, KEY, sim.snapshot(), now());
-    if (!ok) ui.savedNote('could not save');
+    if (!ok) ui.savedNote('Could not save.');
     return ok;
   };
 

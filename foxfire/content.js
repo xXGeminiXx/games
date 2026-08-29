@@ -41,10 +41,10 @@ export const CONTENT = {
   // TRAITS - one line each, stating what changes
   // -------------------------------------------------------------------------
   traits: {
-    lignin:     { name: 'Lignin enzymes',   line: 'Dead wood is broken down half again as fast, each level' },
+    lignin:     { name: 'Lignin enzymes',   line: 'Dead wood is broken down half again as fast' },
     cables:     { name: 'Rhizomorphs',      line: 'Tips run in bootlace cables and travel faster' },
     branching:  { name: 'Branching',        line: 'Every new tip costs less than it did' },
-    reach:      { name: 'Foraging',         line: 'A tip looks a cell further for something to reach' },
+    reach:      { name: 'Foraging',         line: 'A tip looks further for the next place to reach' },
     symbiosis:  { name: 'Symbiosis',        line: 'Every tree pays more for what it is sent' },
     parasitism: { name: 'Parasitism',       line: 'A tree can be drained and felled for its wood' },
     transfer:   { name: 'Transfer',         line: 'Sugar can be sent to a kind of tree so it grows faster' },
@@ -52,17 +52,17 @@ export const CONTENT = {
     frost:      { name: 'Frost hardiness',  line: 'Cold no longer slows the tips in winter' },
     reserve:    { name: 'Reserves',         line: 'The organism keeps working for more hours while you are away' },
     evergreen:  { name: 'Evergreen trade',  line: 'The trees keep paying a little through the winter' },
-    instinctExtend: { name: 'Instinct: reach',  line: 'The organism opens the next ring itself once the front has nothing left to reach' },
-    instinctTips:   { name: 'Instinct: front',  line: 'The organism grows the front itself when the ground gives up more than the tips carry' },
-    instinctBeyond: { name: 'Instinct: beyond', line: 'The organism folds a finished level itself, if it is let' },
+    instinctExtend: { name: 'Instinct: open rings', line: 'The organism opens the next ring itself once the front has nothing left to reach' },
+    instinctTips:   { name: 'Instinct: grow tips',  line: 'The organism grows the front itself when the ground gives up more than the tips carry' },
+    instinctBeyond: { name: 'Instinct: go beyond',  line: 'The organism goes beyond a finished level itself, once it is switched on' },
   },
 
   genome: {
     headstart: { name: 'Rich spore',   line: 'Every organism after this one begins with more tips' },
     quick:     { name: 'Quick hyphae', line: 'Tips are faster in every organism after this one' },
-    enzymes:   { name: 'Old enzymes',  line: 'Wood, soil and root all yield more, in every organism after' },
-    memory:    { name: 'Memory',       line: 'Traits are learned cheaper in every organism after this one' },
-    patience:  { name: 'Patience',     line: 'More of the hours you are away are counted' },
+    enzymes:   { name: 'Old enzymes',  line: 'Wood, soil and trees all yield more, in every organism after this one' },
+    memory:    { name: 'Memory',       line: 'Traits cost less to learn in every organism after this one' },
+    patience:  { name: 'Patience',     line: 'The organism keeps working for still more hours away, in every organism after this one' },
   },
 
   // -------------------------------------------------------------------------
@@ -152,24 +152,24 @@ export const CONTENT = {
     ],
     season: {
       0: [
-        'Spring. The trees want everything the soil has.',
-        'Spring, and the roots are pulling hard. The best trade of the year.',
-        'Spring. By midday the floor is warm and everything moves at once.',
+        'The trees want everything the soil has.',
+        'The roots are pulling hard. The best trade of the year.',
+        'By midday the floor is warm and everything moves at once.',
       ],
       1: [
-        'Summer. Steady trade, steady growth.',
-        'Summer. The canopy is closed and the floor stays damp under it.',
-        'Summer. We take the same measurements for weeks and they come back the same.',
+        'Steady trade, steady growth.',
+        'The canopy is closed and the floor stays damp under it.',
+        'We take the same measurements for weeks and they come back the same.',
       ],
       2: [
-        'Autumn. The leaves come down and the logs fatten.',
-        'Autumn. The trees pay less and the floor is littered with food.',
-        'Autumn. Litter to the ankle. Wood we had written off has weight in it again.',
+        'The leaves come down and the logs fatten.',
+        'The trees pay less and the floor is littered with food.',
+        'Litter to the ankle. Wood we had written off has weight in it again.',
       ],
       3: [
-        'Winter. The trees go quiet. The wood is still there.',
-        'Winter. Nothing comes down the roots. The tips slow in the cold.',
-        'Winter. We came at dusk and the whole lace was lit, cold green, out to the edge.',
+        'The trees go quiet. The wood is still there.',
+        'Nothing comes down the roots. The tips slow in the cold.',
+        'We came at dusk and the whole lace was lit, cold green, out to the edge.',
       ],
     },
     away: [
@@ -218,26 +218,32 @@ export const CONTENT = {
   // SHORT LINES ON THE FURNITURE
   // -------------------------------------------------------------------------
   ui: {
-    handIdle: 'Push a thread out by hand',
-    handDone: 'The tips do this now',
+    handIdle: 'Press until the organism can grow its first tip.',
+    handDone: 'The tips do this now.',
     tipsLine: '{n} foraging. The next costs {cost}.',
     carryLine: 'They carry {carried} of {produced} minerals/s.',
-    carryShort: 'They carry {carried} of {produced} minerals/s. The rest leaches away.',
-    reachLine: 'Ring {ring} of {rings} on {level}. {reached} of {total} reached.',
-    reachClosed: '{level} is open to its edge.',
-    beyondLine: 'Fold all of {level} into one point and begin on {next}.',
-    beyondNeeds: 'Thread {pct} of {level} first.',
+    carryShort: 'They carry {carried} of {produced} minerals/s. The rest leaches away; more tips would carry it.',
+    reachLine: 'Ring {ring} of {rings} on {level}. {reached} of {total} places reached.',
+    reachClosed: '{level} is open to its edge. {reached} of {total} places reached.',
+    beyondLine: 'All of {level} becomes one point of {next}. Half of what it pays now keeps arriving from below.',
+    beyondNeeds: 'Reach {pct} of {level} first.',
     sporesNote: 'Fruiting ends this organism. It would carry {n} spores.',
+    sporesNeeds: 'This organism can fruit once it reaches {level}.',
     sporesHeld: '{n} spores unspent.',
     belowLine: '{sugar} sugar/s and {minerals} minerals/s arrive from below.',
     noTrees: 'No living trees reached.',
-    treeBest: 'best in {season}',
-    treeFell: 'A grown one is worth {felled} felled, {kept} kept a season.',
+    treeBest: 'Pays best in {season}.',
+    treeFell: 'One grown tree is worth {felled} sugar felled, or {kept} traded each season.',
     treeFeed: 'Feeding pays for itself in {time}.',
-    treeFeedNever: 'Feeding buys nothing here yet.',
-    winter: 'Winter: the trees pay a quarter',
-    evergreenWinter: 'Winter: evergreen trade',
+    treeFeedNever: 'Feeding would not pay for itself here yet.',
+    winter: 'Winter: the trees pay a quarter of the usual',
+    evergreenWinter: 'Winter: evergreen trade keeps them trading',
     largestNote: 'Larger than the largest living thing on Earth',
+
+    // What an absence is written up as, behind the line from the pool above:
+    // how far the organism got through it, and what it has to show.
+    awayCapped: 'Its reserves ran out after {t}.',
+    awayPlaces: '{n} places reached',
 
     // The one entry an instinct is worth. It is written the first time that
     // habit does anything and never again, because an organism that reports

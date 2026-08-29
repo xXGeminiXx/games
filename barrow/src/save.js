@@ -9,7 +9,7 @@
 // browsers by paste.
 // ---------------------------------------------------------------------------
 
-import { SAVE_VERSION } from './sim.js?v=6';
+import { SAVE_VERSION } from './sim.js?v=7';
 
 const migrations = new Map();
 
@@ -92,9 +92,9 @@ export function exportString(snap, wallMs) {
 export function importString(str) {
   const json = fromBase64(String(str).trim());
   const parsed = JSON.parse(json);
-  if (!parsed || typeof parsed !== 'object' || !parsed.snap) throw new Error('not a save');
+  if (!parsed || typeof parsed !== 'object' || !parsed.snap) throw new Error('That is not a save');
   const snap = migrate(parsed.snap);
-  if (!snap) throw new Error('this save is from a build this one cannot read');
+  if (!snap) throw new Error('That save is from a build this one cannot read');
   return { wall: Number.isFinite(parsed.wall) ? parsed.wall : null, snap };
 }
 

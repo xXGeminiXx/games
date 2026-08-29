@@ -11,7 +11,7 @@
 // to get an independent permutation table; the bare exports use a fixed one.
 // ---------------------------------------------------------------------------
 
-import { rng } from './rng.js?v=8';
+import { rng } from './rng.js?v=11';
 
 const GRAD3 = [
   [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],

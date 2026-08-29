@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=6';
-import * as Mk from './market.js?v=6';
-import * as H from './horde.js?v=6';
-import * as R from './rites.js?v=6';
-import * as Rb from './rebirth.js?v=6';
-import * as Lore from './lore.js?v=6';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=6';
-import { fill } from '../config.js?v=6';
+import * as Mat from './materials.js?v=7';
+import * as Mk from './market.js?v=7';
+import * as H from './horde.js?v=7';
+import * as R from './rites.js?v=7';
+import * as Rb from './rebirth.js?v=7';
+import * as Lore from './lore.js?v=7';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=7';
+import { fill } from '../config.js?v=7';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -128,7 +128,7 @@ export function createUI(doc, sim, cfg, actions) {
     const counts = cfg.horde.bulk.concat(['max']);
     nodes.raise.appendChild(el('span', { class: 'lbl', text: T.raise }));
     for (const c of counts) {
-      const b = el('button', { class: 'raise', onclick: () => actions.raise(c) }, el('b', { text: c === 'max' ? T.raiseMax : 'x' + c }), el('i'));
+      const b = el('button', { class: 'raise', title: T.raiseTip, onclick: () => actions.raise(c) }, el('b', { text: c === 'max' ? T.raiseMax : 'x' + c }), el('i'));
       raiseButtons.push({ count: c, node: b, cost: b.lastChild });
       nodes.raise.appendChild(b);
     }
@@ -151,16 +151,16 @@ export function createUI(doc, sim, cfg, actions) {
       const layer = isFace ? null : sim.ground.at(key);
       const name = isFace ? T.face : Lore.label(layer.name);
       const hue = isFace ? cfg.palette.face : layer.hue;
-      const bar = el('span', { class: 'bar' });
+      const bar = el('span', { class: 'bar', title: T.weightBarTip });
       const meta = el('i');
       const tag = el('span', { class: 'seam', text: isFace ? '' : seamTag(key) });
       const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') },
         el('span', { class: 'swatch', style: 'background:' + hue }),
         el('span', { class: 'name', text: name, title: isFace ? T.faceLine : seamLine(key) }),
         tag,
-        el('button', { class: 'w', text: T.weightLess, onclick: () => actions.setWeight(key, -1) }),
+        el('button', { class: 'w', text: T.weightLess, title: T.weightLessTip, onclick: () => actions.setWeight(key, -1) }),
         bar,
-        el('button', { class: 'w', text: T.weightMore, onclick: () => actions.setWeight(key, 1) }),
+        el('button', { class: 'w', text: T.weightMore, title: T.weightMoreTip, onclick: () => actions.setWeight(key, 1) }),
         meta);
       row.firstChild.style.background = hue;
       nodes.weights.appendChild(row);
@@ -221,10 +221,11 @@ export function createUI(doc, sim, cfg, actions) {
     // beside its name.
     const base = el('small', { class: 'ledger', hidden: true });
     price.appendChild(base);
-    const takes = el('small', { class: 'ledger', hidden: true });
+    // What the market takes and how fast it forgets sits under the demand
+    // column. Under "Stock" it read as units on hand, which it is not.
+    const takes = el('small', { class: 'ledger', hidden: true, title: T.ledgerTakesTip });
     held.appendChild(el('b'));
-    held.appendChild(takes);
-    const hot = el('small', { class: 'sat', hidden: true });
+    const hot = el('small', { class: 'sat', hidden: true, title: T.ceilingTip });
     const tag = k >= 0 ? seamTag(k) : '';
     const nameCell = el('td', { class: 'good' },
       el('span', { class: 'swatch', style: 'background:' + good.hue }),
@@ -232,7 +233,7 @@ export function createUI(doc, sim, cfg, actions) {
       tag ? el('small', { class: 'seam', text: tag, title: seamLine(k) }) : null,
       hot);
     nameCell.firstChild.style.background = good.hue;
-    const tr = el('tr', null, nameCell, held, price, el('td', { class: 'chart' }, spark.svg, demand), buttons);
+    const tr = el('tr', null, nameCell, held, price, el('td', { class: 'chart' }, spark.svg, demand, takes), buttons);
     return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark, buy: buttons.lastChild, base, takes, hot, sampled: -1 };
   };
 
@@ -317,7 +318,6 @@ export function createUI(doc, sim, cfg, actions) {
         const sat = Mk.saturation(m, sim.flowOf(id), md);
         row.base.textContent = fill(T.ledgerBase, { base: fmtCoin(base) });
         row.takes.textContent = fill(T.ledgerTakes, { absorb: fmt(absorb), t: fmtTime(recovery) });
-        row.takes.title = 'about what this market takes before it buckles, and how long it takes to recover';
         // Bones are raised, not sold by the ton, so their thin market is not
         // flagged as choking.
         const choking = sat > 1 && id !== Mat.BONES;
@@ -332,6 +332,7 @@ export function createUI(doc, sim, cfg, actions) {
       let value = 0;
       for (const id of lesser) value += sim.quote(id, sim.held(id));
       lesserRow.name.textContent = fill(T.lesserGoods, { n: lesser.length });
+      lesserRow.name.title = T.lesserTip;
       lesserRow.meta.textContent = fill(T.lesserWorth, { coin: fmtCoin(value) });
     }
   };
@@ -390,6 +391,33 @@ export function createUI(doc, sim, cfg, actions) {
 
   // -- a chamber -----------------------------------------------------------
 
+  /**
+   * What an offer is worth, worked out from the run as it stands, so both
+   * sides of a choice are read on the same axis. Without it a room asks a
+   * player to weigh "everything cuts faster" against "the cut goes down
+   * without shoring", which are two pictures and no figures.
+   */
+  const offerGain = (boon) => {
+    if (!boon) return '';
+    const E = T.effects;
+    const parts = [];
+    for (const key of Object.keys(boon)) {
+      const v = boon[key];
+      if (key === 'windfall') {
+        const coin = sim.state.rate * Math.min(v, cfg.chambers.windfallCap);
+        if (coin > 0) parts.push(fill(E.windfall, { coin: fmtCoin(coin) }));
+      } else if (key === 'diggers') {
+        const n = Math.max(1, Math.floor(sim.growthOver(v * cfg.chambers.diggerSeconds)));
+        parts.push(fill(E.diggers, { n: fmtCount(n) }));
+      } else if (key === 'rem') {
+        parts.push(fill(E.rem, { n: fmt(v) }));
+      } else if (E[key]) {
+        parts.push(E[key] + ' +' + Math.round((v - 1) * 100) + '%');
+      }
+    }
+    return parts.join(', ');
+  };
+
   let chamberKey = '';
   const renderChamber = () => {
     const c = sim.state.chamber;
@@ -403,9 +431,10 @@ export function createUI(doc, sim, cfg, actions) {
     for (const l of c.lines) nodes.chamberText.appendChild(el('p', { text: l }));
     clear(nodes.chamberOffers);
     for (const offer of c.offers) {
+      const gain = offerGain(offer.boon);
       nodes.chamberOffers.appendChild(el('div', { class: 'offer' },
         el('button', { text: offer.name, onclick: () => actions.takeOffer(offer.i) }),
-        el('span', { class: 'line', text: offer.line })));
+        el('span', { class: 'line' }, offer.line, gain ? el('b', { text: gain }) : null)));
     }
   };
 
@@ -443,7 +472,7 @@ export function createUI(doc, sim, cfg, actions) {
     const ready = sim.canSeal();
     if (nodes.sealNote) {
       nodes.sealNote.textContent = ready
-        ? words.ready + ' ' + fill(words.yield, { n: fmt(sim.sealYield()) })
+        ? words.ready + ' ' + fill(words.yieldNow, { n: fmt(sim.sealYield()) })
         : fill(words.locked, { depth: cfg.seal.unlockDepth + 1 });
     }
     if (sealButton) {
@@ -541,6 +570,7 @@ export function createUI(doc, sim, cfg, actions) {
         }
         r.meta.textContent = meta;
         r.meta.className = hot ? 'hot' : '';
+        r.meta.title = hot ? T.ceilingTip : '';
       }
       show(nodes.weights, f.face || s.depth > 0);
     }

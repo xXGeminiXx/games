@@ -6,14 +6,14 @@
 // writes the page, and this file decides when each of them happens.
 // ---------------------------------------------------------------------------
 
-import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=5';
-import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=5';
-import { countAlive } from './motes.js?v=5';
-import { kindDef, workAt, stats } from './works.js?v=5';
-import { createIso } from './render/iso.js?v=5';
-import { createGround } from './render/ground.js?v=5';
-import { createScene } from './render/scene.js?v=5';
-import { createUi } from './ui.js?v=5';
+import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=6';
+import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=6';
+import { countAlive } from './motes.js?v=6';
+import { kindDef, workAt, stats } from './works.js?v=6';
+import { createIso } from './render/iso.js?v=6';
+import { createGround } from './render/ground.js?v=6';
+import { createScene } from './render/scene.js?v=6';
+import { createUi } from './ui.js?v=6';
 
 export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const keyMeta = cfg.identity.storagePrefix + '.meta';
@@ -206,7 +206,7 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
     }
     switch (k) {
       case 'r': case 'R': api.setTool('raise'); break;
-      case 'c': case 'C': api.setTool('cut'); break;
+      case 'c': case 'C': case 'l': case 'L': api.setTool('cut'); break;
       case 'Escape': if (ui.isHelpOpen()) ui.showHelp(false); else if (tool.type) api.clearTool(); else selectedId = 0; break;
       case ' ': api.togglePause(); if (ev.preventDefault) ev.preventDefault(); break;
       case 'n': case 'N': api.callSurge(); break;

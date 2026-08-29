@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=6';
-import { pick } from './rng.js?v=6';
-import { fill } from '../config.js?v=6';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=6';
+import * as Lore from './lore.js?v=7';
+import { pick } from './rng.js?v=7';
+import { fill } from '../config.js?v=7';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=7';
 
 export const LEGACY_VERSION = 1;
 
@@ -166,7 +166,7 @@ export function seal(state, cfg, legacy) {
     coin: fmtCoin(state.totals.earned),
     horde: fmtCount(state.horde),
   }));
-  lines.push(fill(words.yield, { n: fmt(rem) }));
+  lines.push(fill(words.yieldPaid, { n: fmt(rem) }));
   lines.push(pick(words.openLines, state.seed, salt) || '');
   return { rem, finale, lines: lines.filter(Boolean) };
 }
