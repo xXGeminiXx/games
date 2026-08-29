@@ -19,11 +19,6 @@ export function update(state, cfg, ctx) {
   if (ctx.rootsReached > 0) set('trees');
   if (state.totals.traded > 0) set('season');
   if (state.level >= 1) set('below');
-  // The instinct panel arrives with the first habit learned, because that is
-  // the first moment there is a switch on it worth throwing.
-  for (const t of cfg.traits) {
-    if (t.effect && t.effect.instinct && (state.traits || {})[t.id] > 0) { set('instinct'); break; }
-  }
   if (state.level >= cfg.spores.fromLevel || (ctx.genome && ctx.genome.fruitings > 0)) set('spores');
   if (f.tips && state.tipCount >= 1) set('handDone');
 

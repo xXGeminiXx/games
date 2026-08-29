@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=2';
-import { fill } from '../content.js?v=2';
+import { fmt, rate, count, pct } from './numbers.js?v=1';
+import { fill } from '../content.js?v=1';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
@@ -13,7 +13,6 @@ export function createUI(doc, cfg, content, eco, on) {
     carrier: $('carrier'), upRows: $('up-rows'), voyage: $('voyage'), island: $('island'), remaining: $('remaining'),
     castOff: $('castoff'), castOffCost: $('castoff-cost'), log: $('log'), anchorHint: $('anchor-hint'),
     exportBtn: $('export'), importBtn: $('import'), resetBtn: $('reset'), saveBox: $('savebox'), range: $('range'),
-    fold: $('fold'), quality: $('quality'), rateOut: $('rate'), perfBtn: $('perf'), keysBtn: $('keys'), keyHelp: $('keyhelp'), keyRows: $('key-rows'), keyClose: $('keyclose'),
   };
   const L = content.labels;
 
@@ -40,67 +39,6 @@ export function createUI(doc, cfg, content, eco, on) {
   el.exportBtn.addEventListener('click', on.exportSave);
   el.importBtn.addEventListener('click', on.importSave);
   el.resetBtn.addEventListener('click', on.reset);
-  // ---- the view card: how sharp the picture is, and how it is running ----
-  const qualityBtns = {};
-  for (const name of cfg.render.presetOrder) {
-    const preset = cfg.render.presets[name];
-    if (!preset) continue;
-    const b = doc.createElement('button');
-    b.type = 'button';
-    b.dataset.quality = name;
-    b.title = preset.hint || '';
-    b.setAttribute('aria-pressed', 'false');
-    b.innerHTML = `<b>${preset.name}</b>`;
-    b.addEventListener('click', () => on.quality(name));
-    el.quality.appendChild(b);
-    qualityBtns[name] = b;
-  }
-  el.quality.title = content.hints.quality;
-
-  // The chosen preset is the pressed one; auto also reports where it settled.
-  const showQuality = (name, scale, hz) => {
-    for (const k in qualityBtns) qualityBtns[k].setAttribute('aria-pressed', String(k === name));
-    if (!cfg.render.showRate) { el.rateOut.textContent = ''; return; }
-    const at = name === 'auto' ? fill(' at {pct} of full', { pct: Math.round(scale * 100) + '%' }) : '';
-    el.rateOut.textContent = hz > 0 ? fill(L.rate, { n: Math.round(hz) }) + at : '';
-  };
-
-  // ---- folding the table away ---------------------------------------------
-  const showFold = (folded) => {
-    doc.body.classList.toggle('folded', !!folded);
-    el.fold.innerHTML = folded ? '<b>&lsaquo;</b>' : '<b>&rsaquo;</b>';
-    const label = folded ? L.unfold : L.fold;
-    el.fold.title = label;
-    el.fold.setAttribute('aria-label', label);
-    el.fold.setAttribute('aria-expanded', String(!folded));
-    el.anchorHint.textContent = folded ? L.hintFolded : L.hint;
-  };
-  el.fold.addEventListener('click', on.fold);
-  el.fold.title = content.hints.fold;
-
-  // ---- the key list, printed from the same table the keyboard reads -------
-  const printKey = (k) => (content.keyLabels[k] || (k.length === 1 ? k.toUpperCase() : k));
-  for (const group in content.keyGroups) {
-    const h = doc.createElement('h2');
-    h.textContent = content.keyGroupNames[group] || group;
-    el.keyRows.appendChild(h);
-    for (const action of content.keyGroups[group]) {
-      const keys = cfg.keys[action];
-      if (!keys || !keys.length) continue;
-      const d = doc.createElement('div');
-      d.className = 'krow';
-      d.innerHTML = `<kbd></kbd><span></span>`;
-      d.querySelector('kbd').textContent = keys.map(printKey).join('  /  ');
-      d.querySelector('span').textContent = content.keyNames[action] || action;
-      el.keyRows.appendChild(d);
-    }
-  }
-  const showKeys = (open) => { el.keyHelp.hidden = !open; };
-  el.keysBtn.addEventListener('click', on.help);
-  el.perfBtn.addEventListener('click', on.exportPerf);
-  el.perfBtn.title = content.hints.perf;
-  el.keyClose.addEventListener('click', on.closeHelp);
-
   el.hire.title = content.hints.hire;
   el.castOff.title = fill(content.hints.castOff, { x: cfg.economy.islandRichness, y: cfg.economy.islandPrice });
 
@@ -164,5 +102,5 @@ export function createUI(doc, cfg, content, eco, on) {
     show(el.voyage, flags.voyage);
   };
 
-  return { el, log, update, reveal, show, showQuality, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
+  return { el, log, update, reveal, show };
 }

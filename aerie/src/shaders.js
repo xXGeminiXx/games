@@ -1,7 +1,7 @@
 // The GPU side of the island: the land as textures, the drones as textures,
 // and the picture raymarched from both. All constants are baked from config.
-import { NOISE, HASH } from './noise.glsl.js?v=2';
-import { LIGHT } from './light.glsl.js?v=2';
+import { NOISE, HASH } from './noise.glsl.js?v=1';
+import { LIGHT } from './light.glsl.js?v=1';
 
 const HEAD = `#version 300 es
 precision highp float;
@@ -236,7 +236,6 @@ precision highp float;
 precision highp sampler2D;
 in vec3 a_pos;
 in vec3 a_nrm;
-in float a_shade;
 uniform sampler2D u_pos;
 uniform sampler2D u_aux;
 uniform int u_texW;
@@ -248,10 +247,8 @@ uniform vec3 u_carrier;
 out vec3 v_nrm;
 out float v_dist;
 out float v_loaded;
-out float v_shade;
 void main() {
   int id = gl_InstanceID;
-  v_shade = a_shade;
   ivec2 c = ivec2(id % u_texW, id / u_texW);
   vec4 s = texelFetch(u_pos, c, 0);
   vec4 a = texelFetch(u_aux, c, 0);
@@ -278,20 +275,16 @@ precision highp int;
 in vec3 v_nrm;
 in float v_dist;
 in float v_loaded;
-in float v_shade;
 out vec4 fragColor;
 uniform vec3 u_sun;
 uniform vec3 u_col;
 uniform vec3 u_colLoaded;
-uniform vec3 u_colTrim;
 uniform vec3 u_fog;
 uniform float u_fogK;
 ` + LIGHT + `
 void main() {
   float dif = wrapDiffuse(v_nrm, u_sun, 0.4);
-  // the body takes the fleet colour; the canopy and the rotors take the trim
-  vec3 body = mix(u_col, u_colLoaded, v_loaded);
-  vec3 col = mix(body, u_colTrim, v_shade) * (0.45 + 0.75 * dif);
+  vec3 col = mix(u_col, u_colLoaded, v_loaded) * (0.45 + 0.75 * dif);
   col = mix(col, u_fog, fogExp(v_dist, u_fogK));
   fragColor = vec4(col, 1.0);
 }`;
@@ -301,18 +294,15 @@ void main() {
 precision highp float;
 in vec3 a_pos;
 in vec3 a_nrm;
-in vec4 a_col;
 uniform mat4 u_model;
 uniform mat4 u_viewProj;
 out vec3 v_nrm;
 out float v_dist;
 out vec3 v_wp;
-out vec4 v_col;
 void main() {
   vec4 wp = u_model * vec4(a_pos, 1.0);
   v_wp = wp.xyz;
   v_nrm = normalize(mat3(u_model) * a_nrm);
-  v_col = a_col;
   vec4 clip = u_viewProj * wp;
   v_dist = clip.w;
   gl_Position = clip;
@@ -323,9 +313,9 @@ precision highp int;
 in vec3 v_nrm;
 in float v_dist;
 in vec3 v_wp;
-in vec4 v_col;
 out vec4 fragColor;
 uniform vec3 u_sun;
+uniform vec3 u_col;
 uniform vec3 u_colDark;
 uniform vec3 u_fog;
 uniform vec3 u_eye;
@@ -335,15 +325,10 @@ void main() {
   vec3 n = normalize(v_nrm);
   vec3 v = normalize(u_eye - v_wp);
   float dif = wrapDiffuse(n, u_sun, 0.3);
-  // Each piece carries its own colour; the shaded side falls toward the
-  // ship's dark rather than toward black, so panel lines stay readable.
-  vec3 col = mix(v_col.rgb * u_colDark * 2.0, v_col.rgb, dif);
-  col += vec3(1.0) * specular(n, u_sun, v, 60.0) * 0.22;
-  col += u_fog * fresnel(n, v, 3.0) * 0.22;
-  // windows and lamps burn through the shading and hold their colour in haze
-  float lit = v_col.a;
-  col = mix(col, v_col.rgb * 1.25, lit);
-  col = mix(col, u_fog, fogExp(v_dist, u_fogK) * (1.0 - 0.7 * lit));
+  vec3 col = mix(u_colDark, u_col, dif);
+  col += vec3(1.0) * specular(n, u_sun, v, 60.0) * 0.25;
+  col += u_fog * fresnel(n, v, 3.0) * 0.25;
+  col = mix(col, u_fog, fogExp(v_dist, u_fogK));
   fragColor = vec4(col, 1.0);
 }`;
 

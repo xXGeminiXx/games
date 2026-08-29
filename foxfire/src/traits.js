@@ -6,7 +6,7 @@
 // through the simulation.
 // ---------------------------------------------------------------------------
 
-import { costScale } from './levels.js?v=5';
+import { costScale } from './levels.js?v=4';
 
 export function levelOf(state, id) {
   return (state.traits && state.traits[id]) || 0;
@@ -49,9 +49,6 @@ export function modsOf(state, cfg, genome) {
     yield: 1,        // everything
     startTips: 0,
     traitCost: 0,
-    // Which habits the organism has learned. Each one is only a permission:
-    // whether it is acted on is the switch in the journal.
-    instinct: { extend: 0, tips: 0, beyond: 0 },
   };
   const apply = (list, levels) => {
     for (const t of list) {
@@ -72,7 +69,6 @@ export function modsOf(state, cfg, genome) {
       if (e.yield) m.yield *= 1 + e.yield * lv;
       if (e.startTips) m.startTips += e.startTips * lv;
       if (e.traitCost) m.traitCost += e.traitCost * lv;
-      if (e.instinct && e.instinct in m.instinct) m.instinct[e.instinct] = 1;
     }
   };
   apply(cfg.traits, state.traits || {});

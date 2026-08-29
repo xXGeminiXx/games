@@ -11,8 +11,6 @@ export const CONTENT = {
     carrier: 'Carrier',
     voyage: 'Voyage',
     log: 'Deck log',
-    view: 'View',
-    keys: 'Keys',
   },
 
   labels: {
@@ -40,61 +38,6 @@ export const CONTENT = {
     level: 'level {n}',
     maxed: 'at its limit',
     offline: 'While you were away ({time}): {funds} earned.',
-    quality: 'detail',
-    rate: '{n} frames a second',
-    quality_auto: 'auto',
-    fold: 'hide the table',
-    unfold: 'show the table',
-    keys: 'keys',
-    closeKeys: 'close',
-    hint: 'W A S D to fly, drag to look, click the land to move the carrier, ? for keys',
-    hintFolded: 'P brings the table back',
-  },
-
-  // What each key does, in the player's words. The table itself lives in
-  // config; this only names the rows.
-  keyNames: {
-    forward: 'fly ahead',
-    back: 'fly astern',
-    left: 'fly to port',
-    right: 'fly to starboard',
-    orbitLeft: 'turn the view left',
-    orbitRight: 'turn the view right',
-    pitchUp: 'raise the view',
-    pitchDown: 'lower the view',
-    zoomIn: 'closer',
-    zoomOut: 'further off',
-    recentre: 'frame the carrier again',
-    hire: 'hire a drone',
-    wing: 'hire a wing',
-    upgrade1: 'work on the hold',
-    upgrade2: 'work on the range',
-    upgrade3: 'work on the engines',
-    upgrade4: 'work on the hangars',
-    panel: 'show or hide the table',
-    help: 'show or hide this list',
-    close: 'close this list',
-  },
-
-  keyGroups: {
-    flying: ['forward', 'back', 'left', 'right'],
-    view: ['orbitLeft', 'orbitRight', 'pitchUp', 'pitchDown', 'zoomIn', 'zoomOut', 'recentre'],
-    ship: ['hire', 'wing', 'upgrade1', 'upgrade2', 'upgrade3', 'upgrade4'],
-    page: ['panel', 'help', 'close'],
-  },
-
-  keyGroupNames: {
-    flying: 'Flying the carrier',
-    view: 'The view',
-    ship: 'The ship',
-    page: 'The page',
-  },
-
-  // How a key is printed. Anything not named here is printed as itself, in
-  // capitals.
-  keyLabels: {
-    arrowup: 'Up', arrowdown: 'Down', arrowleft: 'Left', arrowright: 'Right',
-    escape: 'Esc', ' ': 'Space',
   },
 
   kinds: {
@@ -130,9 +73,6 @@ export const CONTENT = {
     prices: 'selling floods a market; prices fall with volume and recover with time',
     range: 'drones work the land within this radius of the carrier',
     castOff: 'the next island is {x} times as rich and pays {y} times the price',
-    quality: 'how much of the picture is drawn; auto follows what your machine can hold',
-    fold: 'fold the table away and see the whole world',
-    perf: 'how the game has been running on this machine, kept here and sent nowhere',
   },
 };
 

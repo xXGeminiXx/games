@@ -80,25 +80,6 @@ export const CONFIG = {
     resetSure:   'Sure? Everything goes',
     bought:      'Held',
 
-    // Instinct: the habits the organism can learn, what it says it last did,
-    // and the share of the sugar it is not allowed to touch.
-    instinct: {
-      names: { extend: 'Reach', tips: 'Front', beyond: 'Beyond' },
-      hints: {
-        extend: 'Open the next ring once the front has nothing left to reach',
-        tips:   'Grow the front when the ground gives up more than the tips can carry',
-        beyond: 'Fold a finished level and begin on the one above it',
-      },
-      acted:  { extend: 'extended', tips: 'grew the front', beyond: 'went beyond' },
-      on:     'on',
-      off:    'off',
-      ago:    '{what}, {t} ago',
-      idle:   'has done nothing yet',
-      reserve:    'Reserve',
-      reserves:   ['none', '1/4', '1/2', '3/4'],
-      reserveTip: 'The share of the sugar instinct will not spend',
-    },
-
     // Moving a save between browsers.
     savePrompt:   'your save',
     savePaste:    'paste a save',
@@ -112,7 +93,6 @@ export const CONFIG = {
       season:  'The year',
       reach:   'Reach',
       traits:  'Traits',
-      instinct: 'Instinct',
       spores:  'Fruiting',
       genome:  'What the spore carries',
     },
@@ -257,35 +237,23 @@ export const CONFIG = {
   // The roster is ordered by value; each level takes perLevel kinds starting
   // at level * perLevel, and past the end of the roster the names repeat with
   // an age in front of them.
-  //
-  // The three kinds on a level are deliberately far apart. The first mineral
-  // fetches rate/need, and within a level those three prices stand at about
-  // 1 : 1.6 : 2.6, so where the minerals go is worth deciding. They are also
-  // deep to different depths: a kind saturates around need * size minerals a
-  // second, and the dearest kind has the largest appetite, so filling it is
-  // what the good answer usually looks like - until the year moves.
-  //
-  // season is what a kind pays, spring to winter, on top of the year's own
-  // curve. Each one averages to one, so it swings a kind's price about rather
-  // than handing anything out, and the swings are wide enough that a
-  // different kind pays best in different seasons.
   // -------------------------------------------------------------------------
   trees: {
     perLevel: 3,
     roster: [
-      // name        rate  need  growth   max   wood   weight  season (spring, summer, autumn, winter)
-      { name: 'birch',    rate: 0.28, need: 0.29, growth: 0.0045, max: 3.5, wood: 38,  weight: 5, season: [0.90, 1.70, 0.85, 0.55] },
-      { name: 'alder',    rate: 0.77, need: 0.51, growth: 0.0040, max: 4.0, wood: 69,  weight: 4, season: [0.75, 0.80, 1.65, 0.80] },
-      { name: 'pine',     rate: 1.55, need: 0.63, growth: 0.0028, max: 7.0, wood: 85,  weight: 3, season: [1.35, 0.50, 0.95, 1.20] },
-      { name: 'aspen',    rate: 0.46, need: 0.40, growth: 0.0050, max: 4.5, wood: 64,  weight: 5, season: [0.85, 0.80, 1.75, 0.60] },
-      { name: 'spruce',   rate: 0.82, need: 0.45, growth: 0.0026, max: 8.0, wood: 74,  weight: 4, season: [1.15, 0.85, 0.70, 1.30] },
-      { name: 'maple',    rate: 3.57, need: 1.20, growth: 0.0030, max: 6.5, wood: 196, weight: 3, season: [1.00, 1.60, 0.65, 0.75] },
-      { name: 'beech',    rate: 0.63, need: 0.50, growth: 0.0022, max: 9.0, wood: 89,  weight: 4, season: [0.75, 0.80, 0.75, 1.70] },
-      { name: 'oak',      rate: 1.62, need: 0.80, growth: 0.0018, max: 12.0, wood: 146, weight: 3, season: [1.55, 0.85, 0.90, 0.70] },
-      { name: 'fir',      rate: 3.50, need: 1.07, growth: 0.0024, max: 11.0, wood: 193, weight: 4, season: [0.90, 1.30, 1.25, 0.55] },
-      { name: 'hemlock',  rate: 0.84, need: 0.60, growth: 0.0020, max: 13.0, wood: 117, weight: 4, season: [0.80, 1.75, 0.85, 0.60] },
-      { name: 'cedar',    rate: 2.47, need: 1.11, growth: 0.0016, max: 15.0, wood: 223, weight: 3, season: [0.90, 0.75, 1.60, 0.75] },
-      { name: 'redwood',  rate: 6.12, need: 1.70, growth: 0.0012, max: 24.0, wood: 337, weight: 2, season: [1.35, 0.65, 0.95, 1.05] },
+      // name        rate  need  growth   max   wood   weight
+      { name: 'birch',    rate: 0.55, need: 0.40, growth: 0.0045, max: 3.5, wood: 90,  weight: 5 },
+      { name: 'alder',    rate: 0.75, need: 0.55, growth: 0.0040, max: 4.0, wood: 100, weight: 4 },
+      { name: 'pine',     rate: 1.10, need: 0.50, growth: 0.0028, max: 7.0, wood: 130, weight: 3 },
+      { name: 'aspen',    rate: 0.90, need: 0.45, growth: 0.0050, max: 4.5, wood: 95,  weight: 5 },
+      { name: 'spruce',   rate: 1.30, need: 0.60, growth: 0.0026, max: 8.0, wood: 150, weight: 4 },
+      { name: 'maple',    rate: 1.60, need: 0.90, growth: 0.0030, max: 6.5, wood: 170, weight: 3 },
+      { name: 'beech',    rate: 1.50, need: 0.70, growth: 0.0022, max: 9.0, wood: 190, weight: 4 },
+      { name: 'oak',      rate: 2.00, need: 1.00, growth: 0.0018, max: 12.0, wood: 240, weight: 3 },
+      { name: 'fir',      rate: 1.80, need: 0.75, growth: 0.0024, max: 11.0, wood: 200, weight: 4 },
+      { name: 'hemlock',  rate: 2.10, need: 0.80, growth: 0.0020, max: 13.0, wood: 230, weight: 4 },
+      { name: 'cedar',    rate: 2.60, need: 1.20, growth: 0.0016, max: 15.0, wood: 300, weight: 3 },
+      { name: 'redwood',  rate: 3.40, need: 1.40, growth: 0.0012, max: 24.0, wood: 420, weight: 2 },
     ],
     ages: ['old', 'ancient', 'elder', 'primeval', 'first'],
     // A tree begins between these shares of its full size.
@@ -294,19 +262,12 @@ export const CONFIG = {
     mature: 0.8,
     // Felling: a tree drained by parasitism loses health at this rate and pays
     // this many times its trade rate while it goes, without wanting minerals.
-    // A drain pays yield * seconds times the tree's rate whatever the season,
-    // which is the whole of the rotation question: a tree nobody is sending
-    // minerals to, or a tree in a season that pays nothing, is worth more
-    // felled than kept, and a tree at the front of a good trade is not.
-    fell: { seconds: 60, yield: 1.6 },
+    fell: { seconds: 90, yield: 2.5 },
     // A felled tree becomes dead wood worth size * wood, and once that has
     // been eaten a seedling comes up in its place.
     regrowSeconds: 240,
     // Feeding: sugar sent per second per unit of size, and the growth it buys.
-    // The ledger states when it pays for itself; past this many seconds it is
-    // stated as not paying at all rather than as a number nobody would wait
-    // out.
-    nurture: { sugarPerSize: 0.06, boost: 2.0, paybackHorizon: 3600 },
+    nurture: { sugarPerSize: 0.12, boost: 2.0 },
     // A weight is 0..this; the trade splits minerals by weight.
     weightMax: 5,
     weightNew: 1,
@@ -331,28 +292,19 @@ export const CONFIG = {
   //
   // cost is for the first level; each level after costs growth times more.
   // Levels stop at cap. Every effect is read in one place, traits.modsOf.
-  //
-  // The three instincts are habits rather than powers: each one is a button
-  // the player has been pressing, learned. They are priced to arrive across
-  // the first level and the second - reach at about the fourth ring, the
-  // front in the middle of the floor, and going beyond only once a level has
-  // been folded, since the floor's whole economy is spent on the fold itself.
   // -------------------------------------------------------------------------
   traits: [
-    { id: 'lignin',         cost: 300,    growth: 3.5, cap: 3,  effect: { eat: 0.5 } },
-    { id: 'cables',         cost: 450,    growth: 3.5, cap: 6,  effect: { speed: 0.3 } },
-    { id: 'instinctExtend', cost: 500,    growth: 1,   cap: 1,  effect: { instinct: 'extend' } },
-    { id: 'branching',      cost: 750,    growth: 3.5, cap: 5,  effect: { tipCost: -0.12 } },
-    { id: 'reach',          cost: 1000,   growth: 3.5, cap: 4,  effect: { search: 1.0 } },
-    { id: 'symbiosis',      cost: 1300,   growth: 3.5, cap: 6,  effect: { trade: 0.25 } },
-    { id: 'parasitism',     cost: 2500,   growth: 1,   cap: 1,  effect: { fell: 1 } },
-    { id: 'transfer',       cost: 3500,   growth: 1,   cap: 1,  effect: { nurture: 1 } },
-    { id: 'instinctTips',   cost: 4000,   growth: 1,   cap: 1,  effect: { instinct: 'tips' } },
-    { id: 'rot',            cost: 4500,   growth: 3.5, cap: 5,  effect: { felledWood: 0.3 } },
-    { id: 'frost',          cost: 6000,   growth: 1,   cap: 1,  effect: { frost: 1 } },
-    { id: 'reserve',        cost: 7500,   growth: 3.0, cap: 6,  effect: { awayHours: 4 } },
-    { id: 'evergreen',      cost: 20000,  growth: 1,   cap: 1,  effect: { evergreen: 1 } },
-    { id: 'instinctBeyond', cost: 60000,  growth: 1,   cap: 1,  effect: { instinct: 'beyond' } },
+    { id: 'lignin',     cost: 300,   growth: 3.5, cap: 3,  effect: { eat: 0.5 } },
+    { id: 'cables',     cost: 450,   growth: 3.5, cap: 6,  effect: { speed: 0.3 } },
+    { id: 'branching',  cost: 750,   growth: 3.5, cap: 5,  effect: { tipCost: -0.12 } },
+    { id: 'reach',      cost: 1000,  growth: 3.5, cap: 4,  effect: { search: 1.0 } },
+    { id: 'symbiosis',  cost: 1300,  growth: 3.5, cap: 6,  effect: { trade: 0.25 } },
+    { id: 'parasitism', cost: 2500,  growth: 1,   cap: 1,  effect: { fell: 1 } },
+    { id: 'transfer',   cost: 3500,  growth: 1,   cap: 1,  effect: { nurture: 1 } },
+    { id: 'rot',        cost: 4500,  growth: 3.5, cap: 5,  effect: { felledWood: 0.3 } },
+    { id: 'frost',      cost: 6000,  growth: 1,   cap: 1,  effect: { frost: 1 } },
+    { id: 'reserve',    cost: 7500,  growth: 3.0, cap: 6,  effect: { awayHours: 4 } },
+    { id: 'evergreen',  cost: 20000, growth: 1,   cap: 1,  effect: { evergreen: 1 } },
   ],
 
   // -------------------------------------------------------------------------
@@ -471,34 +423,6 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
-  // INSTINCT - what the organism does for itself
-  //
-  // Three habits, each learned as a trait and switched on in the journal:
-  // open the next ring when the front has run out of ground, grow the front
-  // when the ground gives up more minerals than the tips can carry, and fold
-  // a level that is finished. Each one presses a button the player could
-  // press and nothing else, so instinct saves attention and never buys
-  // anything cheaper than a hand would.
-  //
-  // They decide on their own coarse clock rather than every tick, so an hour
-  // watched and an hour away take the same decisions at the same moments.
-  // -------------------------------------------------------------------------
-  instinct: {
-    everySeconds: 5,    // sim seconds between decisions, awake or away
-    // The shares of the sugar an instinct will not spend, and which of them
-    // an organism starts on. A reserve is one of these and nothing else.
-    reserves: [0, 0.25, 0.5, 0.75],
-    reserveDefault: 1,
-    // The front is grown once the ground produces this much more than the
-    // tips can carry, so a hair of leaching does not set it buying.
-    carryShort: 1.05,
-    // At most this share of what is above the reserve goes into tips in one
-    // decision, so closing a wide gap takes several and leaves sugar for
-    // ground and traits meanwhile.
-    tipsShare: 0.5,
-  },
-
-  // -------------------------------------------------------------------------
   // TIME
   // -------------------------------------------------------------------------
   time: {
@@ -605,76 +529,6 @@ export const CONFIG = {
     // BEYOND - how slowly a folded level opens its new clearing.
     fold: { seconds: 1.5 },
 
-    // THE BURN - the wedge of ground a fire has been through. Ash lies over
-    // the floor in it, char takes the place of the leaf litter, the moss is
-    // gone, the logs are husks and the trees in it stand as black snags with
-    // charred heartwood at the foot. All of it fades back toward ordinary
-    // ground as the mark ages.
-    burn: {
-      ash: 'night',           // the wash that darkens scorched ground
-      ashAlpha: 0.72,         // how heavily the ash lies in the middle of it
-      ashScale: 1.1,          // cells per patch of ash laid on the floor
-      ashVary: 0.45,          // how unevenly it lies, as a share of its weight
-      soften: 1.4,            // cells of soft edge at the near and far rims
-      softenAngle: 0.22,      // radians of soft edge along its sides
-      char: ['night', 'damp', 'bark'],  // splinters left where the litter was
-      charPer: 2.2,           // char marks per cell of scorched ground
-      charAlpha: 0.75,
-      charLen: 0.3,           // one char mark, in cells
-      charWide: 0.085,
-      husk: 'night',          // a log the fire went through
-      huskAlpha: 0.8,
-      snag: 'night',          // a tree it went through: black, not ordinary grey
-      snagAlpha: 0.95,
-      snagBranch: 1.5,        // its branches, against an ordinary snag's
-      ember: 'rust',          // charred heartwood, the whole reason to go back
-      emberAlpha: 0.45,
-      emberRadius: 0.5,       // as a share of the snag
-      fadeSteps: 5,           // steps the mark fades over, so an ageing burn
-                              // redraws the floor a handful of times, not on every frame
-    },
-
-    // THE DROUGHT - while the rain holds off the floor dries out: the litter
-    // goes pale and grey, the moss browns off, the damp patches lighten, and
-    // a dry light lies over the whole of it.
-    drought: {
-      mix: 0.55,              // how far it dries: the share of the litter that
-                              // takes the dry colour, and how much of the moss
-                              // and the damp is left
-      litter: 'dead',         // dry litter, paler and greyer than the season's
-      moss: 'litter',         // moss browned off
-      wash: 'dead',           // the dry light over all of it
-      washAlpha: 0.1,
-    },
-
-    // A RIVAL - another fungus holding ground of its own. Its lace is dark,
-    // thick and matted where ours is pale and open, and it carries a tuft on
-    // every place it holds, so its patch never reads as more of us.
-    rival: {
-      lace: 'damp',           // its threads: dark, never our cream
-      laceAlpha: 0.9,
-      width: 0.17,            // one of its threads, in cells
-      mat: 'bark',            // the matted ground under them
-      matWidth: 3.2,          // as a multiple of the thread
-      matAlpha: 0.22,
-      tuft: 'damp',           // small dark tufts on the ground it holds
-      tuftAlpha: 0.85,
-      tufts: 4,               // marks in one tuft
-      tuftLen: 0.34,          // in cells
-      tuftWide: 0.1,
-      tuftSpread: 0.26,       // how far a tuft's marks sit from the node, in cells
-    },
-
-    // WINDTHROW - a log the wind has just put on the ground. Until the threads
-    // find it the break is fresh: pale, bright, unweathered wood.
-    fallen: {
-      wood: 'woodPale',       // the fresh face, brighter than wood that has lain
-      face: 0.9,              // how much of the log's width it covers
-      alpha: 1,
-      breakLen: 0.16,         // the splintered end, as a share of the log
-      breakAlpha: 0.95,
-    },
-
     // THE SEASONS. A season is a set of overrides on the palette: which
     // colours the litter takes, how thickly it lies, what the light washes
     // over the floor, and how much the lace glows in it. Colours are named
@@ -777,7 +631,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 5,
+    build: 4,
   },
 };
 
@@ -947,7 +801,6 @@ export function applyIdentity(doc) {
   put('p-season',     t.panels.season);
   put('p-reach',      t.panels.reach);
   put('p-traits',     t.panels.traits);
-  put('p-instinct',   t.panels.instinct);
   put('p-spores',     t.panels.spores);
   put('p-genome',     t.panels.genome);
   put('fieldhint',    t.panels.entries);
