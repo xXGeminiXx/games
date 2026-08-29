@@ -9,9 +9,9 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=8';
-import * as Rb from './rebirth.js?v=8';
-import * as Lore from './lore.js?v=8';
+import * as Ch from './chambers.js?v=9';
+import * as Rb from './rebirth.js?v=9';
+import * as Lore from './lore.js?v=9';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -44,14 +44,39 @@ export function canBuy(s, def) {
 }
 
 /** Buy the next level. Returns the level reached, or 0 if nothing happened. */
-export function buy(s, id, cfg) {
+export function buy(s, id, cfg, count) {
   const def = defOf(cfg, id);
-  if (!def || !canBuy(s, def)) return 0;
-  const price = cost(def, levelOf(s, id));
-  s.coin -= price;
-  s.totals.spent += price;
-  s.rites[id] = levelOf(s, id) + 1;
-  return s.rites[id];
+  if (!def) return 0;
+  // Levels are bought one at a time even when many are asked for: each level
+  // sets the price of the next, and a rite may have a ceiling. Buying stops at
+  // whichever runs out first, the coin or the levels.
+  const want = count === undefined ? 1 : Math.max(1, count | 0);
+  let bought = 0;
+  for (let i = 0; i < want; i++) {
+    if (!canBuy(s, def)) break;
+    const price = cost(def, levelOf(s, id));
+    s.coin -= price;
+    s.totals.spent += price;
+    s.rites[id] = levelOf(s, id) + 1;
+    bought++;
+  }
+  return bought > 0 ? s.rites[id] : 0;
+}
+
+/** The most levels of this rite the coin in hand allows. */
+export function maxBuy(s, id, cfg) {
+  const def = defOf(cfg, id);
+  if (!def) return 0;
+  let coin = s.coin, lv = levelOf(s, id), n = 0;
+  // A hundred is not a limit anyone reaches; it stops a runaway loop if a
+  // rite is ever given a price that does not climb.
+  while (n < 100) {
+    const price = cost(def, lv);
+    if (!(price <= coin)) break;
+    if (def.max !== undefined && lv >= def.max) break;
+    coin -= price; lv++; n++;
+  }
+  return n;
 }
 
 /**

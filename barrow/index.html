@@ -53,6 +53,10 @@
   /* Two columns only where a second one still leaves room for the line that
      says what a rite does; otherwise one. The panel never takes more than
      half the field, and scrolls inside itself if the list outgrows that. */
+  #rite-bulk{display:flex;gap:4px;align-items:center;margin:0 0 7px}
+  #rite-bulk .lbl{color:var(--faded);font-size:11px;margin-right:auto}
+  #rite-bulk button{font:inherit;font-size:11px;padding:1px 7px;cursor:pointer;background:transparent;color:var(--faded);border:1px solid var(--rule)}
+  #rite-bulk button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
   #rites-panel{border-top:1px solid var(--rule);padding:10px 18px 8px;flex:0 0 auto;max-height:48%;overflow-y:auto}
   #rites{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1px 22px}
 
@@ -191,7 +195,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="225aeca9e2db">
+<meta name="build" content="ab0d27b078c5">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -274,7 +278,7 @@
   </section>
   <section id="field">
     <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
-    <div id="rites-panel" hidden><h2 id="p-rites">Rites</h2><div id="rites"></div></div>
+    <div id="rites-panel" hidden><h2 id="p-rites">Rites</h2><div id="rite-bulk"></div><div id="rites"></div></div>
   </section>
 </main>
 <footer>
@@ -292,8 +296,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=8';
-import { createGame } from './src/game.js?v=8';
+import { CONFIG, applyIdentity } from './config.js?v=9';
+import { createGame } from './src/game.js?v=9';
 
 applyIdentity(document);
 

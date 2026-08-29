@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=12';
-import { fill } from '../content.js?v=12';
-import { makeShaders } from './shaders.js?v=12';
-import { createWorld } from './world.js?v=12';
-import { createDrones } from './drones.js?v=12';
-import { createView } from './view.js?v=12';
-import { createEconomy } from './economy.js?v=12';
-import { createSave, createPrefs } from './save.js?v=12';
-import { createUI } from './ui.js?v=12';
-import { createControls } from './controls.js?v=12';
-import { createQuality } from './quality.js?v=12';
-import { createPerfLog } from './perflog.js?v=12';
-import { loop, createGL } from './gl.js?v=12';
-import { rng } from './rng.js?v=12';
-import { fmt, duration } from './numbers.js?v=12';
+import { withOverrides, applyIdentity } from '../config.js?v=15';
+import { fill } from '../content.js?v=15';
+import { makeShaders } from './shaders.js?v=15';
+import { createWorld } from './world.js?v=15';
+import { createDrones } from './drones.js?v=15';
+import { createView } from './view.js?v=15';
+import { createEconomy } from './economy.js?v=15';
+import { createSave, createPrefs } from './save.js?v=15';
+import { createUI } from './ui.js?v=15';
+import { createControls } from './controls.js?v=15';
+import { createQuality } from './quality.js?v=15';
+import { createPerfLog } from './perflog.js?v=15';
+import { loop, createGL } from './gl.js?v=15';
+import { rng } from './rng.js?v=15';
+import { fmt, duration } from './numbers.js?v=15';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -31,6 +31,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   const wantQuality = cfg.render.presets[prefs.get('quality', cfg.render.quality)] ? prefs.get('quality', cfg.render.quality) : cfg.render.quality;
   cfg.render.scale = cfg.render.presets[wantQuality].scale;
   cfg.render.maxDpr = cfg.render.presets[wantQuality].dpr;
+  // The frame they asked to be held, and what the guard learned this machine
+  // could actually hold. Opening at last time's answer means the second run
+  // starts where the first one settled instead of working the machine out
+  // again from scratch, which the player watches happen.
+  cfg.render.target = Number(prefs.get('target', cfg.render.target)) || cfg.render.target;
+  if (cfg.render.presets[wantQuality].adapt) {
+    const learned = Number(prefs.get('learnedScale', 0));
+    if (learned > 0 && cfg.adapt.rungs.indexOf(learned) >= 0) cfg.render.scale = learned;
+  }
 
   // ---- the picture ----
   const G = createGL(canvas, { maxDpr: cfg.render.maxDpr, minDpr: cfg.render.minDpr });
@@ -75,8 +84,19 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       else ui.log(fill(content.log.hireMany, { n: fmt(many), total: fmt(eco.state.drones) }));
     },
     wing: () => { if (eco.actions.wing.do()) { syncFleet(); ui.log(fill(content.log.wing, { n: cfg.economy.wingSize })); } },
-    specialist: (k) => { if (eco.actions.specialist.do(k)) { syncFleet(); ui.log(fill(content.log.specialist, { kind: content.kinds[k] })); } },
-    upgrade: (u) => { if (eco.actions.upgrade.do(u)) { ui.log(fill(content.log.upgrade, { name: cfg.economy.upgrades[u].name, n: eco.level(u) })); if (u === 'hangars') cfg.carrier.scale = 1 + 0.06 * eco.level('hangars'); } },
+    specialist: (k, n) => {
+      const many = Math.max(1, n | 0);
+      if (!eco.actions.specialist.do(k, many)) return;
+      syncFleet();
+      ui.log(many === 1 ? fill(content.log.specialist, { kind: content.kinds[k] })
+                        : fill(content.log.specialistMany, { n: fmt(many), kind: content.kinds[k] }));
+    },
+    upgrade: (u, n) => {
+      const many = Math.max(1, n | 0);
+      if (!eco.actions.upgrade.do(u, many)) return;
+      ui.log(fill(content.log.upgrade, { name: cfg.economy.upgrades[u].name, n: eco.level(u) }));
+      if (u === 'hangars') cfg.carrier.scale = 1 + 0.06 * eco.level('hangars');
+    },
     castOff: () => {
       if (!eco.actions.castOff.do()) return;
       ui.log(fill(content.log.castOff, { n: eco.state.island }));
@@ -103,7 +123,22 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
     },
     reset: () => { if (doc.defaultView && doc.defaultView.confirm && !doc.defaultView.confirm(content.labels.resetConfirm)) return; save.clear(); location.reload(); },
     // the window's own controls
-    quality: (name) => { if (!quality.choose(name)) return; prefs.set('quality', name); ui.showQuality(quality.preset, quality.scale, quality.rate); },
+    quality: (name) => {
+      if (!quality.choose(name)) return;
+      prefs.set('quality', name);
+      // A preset chosen by hand replaces whatever the guard had learned; the
+      // learned number is only ever the guard's own answer.
+      if (!quality.adapting) prefs.set('learnedScale', 0);
+      ui.showQuality(quality.preset, quality.scale, quality.rate);
+    },
+    target: (fps) => {
+      if (!quality.aimAt(fps)) return;
+      prefs.set('target', fps);
+      // What was learned was learned against the old frame, so it stops being
+      // an answer the moment the question changes.
+      prefs.set('learnedScale', 0);
+      ui.showTarget(quality.target);
+    },
     fold: () => { const next = !prefs.get('folded', false); prefs.set('folded', next); ui.showFold(next); },
     help: () => { ui.showKeys(!ui.keysOpen); },
     closeHelp: () => ui.showKeys(false),
@@ -124,8 +159,10 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   });
   const ui = createUI(doc, cfg, content, eco, actions);
   const flags = eco.state.flags;
-  quality.choose(wantQuality);
+  // Opened at what the guard learned about this machine, if it learned one.
+  quality.choose(wantQuality, cfg.render.scale !== cfg.render.presets[wantQuality].scale);
   ui.showQuality(quality.preset, quality.scale, 0);
+  ui.showTarget(quality.target);
   ui.showFold(prefs.get('folded', false));
   ui.reveal(flags);
   ui.log(snap ? fill(content.log.resume, { n: eco.state.island }) : fill(content.log.start, { n: cfg.drones.start }));
@@ -198,7 +235,11 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
     }
     view.draw(t, eco.range(), 0.0009, h);
     // Watch the frames and let the guard move the resolution if it must.
-    quality.sample(dt * 1000);
+    // A move is what this machine has just been shown to hold, so it is
+    // remembered; the next run opens there rather than working it out again.
+    if (quality.sample(dt * 1000) && quality.adapting) {
+      prefs.set('learnedScale', +quality.scale.toFixed(2));
+    }
     perfT += dt;
     if (perfT >= cfg.adapt.logEvery) {
       perfT = 0;

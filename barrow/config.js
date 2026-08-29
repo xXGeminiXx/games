@@ -84,6 +84,7 @@ export const CONFIG = {
       horde:   'The horde',
       market:  'The market',
       rites:   'Rites',
+      riteBulk: 'Levels at a time',
       visitor: 'At the gate',
       chamber: 'A chamber',
       seal:    'The seal',
@@ -540,7 +541,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 8,
+    build: 9,
   },
 };
 

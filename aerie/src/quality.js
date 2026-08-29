@@ -41,6 +41,11 @@ export function createQuality(cfg, { onScale, onDpr } = {}) {
   let preset = R.quality;
   let scale = R.scale;
   let stats = { median: 0, p95: 0 };
+  // The frame the guard is aiming at. 0 is uncapped: no budget can be missed,
+  // so the guard only ever climbs and the display's own refresh is the ceiling.
+  let target = R.target;
+  const budget = () => (target > 0 ? 1000 / target : Infinity);
+  const stutter = () => (target > 0 ? 2000 / target : Infinity);
 
   const rungIndex = (s) => {
     let best = 0, bestD = Infinity;
@@ -66,12 +71,20 @@ export function createQuality(cfg, { onScale, onDpr } = {}) {
   };
 
   // Choose a named preset. Anything but auto stops the guard.
-  const choose = (name) => {
+  /**
+   * Choose a preset. `keepScale` opens an adaptive preset at where the guard
+   * left off last time instead of at the preset's own opening number: without
+   * it, a remembered answer is applied at startup and then overwritten a
+   * moment later by this, and the player watches the machine be worked out
+   * again on every visit.
+   */
+  const choose = (name, keepScale) => {
     const p = R.presets[name];
     if (!p) return false;
     preset = name;
     if (onDpr) onDpr(p.dpr);
-    if (!setScale(p.scale)) settle = A.settle;
+    const to = keepScale && p.adapt ? scale : p.scale;
+    if (!setScale(to)) settle = A.settle;
     return true;
   };
 
@@ -87,7 +100,7 @@ export function createQuality(cfg, { onScale, onDpr } = {}) {
     if (times.length < Math.min(A.window, A.minSamples) || stats.median <= 0) return false;
 
     const i = rungIndex(scale);
-    const bad = stats.median > A.budgetMs || stats.p95 > A.stutterMs;
+    const bad = stats.median > budget() || stats.p95 > stutter();
     if (bad) {
       under = 0; over += dt;
       if (over >= A.downAfter && i > 0) return setScale(A.rungs[i - 1]);
@@ -102,7 +115,7 @@ export function createQuality(cfg, { onScale, onDpr } = {}) {
     // into a rung it cannot hold and dropping straight back out of it.
     const next = A.rungs[i + 1];
     const k = (next * next) / (scale * scale);
-    const fits = stats.median * k < A.budgetMs * A.upMargin && stats.p95 * k < A.stutterMs * A.upMargin;
+    const fits = stats.median * k < budget() * A.upMargin && stats.p95 * k < stutter() * A.upMargin;
     if (fits) {
       over = 0; under += dt;
       if (under >= A.upAfter) return setScale(next);
@@ -113,8 +126,24 @@ export function createQuality(cfg, { onScale, onDpr } = {}) {
   // The frames measured since the last window, for the performance log.
   const window = () => times.slice();
 
+  /**
+   * Aim at a different frame. The measurements already taken were judged
+   * against the old target, so they are thrown away and the settle clock is
+   * restarted - otherwise a player raising the target is punished for frames
+   * measured while a lower one was in force.
+   */
+  const aimAt = (fps) => {
+    const n = Number(fps);
+    if (!Number.isFinite(n) || n < 0 || n === target) return false;
+    target = n;
+    times.length = 0;
+    over = 0; under = 0; settle = A.settle;
+    return true;
+  };
+
   return {
-    sample, choose, setScale, window,
+    sample, choose, setScale, window, aimAt,
+    get target() { return target; },
     get preset() { return preset; },
     get scale() { return scale; },
     get median() { return stats.median; },

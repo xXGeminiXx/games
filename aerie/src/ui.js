@@ -1,14 +1,14 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=12';
-import { fill } from '../content.js?v=12';
+import { fmt, rate, count, pct } from './numbers.js?v=15';
+import { fill } from '../content.js?v=15';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
   const K = cfg.kindOrder;
   const el = {
     funds: $('funds'), income: $('income'), drones: $('drones'), working: $('working'),
-    hire: $('hire'), hireCost: $('hire-cost'), hireLabel: $('hire-label'),
+    target: $('target'), hire: $('hire'), hireCost: $('hire-cost'), hireLabel: $('hire-label'),
     bulk: $('bulk'), wing: $('wing'), wingCost: $('wing-cost'),
     hold: $('hold'), holdRows: $('hold-rows'), fleet: $('fleet'), specialists: $('specialists'), specRows: $('spec-rows'),
     carrier: $('carrier'), upRows: $('up-rows'), voyage: $('voyage'), island: $('island'), remaining: $('remaining'),
@@ -36,13 +36,13 @@ export function createUI(doc, cfg, content, eco, on) {
   for (const k of K) {
     specRows[k] = row(el.specRows, `<button data-spec="${k}"><b>${fill(L.specialist, { kind: content.kinds[k] })}</b><i data-cost></i></button><span class="v" data-n></span>`);
     specRows[k].title = fill(content.hints.specialist, { kind: content.kinds[k], x: cfg.economy.specialistMult });
-    specRows[k].querySelector('button').addEventListener('click', () => on.specialist(k));
+    specRows[k].querySelector('button').addEventListener('click', () => { on.specialist(k, countFor('specialist', k)); paintHire(); });
   }
   for (const u in cfg.economy.upgrades) {
     const U = cfg.economy.upgrades[u];
     upRows[u] = row(el.upRows, `<button data-up="${u}"><b>${U.name}</b><i data-cost></i></button><span class="v" data-lvl></span>`);
     upRows[u].title = U.does;
-    upRows[u].querySelector('button').addEventListener('click', () => on.upgrade(u));
+    upRows[u].querySelector('button').addEventListener('click', () => { on.upgrade(u, countFor('upgrade', u)); paintHire(); });
   }
   if (el.rangeRow) el.rangeRow.title = content.hints.range;
   // How many a press buys. Remembered, because a player who has decided to
@@ -79,6 +79,16 @@ export function createUI(doc, cfg, content, eco, on) {
   paintBulk();
   /** How many the next press would buy: the chosen number, or all that is affordable. */
   const bulkCount = () => (bulk === 0 ? Math.max(1, eco.actions.hire.max()) : bulk);
+  /**
+   * The same choice, asked of any action that can be bought more than once.
+   * `max` means as many as that particular thing allows, which is not the same
+   * number for a drone, a specialist and an upgrade - each has its own ceiling.
+   */
+  const countFor = (name, arg) => {
+    const a = eco.actions[name];
+    if (bulk !== 0) return bulk;
+    return Math.max(1, a && a.max ? a.max(arg) : 1);
+  };
 
   el.hire.addEventListener('click', () => { on.hire(bulkCount()); paintHire(); });
   el.wing.addEventListener('click', on.wing);
@@ -102,6 +112,22 @@ export function createUI(doc, cfg, content, eco, on) {
     qualityBtns[name] = b;
   }
   el.quality.title = content.hints.quality;
+
+  // WHAT THE PICTURE IS TRADED AGAINST. The detail buttons say how much to
+  // draw; this says how often. They are separate because the trade between
+  // them is the player's to make, not a single dial someone else decided.
+  const targetBtns = {};
+  for (const fps of cfg.render.targets) {
+    const b = doc.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<b>${fps > 0 ? fps : (L.targetFree || 'as many as it can')}</b>`;
+    b.addEventListener('click', () => on.target(fps));
+    el.target.appendChild(b);
+    targetBtns[fps] = b;
+  }
+  const showTarget = (fps) => {
+    for (const k in targetBtns) targetBtns[k].setAttribute('aria-pressed', String(Number(k) === Number(fps)));
+  };
 
   // The chosen preset is the pressed one; auto also reports where it settled.
   const showQuality = (name, scale, hz) => {
@@ -200,7 +226,10 @@ export function createUI(doc, cfg, content, eco, on) {
       ne.textContent = n ? count(n) : '';
       ne.className = 'v' + (stranded ? ' bad' : '');
       ne.title = stranded ? fill(L.workedOutOne, { kind: content.kinds[k] }) : '';
-      sr.querySelector('button').disabled = !eco.actions.specialist.can(k);
+      const sn = countFor('specialist', k);
+      sr.querySelector('[data-cost]').textContent = fmt(eco.actions.specialist.cost(k, sn));
+      sr.querySelector('button').disabled = !eco.actions.specialist.can(k, sn);
+      sr.querySelector('button').dataset.many = sn > 1 ? 'x' + count(sn) : '';
     }
     // A tooltip is no use to a player who does not know to hover. Specialists
     // are locked to one trade, so a trade with nothing left within reach earns
@@ -215,7 +244,9 @@ export function createUI(doc, cfg, content, eco, on) {
       const lvl = eco.level(u), max = cfg.economy.upgrades[u].max;
       r.querySelector('[data-cost]').textContent = lvl >= max ? L.maxed : fmt(eco.upgradeCost(u));
       r.querySelector('[data-lvl]').textContent = lvl ? fill(L.level, { n: lvl }) : '';
-      r.querySelector('button').disabled = !eco.actions.upgrade.can(u);
+      const un = countFor('upgrade', u);
+      r.querySelector('button').disabled = !eco.actions.upgrade.can(u, un);
+      r.querySelector('button').dataset.many = un > 1 ? 'x' + count(un) : '';
     }
     el.island.textContent = fill(L.island, { n: s.island });
     el.remaining.textContent = pct(s.remaining);
@@ -239,5 +270,5 @@ export function createUI(doc, cfg, content, eco, on) {
     show(el.voyage, flags.voyage);
   };
 
-  return { el, log, update, reveal, get bulk() { return bulk; }, show, showQuality, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
+  return { el, log, update, reveal, get bulk() { return bulk; }, show, showQuality, showTarget, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
 }

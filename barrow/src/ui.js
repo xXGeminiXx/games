@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=8';
-import * as Mk from './market.js?v=8';
-import * as H from './horde.js?v=8';
-import * as R from './rites.js?v=8';
-import * as Rb from './rebirth.js?v=8';
-import * as Lore from './lore.js?v=8';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=8';
-import { fill } from '../config.js?v=8';
+import * as Mat from './materials.js?v=9';
+import * as Mk from './market.js?v=9';
+import * as H from './horde.js?v=9';
+import * as R from './rites.js?v=9';
+import * as Rb from './rebirth.js?v=9';
+import * as Lore from './lore.js?v=9';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=9';
+import { fill } from '../config.js?v=9';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -49,7 +49,7 @@ export function createUI(doc, sim, cfg, actions) {
     hand: byId('hand'), dig: byId('dig'), sell: byId('sell'), handline: byId('handline'),
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
     marketPanel: byId('market-panel'), market: byId('market'),
-    ritesPanel: byId('rites-panel'), rites: byId('rites'),
+    ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
     visitorPanel: byId('visitor-panel'), visitorText: byId('visitor-text'), visitorActs: byId('visitor-acts'),
     chamberPanel: byId('chamber-panel'), chamberTitle: byId('chamber-title'),
     chamberText: byId('chamber-text'), chamberOffers: byId('chamber-offers'),
@@ -120,6 +120,29 @@ export function createUI(doc, sim, cfg, actions) {
   if (nodes.sell) nodes.sell.addEventListener('click', () => actions.sell('s0', sim.held('s0')));
 
   // -- the horde -----------------------------------------------------------
+
+  // HOW MANY LEVELS OF A RITE ONE PRESS BUYS. A rite reaches sixteen levels
+  // and more, and buying it there one press at a time is the game asking a
+  // player to do arithmetic with their hand. One choice serves every rite in
+  // the list rather than three more buttons on each row.
+  let ritePick = 1;
+  const riteSteps = [1, 5, 25, 'max'];
+  const riteButtons = [];
+  const riteCount = (id) => (ritePick === 'max' ? Math.max(1, sim.riteMax(id)) : ritePick);
+  const buildRiteBulk = () => {
+    if (!nodes.riteBulk || riteButtons.length) return;
+    nodes.riteBulk.appendChild(el('span', { class: 'lbl', text: T.riteBulk || 'levels at a time' }));
+    for (const n of riteSteps) {
+      const b = el('button', { onclick: () => { ritePick = n; paintRiteBulk(); } },
+                   el('b', { text: n === 'max' ? 'max' : 'x' + n }));
+      riteButtons.push({ n, node: b });
+      nodes.riteBulk.appendChild(b);
+    }
+    paintRiteBulk();
+  };
+  const paintRiteBulk = () => {
+    for (const { n, node } of riteButtons) node.setAttribute('aria-pressed', String(n === ritePick));
+  };
 
   const raiseButtons = [];
   const buildRaise = () => {
@@ -348,7 +371,7 @@ export function createUI(doc, sim, cfg, actions) {
       const words = R.wordsOf(def.id);
       const cost = el('i');
       const level = el('span', { class: 'lv' });
-      const button = el('button', { class: 'rite', onclick: () => actions.buyRite(def.id) }, el('b', { text: words.name }), cost);
+      const button = el('button', { class: 'rite', onclick: () => actions.buyRite(def.id, riteCount(def.id)) }, el('b', { text: words.name }), cost);
       // The row shows the short line and says the whole of it on hover, so a
       // narrow column never hides something the player needed.
       const row = el('div', { class: 'rrow', title: words.name + ': ' + (words.long || words.line) },
@@ -581,7 +604,7 @@ export function createUI(doc, sim, cfg, actions) {
 
     // Rites.
     show(nodes.ritesPanel, f.rites);
-    if (f.rites) { buildRites(); renderRites(); }
+    if (f.rites) { buildRiteBulk(); buildRites(); renderRites(); }
 
     // The seal.
     show(nodes.sealPanel, f.seal);

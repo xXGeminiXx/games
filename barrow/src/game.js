@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=8';
-import { createSim, restoreSim, openedState } from './sim.js?v=8';
-import * as Save from './save.js?v=8';
-import * as Rb from './rebirth.js?v=8';
-import * as Lore from './lore.js?v=8';
-import { hash } from './rng.js?v=8';
-import { createUI } from './ui.js?v=8';
-import { createView } from './view.js?v=8';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=8';
-import * as Mat from './materials.js?v=8';
+import { storageKey, fill } from '../config.js?v=9';
+import { createSim, restoreSim, openedState } from './sim.js?v=9';
+import * as Save from './save.js?v=9';
+import * as Rb from './rebirth.js?v=9';
+import * as Lore from './lore.js?v=9';
+import { hash } from './rng.js?v=9';
+import { createUI } from './ui.js?v=9';
+import { createView } from './view.js?v=9';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=9';
+import * as Mat from './materials.js?v=9';
 
 /**
  * @param {object} o
@@ -75,7 +75,7 @@ export function createGame(o) {
   actions.buy = wrap((id) => sim.buy(id));
   actions.raise = wrap((count) => { const r = sim.raise(count); save(); return r; });
   actions.setWeight = wrap((key, delta) => { sim.setWeight(key, delta); return []; });
-  actions.buyRite = wrap((id) => { const r = sim.buyRite(id); save(); return r; });
+  actions.buyRite = wrap((id, count) => { const r = sim.buyRite(id, count); save(); return r; });
   actions.takeOffer = wrap((i) => { const r = sim.takeOffer(i); save(); return r; });
   actions.acceptVisitor = wrap(() => { const r = sim.acceptVisitor(); save(); return r; });
   actions.declineVisitor = wrap(() => { const r = sim.declineVisitor(); save(); return r; });

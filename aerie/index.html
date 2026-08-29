@@ -69,9 +69,9 @@
   #fold b{font-weight:600;font-size:15px;line-height:1}
   body.folded #fold{right:14px}
   body.folded #table{display:none}
-  #quality{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
-  #quality button{flex:0 0 auto;font-size:12px;padding:2px 8px;justify-content:center}
-  #quality button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 14%,#fff);font-weight:500}
+  #quality, #target{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+  #quality button, #target button{flex:0 0 auto;font-size:12px;padding:2px 8px;justify-content:center}
+  #quality button[aria-pressed="true"], #target button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 14%,#fff);font-weight:500}
   #rate{color:var(--dim);font-size:12px;margin-top:5px}
   /* the key list: a sheet over the picture, reachable at any window size */
   #keyhelp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;width:min(520px,calc(100% - 28px));max-height:calc(100% - 28px);overflow-y:auto;padding:14px 16px 16px}
@@ -90,7 +90,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="0dce69072070">
+<meta name="build" content="5c3b0668112b">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -196,13 +196,15 @@
     <h2 data-t="sections.view">View</h2>
     <div class="dim" style="font-size:12px" data-t="labels.quality">detail</div>
     <div id="quality"></div>
+    <div class="dim" style="font-size:12px;margin-top:8px" data-t="labels.target">frames a second</div>
+    <div id="target"></div>
     <div id="rate"></div>
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=12';
-  import { CONTENT } from './content.js?v=12';
-  import { createGame } from './src/game.js?v=12';
+  import { CONFIG } from './config.js?v=15';
+  import { CONTENT } from './content.js?v=15';
+  import { createGame } from './src/game.js?v=15';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

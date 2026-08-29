@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=12';
+import { oklch } from './src/palette.js?v=15';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 12,             // the ?v= tag every import carries; bump on every src change
+    build: 15,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -71,6 +71,9 @@ export const CONFIG = {
     hireBase: 12,
     hireGrowth: 1.085,
     // a wing is ten drones at a discount, unlocked later
+    // Enough hangar levels make each drone cheaper than the last, so `max`
+    // would otherwise ask for an unbounded number. This is that bound.
+    hireMaxAtOnce: 100000,
     wingSize: 10,
     wingDiscount: 0.82,
     // specialists gather their kind at specialistMult and nothing else
@@ -150,7 +153,12 @@ export const CONFIG = {
     minDpr: 0,            // floor on the drawing buffer's pixel ratio
     quality: 'auto',      // the preset a new player starts on
     presets: {
-      auto:   { name: 'auto',   scale: 0.7,  dpr: 1.5, adapt: true,  hint: 'picks the sharpest picture your machine can hold at 60 frames a second, and keeps checking' },
+      // Opens at the top and comes down only if the machine cannot hold it,
+      // rather than opening in the middle and working up. A player's first
+      // sight of the island should be the best one their machine can draw;
+      // finding that out by degrading is kinder than by improving, because
+      // nobody sees the picture they never got.
+      auto:   { name: 'auto',   scale: 1.0,  dpr: 1.5, adapt: true,  hint: 'opens at the sharpest picture and eases off only if your machine cannot hold the frame you asked for' },
       low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels; for a slow machine' },
       normal: { name: 'normal', scale: 0.7,  dpr: 1.5, adapt: false, hint: 'a good picture on most machines, at about half the cost of high' },
       high:   { name: 'high',   scale: 1.0,  dpr: 1.5, adapt: false, hint: 'the whole picture drawn at full resolution' },
@@ -159,6 +167,15 @@ export const CONFIG = {
       extra:  { name: 'ultra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'drawn larger than the window and shrunk back down, which softens hard edges. Costs a great deal, and does nothing on a display too coarse to show it' },
     },
     presetOrder: ['auto', 'low', 'normal', 'high', 'extra'],
+
+    // WHAT THE PICTURE IS BEING TRADED AGAINST. The guard spends spare frame
+    // time on resolution and stops at the target; raise the target and it
+    // spends less, lower it and it spends more. `0` means never stop spending,
+    // which on a display that caps at its own refresh means the sharpest
+    // picture the machine can draw. This is the player's trade to make, so it
+    // is a setting rather than a number in this file.
+    targets: [30, 60, 120, 0],
+    target: 60,
     showRate: true,       // the frame rate beside the quality buttons
     resizeDelay: 0.25,    // seconds a new window size must hold before the
                           // picture's buffer is rebuilt for it
@@ -180,8 +197,12 @@ export const CONFIG = {
   // smooth, and a guard watching only the median would have called it fine.
   adapt: {
     rungs: [0.4, 0.55, 0.7, 0.85, 1.0],
-    budgetMs: 16.7,       // 60 frames a second, usually
-    stutterMs: 33,        // and no worse than 30 in the roughest twentieth
+    // Derived from the chosen target rather than fixed: a frame should
+    // usually fit the target, and the worst twentieth is allowed twice that
+    // before the picture is called rough. An uncapped target has no budget to
+    // miss, so the guard only ever climbs.
+    budgetMs: 16.7,       // the default target, 60 a second; recomputed on change
+    stutterMs: 33,        // and no worse than half the target in the roughest twentieth
     upMargin: 0.86,       // a predicted frame must fit this far inside both
     window: 45,           // frames in the rolling measurement
     minSamples: 24,       // enough to judge by; a slow machine would take many

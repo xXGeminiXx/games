@@ -1,7 +1,7 @@
 // The GPU side of the island: the land as textures, the drones as textures,
 // and the picture raymarched from both. All constants are baked from config.
-import { NOISE, HASH } from './noise.glsl.js?v=12';
-import { LIGHT } from './light.glsl.js?v=12';
+import { NOISE, HASH } from './noise.glsl.js?v=15';
+import { LIGHT } from './light.glsl.js?v=15';
 
 const HEAD = `#version 300 es
 precision highp float;
