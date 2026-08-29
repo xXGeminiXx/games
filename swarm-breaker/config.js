@@ -1002,7 +1002,7 @@ export const CONFIG = {
   // this device's own runs, and every row reads unchecked. Fill this in only
   // after the Worker is deployed - see docs/LEADERBOARD.md for the four steps.
   boards: {
-    endpoint: '',
+    endpoint: 'https://swarm-breaker-boards.xxgeminixx.workers.dev',
     // Remote boards only run on hosts named here, so a fork served from
     // anywhere else keeps its own runs and never calls this Worker.
     allowedHosts: ['localhost', '127.0.0.1', 'xxgeminixx.github.io'],
@@ -1017,7 +1017,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 12,
+    build: 13,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.

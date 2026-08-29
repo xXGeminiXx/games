@@ -29,7 +29,7 @@
 // in it and no wall clock reaches it. See docs/LEADERBOARD.md.
 // ---------------------------------------------------------------------------
 
-import { stateHash, hashHex } from './replay.js?v=12';
+import { stateHash, hashHex } from './replay.js?v=13';
 
 export const LOG_VERSION = 1;
 
