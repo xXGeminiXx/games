@@ -27,6 +27,16 @@
     position:fixed; left:30px; bottom:30px; color:var(--quiet); font-size:11px;
     pointer-events:none;
   }
+  /* A run that fills its field cannot be clicked any further, and every other
+     way out of it was a console command. This is the way out, kept as quiet as
+     the prompt above it so it is there without asking to be pressed. */
+  #again{
+    position:fixed; left:30px; bottom:52px;
+    background:none; border:0; padding:0;
+    color:var(--label); font:inherit; font-size:10px;
+    text-transform:uppercase; letter-spacing:.11em; cursor:pointer;
+  }
+  #again:hover, #again:focus-visible{color:var(--figure); outline:none}
   /* The research window: at most six rows, in the same gutter as the mass. */
   #board{position:fixed; left:30px; top:178px; width:280px; font-size:11px; line-height:1.35}
   #board #era{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--label);margin-bottom:8px}
@@ -54,7 +64,7 @@
   #ending .again:hover{color:var(--figure)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="383fe1ea27e3">
+<meta name="build" content="772541d0be4c">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -106,6 +116,7 @@
 <div id="board"><div id="era"></div><div id="nodes"></div><div id="laws"></div></div>
 <div id="ending"></div>
 <div id="note">click the void</div>
+<button id="again" type="button">start over</button>
 
 <script type="module">
 // ---------------------------------------------------------------------------
@@ -581,6 +592,19 @@ if (typeof window !== 'undefined') {
     reset() { game.forget(); location.reload(); },
   };
 }
+
+// Starting over throws the run away, so it asks first - and it asks in the
+// page rather than through the console, because a field that will take no more
+// leaves a player with nothing else to press.
+// The test harness runs this page against a DOM that has only the few nodes a
+// field needs, so the control may not be there at all.
+const againEl = document.getElementById('again');
+if (againEl) againEl.addEventListener('click', () => {
+  const w = document.defaultView;
+  if (w && w.confirm && !w.confirm(CONFIG.text.confirmAgain)) return;
+  game.forget();
+  location.reload();
+});
 
 // The renderer can drive itself, but the field has to step first, so frames
 // are driven from here. Calling start() as well would paint twice per frame,

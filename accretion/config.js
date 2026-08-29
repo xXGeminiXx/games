@@ -57,7 +57,8 @@ export const CONFIG = {
     // Shown when the field has reached the top of the ladder and will take no
     // more. The arc has an authored end designed for it; this is what stands in
     // for that end until it is built.
-    promptFull:   'the field will take no more',
+    promptFull:   'the field will take no more - it holds all the mass one run can carry. start over below to begin another.',
+    confirmAgain: 'Start over? This run and everything in it is thrown away.',
 
     // WHAT THE FIELD SAYS THE FIRST TIME IT MAKES SOMETHING. One line, along
     // the bottom, the first time each of these happens, then quiet. Keyed by
