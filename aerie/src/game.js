@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=4';
-import { fill } from '../content.js?v=4';
-import { makeShaders } from './shaders.js?v=4';
-import { createWorld } from './world.js?v=4';
-import { createDrones } from './drones.js?v=4';
-import { createView } from './view.js?v=4';
-import { createEconomy } from './economy.js?v=4';
-import { createSave, createPrefs } from './save.js?v=4';
-import { createUI } from './ui.js?v=4';
-import { createControls } from './controls.js?v=4';
-import { createQuality } from './quality.js?v=4';
-import { createPerfLog } from './perflog.js?v=4';
-import { loop, createGL } from './gl.js?v=4';
-import { rng } from './rng.js?v=4';
-import { fmt, duration } from './numbers.js?v=4';
+import { withOverrides, applyIdentity } from '../config.js?v=5';
+import { fill } from '../content.js?v=5';
+import { makeShaders } from './shaders.js?v=5';
+import { createWorld } from './world.js?v=5';
+import { createDrones } from './drones.js?v=5';
+import { createView } from './view.js?v=5';
+import { createEconomy } from './economy.js?v=5';
+import { createSave, createPrefs } from './save.js?v=5';
+import { createUI } from './ui.js?v=5';
+import { createControls } from './controls.js?v=5';
+import { createQuality } from './quality.js?v=5';
+import { createPerfLog } from './perflog.js?v=5';
+import { loop, createGL } from './gl.js?v=5';
+import { rng } from './rng.js?v=5';
+import { fmt, duration } from './numbers.js?v=5';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -201,6 +201,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   });
   doc.addEventListener('visibilitychange', () => { if (doc.hidden) persist(); });
   window.addEventListener('beforeunload', persist);
+
+  // If the graphics context is taken away, everything on the GPU goes with it
+  // - the island, the fleet, every shader - and none of it can be drawn again
+  // from the objects this run is holding. The run itself is only a seed and a
+  // ledger, so the honest recovery is to write it down and start the page
+  // over once the browser offers a context back: the same island rebuilds
+  // from the same seed and the player keeps everything they had.
+  G.onContextLost(() => { persist(); ui.log(content.log.contextLost); });
+  G.onContextRestored(() => { location.reload(); });
   ui.update({ active: drones.active });
 
   return { cfg, eco, world, drones, view, ui, save, prefs, perf, quality, controls, stop, persist, snapshot };

@@ -33,7 +33,10 @@ export function createGL(canvas, opts = {}) {
   // browser - which no quality setting can undo. Holding a floor of one
   // device pixel per page pixel costs pixels; the frame guard is what pays
   // for it, by easing the raymarch resolution instead.
-  let minDpr = opts.minDpr ?? 1;
+  // Off by default: a ratio below 1 is that display's own native, so forcing
+  // the buffer up to 1 is supersampling rather than recovery, and it costs
+  // about half as many rays again. A game that wants a sharper edge asks.
+  let minDpr = opts.minDpr ?? 0;
 
   // Size the drawing buffer to the element's CSS size times the device pixel
   // ratio, capped, and return whether anything changed.
@@ -58,7 +61,31 @@ export function createGL(canvas, opts = {}) {
   const setMaxDpr = (v) => { maxDpr = Math.max(0.5, Number(v) || 1); };
   const dpr = () => Math.max(minDpr, Math.min(maxDpr, window.devicePixelRatio || 1));
 
-  return { gl, canvas, resize, floatColor, floatLinear, setMaxDpr, dpr, get maxDpr() { return maxDpr; }, get minDpr() { return minDpr; } };
+  // A WebGL context can be taken away at any moment - the driver resets, a
+  // phone discards a backgrounded tab, another page asks for too much. The
+  // browser only ever offers it back if the loss event has its default
+  // prevented, so that call belongs here rather than in each caller. What to
+  // rebuild afterwards is the caller's business; only it knows what it built.
+  let lost = false;
+  const onLost = [], onRestored = [];
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    lost = true;
+    for (const fn of onLost) fn();
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    lost = false;
+    for (const fn of onRestored) fn();
+  });
+
+  return {
+    gl, canvas, resize, floatColor, floatLinear, setMaxDpr, dpr,
+    get maxDpr() { return maxDpr; },
+    get minDpr() { return minDpr; },
+    isLost: () => lost,
+    onContextLost: (fn) => { onLost.push(fn); },
+    onContextRestored: (fn) => { onRestored.push(fn); },
+  };
 }
 
 // ---- shaders --------------------------------------------------------------

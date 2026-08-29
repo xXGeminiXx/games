@@ -103,6 +103,7 @@ export const CONTENT = {
 
   log: {
     start: 'The carrier holds station over the island. Three drones on the deck.',
+    contextLost: 'The instruments have gone dark. The log is written down; the view will come back on its own.',
     firstHire: 'A fourth drone. The deck is not large.',
     hire: 'Drone {n} launched.',
     wing: 'A wing of {n} launched.',
