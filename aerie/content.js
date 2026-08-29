@@ -39,6 +39,7 @@ export const CONTENT = {
     resetConfirm: 'Start over? The island, the fleet and the funds are gone.',
     level: 'level {n}',
     maxed: 'at its limit',
+    workedOut: 'This seam is worked out. These drones bring back nothing until the carrier moves.',
     offline: 'While you were away ({time}): {funds} earned.',
     quality: 'detail',
     rate: '{n} frames a second',

@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=6';
-import { fill } from '../content.js?v=6';
+import { fmt, rate, count, pct } from './numbers.js?v=7';
+import { fill } from '../content.js?v=7';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
@@ -140,7 +140,16 @@ export function createUI(doc, cfg, content, eco, on) {
       pe.className = 'v ' + (p < 0.5 ? 'bad' : p < 0.85 ? 'dim' : 'good');
       const sr = specRows[k];
       sr.querySelector('[data-cost]').textContent = fmt(eco.specialistCost());
-      sr.querySelector('[data-n]').textContent = s.specialists[k] ? count(s.specialists[k]) : '';
+      // What the land still holds of this kind. Income is multiplied by it, so
+      // a kind worked down to nothing pays nothing however many drones are on
+      // it - and without this the panel gave no sign of that at all, leaving
+      // specialists assigned to a seam that had run out.
+      const left = s.avail[k];
+      const n = s.specialists[k];
+      const ne = sr.querySelector('[data-n]');
+      ne.textContent = n ? count(n) : '';
+      ne.className = 'v' + (n && !(left > 0) ? ' bad' : '');
+      ne.title = n && !(left > 0) ? L.workedOut : '';
       sr.querySelector('button').disabled = !eco.actions.specialist.can(k);
     }
     for (const u in cfg.economy.upgrades) {
