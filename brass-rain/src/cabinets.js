@@ -18,9 +18,9 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos } from './board.js?v=1';
-import { createBalls, launch, stepPhysics } from './physics.js?v=1';
-import { rng as makeRng } from './rng.js?v=1';
+import { createBoard, nailPos, layoutFor } from './board.js?v=2';
+import { createBalls, launch, stepPhysics } from './physics.js?v=2';
+import { rng as makeRng } from './rng.js?v=2';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -56,6 +56,8 @@ export function readCabinet(cfg, seed, index) {
   return {
     seed,
     name: cabinetName(seed, index),
+    layout: board.layout ? board.layout.name : '',
+    note: board.layout ? board.layout.note : '',
     nails: board.pinCount,
     lean: shape.lean,
     leanWord: shape.leanWord,
@@ -65,7 +67,7 @@ export function readCabinet(cfg, seed, index) {
     back: trial.back,
     where: trial.where,
     at: trial.at,
-    line: sentence(shape, trial),
+    line: (board.layout && board.layout.note ? board.layout.note.charAt(0).toUpperCase() + board.layout.note.slice(1) + '. ' : '') + sentence(shape, trial),
   };
 }
 

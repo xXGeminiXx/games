@@ -11,21 +11,21 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=1';
+import { loadConfig } from '../config.js?v=2';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
-         budgetFor, clearBonusFor, pullsLeft, pullsFor,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=1';
+         budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=2';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=1';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=1';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=1';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=1';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=1';
-import { rng as makeRng } from './rng.js?v=1';
-import { offerCabinets } from './cabinets.js?v=1';
-import * as Save from './save.js?v=1';
+         handMult, restoreFloor } from './floor.js?v=2';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=2';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=2';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=2';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=2';
+import { rng as makeRng } from './rng.js?v=2';
+import { offerCabinets } from './cabinets.js?v=2';
+import * as Save from './save.js?v=2';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -46,8 +46,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=1');
-  const metaModule = await optional('./meta.js?v=1');
+  const catalogue = await optional('./fittings.js?v=2');
+  const metaModule = await optional('./meta.js?v=2');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -210,6 +210,7 @@ export function newRun(game, seed, withFittings) {
     bench: game.bench, model: modelFor(game, ids), fittings: ids, mods: fitted.mods,
   });
   game.run.board = buildFittedBoard(fitted.cfg, seed >>> 0, fitted.shape);
+  useCabinet(fitted.cfg, game.run.board);
   // Anything the technician has learned to bolt in before the night starts is
   // bolted in now, and the machine is then refitted around it. An id that is
   // not in the catalogue is dropped without a word.
@@ -223,6 +224,7 @@ export function newRun(game, seed, withFittings) {
       game.run.mods = again.mods;
       game.run.model = catalogueModel(game);
       game.run.board = buildFittedBoard(again.cfg, seed >>> 0, again.shape);
+      useCabinet(again.cfg, game.run.board);
     }
   }
   game.run.bendsLeft = bendsPerRound(game);
@@ -342,6 +344,7 @@ function loadSave(game, saved) {
       bench: game.bench, model: modelFor(game, savedIds), fittings: savedIds, mods: fitted.mods,
     });
     game.run.board = buildFittedBoard(fitted.cfg, seed, fitted.shape);
+    useCabinet(fitted.cfg, game.run.board);
     if (Array.isArray(saved.run.fittings)) {
       game.run.fittings = saved.run.fittings.slice();
       const again = refit(game, seed);
@@ -350,6 +353,7 @@ function loadSave(game, saved) {
       game.run.mods = again.mods;
       game.run.model = catalogueModel(game);
       game.run.board = buildFittedBoard(again.cfg, seed, again.shape);
+      useCabinet(again.cfg, game.run.board);
     } else {
       game.run.mods = fitted.mods;
     }
@@ -454,6 +458,7 @@ function api(game) {
       game.run.model = catalogueModel(game);
       const bends = serializeBendState(game.run.board);
       game.run.board = buildFittedBoard(fitted.cfg, game.run.seed, fitted.shape);
+      useCabinet(fitted.cfg, game.run.board);
       restoreBendState(game.run.board, bends);
       game.offer.splice(index, 1);
       logLine(game.run, 'fitting', offer.fitting.name + ' bolted in');
@@ -617,6 +622,7 @@ export function reading(game) {
     pullsLeft: pullsLeft(run),
     pulls: pullsFor(cfg, run.round, run.mods),
     nextBonus: clearBonusFor(cfg, run.round, run.mods),
+    cabinet: run.board && run.board.layout ? run.board.layout : null,
     lent: run.lent || 0,
     strength: run.strength,
     locked: !!cfg.launch.locked,

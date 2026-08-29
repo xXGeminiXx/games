@@ -249,12 +249,40 @@
   .settingrow output{flex:0 0 74px;text-align:right;font-size:12px;color:var(--lamp)}
 
   #owned{display:flex;flex-wrap:wrap;gap:5px}
+  /* A bolted-in part. Its rarity is carried by a coloured bead rather than by
+     the chip's own colour, so the row still reads as one row of parts and the
+     rarest thing in it is still findable at a glance. */
   .chip{
-    font-size:11px;padding:2px 8px;border-radius:11px;
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:11px;padding:2px 9px 2px 7px;border-radius:11px;
     background:rgba(176,134,55,.18);border:1px solid rgba(176,134,55,.4);color:var(--lamp);
     cursor:pointer;
   }
-  .chip:hover{background:rgba(176,134,55,.32)}
+  .chip:hover,.chip:focus-visible{background:rgba(176,134,55,.34)}
+  .chip i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;font-style:normal}
+  .chip.r-common i{background:#9a9382}
+  .chip.r-uncommon i{background:#5fbf9c}
+  .chip.r-rare i{background:#6ea8dc}
+  .chip.r-brass i{background:linear-gradient(#f0cf83,#b08637);box-shadow:0 0 0 1px rgba(240,207,131,.5)}
+  .chip.combo{border-color:var(--jade);box-shadow:0 0 0 1px rgba(79,168,138,.4)}
+
+  /* The hover card. Fixed to the window and put on the body, so it is never
+     clipped by whatever it is hovering inside. */
+  #tip{
+    position:fixed;z-index:60;max-width:330px;pointer-events:none;
+    background:linear-gradient(#fbf9ef,#e4e0cf);color:var(--oxblood);
+    border:1px solid rgba(0,0,0,.4);border-radius:5px;padding:9px 11px 10px;
+    box-shadow:4px 5px 0 rgba(0,0,0,.45);
+    font:12px/1.35 var(--narrow);
+  }
+  #tip[hidden]{display:none}
+  #tip h5{margin:0 0 1px;font:600 14px/1.15 var(--narrow);color:var(--ink)}
+  #tip .rar{font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:#8a4a3a;margin-bottom:5px}
+  #tip .rar b{color:#7a5c50;font-weight:600;letter-spacing:0;text-transform:none;font-size:11px}
+  #tip p{margin:0 0 5px;color:#4a342c}
+  #tip .bound{color:#7a6a60;font-style:italic;border-top:1px dotted rgba(92,29,32,.25);padding-top:5px;margin-top:2px}
+  #tip .combos{color:#1d6b55;font-weight:600;margin-top:4px}
+  #tip .tags{color:#8a7f74;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
 
   .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12px}
   .kv dt{color:var(--dim)}
@@ -266,7 +294,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="848f2122047e">
+<meta name="build" content="f458b3445cae">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -316,8 +344,8 @@
 <header>
   <div id="brand"><b id="title">Brass Rain</b><span id="tagline"></span></div>
   <div id="tools">
-    <button id="toRow" type="button">Machines</button>
-    <button id="toFloor" type="button">Floor</button>
+    <button id="toRow" type="button">The row</button>
+    <button id="toFloor" type="button">The parlour</button>
     <button id="toSettings" type="button">Settings</button>
     <button id="toHelp" type="button">Help</button>
   </div>
@@ -327,7 +355,7 @@
   <aside id="plaques">
 
     <section class="plaque" id="pRound">
-      <h2>Round <span id="roundNo">1</span></h2>
+      <h2>Round <span id="roundNo">1</span> <span id="cabinet"></span></h2>
       <div class="row"><span class="big" id="wonNow">0</span><span class="sub">of <b id="quotaNo">0</b></span></div>
       <div class="tube" id="quotaTube"><i style="width:0%"></i></div>
       <div class="row"><span class="sub" id="perBall"></span></div>
@@ -355,7 +383,7 @@
     </section>
 
     <section class="plaque" id="pFloor">
-      <h2>The floor</h2>
+      <h2>The parlour</h2>
       <div class="row"><span class="big" id="scrip">0</span><span class="sub">scrip</span></div>
       <div class="row"><span class="sub">Earning</span><b class="live" id="income">0 /s</b></div>
       <div class="row"><span class="sub">Your best round pays</span><b id="handMult">x1</b></div>
@@ -381,6 +409,8 @@
 
 <footer id="rail"></footer>
 
+<div id="tip" hidden role="tooltip"></div>
+
 <!-- the bench, between rounds -->
 <div class="sheet dock" id="bench" hidden>
   <div class="panel">
@@ -404,7 +434,7 @@
 <!-- the parlour floor -->
 <div class="sheet" id="floor" hidden>
   <div class="panel">
-    <h1>The floor</h1>
+    <h1>The parlour</h1>
     <p class="lede" id="floorLede"></p>
     <div id="bulkbar"></div>
     <table id="machines"><thead><tr>
@@ -477,7 +507,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=1';
+  import { boot } from './src/ui.js?v=2';
   boot(document);
 </script>
 </body>

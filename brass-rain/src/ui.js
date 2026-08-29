@@ -15,12 +15,12 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=1';
-import { createScene } from './render/scene.js?v=1';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=1';
-import { num, count, duration, mult, pct, fill } from './format.js?v=1';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=1';
-import { nailPos } from './board.js?v=1';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=2';
+import { createScene } from './render/scene.js?v=2';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=2';
+import { num, count, duration, mult, pct, fill } from './format.js?v=2';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=2';
+import { nailPos } from './board.js?v=2';
 
 const SPEEDS = [1, 2, 4];
 
@@ -189,6 +189,9 @@ export async function boot(doc) {
   // ---- painting ------------------------------------------------------
   function paint(r) {
     el.roundNo.textContent = r.round;
+    // Which cabinet this is. The whole point of walking the row is that the
+    // machine in front of you is a particular machine, so it says which.
+    if (el.cabinet) el.cabinet.textContent = r.cabinet ? r.cabinet.name : '';
     el.wonNow.textContent = num(r.won);
     el.quotaNo.textContent = num(r.quota);
     const done = Math.min(1, r.quota > 0 ? r.won / r.quota : 0);
@@ -332,7 +335,7 @@ export async function boot(doc) {
       const f = offer.fitting;
       const card = doc.createElement('div');
       card.className = 'card' + (offer.partners.length ? ' combo' : '');
-      const text = describe(f);
+      const text = describe(f, true);
       card.innerHTML = '<div class="rar"></div><h4></h4><p></p>'
         + (offer.partners.length ? '<div class="combos"></div>' : '')
         + '<div class="price"><span></span></div>';
@@ -343,6 +346,13 @@ export async function boot(doc) {
         card.querySelector('.combos').textContent = 'Works with ' + offer.partners.map(nameOf).join(', ');
       }
       card.querySelector('.price span').textContent = num(offer.price) + ' balls';
+      // The same card a bolted-in part shows, so what is on offer and what is
+      // already in the machine are read the same way.
+      attachTip(card, () => {
+        const t = tipFor(f.id) || { name: f.name, rarity: f.rarity, price: f.price, text, bound: f.bound || '', tags: f.tags || [], combos: [], partners: [] };
+        t.price = offer.price;
+        return t;
+      });
       const b = doc.createElement('button');
       b.type = 'button';
       b.textContent = 'Bolt in';
@@ -358,12 +368,23 @@ export async function boot(doc) {
 
     el.slotCount.textContent = '(' + r.fittings.length + ' of ' + r.slots + ')';
     el.owned.textContent = '';
+    const combos = activeCombos(r.fittings);
     for (const id of r.fittings) {
+      const f = game.bench.byId.get(id);
       const chip = doc.createElement('span');
-      chip.className = 'chip';
-      chip.textContent = nameOf(id);
-      chip.title = 'Click to unbolt';
-      chip.addEventListener('click', () => { game.sellFitting(id); paintBench(); });
+      chip.className = 'chip r-' + (f ? f.rarity : 'common')
+        + (combos.some(c => c.ids.indexOf(id) >= 0) ? ' combo' : '');
+      chip.tabIndex = 0;
+      const bead = doc.createElement('i');
+      bead.setAttribute('aria-hidden', 'true');
+      chip.appendChild(bead);
+      chip.appendChild(doc.createTextNode(nameOf(id)));
+      chip.setAttribute('aria-label', nameOf(id) + ', ' + (f ? f.rarity : 'common') + '. Click to unbolt.');
+      attachTip(chip, () => tipFor(id));
+      chip.addEventListener('click', () => { hideTip(); game.sellFitting(id); paintBench(); });
+      chip.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideTip(); game.sellFitting(id); paintBench(); }
+      });
       el.owned.appendChild(chip);
     }
     if (!r.fittings.length) el.owned.textContent = 'Nothing bolted in yet.';
@@ -416,15 +437,154 @@ export async function boot(doc) {
 
   function sum(arr) { let t = 0; for (let i = 0; i < arr.length; i++) t += arr[i]; return t; }
 
-  function describe(f) {
+  // ---- the hover card -------------------------------------------------
+  //
+  // What a part is, in full, without having to unbolt it to find out: its
+  // rarity, what it does with the numbers this machine actually has in it, the
+  // ceiling the catalogue puts on it, and any named combination it is
+  // currently half of. Shown on hover and on keyboard focus, because a detail
+  // only reachable with a mouse is a detail some players never see.
+
+  function activeCombos(ids) {
+    const cat = game.catalogue;
+    if (!cat || typeof cat.activeSynergies !== 'function') return [];
+    try {
+      const owned = (cat.FITTINGS || []).filter(f => ids.indexOf(f.id) >= 0);
+      return cat.activeSynergies(owned) || [];
+    } catch (e) { return []; }
+  }
+
+  function tipFor(id) {
+    const f = game.bench.byId.get(id);
+    if (!f) return null;
+    
+    const owned = game.reading().fittings;
+    const live = activeCombos(owned).filter(c => c.ids.indexOf(id) >= 0);
+    const partners = partnersOf(id, owned);
+    return {
+      name: f.name,
+      rarity: f.rarity,
+      price: f.price,
+      text: describe(f, owned.indexOf(id) < 0),
+      bound: f.bound || '',
+      tags: Array.isArray(f.tags) ? f.tags : [],
+      combos: live,
+      partners,
+    };
+  }
+
+  function partnersOf(id, owned) {
+    const cat = game.catalogue;
+    const list = (cat && Array.isArray(cat.SYNERGIES)) ? cat.SYNERGIES : [];
+    const out = [];
+    for (const sgy of list) {
+      if (!sgy || !Array.isArray(sgy.ids) || sgy.ids.indexOf(id) < 0) continue;
+      const missing = sgy.ids.filter(x => x !== id && owned.indexOf(x) < 0);
+      if (missing.length) out.push({ name: sgy.name, missing: missing.map(nameOf) });
+    }
+    return out;
+  }
+
+  function attachTip(node, build) {
+    const show = (e) => {
+      const t = build();
+      if (!t) return;
+      el.tip.innerHTML = '<h5></h5><div class="rar"></div><p></p>';
+      el.tip.querySelector('h5').textContent = t.name;
+      el.tip.querySelector('.rar').innerHTML = '';
+      el.tip.querySelector('.rar').appendChild(doc.createTextNode(t.rarity));
+      const cost = doc.createElement('b');
+      cost.textContent = '  bought for ' + num(t.price) + ' balls';
+      el.tip.querySelector('.rar').appendChild(cost);
+      el.tip.querySelector('p').textContent = t.text;
+
+      for (const c of t.combos) {
+        const d = doc.createElement('div');
+        d.className = 'combos';
+        d.textContent = c.name + ': ' + c.text;
+        el.tip.appendChild(d);
+      }
+      for (const p of t.partners) {
+        const d = doc.createElement('div');
+        d.className = 'combos';
+        d.style.color = '#8a6a3a';
+        d.textContent = p.name + ' needs ' + p.missing.join(' and ');
+        el.tip.appendChild(d);
+      }
+      if (t.bound) {
+        const b = doc.createElement('div');
+        b.className = 'bound';
+        b.textContent = t.bound;
+        el.tip.appendChild(b);
+      }
+      if (t.tags.length) {
+        const g = doc.createElement('div');
+        g.className = 'tags';
+        g.textContent = t.tags.join('  ');
+        el.tip.appendChild(g);
+      }
+      el.tip.hidden = false;
+      place(e || lastPoint, node);
+    };
+    node.addEventListener('pointerenter', show);
+    node.addEventListener('focus', show);
+    node.addEventListener('pointermove', (e) => { if (!el.tip.hidden) place(e, node); });
+    node.addEventListener('pointerleave', hideTip);
+    node.addEventListener('blur', hideTip);
+  }
+
+  let lastPoint = null;
+  function place(e, node) {
+    const box = el.tip.getBoundingClientRect();
+    const pad = 12;
+    let x, y;
+    if (e && Number.isFinite(e.clientX)) {
+      lastPoint = e;
+      x = e.clientX + 14;
+      y = e.clientY + 16;
+    } else {
+      const r = node.getBoundingClientRect();
+      x = r.left;
+      y = r.bottom + 8;
+    }
+    // Kept inside the window on both axes, so a part near an edge still shows
+    // its whole card rather than half of one.
+    if (x + box.width + pad > window.innerWidth) x = window.innerWidth - box.width - pad;
+    if (y + box.height + pad > window.innerHeight) y = y - box.height - 26;
+    el.tip.style.left = Math.max(pad, x) + 'px';
+    el.tip.style.top = Math.max(pad, y) + 'px';
+  }
+
+  function hideTip() { el.tip.hidden = true; }
+
+  /**
+   * A part's sentence, with the numbers it would actually produce.
+   *
+   * `withPart` means the sentence is built against the machine this part WOULD
+   * make rather than the one it is not in yet, which is the difference between
+   * "fever runs 12 balls instead of 10" and "fever runs 10 balls instead of 10".
+   */
+  function describe(f, withPart) {
     const cat = game.catalogue;
     if (cat && typeof cat.describe === 'function') {
       try {
-        const s = cat.describe(f, { model: game.catalogueModel() });
+        const model = withPart ? modelWith(f.id) : game.catalogueModel();
+        const s = cat.describe(f, { model });
         if (typeof s === 'string' && s) return s;
       } catch (e) { /* fall through to the plain text */ }
     }
-    return String(f.text || '').replace(/\{\w+%?\}/g, '');
+    return String(f.text || '').replace(/\{\w+[%#~]?\}/g, '');
+  }
+
+  /** The catalogue's view of this machine with one more part bolted in. */
+  function modelWith(id) {
+    const cat = game.catalogue;
+    if (!cat || typeof cat.buildModel !== 'function') return null;
+    try {
+      const want = new Set(game.reading().fittings);
+      want.add(id);
+      return cat.buildModel((cat.FITTINGS || []).filter(x => want.has(x.id)));
+    } catch (e) { return game.catalogueModel(); }
   }
 
   function nameOf(id) {
@@ -460,7 +620,7 @@ export async function boot(doc) {
       d.innerHTML = '<h4></h4><div class="big"></div><p></p>'
         + '<dl><dt>Nails</dt><dd class="n1"></dd><dt>Rows</dt><dd class="n2"></dd>'
         + '<dt>Back per ball</dt><dd class="n3"></dd></dl>';
-      d.querySelector('h4').textContent = cab.name;
+      d.querySelector('h4').textContent = cab.name + (cab.layout ? '  ' + cab.layout : '');
       d.querySelector('.big').textContent = pct(cab.gate) + ' to the gate';
       d.querySelector('p').textContent = cab.line;
       d.querySelector('.n1').textContent = count(cab.nails);
@@ -486,8 +646,8 @@ export async function boot(doc) {
 
   function paintFloor() {
     const r = game.reading();
-    el.floorLede.textContent = 'The floor earns ' + num(r.income) + ' scrip a second whether you are at the handle '
-      + 'or not, and everything on it is multiplied by ' + mult(game.handMultiplier())
+    el.floorLede.textContent = 'The parlour earns ' + num(r.income) + ' scrip a second whether you are at the handle '
+      + 'or not, and everything in it is multiplied by ' + mult(game.handMultiplier())
       + ' because you have taken a night to round ' + Math.max(r.bestRound, 0) + '. You hold ' + num(r.scrip) + '.';
 
     if (!el.bulkbar._built) {
@@ -683,29 +843,34 @@ const HELP = [
   ['The gate', 'The narrow mouth in the middle. A ball through it spins the reels. Three matching digits open '
     + 'the attacker, and while the attacker is open the plates run almost everything into it. The odds are printed '
     + 'on the plaque, the way a real cabinet prints them on the glass. Nothing is hidden and nothing is arranged.'],
-  ['The nails', 'Between rounds the machine goes on the bench and you can lean the nails. Drag one. A single nail '
-    + 'in the right place is worth several times the gate rate; the wrong one closes the board. Watch where balls '
-    + 'have been landing and lean the nails that feed the gate. This is the whole craft of the thing.'],
+  ['The nails', 'Between rounds the machine goes on the bench and you can lean the nails. Drag one. A well chosen '
+    + 'lean puts about a quarter more balls through the gate and a badly chosen one costs you, so it is a night of '
+    + 'small deliberate changes rather than one clever move. The chart on the bench shows where the last round '
+    + 'actually went; lean the nails that feed the gate. This is the whole craft of the thing.'],
   ['The tray', 'Launching costs a ball. Pockets pay balls. Played straight the face pays back less than it takes, '
     + 'so a round only comes out ahead through a fever. The tray is also the money at the bench: parts and rerolls '
     + 'are bought with the balls you have not spent.'],
-  ['The floor', 'Cash a tray out and it becomes scrip, which buys machines. Machines earn on their own. What they '
-    + 'earn is multiplied by how deep you have taken a night at the handle, so playing is always the best thing '
-    + 'you can do for the floor.'],
+  ['The row', 'Every cabinet on the row is a different machine, not the same one nailed differently. Six faces exist '
+    + 'and each has its mouths in different places, its gate at a different height and its own funnel, so what pays '
+    + 'on one does not pay on the next. What a cabinet asks of you is scaled to what it pays, so a thin board is not '
+    + 'a punishment - it is a different game. Walk the row before you sit down.'],
+  ['The parlour', 'Cash a tray out and it becomes scrip, which buys machines. Machines you own earn on their own. '
+    + 'What they earn is multiplied by how deep you have taken a night at the handle, so playing is always the best '
+    + 'thing you can do for the parlour.'],
 ];
 
 function index(doc) {
   const $ = (id) => doc.getElementById(id);
   return {
     title: $('title'), tagline: $('tagline'),
-    roundNo: $('roundNo'), wonNow: $('wonNow'), quotaNo: $('quotaNo'),
+    roundNo: $('roundNo'), cabinet: $('cabinet'), wonNow: $('wonNow'), quotaNo: $('quotaNo'),
     quotaTube: $('quotaTube'), perBall: $('perBall'),
     handle: $('handle'), strengthOut: $('strengthOut'), perPull: $('perPull'),
     pull: $('pull'), auto: $('auto'), speed: $('speed'),
     oddsMatch: $('oddsMatch'), oddsCont: $('oddsCont'), oddsGate: $('oddsGate'), oddsBack: $('oddsBack'),
     scrip: $('scrip'), income: $('income'), handMult: $('handMult'), cash: $('cash'),
     log: $('log'), rail: $('rail'), face: $('face'), canvas: $('view'),
-    banner: $('banner'), hint: $('hint'), flyer: $('flyer'),
+    banner: $('banner'), hint: $('hint'), flyer: $('flyer'), tip: $('tip'),
     toRow: $('toRow'), rowSheet: $('row'), rowTitle: $('rowTitle'), rowLede: $('rowLede'),
     cabinets: $('cabinets'), rowLater: $('rowLater'),
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),

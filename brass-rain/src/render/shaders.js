@@ -20,7 +20,7 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=1';
+import { digitGlsl } from './digits.js?v=2';
 
 // ---- shared ---------------------------------------------------------------
 

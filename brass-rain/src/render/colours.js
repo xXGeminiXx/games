@@ -20,7 +20,7 @@
 // in fever is the same lamp turned up, not a different lamp.
 // ---------------------------------------------------------------------------
 
-import { oklch, hexToRgb, srgbToLinear, hexToOklch, clampOklch } from '../palette.js?v=1';
+import { oklch, hexToRgb, srgbToLinear, hexToOklch, clampOklch } from '../palette.js?v=2';
 
 // The face as it would be described by somebody standing in front of it:
 // deep oxblood lacquer, one cream lamp, brass pins, chrome balls and bezel,

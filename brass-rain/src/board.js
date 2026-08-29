@@ -18,19 +18,35 @@
 // to read it again.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=1';
+import { rng as makeRng } from './rng.js?v=2';
 
 export const POCKET_OUT = 'out';
 export const POCKET_PAY = 'pay';
 export const POCKET_GATE = 'gate';
 export const POCKET_ATTACKER = 'attacker';
 
+/**
+ * Which cabinet a seed is.
+ *
+ * A parlour is a row of different machines. The seed picks a layout, and the
+ * layout decides where the gate is, what mouths are cut into the face, how the
+ * plates run and how tight the funnel is - so two machines are different
+ * objects rather than the same object nailed slightly differently.
+ */
+export function layoutFor(cfg, seed) {
+  const list = Array.isArray(cfg.board.layouts) && cfg.board.layouts.length
+    ? cfg.board.layouts : [{ id: 'sea', name: 'Sea', note: '' }];
+  return list[(seed >>> 0) % list.length];
+}
+
 /** A board laid out from a seed. */
 export function createBoard(cfg, seed) {
   const b = cfg.board;
+  const layout = layoutFor(cfg, seed);
   const board = {
     version: 1,
     seed: seed >>> 0,
+    layout,
     w: b.w,
     h: b.h,
     pinRadius: b.pinRadius,
@@ -50,17 +66,21 @@ export function createBoard(cfg, seed) {
   // Pockets and rails first: a nail is never driven into a mouth, into a
   // plate, or close enough to either that a ball could jam between them, and
   // that can only be checked against furniture that is already placed.
-  layOutPockets(cfg, board);
-  layOutRails(cfg, board);
-  layOutNails(cfg, board, makeRng(seed).next);
+  layOutPockets(cfg, board, layout);
+  layOutRails(cfg, board, layout);
+  liftPocketsOffPlates(cfg, board);
+  layOutNails(cfg, board, makeRng(seed).next, layout);
   rebuild(board);
   return board;
 }
 
-function layOutNails(cfg, board, rng) {
+function layOutNails(cfg, board, rng, layout) {
   const b = cfg.board;
   const nails = [];
-  const gate = b.gate;
+  const shape = layout || {};
+  const gate = shape.gate || b.gate;
+  const funnelRows = Number.isFinite(shape.funnelRows) ? shape.funnelRows : b.gateFunnelRows;
+  const funnelWidth = Number.isFinite(shape.funnelWidth) ? shape.funnelWidth : b.gateFunnelWidth;
   // Two nails closer together than this cannot pass a ball, and a ball that
   // cannot pass and cannot roll off is a ball that never resolves. A board is
   // nailed tight but it is never nailed shut, so every pair laid here is
@@ -114,10 +134,10 @@ function layOutNails(cfg, board, rng) {
   // narrow band of falling balls and drop them at the gate mouth, with a pair
   // of shoulder nails that turn most of them away again. Without this the gate
   // is unreachable; with it too wide the gate is free.
-  const rows = b.gateFunnelRows;
+  const rows = funnelRows;
   for (let i = 0; i < rows; i++) {
     const t = i / Math.max(1, rows - 1);
-    const halfWidth = b.gateFunnelWidth * (1 - t * 0.62) * 0.5;
+    const halfWidth = funnelWidth * (1 - t * 0.62) * 0.5;
     const y = gate.y - (rows - i) * 4.4;
     // The funnel is driven over whatever the lattice put there, because its
     // whole job is to be the one deliberate shape on an otherwise even face.
@@ -160,20 +180,30 @@ function clearNear(nails, x, y, r) {
   }
 }
 
-function layOutPockets(cfg, board) {
+function layOutPockets(cfg, board, layout) {
   const b = cfg.board;
+  const shape = layout || {};
+  const gate = shape.gate || b.gate;
+  const attacker = shape.attacker || b.attacker;
+  const pockets = Array.isArray(shape.payPockets) ? shape.payPockets : b.payPockets;
   const p = [];
 
   p.push({
     id: 'gate', kind: POCKET_GATE, label: cfg.text.gate, open: true, pay: 0,
-    x: b.gate.x, y: b.gate.y, w: b.gate.w, h: b.gate.h,
+    x: gate.x, y: gate.y, w: gate.w, h: gate.h,
   });
+  if (shape.extraGate) {
+    p.push({
+      id: 'gate2', kind: POCKET_GATE, label: cfg.text.gate, open: true, pay: 0,
+      x: shape.extraGate.x, y: shape.extraGate.y, w: shape.extraGate.w, h: shape.extraGate.h,
+    });
+  }
   p.push({
     id: 'attacker', kind: POCKET_ATTACKER, label: cfg.text.attacker, open: false,
     pay: cfg.fever.attackerPay,
-    x: b.attacker.x, y: b.attacker.y, w: b.attacker.w, h: b.attacker.h,
+    x: attacker.x, y: attacker.y, w: attacker.w, h: attacker.h,
   });
-  b.payPockets.forEach((q, i) => {
+  pockets.forEach((q, i) => {
     p.push({
       id: q.id || ('pay' + i), kind: POCKET_PAY, label: String(q.pay), open: true, pay: q.pay,
       tone: q.tone || 'enamel', x: q.x, y: q.y, w: q.w, h: q.h,
@@ -183,8 +213,9 @@ function layOutPockets(cfg, board) {
   board.pockets = p;
 }
 
-function layOutRails(cfg, board) {
+function layOutRails(cfg, board, layout) {
   const b = cfg.board;
+  const shape = layout || {};
   // The outer rails. The left one is the curve a strongly hit ball rides
   // around; the right one is the channel it is launched up.
   board.walls = [
@@ -196,12 +227,39 @@ function layOutRails(cfg, board) {
   // is a payout or the out lane is decided entirely by whether the attacker is
   // open, which is what makes a fever worth having and the rest of the time
   // worth surviving.
-  const a = b.attacker;
+  const a = shape.attacker || b.attacker;
   const mouthY = a.y - a.h * 0.5 - cfg.physics.ballRadius * 1.1;
   board.guides = [
     { x1: b.fieldLeft, y1: mouthY - 11, x2: a.x - a.w * 0.4, y2: mouthY },
     { x1: b.fieldRight, y1: mouthY - 11, x2: a.x + a.w * 0.4, y2: mouthY },
   ];
+}
+
+/**
+ * Moves any pay mouth that is sitting on a plate.
+ *
+ * The plates are a chute: everything the nails scatter runs down them to the
+ * attacker's mouth. A pay mouth left on that run catches almost every ball
+ * that reaches it - measured at 97 percent on one cabinet, which paid nearly
+ * two balls for every one launched and made the gate pointless. Whether that
+ * happens is decided by two numbers in a layout being close together, which is
+ * far too easy to do by accident, so it is corrected here rather than trusted
+ * to whoever writes the next cabinet.
+ */
+function liftPocketsOffPlates(cfg, board) {
+  const clear = cfg.physics.ballRadius * 2.6;
+  for (const p of board.pockets) {
+    if (p.kind !== POCKET_PAY) continue;
+    for (let tries = 0; tries < 30; tries++) {
+      let onPlate = false;
+      for (const g of board.guides) {
+        if (pointToSegment(p.x, p.y, g) < clear) { onPlate = true; break; }
+      }
+      if (!onPlate) break;
+      p.y -= clear * 0.5;
+      if (p.y < cfg.board.fieldTop + 6) break;
+    }
+  }
 }
 
 /** Rebuilds the packed nail array and the lookup grid. Call after any change. */
@@ -361,7 +419,7 @@ export function removePinsNear(board, x, y, r) {
 /** Re-lays every nail from a new seed. Bends and additions do not survive. */
 export function renail(cfg, board, seed) {
   board.seed = seed >>> 0;
-  layOutNails(cfg, board, makeRng(board.seed).next);
+  layOutNails(cfg, board, makeRng(board.seed).next, board.layout);
   return rebuild(board);
 }
 

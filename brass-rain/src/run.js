@@ -13,10 +13,10 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=1';
-import { createBoard, pocket } from './board.js?v=1';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=1';
-import { fire, hasHook } from './hooks.js?v=1';
+import { rng as makeRng } from './rng.js?v=2';
+import { createBoard, pocket } from './board.js?v=2';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=2';
+import { fire, hasHook } from './hooks.js?v=2';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -50,13 +50,15 @@ export function baseMods() {
 /** A fresh run on a fresh machine. */
 export function createRun(cfg, seed, meta, fitted) {
   const r = makeRng('run:' + seed);
+  const board = createBoard(cfg, seed);
+  useCabinet(cfg, board);
   const state = {
     cfg,
     seed: seed >>> 0,
     rng: r,
     meta: meta || emptyMeta(),
 
-    board: createBoard(cfg, seed),
+    board,
     balls: createBalls(cfg.physics.maxLive),
 
     phase: PHASE_PLAY,
@@ -71,7 +73,7 @@ export function createRun(cfg, seed, meta, fitted) {
     launchAcc: 0,
     lent: 0,              // balls the counter put in to cover this round
 
-    fever: { active: false, ballsLeft: 0, chain: 0, mult: 1, t: 0 },
+    fever: { active: false, ballsLeft: 0, chain: 0, mult: 1, t: 0, spent: 0 },
     reel: { spinning: false, t: 0, queued: 0, digits: [0, 0, 0], result: null, holdT: 0 },
 
     fittings: [],
@@ -137,8 +139,27 @@ export function emptyMeta() {
  */
 export function quotaFor(cfg, n, mods) {
   const demand = cfg.run.demandBase * Math.pow(cfg.run.demandGrowth, Math.max(0, n - 1));
+  // Asked against what THIS cabinet pays, which is carried on the run's own
+  // configuration rather than threaded through every caller. A thin board and
+  // a generous one are different machines, and asking both for the same
+  // number of balls would make picking a cabinet a matter of picking the least
+  // punishing one rather than picking the one you want to play.
   const base = demand * cfg.run.baseReturn * budgetFor(cfg, n, mods);
   return Math.max(1, Math.ceil(base * (mods ? mods.quotaMult : 1)));
+}
+
+/**
+ * Tells a configuration which cabinet it belongs to.
+ *
+ * Called once when a board is put in front of the player. Everything that asks
+ * what a round demands then gets the right answer without having to know a
+ * cabinet exists.
+ */
+export function useCabinet(cfg, board) {
+  const pays = board && board.layout && Number.isFinite(board.layout.baseReturn)
+    ? board.layout.baseReturn : null;
+  if (pays !== null) cfg.run.baseReturn = pays;
+  return cfg;
 }
 
 /** How many pulls of the handle round `n` is rented for. */
@@ -314,6 +335,20 @@ export function pullHandle(state) {
     // put it and stop working the moment they try.
     const ball = { mul: state.mods.ballWorth, add: 0, free: false, forceGate: false, forcePocket: null, tags: [], s: {} };
     moment(state, 'onLaunch', { ball, strength: state.strength, launchIndex: state.launched });
+    // A ball sent during a fever is offered to the parts BEFORE it is paid
+    // for and before it leaves the handle, so a part that pays for it, enriches
+    // it or lengthens the fever is acting on the ball about to be sent rather
+    // than on one already gone.
+    if (state.fever.active) {
+      const fb = {
+        fever: { balls: state.fever.ballsLeft, mult: state.fever.mult, ballsUsed: state.fever.spent || 0 },
+        ball, ballsLeft: state.fever.ballsLeft,
+      };
+      moment(state, 'onFeverBall', fb);
+      if (Number.isFinite(fb.fever.mult) && fb.fever.mult > 0) state.fever.mult = fb.fever.mult;
+      if (Number.isFinite(fb.fever.balls) && fb.fever.balls > 0) state.fever.ballsLeft = Math.round(fb.fever.balls);
+      state.fever.spent = (state.fever.spent || 0) + 1;
+    }
     const idx = launch(cfg, state.balls, state.strength, jitter,
       Number.isFinite(ball.mul) ? ball.mul : 1,
       Number.isFinite(ball.add) ? ball.add : 0,
@@ -334,10 +369,6 @@ export function pullHandle(state) {
     // A fever is measured in balls sent, not in seconds, so it cannot be
     // stretched by playing slowly or cut short by a pause.
     if (state.fever.active) {
-      const fb = { fever: { balls: state.fever.ballsLeft, mult: state.fever.mult, ballsUsed: state.launched },
-        ball, ballsLeft: state.fever.ballsLeft };
-      moment(state, 'onFeverBall', fb);
-      if (Number.isFinite(fb.fever.mult) && fb.fever.mult > 0) state.fever.mult = fb.fever.mult;
       if (--state.fever.ballsLeft <= 0) endFever(state);
     }
   }
@@ -454,7 +485,15 @@ function resolveEvent(state, e, out) {
     const given = Number.isFinite(pocketCtx.value) ? pocketCtx.value : pocketCtx.payout;
     if (Number.isFinite(given)) base = given;
   }
-  const pay = Math.max(0, Math.round(base * state.mods.payMult * feverMult * gateMult));
+  // Carried as a fraction rather than rounded at each mouth. The mouths pay
+  // 1, 1, 2, 2 and 6, so rounding here threw away every multiplier under about
+  // a quarter: a part promising eight percent more per ball delivered exactly
+  // nothing on a board where nothing pays enough for eight percent to be a
+  // whole ball. The remainder is kept and paid out as soon as it adds up.
+  const exact = Math.max(0, base * state.mods.payMult * feverMult * gateMult);
+  state.wonFrac = (state.wonFrac || 0) + exact;
+  const pay = Math.floor(state.wonFrac);
+  state.wonFrac -= pay;
   if (pay > 0) {
     state.tray += pay;
     state.won += pay;
@@ -542,17 +581,22 @@ function stepReels(state, dt, out) {
   let symbol = Math.floor(state.rng.next() * cfg.reels.digits);
   let feverLen = 0, feverMult = 0;
 
+  // One face on the strip is the seven, the way a cabinet has one. It is named
+  // rather than numbered so a part can ask for it by name, which is how the
+  // catalogue is written.
+  const named = (d) => (d === cfg.reels.sevenDigit ? 'seven' : d);
   const spinCtx = moment(state, 'onReelSpin', {
     spin: {
       reels: [reel.digits[0], reel.digits[1], reel.digits[2]],
-      reach: !matched, reachSymbol: symbol, matched, symbol,
+      reach: !matched, reachSymbol: named(symbol), matched, symbol: named(symbol),
       respins: 0, respin: false, feverLen: 0, feverMult: 0,
     },
   });
   if (spinCtx) {
     const sp = spinCtx.spin;
     if (typeof sp.matched === 'boolean') matched = sp.matched;
-    if (Number.isFinite(sp.symbol)) symbol = Math.max(0, Math.floor(sp.symbol)) % cfg.reels.digits;
+    if (sp.symbol === 'seven') symbol = cfg.reels.sevenDigit;
+    else if (Number.isFinite(sp.symbol)) symbol = Math.max(0, Math.floor(sp.symbol)) % cfg.reels.digits;
     if (Number.isFinite(sp.feverLen) && sp.feverLen > 0) feverLen = sp.feverLen;
     if (Number.isFinite(sp.feverMult) && sp.feverMult > 0) feverMult = sp.feverMult;
     // A part may buy one more turn of the reels, and exactly one, so no
@@ -599,6 +643,7 @@ export function startFever(state, out, lenOverride, multOverride) {
   moment(state, 'onFeverStart', { fever: fev });
   f.ballsLeft = Math.max(1, Math.round(fev.balls));
   f.chain = chaining ? f.chain + 1 : 1;
+  f.spent = 0;
   f.mult = Number.isFinite(fev.mult) && fev.mult > 0 ? fev.mult : 1;
   // A part may buy extra balls of an open attacker on top of the fever itself.
   // The attacker is a flap: the only thing a window can mean physically is

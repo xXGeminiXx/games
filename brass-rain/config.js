@@ -68,7 +68,7 @@ export const CONFIG = {
     shop:       'The Bench',
     fittings:   'Fittings',
     fitting:    'Fitting',
-    machines:   'Floor',
+    machines:   'The parlour',
     machine:    'Machine',
     attendant:  'Attendant',
     cashOut:    'Cash out',
@@ -169,17 +169,119 @@ export const CONFIG = {
     // pay mouths take a ball with about a third of a ball to spare, the gate
     // is tighter still, and the attacker is wide because it is only ever open
     // during a fever.
+    //
+    // These are the DEFAULTS. A cabinet picks a layout from the list below and
+    // overrides them, so two machines on the floor are different objects
+    // rather than the same object nailed slightly differently.
     gate:      { x: 50, y: 74, w: 3.20, h: 1.42 },
     attacker:  { x: 50, y: 97, w: 10.5, h: 2.13 },
-    // Two pairs and a single. The upper pair are the shelves a wide ball finds
-    // on its way down; the lower pair are the cream mouths either side of the
-    // gate; the jade mouth is the one worth aiming at and the hardest to hit.
     payPockets: [
       { id: 'side0',  x: 17, y: 62, w: 2.73, h: 1.30, pay: 1, tone: 'enamel' },
       { id: 'side1',  x: 83, y: 62, w: 2.73, h: 1.30, pay: 1, tone: 'enamel' },
       { id: 'cream0', x: 31, y: 86, w: 3.00, h: 1.30, pay: 2, tone: 'enamel' },
       { id: 'cream1', x: 69, y: 86, w: 3.00, h: 1.30, pay: 2, tone: 'enamel' },
       { id: 'jade',   x: 50, y: 41, w: 2.18, h: 1.30, pay: 6, tone: 'jade' },
+    ],
+
+    // ------------------------------------------------------------------
+    // THE CABINETS
+    //
+    // A parlour is a row of different machines, not one machine repeated. A
+    // layout is a whole face: where the gate sits, what mouths are cut into
+    // it, how the plates run, how tight the funnel is and how the nails are
+    // laid. Two of these read as different objects across a room, which is
+    // the point - a player walks the row and picks one.
+    //
+    // Every layout is measured before it ships: each has to resolve every
+    // ball, keep the return under one without a fever, and put a findable
+    // number of balls through its gate.
+    // ------------------------------------------------------------------
+    layouts: [
+      {
+        id: 'sea',
+        baseReturn: 0.60,
+        name: 'Sea',
+        note: 'the plain one: a centre gate, shelves high and cream mouths low',
+      },
+      {
+        id: 'tower',
+        baseReturn: 0.80,
+        name: 'Tower',
+        note: 'a high gate under a long funnel, and everything else pushed low',
+        gate: { x: 50, y: 58, w: 3.0, h: 1.42 },
+        funnelRows: 5, funnelWidth: 11,
+        payPockets: [
+          { id: 'side0',  x: 13, y: 48, w: 2.9, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side1',  x: 87, y: 48, w: 2.9, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'cream0', x: 27, y: 88, w: 3.2, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'cream1', x: 73, y: 88, w: 3.2, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'jade',   x: 50, y: 45, w: 2.1, h: 1.30, pay: 5, tone: 'jade' },
+        ],
+      },
+      {
+        id: 'shelf',
+        baseReturn: 0.68,
+        name: 'Shelf',
+        note: 'four wide shelves either side and a gate that sits low and tight',
+        gate: { x: 50, y: 88, w: 2.9, h: 1.42 },
+        funnelRows: 3, funnelWidth: 8,
+        attacker: { x: 50, y: 103, w: 12, h: 2.13 },
+        payPockets: [
+          { id: 'side0',  x: 15, y: 46, w: 3.4, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side1',  x: 85, y: 46, w: 3.4, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side2',  x: 20, y: 68, w: 3.4, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side3',  x: 80, y: 68, w: 3.4, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'cream0', x: 34, y: 80, w: 2.8, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'cream1', x: 66, y: 80, w: 2.8, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'jade',   x: 50, y: 55, w: 1.9, h: 1.30, pay: 5, tone: 'jade' },
+        ],
+      },
+      {
+        id: 'twin',
+        baseReturn: 0.53,
+        name: 'Twin',
+        note: 'two gates off the centre line, and no jade mouth at all',
+        gate: { x: 32, y: 76, w: 3.1, h: 1.42 },
+        extraGate: { x: 68, y: 76, w: 3.1, h: 1.42 },
+        funnelRows: 3, funnelWidth: 9,
+        payPockets: [
+          { id: 'side0',  x: 12, y: 58, w: 2.8, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side1',  x: 88, y: 58, w: 2.8, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'cream0', x: 50, y: 50, w: 3.6, h: 1.30, pay: 4, tone: 'enamel' },
+          { id: 'cream1', x: 50, y: 88, w: 3.2, h: 1.30, pay: 3, tone: 'enamel' },
+        ],
+      },
+      {
+        id: 'well',
+        baseReturn: 0.81,
+        name: 'Well',
+        note: 'a deep centre well: the jade mouth sits right above the gate',
+        gate: { x: 50, y: 80, w: 3.3, h: 1.42 },
+        funnelRows: 4, funnelWidth: 7,
+        payPockets: [
+          { id: 'side0',  x: 20, y: 54, w: 2.7, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side1',  x: 80, y: 54, w: 2.7, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'cream0', x: 24, y: 84, w: 3.1, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'cream1', x: 76, y: 84, w: 3.1, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'jade',   x: 50, y: 66, w: 1.9, h: 1.30, pay: 5, tone: 'jade' },
+        ],
+      },
+      {
+        id: 'ladder',
+        baseReturn: 0.67,
+        name: 'Ladder',
+        note: 'mouths stepped down the face in a line, cheapest at the top',
+        gate: { x: 50, y: 92, w: 3.0, h: 1.42 },
+        funnelRows: 2, funnelWidth: 8,
+        attacker: { x: 50, y: 104, w: 11, h: 2.13 },
+        payPockets: [
+          { id: 'side0',  x: 30, y: 40, w: 3.0, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side1',  x: 70, y: 52, w: 3.0, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'cream0', x: 26, y: 64, w: 3.0, h: 1.30, pay: 2, tone: 'enamel' },
+          { id: 'cream1', x: 74, y: 76, w: 3.0, h: 1.30, pay: 3, tone: 'enamel' },
+          { id: 'jade',   x: 50, y: 46, w: 2.1, h: 1.30, pay: 7, tone: 'jade' },
+        ],
+      },
     ],
 
     // The out lane across the bottom - everything that misses ends here.
@@ -235,7 +337,8 @@ export const CONFIG = {
     // the opening reads as a machine sending single balls and steady enough
     // that it never reads as waiting. Fittings raise it; nothing lowers it.
     perMinute: 60,
-    strength: 0.62,       // where the handle sits when a run starts
+    strength: 0.67,       // where the handle sits when a run starts,
+                          // which is the best setting measured across boards
     strengthMin: 0.18,
     strengthMax: 1.0,
     // The machine's own slop. Measured: at a tenth of this the handle is a
@@ -252,6 +355,9 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   reels: {
     digits: 10,
+    // Which face is the seven. A cabinet has one, and parts that care about it
+    // ask for it by name rather than by number.
+    sevenDigit: 7,
     spinSeconds: 1.6,
     holdSeconds: 1.1,     // how long the result stays up
     // The published odds. A real cabinet prints these on the glass and this
@@ -288,7 +394,7 @@ export const CONFIG = {
 
     // Launches allowed in round n: budgetBase + budgetStep * n.
     budgetBase: 64,
-    budgetStep: 8,
+    budgetStep: 4,
 
     // What round n asks for, as a share of what the budget would pay back at
     // the machine's own rate. Demand crosses 1.000 at round 4, which is the
@@ -301,7 +407,11 @@ export const CONFIG = {
     // thousand balls at the default handle across eight boards. The quota is
     // derived from this, so measuring it rather than assuming it is what keeps
     // a round asking for the same effort after the face has been re-nailed.
-    baseReturn: 0.77,
+    // What a cabinet pays back with nothing bolted in, used to derive its
+    // quota. Each layout carries its own measured figure, so a thin board is
+    // not asked for the same number of balls as a generous one; this is only
+    // the fallback for a layout that has not declared one.
+    baseReturn: 0.68,
 
     // Cleared rounds pay. This is the money the bench runs on, and it is
     // deliberately larger than the quota so that clearing early is worth more
@@ -317,7 +427,7 @@ export const CONFIG = {
     // Balls sent by one pull of the handle, by round. A machine starts with
     // one ball on the glass at a time, which is the only way the opening reads
     // as a machine rather than a spray. Fittings add to it.
-    ballsPerPull: [1, 1, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10],
+    ballsPerPull: [1, 1, 1, 2, 2, 3, 4, 6, 8, 11, 15, 20],
   },
 
   // -------------------------------------------------------------------------
