@@ -52,6 +52,7 @@ export function createGame(o) {
 
   const el = (id) => (doc && typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
   const fluxEl = el('flux'), rateEl = el('fluxrate'), eraEl = el('era'), nodesEl = el('nodes'), lawsEl = el('laws');
+  const starRow = el('starrow'), starEl = el('star'), starLabel = el('starlabel');
   const endingEl = el('ending'), boardEl = el('board');
 
   function fmt(n) {
@@ -255,6 +256,30 @@ export function createGame(o) {
     return row.cost > 0 ? fmt(row.cost) : '';
   }
 
+  /**
+   * The heaviest star, named. Nothing is shown until the research that reads a
+   * spectrum is bought, and nothing is shown when the field holds no star -
+   * which is most of an opening, and is not worth a line saying so.
+   */
+  function renderStar() {
+    if (!starRow) return;
+    const on = research.hud && research.hud.indexOf('spectroscopy') >= 0;
+    const st = on && getSim().stats ? getSim().stats() : null;
+    const s = st && st.heaviestStar;
+    if (!s) { starRow.hidden = true; return; }
+    starRow.hidden = false;
+    if (starEl) starEl.textContent = s.spectral;
+    if (!starLabel) return;
+    const mass = (s.solar < 10 ? s.solar.toFixed(2) : fmt(s.solar)) + ' ' + (T.starSolar || 'solar');
+    // Seconds while there is a run left to watch, minutes once there is not
+    // much point counting them - the same shape the ending uses for its span.
+    const left = s.secondsLeft < 90
+      ? Math.max(1, Math.round(s.secondsLeft)) + ' ' + (T.endingSeconds || 'seconds')
+      : Math.round(s.secondsLeft / 60) + ' ' + (T.endingMinutes || 'minutes');
+    const what = s.giant ? (T.starGiant || 'giant') : (T.starMain || 'main sequence');
+    starLabel.textContent = what + ' - ' + mass + ' - ' + left + ' ' + (T.starLeft || 'left');
+  }
+
   function renderBoard() {
     boardDirty = false;
     if (!nodesEl) return;
@@ -313,6 +338,7 @@ export function createGame(o) {
 
   function renderFlux() {
     if (fluxEl) fluxEl.textContent = fmt(research.flux);
+    renderStar();
     if (rateEl) rateEl.textContent = research.rate > 0.005 ? '+' + (research.rate < 10 ? research.rate.toFixed(1) : fmt(research.rate)) + '/s' : '';
     // Affordability changes as flux climbs; re-render the board when a row
     // crosses its price rather than every frame.

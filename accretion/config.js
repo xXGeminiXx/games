@@ -89,6 +89,11 @@ export const CONFIG = {
     },
     // How long a discovery line stays before the bottom goes quiet again.
     captionSeconds: 7,
+    // The spectroscopic reading, assembled beside the flux figure.
+    starSolar:  'solar',
+    starMain:   'main sequence',
+    starGiant:  'giant',
+    starLeft:   'left',
 
     // THE BOARD. The figure beside the mass, the word for a node already
     // known from an earlier universe, the prefix on a node that is waiting on

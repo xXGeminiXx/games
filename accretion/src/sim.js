@@ -3069,6 +3069,10 @@ export function createSim(opts = {}) {
    */
   function stats() {
     let mTot = 0, mMax = 0, hTot = 0, kePop = 0;
+    // The heaviest thing that is actually burning. The heaviest BODY is often
+    // a rock, so a reading about stars cannot be taken from mMax; and only a
+    // star has a class or a life left to report.
+    let starI = -1, starM = 0;
     let aggCount = 0;
     const byKindCount = new Int32Array(KIND_COUNT);
     const byKindPop = new Float64Array(KIND_COUNT);
@@ -3079,6 +3083,7 @@ export function createSim(opts = {}) {
       if (m > mMax) mMax = m;
       hTot += heat[i];
       const k = kind[i];
+      if ((k === KIND.STAR || k === KIND.GIANT_STAR) && m > starM) { starM = m; starI = i; }
       byKindCount[k]++;
       byKindMass[k] += m;
       if (flags[i] & FLAG_AGGREGATE) {
@@ -3109,6 +3114,20 @@ export function createSim(opts = {}) {
       // Magnitude
       totalMass: magFromCode(mTot, expMass),
       maxMass: magFromCode(mMax, expMass),
+      // What spectroscopy reads: the heaviest star, named, with what it has
+      // left. `burn` is the share of its life already spent, so the remainder
+      // is what is left of the life its mass allows it. Null when the field
+      // holds no star at all, which is most of a run's opening.
+      heaviestStar: starI < 0 ? null : (() => {
+        const M = solarOf(starI);
+        const life = Stellar.lifeSeconds(M, stellarP);
+        return {
+          solar: M,
+          spectral: Stellar.spectralClass(M),
+          giant: kind[starI] === KIND.GIANT_STAR,
+          secondsLeft: Math.max(0, (1 - Math.min(1, burn[starI])) * life),
+        };
+      })(),
       heat: magFromCode(hTot, 2 * expMass - expLen),
       heatRadiated: magFromCode(heatRadiated, 2 * expMass - expLen),
       epoch: epochIndex,

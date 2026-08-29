@@ -23,6 +23,13 @@
   #hud #fluxrow{margin-top:10px}
   #hud #fluxrow b{font-size:16px;display:inline-block;margin-right:8px}
   #hud #fluxrow i{font-style:normal;font-size:10px;color:var(--quiet);margin-left:8px}
+  /* The spectroscopic reading. It arrives only when the research that names a
+     star is bought, and it reads at the weight of the flux line rather than
+     the mass line: it is something the field is telling you, not the figure
+     the run is measured by. */
+  #hud #starrow{margin-top:10px}
+  #hud #starrow b{font-size:16px;display:inline-block;margin-right:8px}
+  #hud #starrow[hidden]{display:none}
   #note{
     position:fixed; left:30px; bottom:30px; color:var(--quiet); font-size:11px;
     pointer-events:none;
@@ -64,7 +71,7 @@
   #ending .again:hover{color:var(--figure)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="bfc5ba2131ff">
+<meta name="build" content="df1b42650c76">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -112,7 +119,8 @@
 <body>
 <canvas id="v"></canvas>
 <div id="hud"><b id="mass">0</b><span id="masslabel">bound mass</span>
-  <div id="fluxrow"><b id="flux">0</b><span id="fluxlabel">flux</span><i id="fluxrate"></i></div></div>
+  <div id="fluxrow"><b id="flux">0</b><span id="fluxlabel">flux</span><i id="fluxrate"></i></div>
+  <div id="starrow" hidden><b id="star"></b><span id="starlabel"></span></div></div>
 <div id="board"><div id="era"></div><div id="nodes"></div><div id="laws"></div></div>
 <div id="ending"></div>
 <div id="note">click the void</div>
