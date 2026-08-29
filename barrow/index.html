@@ -165,7 +165,12 @@
   @media (max-width:760px){
     body{overflow:auto}
     #rites-panel{max-height:none;overflow:visible}
-    main{display:flex;flex-direction:column}
+    /* Stacked, the page scrolls instead of the columns scrolling inside a
+       fixed frame - so main has to be allowed to grow past the viewport.
+       Left at flex:1 with min-height:0 it stays locked to the window height
+       while its children are told to overflow visibly, and the rites end up
+       painted straight through the market table underneath them. */
+    main{display:flex;flex-direction:column;flex:none;min-height:auto}
     #field{order:-1;border-bottom:1px solid var(--rule)}
     #hill{height:200px;flex:none}
     #rites-panel{max-height:none}
@@ -186,7 +191,7 @@
   }
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="ffbf35dfa665">
+<meta name="build" content="225aeca9e2db">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -287,8 +292,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=7';
-import { createGame } from './src/game.js?v=7';
+import { CONFIG, applyIdentity } from './config.js?v=8';
+import { createGame } from './src/game.js?v=8';
 
 applyIdentity(document);
 

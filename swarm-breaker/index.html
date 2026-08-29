@@ -77,6 +77,14 @@
     border-top:1px solid var(--line);
   }
   #shop.on{display:flex}
+  /* Four offers across a phone leaves each about 80px, and the second line -
+     the price and what it buys, which is the whole basis of the choice - is
+     cut off mid-word. Below that width the row becomes two columns, which
+     gives every offer twice the room and costs one line of height. */
+  @media (max-width:480px){
+    #shop{flex-wrap:wrap}
+    #shop.on .buy{flex:1 1 calc(50% - 5px)}
+  }
   /* One row, always. flex-basis 0 with min-width 0 is what stops the longest
      description deciding the width of everything and wrapping the fourth
      button onto a second line. */
@@ -180,7 +188,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="cb0c5fc5ccc9">
+<meta name="build" content="801012e0dce9">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -315,17 +323,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=7';
-import { createJuice } from './src/juice.js?v=7';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=7';
-import { createBlockKinds } from './src/blocks.js?v=7';
-import { safeRows } from './src/arrival.js?v=7';
-import { createAwards } from './src/awards.js?v=7';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=7';
-import { createLeaderboard } from './src/leaderboard.js?v=7';
-import * as Tiers from './src/tiers.js?v=7';
-import { createOnboarding } from './src/onboarding.js?v=7';
-import { createVisual } from './src/visual.js?v=7';
+         storageKey, offerCost, applyIdentity } from './config.js?v=8';
+import { createJuice } from './src/juice.js?v=8';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=8';
+import { createBlockKinds } from './src/blocks.js?v=8';
+import { safeRows } from './src/arrival.js?v=8';
+import { createAwards } from './src/awards.js?v=8';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=8';
+import { createLeaderboard } from './src/leaderboard.js?v=8';
+import * as Tiers from './src/tiers.js?v=8';
+import { createOnboarding } from './src/onboarding.js?v=8';
+import { createVisual } from './src/visual.js?v=8';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.

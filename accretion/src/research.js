@@ -179,7 +179,7 @@ export function createResearch(known = []) {
     known: Array.from(new Set(known)),
     laws: [],
     dials: {},
-    mult: { death: 1, all: 1, condense: 1, star: 1, giant: 1, remnant: 0, hole: 0 },
+    mult: { death: 1, all: 1, condense: 0, star: 1, giant: 1, remnant: 0, hole: 0 },
     hud: [],
     wanted: [],      // kinds the field has earned but may not take
     closed: false,
@@ -237,11 +237,14 @@ export function buy(s, id) {
     effects.push({ unlock: d.unlock });
     s.wanted = s.wanted.filter(k => k !== d.unlock);
   }
-  if (d.pays) { s.mult[d.pays] = (s.mult[d.pays] || 1) * d.x; effects.push({ pays: d.pays, x: d.x }); }
-  if (d.shines) {
-    s.mult[d.shines] = d.x === 1 && !s.mult[d.shines] ? 1 : (s.mult[d.shines] || 1) * d.x;
-    effects.push({ shines: d.shines });
-  }
+  // A class that pays nothing yet is switched ON by a node of x 1, rather
+  // than multiplied by it. Without this a node whose whole purpose is to make
+  // a class start paying costs its price and changes nothing, because one
+  // times one is one. Both branches need it: the same node shape exists on
+  // each side, and only one of them used to handle it.
+  const turnOn = (m, cls, x) => (x === 1 && !m[cls] ? 1 : (m[cls] || 1) * x);
+  if (d.pays) { s.mult[d.pays] = turnOn(s.mult, d.pays, d.x); effects.push({ pays: d.pays, x: d.x }); }
+  if (d.shines) { s.mult[d.shines] = turnOn(s.mult, d.shines, d.x); effects.push({ shines: d.shines }); }
   if (d.law) {
     s.laws.push(d.law);
     if (s.dials[d.dial.key] === undefined) s.dials[d.dial.key] = d.dial.def;
@@ -276,7 +279,11 @@ export function want(s, kind) {
 }
 
 function pay(s, amount, cls) {
-  const m = (cls ? (s.mult[cls] || 1) : 1) * (s.mult.all || 1);
+  // A class the field has not learned to be paid for yet sits at 0, and that
+  // zero has to survive: `||` would read it as missing and hand back 1, which
+  // is how a node whose whole purpose is to switch an income on could cost
+  // three million and change nothing. An unknown class still defaults to 1.
+  const m = (cls ? (s.mult[cls] ?? 1) : 1) * (s.mult.all ?? 1);
   const v = amount * m;
   s.flux += v;
   s.earned += v;
