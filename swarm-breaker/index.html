@@ -202,6 +202,17 @@
   }
   #bdnote{margin:4px 0 8px; color:var(--dim); font-size:10px; line-height:1.4}
   #bdlist{display:flex; flex-direction:column; gap:4px}
+  /* Runs only reach the shared board once they have a name to post under. The
+     board module has always been able to take one and nothing ever asked, so
+     every run stayed on the device that played it. */
+  #bdname{display:flex; gap:6px; margin:0 0 8px}
+  #bdname[hidden]{display:none}
+  #bdnameinput{
+    flex:1 1 auto; min-width:0; padding:4px 7px;
+    background:#0b0e14; color:var(--ink); border:1px solid var(--line);
+    font:inherit; font-size:11px;
+  }
+  #bdnameinput:focus{outline:none; border-color:var(--sb-swarm)}
   .bdrow{
     display:flex; align-items:baseline; gap:8px; padding:5px 8px;
     border:1px solid var(--line); background:var(--panel); font-size:12px;
@@ -382,7 +393,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="815427e636de">
+<meta name="build" content="48fa9cfdf81c">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -477,6 +488,11 @@
     <div id="boards">
       <div class="bdhead"><span id="bdtitle">board</span><span id="bdscope"></span></div>
       <p id="bdnote"></p>
+      <div id="bdname" hidden>
+        <input id="bdnameinput" type="text" maxlength="16" placeholder="your name"
+               autocomplete="off" spellcheck="false" aria-label="The name your runs post under">
+        <button id="bdnamesave" type="button">save</button>
+      </div>
       <div id="bdlist"></div>
       <button id="bdcheck" hidden>check the top runs</button>
     </div>
@@ -526,20 +542,20 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=14';
-import { createJuice } from './src/juice.js?v=14';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=14';
-import { createBlockKinds } from './src/blocks.js?v=14';
-import { safeRows } from './src/arrival.js?v=14';
-import { createAwards } from './src/awards.js?v=14';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=14';
-import { createLeaderboard } from './src/leaderboard.js?v=14';
-import * as Tiers from './src/tiers.js?v=14';
-import { createOnboarding } from './src/onboarding.js?v=14';
-import { createVisual } from './src/visual.js?v=14';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=14';
-import { seedForSync, today as utcToday } from './src/daily.js?v=14';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=14';
+         storageKey, offerCost, applyIdentity } from './config.js?v=15';
+import { createJuice } from './src/juice.js?v=15';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=15';
+import { createBlockKinds } from './src/blocks.js?v=15';
+import { safeRows } from './src/arrival.js?v=15';
+import { createAwards } from './src/awards.js?v=15';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=15';
+import { createLeaderboard } from './src/leaderboard.js?v=15';
+import * as Tiers from './src/tiers.js?v=15';
+import { createOnboarding } from './src/onboarding.js?v=15';
+import { createVisual } from './src/visual.js?v=15';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=15';
+import { seedForSync, today as utcToday } from './src/daily.js?v=15';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=15';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -2226,9 +2242,29 @@ function boardEntries(){
 function paintBoard(){
   const list = document.getElementById('bdlist');
   if (!list) return;
+
+  const nameSave = document.getElementById('bdnamesave');
+  const nameInput = document.getElementById('bdnameinput');
+  if (nameSave && nameInput && !nameSave.__wired){
+    nameSave.__wired = 1;
+    const keep = () => {
+      const v = nameInput.value.trim();
+      if (!v) return;
+      board.setName(v);
+      paintBoard();
+    };
+    nameSave.addEventListener('click', keep);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); keep(); } });
+  }
+
   document.getElementById('bdscope').textContent = boardScope();
-  document.getElementById('bdnote').textContent =
-    CONFIG.text.boardNote || 'A run can be replayed by anyone. Rows say whether anybody has.';
+  const consent = board.consent();
+  const wrap = document.getElementById('bdname');
+  const needsName = consent.reason === 'no-name';
+  if (wrap) wrap.hidden = !needsName;
+  document.getElementById('bdnote').textContent = needsName
+    ? (CONFIG.text.boardNameAsk || 'Pick a name and your runs go on the board. It is only a label; nothing else is sent.')
+    : (CONFIG.text.boardNote || 'A run can be replayed by anyone. Rows say whether anybody has.');
   list.innerHTML = '';
 
   boardRows = boardEntries();

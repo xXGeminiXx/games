@@ -1017,7 +1017,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 14,
+    build: 15,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
