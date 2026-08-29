@@ -60,6 +60,11 @@
     color:var(--dim); font-size:11px; display:flex; justify-content:space-between;
     border-top:1px solid var(--line);
   }
+  /* The deepest this difficulty has been taken, beside the controls hint.
+     It reads as a record rather than a target, so it stays as quiet as the
+     hint it sits next to. */
+  #best{margin-left:14px; font-variant-numeric:tabular-nums; white-space:nowrap}
+  #best:empty{display:none}
   button{
     font:inherit; background:var(--panel); color:var(--ink);
     border:1px solid var(--line); padding:4px 10px; cursor:pointer;
@@ -206,7 +211,7 @@
   .aw.won .bar i{background:var(--trade)}
 </style>
 <!-- build-watch:start -->
-<meta name="build" content="1eef4100dac2">
+<meta name="build" content="bf6fdfc16197">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -267,6 +272,7 @@
 
 <footer>
   <span id="hint">drag to aim &middot; release to fire</span>
+  <span id="best"></span>
   <span class="row">
     <button id="modes">menu</button>
     <button id="reset">restart</button>
@@ -342,17 +348,17 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=9';
-import { createJuice } from './src/juice.js?v=9';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=9';
-import { createBlockKinds } from './src/blocks.js?v=9';
-import { safeRows } from './src/arrival.js?v=9';
-import { createAwards } from './src/awards.js?v=9';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=9';
-import { createLeaderboard } from './src/leaderboard.js?v=9';
-import * as Tiers from './src/tiers.js?v=9';
-import { createOnboarding } from './src/onboarding.js?v=9';
-import { createVisual } from './src/visual.js?v=9';
+         storageKey, offerCost, applyIdentity } from './config.js?v=10';
+import { createJuice } from './src/juice.js?v=10';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=10';
+import { createBlockKinds } from './src/blocks.js?v=10';
+import { safeRows } from './src/arrival.js?v=10';
+import { createAwards } from './src/awards.js?v=10';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=10';
+import { createLeaderboard } from './src/leaderboard.js?v=10';
+import * as Tiers from './src/tiers.js?v=10';
+import { createOnboarding } from './src/onboarding.js?v=10';
+import { createVisual } from './src/visual.js?v=10';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1903,9 +1909,15 @@ if (!(resumed && resumed.ok && resumed.found)) openMenu();
 tick();
 
 // The personal best sits in the footer. It works with no server configured.
+// It used to be written to a data attribute that nothing read or styled, so
+// the figure was worked out and thrown away on every load.
 (function showBest(){
   const b = board.best(TIER);
-  if (b && b.depth > 1) document.getElementById('hint').dataset.best = String(b.depth);
+  const el = document.getElementById('best');
+  if (!el) return;
+  el.textContent = b && b.depth > 1
+    ? (CONFIG.text.menuBestLabel || 'best depth') + ' ' + b.depth
+    : '';
 })();
 </script>
 </body>

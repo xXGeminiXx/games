@@ -9,8 +9,8 @@
 // sentences that explain both.
 // ---------------------------------------------------------------------------
 
-import { TRAIT, idsOf, hasTrait, traitEffects, conflicts } from './traits.js?v=6';
-import { unit } from './rng.js?v=6';
+import { TRAIT, idsOf, hasTrait, traitEffects, conflicts } from './traits.js?v=7';
+import { unit } from './rng.js?v=7';
 
 /** The damage types telemetry counts, in the order the panel lists them. */
 const TYPES = ['kinetic', 'blast', 'burn', 'arc'];

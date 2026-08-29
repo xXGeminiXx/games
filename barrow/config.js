@@ -124,6 +124,11 @@ export const CONFIG = {
     // Appended after a figure and a dash, so these three stay lower case:
     // "38% - oversold 1.7x" reads right and "38% - Oversold" does not.
     ceilingLine: 'oversold {x}x',
+    // Anything past the market's capacity is technically over it, and a run
+    // sitting a few percent past is exactly where a player wants to be. Crying
+    // oversold there teaches them to ignore the word. It is said once the
+    // overshoot is large enough to be costing them something.
+    ceilingAt: 1.15,
     ceilingTip:  'More of this is being dug than the market will buy. The same horde on another layer earns more',
     lesserGoods: '{n} older goods',
     lesserTip:   'Everything still held from layers the dead have moved on from',
@@ -541,7 +546,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 9,
+    build: 10,
   },
 };
 

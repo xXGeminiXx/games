@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=9';
-import * as Mk from './market.js?v=9';
-import * as H from './horde.js?v=9';
-import * as R from './rites.js?v=9';
-import * as Rb from './rebirth.js?v=9';
-import * as Lore from './lore.js?v=9';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=9';
-import { fill } from '../config.js?v=9';
+import * as Mat from './materials.js?v=10';
+import * as Mk from './market.js?v=10';
+import * as H from './horde.js?v=10';
+import * as R from './rites.js?v=10';
+import * as Rb from './rebirth.js?v=10';
+import * as Lore from './lore.js?v=10';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=10';
+import { fill } from '../config.js?v=10';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -343,7 +343,7 @@ export function createUI(doc, sim, cfg, actions) {
         row.takes.textContent = fill(T.ledgerTakes, { absorb: fmt(absorb), t: fmtTime(recovery) });
         // Bones are raised, not sold by the ton, so their thin market is not
         // flagged as choking.
-        const choking = sat > 1 && id !== Mat.BONES;
+        const choking = sat > (T.ceilingAt || 1) && id !== Mat.BONES;
         row.hot.textContent = choking ? fill(T.ceilingLine, { x: overBy(sat) }) : '';
         show(row.hot, choking);
       }
@@ -589,7 +589,7 @@ export function createUI(doc, sim, cfg, actions) {
           }
         } else if (md.ledger) {
           const sat = Mk.saturation(sim.marketFor('s' + key), sim.flowOf('s' + key), md);
-          if (sat > 1) { meta += ' - ' + fill(T.ceilingLine, { x: overBy(sat) }); hot = true; }
+          if (sat > (T.ceilingAt || 1)) { meta += ' - ' + fill(T.ceilingLine, { x: overBy(sat) }); hot = true; }
         }
         r.meta.textContent = meta;
         r.meta.className = hot ? 'hot' : '';

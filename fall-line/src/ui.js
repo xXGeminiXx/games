@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=6';
-import { format } from './economy.js?v=6';
-import { kindDef, costOf } from './works.js?v=6';
-import { idsOf } from './traits.js?v=6';
+import { fill } from '../config.js?v=7';
+import { format } from './economy.js?v=7';
+import { kindDef, costOf } from './works.js?v=7';
+import { idsOf } from './traits.js?v=7';
 
 const LOG_SHOWN = 8;
 
@@ -140,7 +140,14 @@ export function createUi(cfg, doc, win, api) {
     if (shownOre < 0 || Math.abs(ore - shownOre) < 1 || Math.abs(ore - shownOre) > 5000) shownOre = ore;
     else shownOre += (ore - shownOre) * 0.25;
     const oreText = Math.abs(ore - shownOre) < 1 ? ore : (ore > shownOre ? Math.floor(shownOre) : Math.ceil(shownOre));
-    put(el.ore, format(oreText));
+    // Raising the ground costs half an ore at odd heights, so a counter that
+    // only ever shows whole ore made a player with 7.9 read "7" and believe a
+    // 7.5 raise was out of reach. The half is shown while the counter is
+    // settled and there is one to show; a climbing figure stays whole so the
+    // count does not flicker through fractions on its way up.
+    const settled = Math.abs(ore - shownOre) < 1;
+    const half = settled && Math.abs(state.ore - ore - 0.5) < 0.05;
+    put(el.ore, format(oreText) + (half ? '.5' : ''));
 
     put(el.hearth, Math.max(0, Math.ceil(state.hearthHp)) + '/' + cfg.hearth.hp);
     setClass(el.hearth, 'low', state.hearthHp < cfg.hearth.hp * 0.3);

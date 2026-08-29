@@ -6,14 +6,14 @@
 // writes the page, and this file decides when each of them happens.
 // ---------------------------------------------------------------------------
 
-import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=6';
-import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=6';
-import { countAlive } from './motes.js?v=6';
-import { kindDef, workAt, stats } from './works.js?v=6';
-import { createIso } from './render/iso.js?v=6';
-import { createGround } from './render/ground.js?v=6';
-import { createScene } from './render/scene.js?v=6';
-import { createUi } from './ui.js?v=6';
+import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=7';
+import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=7';
+import { countAlive } from './motes.js?v=7';
+import { kindDef, workAt, stats } from './works.js?v=7';
+import { createIso } from './render/iso.js?v=7';
+import { createGround } from './render/ground.js?v=7';
+import { createScene } from './render/scene.js?v=7';
+import { createUi } from './ui.js?v=7';
 
 export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const keyMeta = cfg.identity.storagePrefix + '.meta';

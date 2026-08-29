@@ -12,7 +12,7 @@
 // applies a multiplier of its own.
 // ---------------------------------------------------------------------------
 
-import { fireWork, stepProjectiles } from './works-fire.js?v=6';
+import { fireWork, stepProjectiles } from './works-fire.js?v=7';
 
 // How much longer a status holds, and how much harder the drag pulls, for
 // each tier bought. Read from config when the keys exist; these are the

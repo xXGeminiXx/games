@@ -239,6 +239,26 @@ export function createEconomy(cfg, rngLike = Math.random) {
     const num = (v, d) => (Number.isFinite(v) ? v : d);
     state.funds = num(snap.funds, state.funds);
     state.drones = Math.max(cfg.drones.start, num(snap.drones, state.drones));
+    // A fleet bought while hangars made drones cheaper than the last one is
+    // larger than the price curve can now explain, and its owner would find
+    // the hire button dead for ever - the next drone priced at a number with
+    // seventy digits. Bring such a fleet back to what the funds on hand could
+    // actually reach, so the run carries on instead of ending in a wall.
+    if (state.drones > E.hireSaneFleet) {
+      const ratio = 1 + (E.hireGrowth - 1) * Math.pow(E.hangarDiscount, state.upgrades.hangars || 0);
+      const affordable = Math.log(1 + (Math.max(0, state.funds) * (ratio - 1)) / E.hireBase) / Math.log(ratio);
+      // What the funds on hand actually reach, never below the opening fleet.
+      // A floor set at the threshold would leave the hire button just as dead
+      // as before, which is the whole thing being fixed.
+      const keep = Math.max(cfg.drones.start, Math.floor(Number.isFinite(affordable) ? affordable : 0));
+      if (keep < state.drones) {
+        // The specialists among them go with the fleet, in proportion, so the
+        // makeup a player chose survives the correction.
+        const share = keep / state.drones;
+        for (const k of K) state.specialists[k] = Math.floor(state.specialists[k] * share);
+        state.drones = keep;
+      }
+    }
     for (const k of K) { state.specialists[k] = num(snap.specialists && snap.specialists[k], 0); state.pressure[k] = num(snap.pressure && snap.pressure[k], 0); state.avail[k] = num(snap.avail && snap.avail[k], 0.5); }
     for (const u in E.upgrades) state.upgrades[u] = Math.min(E.upgrades[u].max, num(snap.upgrades && snap.upgrades[u], 0));
     state.island = Math.max(1, num(snap.island, 1));

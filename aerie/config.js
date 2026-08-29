@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=15';
+import { oklch } from './src/palette.js?v=16';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 15,             // the ?v= tag every import carries; bump on every src change
+    build: 16,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -74,6 +74,9 @@ export const CONFIG = {
     // Enough hangar levels make each drone cheaper than the last, so `max`
     // would otherwise ask for an unbounded number. This is that bound.
     hireMaxAtOnce: 100000,
+    // A fleet larger than this in an old save was bought under a price that
+    // fell as it grew, and is brought back to what the funds could reach.
+    hireSaneFleet: 400,
     wingSize: 10,
     wingDiscount: 0.82,
     // specialists gather their kind at specialistMult and nothing else

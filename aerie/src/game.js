@@ -1,19 +1,19 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=15';
-import { fill } from '../content.js?v=15';
-import { makeShaders } from './shaders.js?v=15';
-import { createWorld } from './world.js?v=15';
-import { createDrones } from './drones.js?v=15';
-import { createView } from './view.js?v=15';
-import { createEconomy } from './economy.js?v=15';
-import { createSave, createPrefs } from './save.js?v=15';
-import { createUI } from './ui.js?v=15';
-import { createControls } from './controls.js?v=15';
-import { createQuality } from './quality.js?v=15';
-import { createPerfLog } from './perflog.js?v=15';
-import { loop, createGL } from './gl.js?v=15';
-import { rng } from './rng.js?v=15';
-import { fmt, duration } from './numbers.js?v=15';
+import { withOverrides, applyIdentity } from '../config.js?v=16';
+import { fill } from '../content.js?v=16';
+import { makeShaders } from './shaders.js?v=16';
+import { createWorld } from './world.js?v=16';
+import { createDrones } from './drones.js?v=16';
+import { createView } from './view.js?v=16';
+import { createEconomy } from './economy.js?v=16';
+import { createSave, createPrefs } from './save.js?v=16';
+import { createUI } from './ui.js?v=16';
+import { createControls } from './controls.js?v=16';
+import { createQuality } from './quality.js?v=16';
+import { createPerfLog } from './perflog.js?v=16';
+import { loop, createGL } from './gl.js?v=16';
+import { rng } from './rng.js?v=16';
+import { fmt, duration } from './numbers.js?v=16';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -105,8 +105,9 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       view.placeCarrier(p[0], p[1]);
       drones.reset(view.state.carrier);
       syncFleet();
-      flags.voyage = false;
-      ui.reveal(flags);
+      // The card stays. Hiding it here only made it blink: the test that
+      // reveals it reads lifetime earnings, which never fall, so it came
+      // straight back and announced itself again on every voyage.
       ui.log(content.log.arrive);
       persist();
     },
@@ -180,11 +181,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   });
   controls.attach(window);
 
+  // Moving the carrier is said once, not once per click. The deck log holds a
+  // handful of lines, and a few camera-side clicks used to push out the very
+  // messages the game had just spent an unlock teaching.
+  let saidAnchor = false;
   canvas.addEventListener('click', (e) => {
     const p = view.pick(e.clientX, e.clientY);
     if (!p) return;
     view.state.anchor = p;
-    ui.log(content.log.anchor);
+    if (!saidAnchor) { saidAnchor = true; ui.log(content.log.anchor); }
   });
 
   const snapshot = () => ({ eco: eco.snapshot(), seed: cfg.world.seed, anchor: view.state.anchor, at: Date.now() });
