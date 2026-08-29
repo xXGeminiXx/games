@@ -8,7 +8,7 @@
 // its income arriving from below.
 // ---------------------------------------------------------------------------
 
-import { cellsInDisc } from './world.js?v=6';
+import { cellsInDisc } from './world.js?v=7';
 
 export function scale(cfg, level) {
   return Math.pow(cfg.levels.yieldFactor, level);

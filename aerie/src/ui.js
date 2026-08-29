@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=2';
-import { fill } from '../content.js?v=2';
+import { fmt, rate, count, pct } from './numbers.js?v=3';
+import { fill } from '../content.js?v=3';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
@@ -157,6 +157,13 @@ export function createUI(doc, cfg, content, eco, on) {
     el.range.textContent = fmt(eco.range());
   };
 
+  // The view settings are not gated behind progress the way the game's own
+  // panels are. A player whose machine cannot hold a frame needs the quality
+  // control in the first minute, before anything could have unlocked it, so
+  // hiding it until the game decides to offer it would keep it from the one
+  // person who needs it. It sits below the deck log, under the game rather
+  // than inside it, for the same reason the funds and fleet cards are always
+  // there: it is part of the window, not part of the run.
   const reveal = (flags) => {
     show(el.hold, flags.hold);
     show(el.specialists, flags.specialists);

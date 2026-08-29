@@ -9,7 +9,7 @@
 // between browsers by paste.
 // ---------------------------------------------------------------------------
 
-import { SAVE_VERSION } from './sim.js?v=6';
+import { SAVE_VERSION } from './sim.js?v=7';
 
 const migrations = new Map();
 

@@ -1,8 +1,8 @@
 // The fleet as textures. Each drone is one texel in two textures stepped by
 // one shader; the CPU only uploads a kind table when the fleet's makeup
 // changes and a count when it grows. Drawing is one instanced call.
-import { fullscreen, program, instancedMesh, pingpongMRT, texture, buffer } from './gl.js?v=2';
-import { dart } from './dart.js?v=2';
+import { fullscreen, program, instancedMesh, pingpongMRT, texture, buffer } from './gl.js?v=3';
+import { dart } from './dart.js?v=3';
 
 export function createDrones(gl, cfg, S) {
   const W = Math.round(Math.sqrt(cfg.drones.visibleCap));

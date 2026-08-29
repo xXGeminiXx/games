@@ -7,10 +7,10 @@
 // word it differently.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=6';
-import { fill } from '../config.js?v=6';
-import { hash } from './rng.js?v=6';
-import { TEXT as EVENTS } from './events.js?v=6';
+import { CONTENT } from '../content.js?v=7';
+import { fill } from '../config.js?v=7';
+import { hash } from './rng.js?v=7';
+import { TEXT as EVENTS } from './events.js?v=7';
 
 function walk(root, key) {
   let node = root;

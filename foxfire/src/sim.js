@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=6';
-import { buildLevel, nearestOpen } from './world.js?v=6';
-import * as Tips from './tips.js?v=6';
-import * as Trees from './trees.js?v=6';
-import * as Tr from './traits.js?v=6';
-import * as Lv from './levels.js?v=6';
-import * as Sp from './spores.js?v=6';
-import * as Rv from './reveal.js?v=6';
-import * as Ev from './events.js?v=6';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=6';
-import { hash } from './rng.js?v=6';
-import * as Lore from './lore.js?v=6';
-import { fmtArea } from './numbers.js?v=6';
+import { CONFIG as DEFAULT } from '../config.js?v=7';
+import { buildLevel, nearestOpen } from './world.js?v=7';
+import * as Tips from './tips.js?v=7';
+import * as Trees from './trees.js?v=7';
+import * as Tr from './traits.js?v=7';
+import * as Lv from './levels.js?v=7';
+import * as Sp from './spores.js?v=7';
+import * as Rv from './reveal.js?v=7';
+import * as Ev from './events.js?v=7';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=7';
+import { hash } from './rng.js?v=7';
+import * as Lore from './lore.js?v=7';
+import { fmtArea } from './numbers.js?v=7';
 
 export const SAVE_VERSION = 1;
 
@@ -337,7 +337,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         if (!state.nurture[sp.key]) continue;
         const S = sizes[sp.key] || 0;
         if (!(S > 0)) continue;
-        const cost = cfg.trees.nurture.sugarPerSize * S * k * dt;
+        // Sugar is charged on the growth still to come, not on the whole
+        // standing pool. Trees already at their full size cannot use it, so
+        // feeding a grown kind costs nothing and does nothing, and the sugar
+        // always buys size that is actually arriving.
+        const room = Math.max(0, (counts[sp.key] || 0) * sp.max - S);
+        if (!(room > 0)) continue;
+        const cost = cfg.trees.nurture.sugarPerSize * room * k * dt;
         if (state.sugar + sugar >= cost) {
           sugar -= cost;
           state.totals.fed += cost;

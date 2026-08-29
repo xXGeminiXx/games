@@ -20,8 +20,8 @@
 // reads are the ones the simulation pays.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=6';
-import { unit } from './rng.js?v=6';
+import { scale } from './levels.js?v=7';
+import { unit } from './rng.js?v=7';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {
@@ -174,8 +174,8 @@ export function fellValue(cfg, species, size, mods) {
  *
  * Fed, a pool closes on its full size at (1 + boost) times the rate; the sugar
  * that buys is the difference between the two curves, and the cost is charged
- * on the size it has while it is growing. Both are integrated, and the answer
- * is where they cross. Past the horizon it is called no payback at all.
+ * on the growth still to come, which is what the sugar is actually buying.
+ * Both are integrated, and the answer is where they cross. Past the horizon it is called no payback at all.
  */
 export function feedPayback(cfg, species, pool, value, growthMult, k) {
   const count = pool.count || 0;
@@ -189,7 +189,7 @@ export function feedPayback(cfg, species, pool, value, growthMult, k) {
   const net = (t) => {
     const ea = Math.exp(-a * t), eb = Math.exp(-b * t);
     const gained = value * room * ((1 - ea) / a - (1 - eb) / b);
-    const paid = cost * (full * t - room * (1 - eb) / b);
+    const paid = cost * room * (1 - eb) / b;
     return gained - paid;
   };
   const horizon = Math.max(1, cfg.trees.nurture.paybackHorizon);
