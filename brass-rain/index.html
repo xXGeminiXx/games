@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brass Rain</title>
+<style>
+  /* The palette arrives from config.js as custom properties. What is here is
+     only what the page shows in the moment before that file has run. */
+  :root{
+    --lacquer:#2b0f12; --lacquer2:#4a1a1c; --lamp:#f6e6c8;
+    --brass:#b08637; --brass-lit:#f0cf83;
+    --chrome:#9aa2a8; --chrome-lit:#ffffff;
+    --enamel:#e9e6d6; --enamel2:#d5d1bd;
+    --jade:#4fa88a; --oxblood:#5c1d20; --ink:#1a0c0d; --dim:#8c7f76; --rule:#7d5a2e;
+    --plaque-shadow: 3px 3px 0 rgba(0,0,0,.45);
+    --narrow:"Arial Narrow","Liberation Sans Narrow","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --plain:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--ink);color:var(--enamel)}
+  body{
+    font:13px/1.35 var(--narrow); font-variant-numeric:tabular-nums lining-nums;
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{
+    font:inherit; font-family:var(--narrow); letter-spacing:.04em;
+    color:var(--oxblood); background:var(--enamel); border:1px solid rgba(0,0,0,.35);
+    padding:4px 11px; cursor:pointer; border-radius:4px; line-height:1.25;
+    box-shadow:2px 2px 0 rgba(0,0,0,.35);
+  }
+  button:hover:not(:disabled){background:#fff}
+  button:active:not(:disabled){transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(0,0,0,.35)}
+  button:disabled{opacity:.38;cursor:default;box-shadow:none}
+  button.on{background:var(--jade);color:#08201a}
+  button.ghost{background:transparent;color:var(--enamel);border-color:rgba(233,230,214,.3);box-shadow:none}
+  button.ghost:hover:not(:disabled){background:rgba(233,230,214,.1)}
+  :focus-visible{outline:2px solid var(--jade); outline-offset:2px}
+
+  /* ---- the title rail ---------------------------------------------- */
+  header{
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px;
+    padding:7px 16px 6px; flex:0 0 auto;
+    background:linear-gradient(#3a1418,#240c0f);
+    border-bottom:1px solid var(--rule);
+  }
+  #brand{display:flex;align-items:baseline;gap:13px;min-width:0}
+  #brand b{
+    font:600 19px/1 var(--narrow); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--brass-lit); white-space:nowrap;
+    text-shadow:0 1px 0 rgba(0,0,0,.7);
+  }
+  #brand span{font:12px/1 var(--narrow);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #tools{display:flex;gap:6px;flex:0 0 auto}
+  #tools button{font-size:11px;padding:3px 9px}
+
+  /* ---- the body: plaques left, machine right ----------------------- */
+  main{flex:1 1 auto;min-height:0;display:flex;gap:0}
+  #plaques{
+    width:252px; flex:0 0 auto; padding:11px 11px 11px 13px; overflow:auto;
+    display:flex; flex-direction:column; gap:9px;
+    background:linear-gradient(#1e0a0c,#160708);
+    border-right:1px solid rgba(176,134,55,.35);
+  }
+  .plaque{
+    background:linear-gradient(var(--enamel),var(--enamel2));
+    color:var(--oxblood); border-radius:5px; padding:8px 10px 9px;
+    box-shadow:var(--plaque-shadow); position:relative;
+  }
+  /* The four rivets. Drawn, never an image. */
+  .plaque::before,.plaque::after{
+    content:""; position:absolute; width:3px; height:3px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fff, #8a8677 70%, #5f5c50);
+    top:5px; left:5px;
+    box-shadow:236px 0 0 -0.5px #8a8677;
+  }
+  .plaque::after{top:auto;bottom:5px}
+  .plaque h2{
+    font:600 10px/1 var(--narrow); letter-spacing:.18em; text-transform:uppercase;
+    color:#8a4a3a; margin:0 0 6px;
+  }
+  .plaque .big{font:600 26px/1 var(--narrow); letter-spacing:.01em; color:var(--ink)}
+  .plaque .sub{font-size:11px;color:#7a5c50}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .row+.row{margin-top:3px}
+  .row b{font-weight:600}
+  .live{color:#1d6b55;font-weight:600}
+
+  /* the quota bar, a filling glass tube */
+  .tube{
+    height:9px;border-radius:5px;margin:6px 0 4px;overflow:hidden;
+    background:#c3bfa9; box-shadow:inset 0 1px 2px rgba(0,0,0,.35);
+  }
+  .tube i{display:block;height:100%;background:linear-gradient(#5fbf9c,#2f7f66);transition:width .18s linear}
+  .tube.done i{background:linear-gradient(#e0b34f,#a97a1e)}
+
+  /* the handle */
+  #handle{width:100%;margin:4px 0 2px;accent-color:#a97a1e}
+  input[type=range]{width:100%}
+  .knobrow{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+  .knobrow button{font-size:11px;padding:3px 8px;flex:0 0 auto}
+
+  /* the deck log */
+  #log{list-style:none;margin:0;padding:0;font-size:11px;color:#6d5348;max-height:112px;overflow:auto}
+  #log li{padding:1px 0;border-bottom:1px dotted rgba(92,29,32,.16)}
+  #log li:last-child{border-bottom:0}
+  #log li.fever{color:#1d6b55;font-weight:600}
+  #log li.lost{color:#9a2f22}
+
+  /* ---- the machine face -------------------------------------------- */
+  #face{flex:1 1 auto;min-width:0;position:relative;background:#120507;overflow:hidden}
+  #view{display:block;width:100%;height:100%}
+  #face.bending #view{cursor:crosshair}
+  #banner{
+    position:absolute;left:50%;top:10px;transform:translateX(-50%);
+    padding:4px 16px;border-radius:3px;
+    font:600 13px/1 var(--narrow);letter-spacing:.3em;text-transform:uppercase;
+    background:var(--jade);color:#06180f;box-shadow:0 2px 8px rgba(0,0,0,.5);
+    pointer-events:none;
+  }
+  #banner[hidden]{display:none}
+  #hint{
+    position:absolute;left:50%;bottom:9px;transform:translateX(-50%);max-width:78%;
+    font-size:12px;color:#c8b8a4;text-align:center;pointer-events:none;
+    text-shadow:0 1px 3px #000;
+  }
+  #flyer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .fly{
+    position:absolute;font:600 12px/1 var(--narrow);color:var(--brass-lit);
+    text-shadow:0 1px 3px #000;animation:rise 1s ease-out forwards;
+  }
+  .fly.jade{color:#7fe0bd}
+  @keyframes rise{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-26px)}}
+
+  /* ---- the brass counter rail -------------------------------------- */
+  footer{
+    flex:0 0 auto;display:flex;align-items:stretch;gap:0;
+    background:linear-gradient(#6b4f22,#3d2c13);
+    border-top:1px solid #d8b56a;
+    padding:4px 8px;
+  }
+  .counter{
+    flex:1 1 0;min-width:0;margin:0 2px;padding:3px 8px 4px;border-radius:3px;
+    background:linear-gradient(#160a05,#241209);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.8), 0 1px 0 rgba(216,181,106,.45);
+    text-align:center;
+  }
+  .counter em{
+    display:block;font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;
+    color:#b08637;font-style:normal;margin-bottom:2px;
+  }
+  .counter b{display:block;font:600 17px/1 var(--narrow);color:var(--lamp)}
+  .counter.hot b{color:#7fe0bd}
+
+  /* ---- overlays ----------------------------------------------------- */
+  .sheet{
+    position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:rgba(10,4,5,.82);padding:22px;
+  }
+  .sheet[hidden]{display:none}
+
+  /* The bench is docked rather than laid over the machine, because the whole
+     point of being at the bench is leaning the nails, and the nails are on the
+     face. The backdrop lets clicks through; only the panel itself catches
+     them, so the face behind stays live the entire time. */
+  .sheet.dock{
+    justify-content:flex-start;align-items:stretch;padding:0;
+    background:linear-gradient(90deg,rgba(10,4,5,.95) 0,rgba(10,4,5,.95) 520px,rgba(10,4,5,.28) 520px,rgba(10,4,5,0) 660px);
+    pointer-events:none;
+  }
+  .sheet.dock .panel{
+    pointer-events:auto;max-width:520px;border-radius:0;border-width:0 1px 0 0;
+    box-shadow:14px 0 40px rgba(0,0,0,.6);
+  }
+  .sheet.dock #offers{grid-template-columns:1fr}
+  .sheet.dock .card{flex-direction:row;flex-wrap:wrap;align-items:baseline}
+  .sheet.dock .card h4{flex:1 1 auto}
+  .sheet.dock .card .rar{flex:0 0 auto;order:-1;width:100%}
+  .sheet.dock .card p{flex:1 1 100%}
+  .sheet.dock .card .price{flex:1 1 100%}
+  .panel{
+    background:linear-gradient(#20090b,#170708);
+    border:1px solid var(--rule);border-radius:7px;
+    max-width:1000px;width:100%;max-height:100%;overflow:auto;padding:18px 20px 20px;
+    box-shadow:0 18px 60px rgba(0,0,0,.7);
+  }
+  .panel h1{
+    font:600 15px/1 var(--narrow);letter-spacing:.22em;text-transform:uppercase;
+    color:var(--brass-lit);margin:0 0 3px;
+  }
+  .panel .lede{color:var(--dim);margin:0 0 15px;font-size:12px}
+  .panel h3{
+    font:600 10px/1 var(--narrow);letter-spacing:.18em;text-transform:uppercase;
+    color:var(--brass);margin:17px 0 8px;
+  }
+  .sheetfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:17px;flex-wrap:wrap}
+
+  /* the offer cards */
+  #offers,#cabinets{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+  .cab{
+    background:linear-gradient(#2a0f12,#1d090b);border:1px solid var(--rule);border-radius:5px;
+    padding:11px 12px 12px;display:flex;flex-direction:column;gap:7px;text-align:left;
+  }
+  .cab h4{margin:0;font:600 16px/1 var(--narrow);letter-spacing:.1em;color:var(--brass-lit)}
+  .cab .big{font:600 24px/1 var(--narrow);color:var(--lamp)}
+  .cab p{margin:0;font-size:12px;color:var(--dim);flex:1 1 auto}
+  .cab dl{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin:0;font-size:11px}
+  .cab dt{color:var(--dim)}
+  .cab dd{margin:0;text-align:right;color:var(--enamel)}
+  .card{
+    background:linear-gradient(var(--enamel),var(--enamel2));color:var(--oxblood);
+    border-radius:5px;padding:10px 11px 11px;box-shadow:var(--plaque-shadow);
+    display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid rgba(0,0,0,.3);
+  }
+  .card.combo{outline:2px solid var(--jade);outline-offset:1px}
+  .card h4{margin:0;font:600 14px/1.15 var(--narrow);color:var(--ink)}
+  .card .rar{
+    font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:#8a4a3a;
+  }
+  .card p{margin:0;font-size:12px;color:#5c4038;flex:1 1 auto}
+  .card .combos{font-size:11px;color:#1d6b55;font-weight:600}
+  .card .price{display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+  /* the machine ladder */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{
+    text-align:left;font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--brass);padding:0 8px 6px 0;font-weight:600;
+  }
+  td{padding:5px 8px 5px 0;border-top:1px solid rgba(176,134,55,.2);color:var(--enamel)}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.poor td{color:#7d6a60}
+  #bulkbar{display:flex;gap:5px;margin:0 0 10px}
+  #bulkbar button{font-size:11px;padding:3px 11px}
+
+  .nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .node{
+    border:1px solid rgba(176,134,55,.3);border-radius:5px;padding:8px 10px;
+    background:rgba(176,134,55,.06);
+  }
+  .node.have{border-color:var(--jade);background:rgba(79,168,138,.1)}
+  .node h4{margin:0 0 3px;font:600 12px/1.2 var(--narrow);color:var(--lamp)}
+  .node p{margin:0 0 6px;font-size:11px;color:var(--dim)}
+
+  .settingrow{display:flex;align-items:center;gap:10px;margin:0 0 9px}
+  .settingrow label{flex:0 0 132px;font-size:12px;color:var(--dim)}
+  .settingrow input[type=range]{flex:1 1 auto}
+  .settingrow output{flex:0 0 74px;text-align:right;font-size:12px;color:var(--lamp)}
+
+  #owned{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{
+    font-size:11px;padding:2px 8px;border-radius:11px;
+    background:rgba(176,134,55,.18);border:1px solid rgba(176,134,55,.4);color:var(--lamp);
+    cursor:pointer;
+  }
+  .chip:hover{background:rgba(176,134,55,.32)}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:12px}
+  .kv dt{color:var(--dim)}
+  .kv dd{margin:0;color:var(--lamp);text-align:right}
+
+  @media (max-width:820px){
+    main{flex-direction:column-reverse}
+    #plaques{width:auto;max-height:44%;border-right:0;border-top:1px solid rgba(176,134,55,.35)}
+  }
+</style>
+<!-- build-watch:start -->
+<meta name="build" content="848f2122047e">
+<script>
+(function () {
+  var meta = document.querySelector('meta[name="build"]');
+  var mine = meta && meta.getAttribute('content');
+  if (!mine || !window.fetch) return;
+  var every = 300000;          // re-ask every five minutes while the tab is open
+  var checking = false;
+
+  function reload(to) {
+    // A plain reload can be answered from cache, so the new build is asked for
+    // by a URL the cache has not seen. Whatever the player already had on the
+    // address bar is kept; only a previous build stamp is replaced.
+    var q = new URLSearchParams(location.search);
+    q.set('b', to);
+    location.replace(location.pathname + '?' + q.toString() + location.hash);
+  }
+
+  function check() {
+    if (checking || document.hidden) return;
+    checking = true;
+    fetch('build.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        checking = false;
+        if (!j || !j.build || j.build === mine) return;
+        // One reload per build. If the page comes back still stamped with the
+        // old id the files were not really replaced, and reloading again would
+        // only spin.
+        try {
+          if (sessionStorage.getItem('build-watch') === j.build) return;
+          sessionStorage.setItem('build-watch', j.build);
+        } catch (e) { /* private mode: fall through and reload once */ }
+        reload(j.build);
+      })
+      .catch(function () { checking = false; });
+  }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  setInterval(check, every);
+  setTimeout(check, 15000);
+})();
+</script>
+<!-- build-watch:end -->
+</head>
+<body>
+
+<header>
+  <div id="brand"><b id="title">Brass Rain</b><span id="tagline"></span></div>
+  <div id="tools">
+    <button id="toRow" type="button">Machines</button>
+    <button id="toFloor" type="button">Floor</button>
+    <button id="toSettings" type="button">Settings</button>
+    <button id="toHelp" type="button">Help</button>
+  </div>
+</header>
+
+<main>
+  <aside id="plaques">
+
+    <section class="plaque" id="pRound">
+      <h2>Round <span id="roundNo">1</span></h2>
+      <div class="row"><span class="big" id="wonNow">0</span><span class="sub">of <b id="quotaNo">0</b></span></div>
+      <div class="tube" id="quotaTube"><i style="width:0%"></i></div>
+      <div class="row"><span class="sub" id="perBall"></span></div>
+    </section>
+
+    <section class="plaque" id="pHandle">
+      <h2>The handle</h2>
+      <input id="handle" type="range" min="0" max="1" step="0.005" value="0.62"
+             aria-label="Launch strength">
+      <div class="row"><span class="sub">Strength</span><b id="strengthOut">0.62</b></div>
+      <div class="row"><span class="sub">Balls per pull</span><b id="perPull">1</b></div>
+      <div class="knobrow">
+        <button id="pull" type="button">Pull</button>
+        <button id="auto" type="button">Auto</button>
+        <button id="speed" type="button">1x</button>
+      </div>
+    </section>
+
+    <section class="plaque" id="pOdds">
+      <h2>Printed on the glass</h2>
+      <div class="row"><span class="sub">Reels agree</span><b id="oddsMatch">11%</b></div>
+      <div class="row"><span class="sub">Fever continues</span><b id="oddsCont">30%</b></div>
+      <div class="row"><span class="sub">Through the gate</span><b id="oddsGate">-</b></div>
+      <div class="row"><span class="sub">Back per ball</span><b id="oddsBack">-</b></div>
+    </section>
+
+    <section class="plaque" id="pFloor">
+      <h2>The floor</h2>
+      <div class="row"><span class="big" id="scrip">0</span><span class="sub">scrip</span></div>
+      <div class="row"><span class="sub">Earning</span><b class="live" id="income">0 /s</b></div>
+      <div class="row"><span class="sub">Your best round pays</span><b id="handMult">x1</b></div>
+      <div class="knobrow">
+        <button id="cash" type="button">Cash out</button>
+      </div>
+    </section>
+
+    <section class="plaque" id="pLog">
+      <h2>The night</h2>
+      <ul id="log"></ul>
+    </section>
+
+  </aside>
+
+  <section id="face">
+    <canvas id="view"></canvas>
+    <div id="flyer"></div>
+    <div id="banner" hidden></div>
+    <div id="hint"></div>
+  </section>
+</main>
+
+<footer id="rail"></footer>
+
+<!-- the bench, between rounds -->
+<div class="sheet dock" id="bench" hidden>
+  <div class="panel">
+    <h1>The bench</h1>
+    <p class="lede" id="benchLede"></p>
+    <h3>Parts</h3>
+    <div id="offers"></div>
+    <h3>Bolted in <span id="slotCount"></span></h3>
+    <div id="owned"></div>
+    <h3>The nails</h3>
+    <p class="lede" id="bendLede"></p>
+    <p class="lede" id="bendChart"></p>
+    <div class="sheetfoot">
+      <button id="reroll" type="button" class="ghost">Reroll</button>
+      <button id="straighten" type="button" class="ghost">Straighten every nail</button>
+      <button id="leave" type="button">Start the round</button>
+    </div>
+  </div>
+</div>
+
+<!-- the parlour floor -->
+<div class="sheet" id="floor" hidden>
+  <div class="panel">
+    <h1>The floor</h1>
+    <p class="lede" id="floorLede"></p>
+    <div id="bulkbar"></div>
+    <table id="machines"><thead><tr>
+      <th>Machine</th><th class="n">Owned</th><th class="n">Earns</th><th class="n">Next</th><th></th><th></th>
+    </tr></thead><tbody></tbody></table>
+    <div id="prestigeBox"></div>
+    <div class="sheetfoot"><button id="closeFloor" type="button">Back to the machine</button></div>
+  </div>
+</div>
+
+<!-- the row: which machine to sit at -->
+<div class="sheet" id="row" hidden>
+  <div class="panel">
+    <h1 id="rowTitle">Walk the row</h1>
+    <p class="lede" id="rowLede"></p>
+    <div id="cabinets"></div>
+    <div class="sheetfoot">
+      <button id="rowLater" type="button" class="ghost">Stay where you are</button>
+    </div>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="sheet" id="settings" hidden>
+  <div class="panel">
+    <h1>Settings</h1>
+    <p class="lede">The picture adapts to whatever it is running on. Everything here overrides that.</p>
+    <div class="settingrow">
+      <label for="fpsTarget">Frame rate aim</label>
+      <input id="fpsTarget" type="range" min="0" max="5" step="1" value="2">
+      <output id="fpsOut">60</output>
+    </div>
+    <div class="settingrow">
+      <label for="scaleSlider">Render scale</label>
+      <input id="scaleSlider" type="range" min="0.4" max="1" step="0.05" value="1">
+      <output id="scaleOut">auto</output>
+    </div>
+    <div class="settingrow">
+      <label>Detail</label>
+      <div class="knobrow" style="margin:0">
+        <button id="tShadows" type="button">Shadows</button>
+        <button id="tReflect" type="button">Reflections</button>
+        <button id="tGlass" type="button">Glass</button>
+        <button id="tAuto" type="button">Adjust by itself</button>
+      </div>
+    </div>
+    <h3>Measured right now</h3>
+    <dl class="kv">
+      <dt>Frames a second</dt><dd id="mFps">-</dd>
+      <dt>Drawing at</dt><dd id="mScale">-</dd>
+      <dt>Balls in flight</dt><dd id="mBalls">-</dd>
+      <dt>Nails on the face</dt><dd id="mPins">-</dd>
+    </dl>
+    <h3>This save</h3>
+    <div class="knobrow">
+      <button id="newRun" type="button" class="ghost">Start a new night</button>
+      <button id="wipe" type="button" class="ghost">Erase everything</button>
+    </div>
+    <div class="sheetfoot"><button id="closeSettings" type="button">Close</button></div>
+  </div>
+</div>
+
+<!-- help -->
+<div class="sheet" id="help" hidden>
+  <div class="panel">
+    <h1>How this machine works</h1>
+    <div id="helpBody"></div>
+    <div class="sheetfoot"><button id="closeHelp" type="button">Close</button></div>
+  </div>
+</div>
+
+<script type="module">
+  import { boot } from './src/ui.js?v=1';
+  boot(document);
+</script>
+</body>
+</html>
