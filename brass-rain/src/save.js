@@ -18,10 +18,11 @@
 //   another program wrote, and none of those may stop the game from starting.
 // ---------------------------------------------------------------------------
 
-import { serializeBends, restoreBends } from './board.js?v=45';
-import { serializeBalls, restoreBalls } from './physics.js?v=45';
-import { serializeFloor, restoreFloor } from './floor.js?v=45';
-import { serializeQuality } from './quality.js?v=45';
+import { signBlob } from './nights.js?v=46';
+import { serializeBends, restoreBends } from './board.js?v=46';
+import { serializeBalls, restoreBalls } from './physics.js?v=46';
+import { serializeFloor, restoreFloor } from './floor.js?v=46';
+import { serializeQuality } from './quality.js?v=46';
 
 export function saveKey(cfg) { return cfg.identity.storagePrefix + ':save'; }
 
@@ -83,7 +84,12 @@ export function serialize(cfg, game) {
 export function write(cfg, game, storage) {
   if (!storage) return false;
   try {
-    storage.setItem(saveKey(cfg), JSON.stringify(serialize(cfg, game)));
+    // The save is signed with this browser's salt. A save edited by hand no
+    // longer matches, still loads, and the nights it produces stay off the board.
+    const obj = serialize(cfg, game);
+    const body = JSON.stringify(obj);
+    obj.sig = signBlob(body, storage);
+    storage.setItem(saveKey(cfg), JSON.stringify(obj));
     return true;
   } catch (e) {
     // Storage can be full or switched off. Neither is worth interrupting play.
@@ -101,6 +107,15 @@ export function read(cfg, storage) {
   try { obj = JSON.parse(raw); } catch (e) { return null; }
   if (!obj || typeof obj !== 'object') return null;
   if (obj.version !== cfg.save.version) return null;
+  // Trusted when it carries this browser's signature over its own body. A save
+  // from before signing began carries none and is taken as it is; a save that
+  // carries one that does not match was changed after it was written.
+  if (obj.sig === undefined) obj.trusted = true;
+  else {
+    const sig = obj.sig;
+    delete obj.sig;
+    obj.trusted = sig === signBlob(JSON.stringify(obj), storage);
+  }
   return obj;
 }
 

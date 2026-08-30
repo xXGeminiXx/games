@@ -17,7 +17,7 @@
 // possible at all.
 // ---------------------------------------------------------------------------
 
-import { pocketAt } from './board.js?v=45';
+import { pocketAt } from './board.js?v=46';
 
 export const RAIL = 0;
 export const FIELD = 1;

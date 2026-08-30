@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=45';
-import { createScene } from './render/scene.js?v=45';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=45';
-import { num, count, duration, mult, pct, fill } from './format.js?v=45';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=45';
-import { nailPos } from './board.js?v=45';
-import { sketchCabinet } from './cabinets.js?v=45';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=45';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=46';
+import { createScene } from './render/scene.js?v=46';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=46';
+import { num, count, duration, mult, pct, fill } from './format.js?v=46';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=46';
+import { nailPos } from './board.js?v=46';
+import { sketchCabinet } from './cabinets.js?v=46';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=46';
 
 const SPEEDS = [1, 2, 4];
 
@@ -357,7 +357,7 @@ export async function boot(doc) {
         recordedSeed = seed;
         const night = {
           round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
-          machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(),
+          machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), trusted: r.trusted !== false,
         };
         const res = recordNight(night);
         lastRank = res.rank; lastNightAt = night.at;
@@ -980,7 +980,7 @@ export async function boot(doc) {
     recordedSeed = seed;
     const night = {
       round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
-      machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), cashed: !r.over,
+      machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), cashed: !r.over, trusted: r.trusted !== false,
     };
     const res = recordNight(night);
     lastRank = res.rank; lastNightAt = night.at;

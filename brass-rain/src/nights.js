@@ -49,6 +49,11 @@ function saltOf(store) {
   } catch (e) { return 'salt'; }
 }
 
+/** A signature for any text, with this browser's salt - the save uses it too. */
+export function signBlob(text, store) {
+  return fnv(saltOf(store) + '#' + String(text)).toString(36);
+}
+
 /** The signature a night should carry in this browser. */
 export function signature(night, store) {
   return fnv(saltOf(store) + '#' + canonical(night)).toString(36);
@@ -63,6 +68,8 @@ export function honest(night, store) {
     if (night.round > 1 + launched / 20) return false;    // no round takes fewer than a few dozen pulls
   }
   if (night.round > 200 || night.won > 1e12) return false;
+  // A night from a game whose save had been edited by hand does not count.
+  if (night.trusted === false) return false;
   return night.sig === signature(night, store);
 }
 
