@@ -253,7 +253,7 @@ export const CONFIG = {
       },
       {
         id: 'tower',
-        baseReturn: 0.32,
+        baseReturn: 0.36,
         name: 'Tower',
         note: 'a high slot right under the screen, with everything else pushed low',
         gate: { x: 50, y: 68, w: 3.0, h: 1.42 },

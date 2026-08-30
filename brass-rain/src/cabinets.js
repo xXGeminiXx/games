@@ -18,10 +18,10 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=23';
-import { createBalls, launch, stepPhysics } from './physics.js?v=23';
-import { rng as makeRng } from './rng.js?v=23';
-import { skinForCabinet } from './render/themes.js?v=23';
+import { createBoard, nailPos, layoutFor } from './board.js?v=24';
+import { createBalls, launch, stepPhysics } from './physics.js?v=24';
+import { rng as makeRng } from './rng.js?v=24';
+import { skinForCabinet } from './render/themes.js?v=24';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -106,9 +106,11 @@ export function playsAtRest(cfg, board, seed) {
     out.flashes.length = 0;
     steps++;
   }
-  let gates = 0, total = 0;
-  for (const e of out.events) { total++; if (e.kind === 'gate') gates++; }
-  return total > 0 && gates / total >= 0.02;
+  let gates = 0, total = 0, paid = 0;
+  for (const e of out.events) { total++; if (e.kind === 'gate') gates++; else if (e.pay > 0) paid += e.pay; }
+  // Both the slot and the pockets have to answer: a face that pays a quarter
+  // ball per ball at rest dies in round one whatever its slot does.
+  return total > 0 && gates / total >= 0.03 && paid / total >= 0.35;
 }
 
 /** A seed drawn fresh whose face plays at rest, or the last one tried. */

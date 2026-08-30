@@ -21,8 +21,8 @@
 // turned up, not a different lamp.
 // ---------------------------------------------------------------------------
 
-import { oklch, hexToRgb, srgbToLinear, hexToOklch, clampOklch } from '../palette.js?v=23';
-import { resolveTheme, themeForCabinet, DEFAULT_THEME } from './themes.js?v=23';
+import { oklch, hexToRgb, srgbToLinear, hexToOklch, clampOklch } from '../palette.js?v=24';
+import { resolveTheme, themeForCabinet, DEFAULT_THEME } from './themes.js?v=24';
 
 // What a machine is made of when nobody has said. This is the default skin
 // written out flat, so this module still produces a face with no skin table
