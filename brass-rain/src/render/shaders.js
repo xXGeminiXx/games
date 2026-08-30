@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=50';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=50';
+import { digitGlsl } from './digits.js?v=51';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=51';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -1602,13 +1602,25 @@ void main() {
     float which = clamp(floor(slot), 0.0, n - 1.0);
     float doorW = v_half.x / n;
     vec2 p = vec2(v_off.x - (which + 0.5 - n * 0.5) * doorW * 2.0, v_off.y);
-    float d = sdBox(p, vec2(doorW * 0.82, v_half.y * 0.86), doorW * 0.22);
+    // Each machine hangs its own doors: portholes on the tide pool and among
+    // the stars, an arched glasshouse door, planked timber at the diggings, a
+    // chamfered hatch on the furnace, and the rounded door of the jukebox.
+    int look = int(u_show.w + 0.5);
+    bool port = look == 0 || look == 5;
+    float side = min(doorW * 0.82, v_half.y * 0.86);
+    vec2 bx = port ? vec2(side) : vec2(doorW * 0.82, v_half.y * 0.86);
+    float rad = port ? side * 0.98
+      : look == 1 ? doorW * 0.60
+      : look == 2 ? doorW * 0.05
+      : look == 3 ? doorW * 0.36
+      : doorW * 0.28;
+    float d = sdBox(p, bx, rad);
 
     float isPick = step(abs(which - pick), 0.4) * step(0.5, shown);
     float dull = step(0.5, shown) * (1.0 - isPick);
 
     c = over(c, vec4(u_lacquer * 0.32, smoothstep(doorW * 0.4, -doorW * 0.1,
-      sdBox(p - away * doorW * 0.25, vec2(doorW * 0.82, v_half.y * 0.86), doorW * 0.22)) * 0.75 * fade));
+      sdBox(p - away * doorW * 0.25, bx, rad)) * 0.75 * fade));
 
     // Open, and paying.
     vec3 open = mix(u_glow, u_lamp, 0.25) * (1.1 + 1.9 * lit);
@@ -1623,8 +1635,10 @@ void main() {
     shut *= 1.0 + (1.0 - step(0.5, shown)) * 0.22 * sin(t * 3.0 + which * 2.1);
 
     c = over(c, vec4(mix(shut, open, isPick), cover(d) * fade));
-    // The seam down the middle of a shut door, and the handle beside it.
-    float seam = max(abs(p.x) - doorW * 0.03, d + doorW * 0.18);
+    // The seam down the middle of a shut door - three seams between the
+    // planks of a timber door, and a rim instead of a seam on a porthole.
+    float sx = look == 2 ? min(abs(p.x), min(abs(p.x - doorW * 0.5), abs(p.x + doorW * 0.5))) : abs(p.x);
+    float seam = port ? abs(d + doorW * 0.12) - doorW * 0.03 : max(sx - doorW * 0.03, d + doorW * 0.18);
     c = over(c, vec4(u_brass * 0.22, cover(seam) * fade * (1.0 - isPick)));
     // The door the player called wears a lamp keyline until the row is read.
     float isCalled = step(abs(which + 1.0 - called), 0.4) * (1.0 - step(0.5, shown));

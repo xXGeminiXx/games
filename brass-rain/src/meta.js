@@ -146,7 +146,7 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=50';
+import { priceAt } from './economy.js?v=51';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
