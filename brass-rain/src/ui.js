@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=37';
-import { createScene } from './render/scene.js?v=37';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=37';
-import { num, count, duration, mult, pct, fill } from './format.js?v=37';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=37';
-import { nailPos } from './board.js?v=37';
-import { sketchCabinet } from './cabinets.js?v=37';
-import { recordNight, loadNights, ordinal } from './nights.js?v=37';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=38';
+import { createScene } from './render/scene.js?v=38';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=38';
+import { num, count, duration, mult, pct, fill } from './format.js?v=38';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=38';
+import { nailPos } from './board.js?v=38';
+import { sketchCabinet } from './cabinets.js?v=38';
+import { recordNight, loadNights, ordinal } from './nights.js?v=38';
 
 const SPEEDS = [1, 2, 4];
 
@@ -101,6 +101,7 @@ export async function boot(doc) {
       // sheet alone left a run with no pulls and no way forward.
       const r = game.reading();
       if (r.over) {
+        bankNight();
         if (r.tray > 0) game.cashOut();
         game.sitAt(game.run && Number.isFinite(game.run.seed) ? game.run.seed : (Math.random() * 1e9) | 0);
       }
@@ -847,6 +848,7 @@ export async function boot(doc) {
         // balls to cash in: an empty tray in the middle of a good run is still
         // a run, and restarting it without a word is how one gets thrown away.
         if (!r.over && !confirm(cost + ' Go ahead?')) return;
+        bankNight();
         if (r.tray > 0) game.cashOut();
         game.sitAt(cab.seed);
         hide(el.rowSheet);
@@ -952,6 +954,24 @@ export async function boot(doc) {
   }
 
   // ---- the board of best nights -------------------------------------------
+  //
+  // A game ends two ways: it dies, or its balls are banked for coins. Both are
+  // nights, and a banked round-twenty game outranks a lost round-eight one.
+  function bankNight() {
+    const r = game.reading();
+    const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
+    if (seed === recordedSeed || !r.stats || !(r.stats.launched > 0)) return;
+    recordedSeed = seed;
+    const night = {
+      round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0,
+      machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), cashed: !r.over,
+    };
+    const res = recordNight(night);
+    lastRank = res.rank; lastNightAt = night.at;
+    if (typeof game.countGame === 'function') game.countGame();
+    paintNights(res.list);
+    return res;
+  }
   //
   // The best finished games this browser has played, best first, always in
   // view under the arcade. The night just finished is marked.
@@ -1229,7 +1249,7 @@ export async function boot(doc) {
   function confirmCash() {
     const worth = game.cashOutValue();
     const msg = fill(cfg.text.cashOutAsk, { balls: count(game.run.tray), scrip: num(worth) });
-    if (confirm(msg)) game.cashOut();
+    if (confirm(msg)) { bankNight(); game.cashOut(); }
   }
 
   function showAway(away) {
