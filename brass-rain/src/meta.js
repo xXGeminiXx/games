@@ -146,7 +146,7 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=32';
+import { priceAt } from './economy.js?v=33';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -581,15 +581,22 @@ export function resetThreshold(cfg, meta) {
  * The sentence is the whole point of this function. A greyed-out button with
  * no reason on it is how a layer becomes a stat page nobody visits.
  */
+function coins(v) {
+  const n = Math.max(0, Number(v) || 0);
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  return String(Math.round(n));
+}
+
 export function canReset(cfg, meta, floor) {
   const L = lifetimeScrip(meta, floor);
   const minScrip = tune(cfg, 'minScrip');
 
   if (!(L > 0)) {
-    return { ok: false, why: 'Nothing has been earned yet. Build an arcade first, and starting over will be worth something.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. Trade balls for coins and buy arcade machines with them - they earn on their own, even while you are away - and the total climbs.', marks: 0, need: resetThreshold(cfg, meta) };
   }
   if (L < minScrip) {
-    return { ok: false, why: 'One game at one machine isn\'t an arcade yet. Keep playing and keep buying.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. You are at ' + coins(L) + '. Arcade machines are what get you there: buy them with your coins and they earn on their own, even while you are away.', marks: 0, need: resetThreshold(cfg, meta) };
   }
 
   const marks = pendingMarks(cfg, meta, floor);
@@ -600,7 +607,7 @@ export function canReset(cfg, meta, floor) {
       ok: false,
       marks, need,
       why: marks <= 0
-        ? 'There\'s nothing new to learn yet. Earn more from the arcade first.'
+        ? 'Stars come from what your arcade machines earn. Buy more of them, or wait for them to earn, and come back.'
         : 'Starting over right now would only pay ' + marks + ' stars. It takes ' + need + ', which is ' + short + ' more, before it\'s worth doing.',
     };
   }

@@ -19,7 +19,7 @@
 // for by the played half rather than replacing it.
 // ---------------------------------------------------------------------------
 
-import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=32';
+import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=33';
 
 /** The floor as it stands at the start of everything. */
 export function createFloor(cfg) {
@@ -33,6 +33,7 @@ export function createFloor(cfg) {
     earned: 0,        // every scrip ever taken, which is what prestige reads
     cashed: 0,        // balls ever handed to the counter
     bestRound: 0,     // the deepest round any run has reached
+    games: 0,         // finished games, counted since this was added
     lastTick: 0,
   };
 }
@@ -177,6 +178,7 @@ export function serializeFloor(floor) {
     earned: floor.earned,
     cashed: floor.cashed,
     bestRound: floor.bestRound,
+    games: floor.games || 0,
   };
 }
 
@@ -192,6 +194,7 @@ export function restoreFloor(cfg, obj) {
   floor.earned = num(obj.earned);
   floor.cashed = num(obj.cashed);
   floor.bestRound = num(obj.bestRound);
+  floor.games = num(obj.games);
   return floor;
 }
 

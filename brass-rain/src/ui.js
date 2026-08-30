@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=32';
-import { createScene } from './render/scene.js?v=32';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=32';
-import { num, count, duration, mult, pct, fill } from './format.js?v=32';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=32';
-import { nailPos } from './board.js?v=32';
-import { sketchCabinet } from './cabinets.js?v=32';
-import { recordNight, loadNights, ordinal } from './nights.js?v=32';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=33';
+import { createScene } from './render/scene.js?v=33';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=33';
+import { num, count, duration, mult, pct, fill } from './format.js?v=33';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=33';
+import { nailPos } from './board.js?v=33';
+import { sketchCabinet } from './cabinets.js?v=33';
+import { recordNight, loadNights, ordinal } from './nights.js?v=33';
 
 const SPEEDS = [1, 2, 4];
 
@@ -280,6 +280,14 @@ export async function boot(doc) {
     if (el.cabinet) el.cabinet.textContent = r.skin ? r.skin.title : (r.cabinet ? r.cabinet.name : '');
     el.wonNow.textContent = num(r.won);
     paintMouths();
+    // The arcade is how stars are earned, and a player with coins and no
+    // machines has not been told. The plaque says so until the first is bought.
+    if (el.floorHint) {
+      const cheapest = cfg.floor && cfg.floor.machines && cfg.floor.machines[0] ? cfg.floor.machines[0].cost : 0;
+      el.floorHint.textContent = r.income > 0 ? ''
+        : r.scrip >= cheapest && cheapest > 0 ? 'You can buy your first arcade machine now - open Your arcade. Machines earn coins on their own, even while you are away.'
+        : 'Trade balls for coins, then buy arcade machines. They earn while you are away, and that is what earns stars.';
+    }
     el.quotaNo.textContent = num(r.quota);
     const done = Math.min(1, r.quota > 0 ? r.won / r.quota : 0);
     el.quotaTube.firstElementChild.style.width = (done * 100).toFixed(1) + '%';
@@ -332,6 +340,7 @@ export async function boot(doc) {
         };
         const res = recordNight(night);
         lastRank = res.rank; lastNightAt = night.at;
+        if (typeof game.countGame === 'function') game.countGame();
         paintNights(res.list);
       }
       if (el.rowSheet.hidden && !shownRow) { shownRow = true; openRow(); }
@@ -1041,7 +1050,8 @@ export async function boot(doc) {
 
   function paintFloor() {
     const r = game.reading();
-    el.floorLede.textContent = 'You own these machines. They earn '
+    const played = game.floor && game.floor.games ? game.floor.games : 0;
+    el.floorLede.textContent = (played ? 'Games finished: ' + played + '. ' : '') + 'You own these machines. They earn '
       + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
       + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
       + ' because your best game reached round ' + Math.max(r.bestRound, 0)
@@ -1316,7 +1326,7 @@ function index(doc) {
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),
     benchSheet: $('bench'), benchLede: $('benchLede'), offers: $('offers'),
     owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'), bendBars: $('bendBars'),
-    nights: $('nights'), nightsLede: $('nightsLede'),
+    nights: $('nights'), nightsLede: $('nightsLede'), floorHint: $('floorHint'),
     reroll: $('reroll'), leave: $('leave'), straighten: $('straighten'),
     floorSheet: $('floor'), floorLede: $('floorLede'), bulkbar: $('bulkbar'),
     machines: $('machines'), prestigeBox: $('prestigeBox'), closeFloor: $('closeFloor'),

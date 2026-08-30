@@ -211,7 +211,9 @@
     font:600 10px/1 var(--narrow);letter-spacing:.18em;text-transform:uppercase;
     color:var(--brass);margin:17px 0 8px;
   }
-  .sheetfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:17px;flex-wrap:wrap}
+  .sheetfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:17px;flex-wrap:wrap;
+    /* the buttons stay at the foot of the panel while its body scrolls, so Close is always in reach */
+    position:sticky;bottom:-20px;margin-bottom:-20px;padding:12px 0 20px;background:#170708;border-top:1px solid var(--rule)}
 
   /* the offer cards */
   #offers,#cabinets{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
@@ -498,7 +500,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="b1259e7e1b17">
+<meta name="build" content="aa3ef27220c2">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -595,6 +597,7 @@
       <div class="knobrow">
         <button id="cash" type="button">Trade balls for coins</button>
       </div>
+      <p class="sub" id="floorHint"></p>
     </section>
     <section class="plaque" id="pNights">
       <h2>Best nights</h2>
@@ -747,7 +750,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=32';
+  import { boot } from './src/ui.js?v=33';
   boot(document);
 </script>
 </body>

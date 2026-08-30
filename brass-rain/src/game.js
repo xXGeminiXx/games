@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=32';
+import { loadConfig } from '../config.js?v=33';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=32';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=33';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=32';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=32';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=32';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=32';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=32';
-import { rng as makeRng } from './rng.js?v=32';
-import { offerCabinets, freshSeed } from './cabinets.js?v=32';
-import * as Save from './save.js?v=32';
-import { showState } from './render/reach.js?v=32';
-import { skinForCabinet } from './render/themes.js?v=32';
-import { chooseDoor as callDoor } from './events.js?v=32';
+         handMult, restoreFloor } from './floor.js?v=33';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=33';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=33';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=33';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=33';
+import { rng as makeRng } from './rng.js?v=33';
+import { offerCabinets, freshSeed } from './cabinets.js?v=33';
+import * as Save from './save.js?v=33';
+import { showState } from './render/reach.js?v=33';
+import { skinForCabinet } from './render/themes.js?v=33';
+import { chooseDoor as callDoor } from './events.js?v=33';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=32');
-  const metaModule = await optional('./meta.js?v=32');
+  const catalogue = await optional('./fittings.js?v=33');
+  const metaModule = await optional('./meta.js?v=33');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -566,6 +566,12 @@ function api(game) {
       // twice.
       if (!game.row) game.row = offerCabinets(game.cfg, game.rowSeed || 'first', 3);
       return game.row;
+    },
+    /** One more finished game on the count. */
+    countGame() {
+      game.floor.games = (game.floor.games || 0) + 1;
+      save(game);
+      return game.floor.games;
     },
     /** The player calls a door in a lit row, counting from 0. */
     chooseDoor(k) {
