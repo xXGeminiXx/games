@@ -768,7 +768,7 @@ export const CONFIG = {
       { id: 'kakuhen',  name: 'Chain Bank',    cost: 1244160,        income: 128,    ratio: 1.11 },
       { id: 'silver',   name: 'Silver Hall',   cost: 14929920,       income: 512,    ratio: 1.10 },
       { id: 'corner',   name: 'Corner Stand',  cost: 179159040,      income: 2048,   ratio: 1.09 },
-      { id: 'aisle',    name: 'The Long Aisle', cost: 2149908480,    income: 8192,   ratio: 1.08 },
+      { id: 'aisle',    name: 'Long Aisle', cost: 2149908480,    income: 8192,   ratio: 1.08 },
       { id: 'tower',    name: 'Tower Floor',   cost: 25798901760,    income: 32768,  ratio: 1.07 },
     ],
   },
