@@ -502,6 +502,8 @@ export const CONFIG = {
     list: [
       {
         id: 'sparemouth',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { hothouse: 2.5 },
         name: 'Spare pocket',
         kind: 'mouth',
         trigger: { kind: 'dry', count: 11 },
@@ -524,6 +526,8 @@ export const CONFIG = {
       },
       {
         id: 'hatch',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { goldrush: 2.5 },
         name: 'Hatch',
         kind: 'mouth',
         trigger: { kind: 'chance' },
@@ -543,6 +547,8 @@ export const CONFIG = {
       },
       {
         id: 'shutter',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { furnace: 2.5 },
         name: 'Shutter',
         kind: 'plate',
         trigger: { kind: 'near' },
@@ -568,6 +574,8 @@ export const CONFIG = {
       },
       {
         id: 'litstripe',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { stardust: 2, tide: 1.5 },
         name: 'Lit stripe',
         kind: 'lane',
         trigger: { kind: 'nails', hits: 44 },
@@ -584,6 +592,8 @@ export const CONFIG = {
       },
       {
         id: 'crosstwo',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { tide: 2, stardust: 2 },
         name: 'Double',
         kind: 'sweep',
         trigger: { kind: 'closed' },
@@ -598,6 +608,8 @@ export const CONFIG = {
       },
       {
         id: 'crossthree',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { cherry: 1.5, goldrush: 1.5 },
         name: 'Triple',
         kind: 'sweep',
         trigger: { kind: 'hot', count: 6 },
@@ -625,6 +637,8 @@ export const CONFIG = {
       },
       {
         id: 'doors',
+        // how much this machine leans toward this one, when several are ready at once
+        weights: { cherry: 2.5, hothouse: 1.5 },
         name: 'Three doors',
         kind: 'doors',
         trigger: { kind: 'pace', share: 0.5 },

@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=20';
-import { summonFor, doorsFor } from './render/themes.js?v=20';
+import { POCKET_PAY } from './board.js?v=21';
+import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=21';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -355,7 +355,20 @@ function tryStart(state, kind, info) {
   if (!ready.length) return null;
   // Two entries can wait on the same trigger, so one is drawn rather than the
   // one written first in the file always winning.
-  const pick = ready.length === 1 ? 0 : Math.floor(state.rng.next() * ready.length) % ready.length;
+  // Each machine leans toward its own: an entry may carry a weight per skin,
+  // so the flytrap's machine opens more spare mouths and the diner lights
+  // more rows of doors, while the same triggers fire at the same rate.
+  let pick = 0;
+  if (ready.length > 1) {
+    const skin = themeForCabinet(state.board && state.board.layout ? state.board.layout.id : '');
+    const w = ready.map(d => {
+      const v = d.weights && Number.isFinite(d.weights[skin]) ? d.weights[skin] : 1;
+      return Math.max(0, v);
+    });
+    const total = w.reduce((a, b) => a + b, 0);
+    let roll = state.rng.next() * (total > 0 ? total : ready.length);
+    for (let i = 0; i < w.length; i++) { roll -= total > 0 ? w[i] : 1; if (roll <= 0) { pick = i; break; } }
+  }
   return start(state, ready[pick], info);
 }
 
