@@ -67,13 +67,18 @@ export function duration(seconds) {
   if (m < 60) return m + 'm ' + (s % 60) + 's';
   const h = Math.floor(m / 60);
   if (h < 24) return h + 'h ' + (m % 60) + 'm';
-  return Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+  const d = Math.floor(h / 24);
+  // Past a thousand days the hours stop mattering and the count takes the
+  // house style, so a damaged timestamp reads as a big number, not exponents.
+  if (d >= 1000) return num(d) + 'd';
+  return d + 'd ' + (h % 24) + 'h';
 }
 
 /** A multiplier, written the way a player would say it. */
 export function mult(v) {
   if (!Number.isFinite(v)) return 'x1';
-  if (v >= 1000) return 'x' + num(v);
+  // Either sign hands over to the house style past a thousand.
+  if (Math.abs(v) >= 1000) return 'x' + num(v);
   if (v === Math.floor(v)) return 'x' + v;
   return 'x' + v.toFixed(v < 10 ? 2 : 1).replace(/\.?0+$/, '');
 }
@@ -82,6 +87,7 @@ export function mult(v) {
 export function pct(v) {
   const p = v * 100;
   if (!Number.isFinite(p)) return '0%';
+  if (Math.abs(p) >= 1000) return num(p) + '%';
   if (p >= 10) return Math.round(p) + '%';
   if (p >= 1) return p.toFixed(1) + '%';
   return p.toFixed(2) + '%';

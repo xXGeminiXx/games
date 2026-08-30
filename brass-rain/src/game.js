@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=43';
+import { loadConfig } from '../config.js?v=44';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=43';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=44';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=43';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=43';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=43';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=43';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=43';
-import { rng as makeRng } from './rng.js?v=43';
-import { offerCabinets, freshSeed } from './cabinets.js?v=43';
-import * as Save from './save.js?v=43';
-import { showState } from './render/reach.js?v=43';
-import { skinForCabinet } from './render/themes.js?v=43';
-import { chooseDoor as callDoor } from './events.js?v=43';
+         handMult, restoreFloor } from './floor.js?v=44';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=44';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=44';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=44';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=44';
+import { rng as makeRng } from './rng.js?v=44';
+import { offerCabinets, freshSeed } from './cabinets.js?v=44';
+import * as Save from './save.js?v=44';
+import { showState } from './render/reach.js?v=44';
+import { skinForCabinet } from './render/themes.js?v=44';
+import { chooseDoor as callDoor } from './events.js?v=44';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=43');
-  const metaModule = await optional('./meta.js?v=43');
+  const catalogue = await optional('./fittings.js?v=44');
+  const metaModule = await optional('./meta.js?v=44');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -626,11 +626,36 @@ function restoreBendState(board, list) {
 }
 
 /** Everything the page shows, gathered once a frame. */
+/**
+ * What the plaques print is never a broken number. Anything that is not
+ * finite is shown as 0 and noted once in the log, so a fault upstream reads
+ * as a wrong number the player can report instead of NaN on a plaque or a
+ * save that stops loading.
+ */
+function readable(game, value, path) {
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return value;
+    const key = path || 'a number';
+    game.brokenNoted = game.brokenNoted || new Set();
+    if (!game.brokenNoted.has(key) && game.run && Array.isArray(game.run.log)) {
+      game.brokenNoted.add(key);
+      game.run.log.unshift({ kind: 'fault', text: 'A number went wrong on the way to the plaques (' + key + ') and shows as 0.' });
+      if (game.run.log.length > 40) game.run.log.length = 40;
+    }
+    return 0;
+  }
+  if (Array.isArray(value)) { for (let i = 0; i < value.length; i++) value[i] = readable(game, value[i], (path || '') + '[' + i + ']'); return value; }
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    for (const k of Object.keys(value)) value[k] = readable(game, value[k], path ? path + '.' + k : k);
+  }
+  return value;
+}
+
 export function reading(game) {
   const run = game.run;
   const cfg = game.runCfg;
   const eff = metaEffects(game);
-  return {
+  const out = {
     view: game.view,
     round: run.round,
     quota: run.quota,
@@ -680,6 +705,7 @@ export function reading(game) {
     fps: game.quality.fps,
     scale: game.quality.scale,
   };
+  return readable(game, out);
 }
 
 function changed(game) {

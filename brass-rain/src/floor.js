@@ -19,7 +19,7 @@
 // for by the played half rather than replacing it.
 // ---------------------------------------------------------------------------
 
-import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=43';
+import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=44';
 
 /** The floor as it stands at the start of everything. */
 export function createFloor(cfg) {
