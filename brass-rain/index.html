@@ -336,6 +336,13 @@
   #nights li small{color:var(--dim);margin-left:4px}
   #nights li.now{background:rgba(79,168,138,.22);border-radius:3px;margin-left:-4px;padding-left:4px}
   #nights:empty{display:none}
+  /* the full board */
+  #bestsBody table{width:100%;border-collapse:collapse;font-size:12px}
+  #bestsBody th{text-align:left;font:600 10px/1 var(--narrow);letter-spacing:.14em;text-transform:uppercase;color:var(--brass);padding:6px 8px;border-bottom:1px solid var(--rule)}
+  #bestsBody td{padding:6px 8px;border-bottom:1px solid rgba(125,90,46,.35);color:var(--enamel)}
+  #bestsBody td.n{text-align:right;font-variant-numeric:tabular-nums}
+  #bestsBody tr.now td{background:rgba(79,168,138,.18);color:var(--lamp)}
+  #bestsBody tr.top td:first-child{color:var(--brass-lit);font-weight:700}
   /* where the last round's balls ended up, column by column across the board */
   .bars{display:block;width:100%;height:56px;border-radius:4px;border:1px solid var(--rule);background:#1a0708;margin:4px 0 8px}
   .cab .sketch{display:block;height:150px;width:auto;margin:0 auto;border-radius:4px;border:1px solid var(--rule);background:#000}
@@ -491,7 +498,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="6faab9648f16">
+<meta name="build" content="b1259e7e1b17">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -544,6 +551,7 @@
     <button id="toRow" type="button">Change machine</button>
     <button id="toFloor" type="button">Your arcade</button>
     <button id="toSettings" type="button">Settings</button>
+    <button id="toBests" type="button">Best nights</button>
     <button id="toHelp" type="button">Help</button>
   </div>
 </header>
@@ -722,6 +730,14 @@
 </div>
 
 <!-- help -->
+<div class="sheet" id="bests" hidden>
+  <div class="panel">
+    <h1>Best nights</h1>
+    <p class="lede" id="bestsLede">Every game you have finished, best first: the round that ended it, then the balls won on the way.</p>
+    <div id="bestsBody"></div>
+    <div class="sheetfoot"><button id="closeBests" type="button">Close</button></div>
+  </div>
+</div>
 <div class="sheet" id="help" hidden>
   <div class="panel">
     <h1>How this machine works</h1>
@@ -731,7 +747,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=31';
+  import { boot } from './src/ui.js?v=32';
   boot(document);
 </script>
 </body>

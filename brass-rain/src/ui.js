@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=31';
-import { createScene } from './render/scene.js?v=31';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=31';
-import { num, count, duration, mult, pct, fill } from './format.js?v=31';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=31';
-import { nailPos } from './board.js?v=31';
-import { sketchCabinet } from './cabinets.js?v=31';
-import { recordNight, loadNights, ordinal } from './nights.js?v=31';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=32';
+import { createScene } from './render/scene.js?v=32';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=32';
+import { num, count, duration, mult, pct, fill } from './format.js?v=32';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=32';
+import { nailPos } from './board.js?v=32';
+import { sketchCabinet } from './cabinets.js?v=32';
+import { recordNight, loadNights, ordinal } from './nights.js?v=32';
 
 const SPEEDS = [1, 2, 4];
 
@@ -111,6 +111,8 @@ export async function boot(doc) {
     on(el.toSettings, 'click', () => openSettings());
     on(el.closeSettings, 'click', () => hide(el.settingsSheet));
     on(el.toHelp, 'click', () => openHelp());
+    on(el.toBests, 'click', () => openBests());
+    on(el.closeBests, 'click', () => hide(el.bestsSheet));
     on(el.closeHelp, 'click', () => hide(el.helpSheet));
     on(el.primerGo, 'click', () => closePrimer());
 
@@ -155,7 +157,7 @@ export async function boot(doc) {
       else if (e.key === 'ArrowLeft') game.setStrength(game.run.strength - 0.01);
       else if (e.key === 'ArrowRight') game.setStrength(game.run.strength + 0.01);
       else if (e.key === 'Escape') {
-        hide(el.floorSheet); hide(el.settingsSheet); hide(el.helpSheet);
+        hide(el.floorSheet); hide(el.settingsSheet); hide(el.helpSheet); hide(el.bestsSheet);
         if (el.primerSheet && !el.primerSheet.hidden) closePrimer();
       }
       else if (e.key === 'f' || e.key === 'F') openFloor();
@@ -966,6 +968,38 @@ export async function boot(doc) {
   }
   paintNights();
 
+  /** The full board, one click from anywhere: every night kept, best first. */
+  function openBests() {
+    const list = loadNights();
+    const body = el.bestsBody;
+    if (!body) return;
+    body.textContent = '';
+    if (!list.length) {
+      const p = doc.createElement('p');
+      p.className = 'lede';
+      p.textContent = 'Nothing yet. Finish a game and it goes here.';
+      body.appendChild(p);
+    } else {
+      const t = doc.createElement('table');
+      t.innerHTML = '<thead><tr><th>#</th><th>Round</th><th>Machine</th><th class="n">Balls won</th><th class="n">Bonuses</th><th>When</th></tr></thead><tbody></tbody>';
+      const tb = t.tBodies[0];
+      list.forEach((n, i) => {
+        const tr = doc.createElement('tr');
+        tr.className = (i === 0 ? 'top' : '') + (n.at === lastNightAt ? ' now' : '');
+        const d = new Date(n.at || 0);
+        const when = n.at && Number.isFinite(d.getTime()) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        const cells = [String(i + 1), 'Round ' + n.round, n.machine || '', num(n.won || 0), num(n.fevers || 0), when];
+        cells.forEach((v, k) => { const td = doc.createElement('td'); if (k === 3 || k === 4) td.className = 'n'; td.textContent = v; tr.appendChild(td); });
+        tb.appendChild(tr);
+      });
+      body.appendChild(t);
+    }
+    if (el.bestsLede) el.bestsLede.textContent = list.length
+      ? 'Every game you have finished, best first: the round that ended it, then the balls won on the way. Beat round ' + list[0].round + ' to take the top.'
+      : 'Every game you finish goes here, best first.';
+    show(el.bestsSheet);
+  }
+
   // ---- the lettering on the mouths ------------------------------------
   //
   // Every mouth is named on the face: the slot says SLOT, a pay mouth says
@@ -1292,6 +1326,7 @@ function index(doc) {
     mFps: $('mFps'), mScale: $('mScale'), mBalls: $('mBalls'), mPins: $('mPins'),
     newRun: $('newRun'), wipe: $('wipe'), closeSettings: $('closeSettings'),
     helpSheet: $('help'), helpBody: $('helpBody'), closeHelp: $('closeHelp'),
+    toBests: $('toBests'), bestsSheet: $('bests'), bestsBody: $('bestsBody'), bestsLede: $('bestsLede'), closeBests: $('closeBests'),
     primerSheet: $('primer'), primerGo: $('primerGo'),
   };
 }
