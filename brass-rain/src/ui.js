@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=40';
-import { createScene } from './render/scene.js?v=40';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=40';
-import { num, count, duration, mult, pct, fill } from './format.js?v=40';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=40';
-import { nailPos } from './board.js?v=40';
-import { sketchCabinet } from './cabinets.js?v=40';
-import { recordNight, loadNights, ordinal } from './nights.js?v=40';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=41';
+import { createScene } from './render/scene.js?v=41';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=41';
+import { num, count, duration, mult, pct, fill } from './format.js?v=41';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=41';
+import { nailPos } from './board.js?v=41';
+import { sketchCabinet } from './cabinets.js?v=41';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=41';
 
 const SPEEDS = [1, 2, 4];
 
@@ -45,6 +45,10 @@ export async function boot(doc) {
   let recordedSeed = null;
   let lastRank = 0;
   let lastNightAt = 0;
+  // The board as last painted, and the live rank last spoken, so the plaque
+  // only rewrites when the standing actually moves.
+  let nightsList = [];
+  let liveKey = '';
   // The last lit row the hint spoke for, so it speaks once per row.
   let litRow = null;
   // The tags on the mouths, keyed by mouth id. Declared here with the rest
@@ -285,6 +289,7 @@ export async function boot(doc) {
     if (el.cabinet) el.cabinet.textContent = r.skin ? r.skin.title : (r.cabinet ? r.cabinet.name : '');
     el.wonNow.textContent = num(r.won);
     paintMouths();
+    paintLiveRank(r);
     // The arcade is how stars are earned, and a player with coins and no
     // machines has not been told. The plaque says so until the first is bought.
     if (el.floorHint) {
@@ -978,7 +983,8 @@ export async function boot(doc) {
   function paintNights(list) {
     const box = el.nights;
     if (!box) return;
-    const rows = (list || loadNights()).slice(0, 5);
+    nightsList = list || loadNights();
+    const rows = nightsList.slice(0, 5);
     box.textContent = '';
     for (const n of rows) {
       const li = doc.createElement('li');
@@ -1000,6 +1006,25 @@ export async function boot(doc) {
     }
   }
   paintNights();
+
+  /** Where the game being played would land on the board right now. */
+  function liveStanding(r) {
+    if (!r || r.over || !r.stats || !(r.stats.launched > 0) || !nightsList.length) return null;
+    const now = { round: r.round, won: r.stats.won || 0, at: -1, seed: -2 };
+    const rank = rankOf(withNight(nightsList, now), now);
+    return rank > 0 ? rank : nightsList.length + 1;
+  }
+
+  /** The plaque says the live standing, rewritten only when it moves. */
+  function paintLiveRank(r) {
+    if (!el.nightsLede) return;
+    const rank = liveStanding(r);
+    const key = rank === null ? '' : rank + ':' + nightsList[0].round;
+    if (key === liveKey) return;
+    liveKey = key;
+    if (rank === null) return;
+    el.nightsLede.textContent = 'This game would land ' + ordinal(rank) + ' right now. Beat round ' + nightsList[0].round + ' to take the top.';
+  }
 
   /** The full board, one click from anywhere: every night kept, best first. */
   function openBests() {
@@ -1027,8 +1052,11 @@ export async function boot(doc) {
       });
       body.appendChild(t);
     }
+    const standing = liveStanding(game.reading());
     if (el.bestsLede) el.bestsLede.textContent = list.length
-      ? 'Every game you have finished, best first: the round that ended it, then the balls won on the way. Beat round ' + list[0].round + ' to take the top.'
+      ? 'Every game you have finished, best first: the round that ended it, then the balls won on the way.'
+        + (standing ? ' The game you are playing would land ' + ordinal(standing) + ' right now.' : '')
+        + ' Beat round ' + list[0].round + ' to take the top.'
       : 'Every game you finish goes here, best first.';
     show(el.bestsSheet);
   }
