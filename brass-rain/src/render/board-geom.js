@@ -273,7 +273,7 @@ export function packArc(rail, into) {
 export const REEL_RING = [
   [-1.38, 0.10], [1.38, 0.10],
   [-1.30, 0.86], [1.30, 0.86],
-  [-1.20, -0.60], [1.20, -0.60],
+  [-1.38, -0.25], [1.38, -0.25],
 ];
 
 // How big an extra window is beside the main strip of drums. Smaller, because

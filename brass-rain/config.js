@@ -323,7 +323,7 @@ export const CONFIG = {
         funnelRows: 2, funnelWidth: 8,
         attacker: { x: 50, y: 104, w: 11, h: 2.13 },
         payPockets: [
-          { id: 'side0',  x: 24, y: 34, w: 3.0, h: 1.30, pay: 1, tone: 'enamel' },
+          { id: 'side0',  x: 14, y: 36, w: 3.0, h: 1.30, pay: 1, tone: 'enamel' },
           { id: 'side1',  x: 74, y: 52, w: 3.0, h: 1.30, pay: 1, tone: 'enamel' },
           { id: 'cream0', x: 26, y: 64, w: 3.0, h: 1.30, pay: 2, tone: 'enamel' },
           { id: 'cream1', x: 74, y: 76, w: 3.0, h: 1.30, pay: 3, tone: 'enamel' },

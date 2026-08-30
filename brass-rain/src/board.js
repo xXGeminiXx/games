@@ -18,7 +18,7 @@
 // to read it again.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=10';
+import { rng as makeRng } from './rng.js?v=11';
 
 export const POCKET_OUT = 'out';
 export const POCKET_PAY = 'pay';
@@ -255,7 +255,7 @@ function layOutRails(cfg, board, layout) {
 export const SCREEN_RING = [
   [-1.38, 0.10], [1.38, 0.10],
   [-1.30, 0.86], [1.30, 0.86],
-  [-1.20, -0.60], [1.20, -0.60],
+  [-1.38, -0.25], [1.38, -0.25],
 ];
 
 /**

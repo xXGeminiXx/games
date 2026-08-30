@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=10';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=10';
+import { digitGlsl } from './digits.js?v=11';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=11';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -304,23 +304,36 @@ void main() {
     float chev = step(0.5, fract((a.x + abs(n.y - 0.965) * 1.2) * 7.0));
     dark += foot * chev * 0.85;
   } else if (look == 4) {
-    // Cherry Bomb: a checkered diner floor along the foot, chrome trim lines,
-    // and the pair of cherries every slot player knows, up in one corner.
+    // Cherry Bomb: a jukebox. A bubble tube climbs the arch over the face
+    // with bubbles rising through it, chrome trim runs the arch's rim, a
+    // speaker grille of chrome bars crosses the foot, and the record deck
+    // on the screen is the machine's heart.
+    vec2 ac = vec2(0.431, 0.34);
+    vec2 ar = vec2(0.40, 0.31);
+    vec2 rel = (a - ac) / ar;
+    float arch = length(rel) - 1.0;
+    float upper = smoothstep(0.03, -0.02, a.y - ac.y - 0.02);
+    float tube = abs(arch) - 0.05;
+    float inTube = smoothstep(0.012, 0.0, tube) * upper;
+    // the tube is the accent, lit brighter where a bubble passes
+    float ang = atan(rel.y, rel.x);
+    float bub = smoothstep(0.10, 0.0, abs(fract(ang * 2.2 - t * 0.35) - 0.5) - 0.02)
+              * smoothstep(0.035, 0.0, abs(arch));
+    acc += inTube * (0.45 + 0.55 * bub);
+    light += inTube * bub * 0.5;
+    // chrome rims either side of the tube
+    dark += smoothstep(0.014, 0.0, abs(abs(arch) - 0.062) - 0.004) * upper * 0.7;
+    light += smoothstep(0.012, 0.0, abs(abs(arch) - 0.074) - 0.003) * upper * 0.6;
+    // a second, thinner tube inside the first
+    float tube2 = abs(arch + 0.11) - 0.014;
+    acc += smoothstep(0.008, 0.0, tube2) * upper * 0.35;
+    // the speaker grille across the foot
     float foot = step(0.90, n.y);
-    float chk = mod(floor(a.x * 14.0) + floor((n.y - 0.90) * 16.2), 2.0);
-    dark += foot * chk * 0.75;
-    light += foot * (1.0 - chk) * 0.40;
-    light += smoothstep(0.005, 0.0, abs(n.y - 0.892)) * 0.9;
+    float bar = step(0.5, fract(a.x * 24.0));
+    light += foot * (1.0 - bar) * 0.45;
+    dark += foot * bar * 0.65;
+    light += smoothstep(0.005, 0.0, abs(n.y - 0.893)) * 0.9;
     light += smoothstep(0.004, 0.0, abs(n.y - 0.050)) * 0.5 + smoothstep(0.004, 0.0, abs(n.y - 0.068)) * 0.35;
-    vec2 c1 = a - vec2(0.105, 0.145), c2 = a - vec2(0.175, 0.170);
-    float ch = min(length(c1) - 0.042, length(c2) - 0.042);
-    dark += smoothstep(0.008, 0.0, ch) * 0.9;
-    light += (smoothstep(0.016, 0.0, length(c1 - vec2(-0.014, -0.014)) - 0.010)
-            + smoothstep(0.016, 0.0, length(c2 - vec2(-0.014, -0.014)) - 0.010)) * 0.8;
-    float s1 = abs((a.x - 0.105) - (0.145 - a.y) * 0.75) - 0.004;
-    float s2 = abs((a.x - 0.175) - (0.170 - a.y) * 0.25) - 0.004;
-    float stem = min(s1 * step(a.y, 0.145), s2 * step(a.y, 0.170));
-    dark += smoothstep(0.004, 0.0, stem) * step(0.06, a.y) * 0.8;
   } else {
     // Stardust: a field of stars that twinkle, a ringed planet up in one
     // corner, and the one dark face on the floor, so the picture is mostly

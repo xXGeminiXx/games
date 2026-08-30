@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=10';
-import { createScene } from './render/scene.js?v=10';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=10';
-import { num, count, duration, mult, pct, fill } from './format.js?v=10';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=10';
-import { nailPos } from './board.js?v=10';
-import { sketchCabinet } from './cabinets.js?v=10';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=11';
+import { createScene } from './render/scene.js?v=11';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=11';
+import { num, count, duration, mult, pct, fill } from './format.js?v=11';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=11';
+import { nailPos } from './board.js?v=11';
+import { sketchCabinet } from './cabinets.js?v=11';
 
 const SPEEDS = [1, 2, 4];
 
@@ -239,6 +239,7 @@ export async function boot(doc) {
     el.quotaTube.classList.toggle('done', done >= 1);
     el.perBall.textContent = r.won >= r.quota
       ? 'Goal met. The counter pays a bonus of ' + num(r.nextBonus) + ' balls.'
+      : r.pullsLeft <= 0 ? 'No pulls left.'
       : num(r.pullsLeft) + ' pulls left' + (r.perPull > 1 ? ' at ' + r.perPull + ' balls a pull' : '')
         + '. Each of those balls has to win ' + r.perBall.toFixed(2) + ' to hit the goal.';
 
@@ -318,7 +319,7 @@ export async function boot(doc) {
   }
 
   function paintBanner(r) {
-    if (r.fever) {
+    if (r.fever && !r.over) {
       el.banner.hidden = false;
       el.banner.textContent = cfg.text.fever + ' - jackpot pocket open, ' + r.feverLeft + ' balls left'
         + (r.feverChain > 1 ? ' - streak ' + r.feverChain : '');

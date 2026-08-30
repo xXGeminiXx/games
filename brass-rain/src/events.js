@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=10';
-import { summonFor } from './render/themes.js?v=10';
+import { POCKET_PAY } from './board.js?v=11';
+import { summonFor } from './render/themes.js?v=11';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -661,7 +661,18 @@ function end(state, e) {
 function clearOne(state, e) {
   // Something that was only ever a warning never happened, so there is nothing
   // on the board to take away at all.
-  if (e.pending) { e.pending = false; e.done = true; return; }
+  if (e.pending) {
+    e.pending = false; e.done = true;
+    // A warning that never became anything still keeps the picture's
+    // promise: every field a drawn event of its kind carries is present,
+    // so a row of doors or a lane cleared mid-warning never reaches the
+    // renderer half made.
+    const def = e.def || {};
+    if (e.kind === 'doors') { e.doors = clampInt(num(def.doors, 3), 2, 8); e.pick = 0; e.prize = 0; e.revealed = false; }
+    else if (e.kind === 'lane') { e.x0 = 0; e.x1 = 1; e.yTop = 0; e.yBottom = 1; }
+    else if (e.kind === 'sweep') { e.x = 0; e.y = 0; e.r = 1; e.dir = 1; }
+    return;
+  }
   e.done = true;
   e.mult = 1;
   if (e.kind === 'mouth' && e.pocket) {
