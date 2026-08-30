@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=25';
-import { createScene } from './render/scene.js?v=25';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=25';
-import { num, count, duration, mult, pct, fill } from './format.js?v=25';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=25';
-import { nailPos } from './board.js?v=25';
-import { sketchCabinet } from './cabinets.js?v=25';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=26';
+import { createScene } from './render/scene.js?v=26';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=26';
+import { num, count, duration, mult, pct, fill } from './format.js?v=26';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=26';
+import { nailPos } from './board.js?v=26';
+import { sketchCabinet } from './cabinets.js?v=26';
 
 const SPEEDS = [1, 2, 4];
 
@@ -40,6 +40,8 @@ export async function boot(doc) {
 
   let bulk = 10;
   let speedIndex = 0;
+  // The last lit row the hint spoke for, so it speaks once per row.
+  let litRow = null;
   // The tags on the mouths, keyed by mouth id. Declared here with the rest
   // of the state because the first paint runs before boot has finished.
   const mouthTags = new Map();
@@ -319,6 +321,13 @@ export async function boot(doc) {
     } else {
       el.hint.textContent = cfg.text.firstLine;
     }
+    // A lit row of doors says how to play it, once, the moment it lights.
+    const lit = (game.run.events && Array.isArray(game.run.events.active) ? game.run.events.active : [])
+      .find(e => e.kind === 'doors' && !e.pending && !e.done && !e.revealed);
+    if (lit && lit.key !== litRow) {
+      litRow = lit.key;
+      el.hint.textContent = (lit.doors || 3) + ' doors are lit. Click one, or press its number, to call it.';
+    }
 
     if (r.away && r.away.gained > 0) {
       showAway(r.away);
@@ -359,6 +368,13 @@ export async function boot(doc) {
   function paintBanner(r) {
     if (r.fever && !r.over) {
       el.banner.hidden = false;
+      // The banner wears the machine's accent, with lettering that reads on it.
+      if (r.skin && r.skin.glow) {
+        const g = r.skin.glow.replace('#', '');
+        const lum = (parseInt(g.slice(0, 2), 16) * 0.2126 + parseInt(g.slice(2, 4), 16) * 0.7152 + parseInt(g.slice(4, 6), 16) * 0.0722) / 255;
+        el.banner.style.background = r.skin.glow;
+        el.banner.style.color = lum < 0.45 ? (r.skin.lamp || '#f6f2ea') : '#06180f';
+      }
       el.banner.textContent = cfg.text.fever + ' - jackpot pocket open, ' + r.feverLeft + ' balls left'
         + (r.feverChain > 1 ? ' - streak ' + r.feverChain : '');
     } else if (r.settling) {
