@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=22';
+import { loadConfig } from '../config.js?v=23';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=22';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=23';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=22';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=22';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=22';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=22';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=22';
-import { rng as makeRng } from './rng.js?v=22';
-import { offerCabinets } from './cabinets.js?v=22';
-import * as Save from './save.js?v=22';
-import { showState } from './render/reach.js?v=22';
-import { skinForCabinet } from './render/themes.js?v=22';
-import { chooseDoor as callDoor } from './events.js?v=22';
+         handMult, restoreFloor } from './floor.js?v=23';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=23';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=23';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=23';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=23';
+import { rng as makeRng } from './rng.js?v=23';
+import { offerCabinets, freshSeed } from './cabinets.js?v=23';
+import * as Save from './save.js?v=23';
+import { showState } from './render/reach.js?v=23';
+import { skinForCabinet } from './render/themes.js?v=23';
+import { chooseDoor as callDoor } from './events.js?v=23';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=22');
-  const metaModule = await optional('./meta.js?v=22');
+  const catalogue = await optional('./fittings.js?v=23');
+  const metaModule = await optional('./meta.js?v=23');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -81,7 +81,7 @@ export async function createGame(opts) {
 
   const saved = Save.read(cfg, storage);
   if (saved) loadSave(game, saved);
-  else newRun(game, (Math.random() * 1e9) | 0);
+  else newRun(game, freshSeed(game.cfg));
 
   return Object.assign(game, api(game));
 }
@@ -368,7 +368,7 @@ function loadSave(game, saved) {
     game.view = game.run.phase === PHASE_SHOP ? VIEW_BENCH : VIEW_MACHINE;
     if (game.view === VIEW_BENCH) rollOffer(game);
   } else {
-    newRun(game, (Math.random() * 1e9) | 0);
+    newRun(game, freshSeed(game.cfg));
   }
 
   // Time away. Both numbers are kept and each is named for what it is, so the
@@ -503,7 +503,7 @@ function api(game) {
       const got = cashOut(game.cfg, game.floor, balls, metaEffects(game));
       if (game.run.round - 1 > game.floor.bestRound) game.floor.bestRound = game.run.round - 1;
       game.run.tray = 0;
-      newRun(game, (Math.random() * 1e9) | 0);
+      newRun(game, freshSeed(game.cfg));
       save(game);
       changed(game);
       return got;
@@ -541,7 +541,7 @@ function api(game) {
           if (Number.isFinite(n) && n > 0 && id in game.floor.owned) game.floor.owned[id] = Math.floor(n);
         }
       }
-      newRun(game, (Math.random() * 1e9) | 0);
+      newRun(game, freshSeed(game.cfg));
       save(game);
       changed(game);
       return { ok: true, why: '' };
@@ -589,7 +589,7 @@ function api(game) {
     // ---- the page ------------------------------------------------------
     setView(v) { game.view = v; changed(game); },
     newRun(seed, fittings) {
-      newRun(game, seed === undefined ? (Math.random() * 1e9) | 0 : seed, fittings);
+      newRun(game, seed === undefined ? freshSeed(game.cfg) : seed, fittings);
       save(game); changed(game);
     },
     reading() { return reading(game); },

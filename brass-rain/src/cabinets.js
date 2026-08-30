@@ -18,10 +18,10 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=22';
-import { createBalls, launch, stepPhysics } from './physics.js?v=22';
-import { rng as makeRng } from './rng.js?v=22';
-import { skinForCabinet } from './render/themes.js?v=22';
+import { createBoard, nailPos, layoutFor } from './board.js?v=23';
+import { createBalls, launch, stepPhysics } from './physics.js?v=23';
+import { rng as makeRng } from './rng.js?v=23';
+import { skinForCabinet } from './render/themes.js?v=23';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -58,7 +58,13 @@ export function offerCabinets(cfg, seedFrom, count) {
       seed = (r.next() * 1e9) >>> 0;
     }
     shown.add(layoutFor(cfg, seed).id);
-    out.push(readCabinet(cfg, seed, i));
+    // A face the trial cannot put balls through is not offered.
+    let cab = readCabinet(cfg, seed, i);
+    for (let t = 0; t < 6 && cab.gate < 0.03; t++) {
+      seed = (r.next() * 1e9) >>> 0;
+      cab = readCabinet(cfg, seed, i);
+    }
+    out.push(cab);
   }
   return out;
 }
@@ -80,6 +86,40 @@ export function sketchCabinet(cfg, seed) {
     guides: (board.guides || []).map(g => [g.x1, g.y1, g.x2, g.y2]),
     nails: board.nails.map(n => { const p = nailPos(n); return [p.x, p.y]; }),
   };
+}
+
+/**
+ * Whether a face can be played with the handle at rest: a short probe there.
+ * Half the boards of one layout put no ball through the slot at the rest
+ * setting and were dead by round three, while the other half played to
+ * round twelve - a seed's lattice, not the layout. A machine handed to a
+ * player has to pass this.
+ */
+export function playsAtRest(cfg, board, seed) {
+  const r = makeRng('rest:' + seed);
+  const balls = createBalls(124);
+  for (let i = 0; i < 120; i++) launch(cfg, balls, 0.67, (r.next() * 2 - 1) * cfg.launch.spread, 1);
+  const out = { events: [], flashes: [], marks: [], flashCap: 0 };
+  let steps = 0;
+  while (balls.n > 0 && steps < TRIAL_STEP_CAP) {
+    stepPhysics(cfg, board, balls, cfg.physics.step, r.next, out);
+    out.flashes.length = 0;
+    steps++;
+  }
+  let gates = 0, total = 0;
+  for (const e of out.events) { total++; if (e.kind === 'gate') gates++; }
+  return total > 0 && gates / total >= 0.02;
+}
+
+/** A seed drawn fresh whose face plays at rest, or the last one tried. */
+export function freshSeed(cfg, rand) {
+  const next = typeof rand === 'function' ? rand : Math.random;
+  let seed = (next() * 1e9) >>> 0;
+  for (let i = 0; i < 12; i++) {
+    if (playsAtRest(cfg, createBoard(cfg, seed), seed)) return seed;
+    seed = (next() * 1e9) >>> 0;
+  }
+  return seed;
 }
 
 function layoutCount(cfg) {
