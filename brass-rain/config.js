@@ -573,6 +573,27 @@ export const CONFIG = {
         ],
       },
       {
+        id: 'sluice',
+        // Gold Rush's own: a bar that drops in from a top corner and runs
+        // balls down toward the middle. Other machines almost never see it.
+        weights: { goldrush: 4, tide: 0.2, hothouse: 0.2, furnace: 0.2, cherry: 0.2, stardust: 0.2 },
+        name: 'Sluice',
+        kind: 'plate',
+        trigger: { kind: 'near' },
+        line: 'Two of the three lined up, and a sluice drops in from the top. Balls run down it toward the middle for {n} balls.',
+        balls: 26,
+        restBalls: 24,
+        tellBalls: 2,
+        tellLine: 'A sluice is lowering.',
+        clearance: 8,
+        spots: [
+          { x: 0.22, y: 0.30, len: 0.26, tilt: 0.55 },
+          { x: 0.78, y: 0.30, len: 0.26, tilt: -0.55 },
+          { x: 0.26, y: 0.50, len: 0.24, tilt: 0.50 },
+          { x: 0.74, y: 0.50, len: 0.24, tilt: -0.50 },
+        ],
+      },
+      {
         id: 'litstripe',
         // how much this machine leans toward this one, when several are ready at once
         weights: { stardust: 2, tide: 1.5 },
