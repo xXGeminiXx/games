@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=26';
+import { loadConfig } from '../config.js?v=27';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=26';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=27';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=26';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=26';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=26';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=26';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=26';
-import { rng as makeRng } from './rng.js?v=26';
-import { offerCabinets, freshSeed } from './cabinets.js?v=26';
-import * as Save from './save.js?v=26';
-import { showState } from './render/reach.js?v=26';
-import { skinForCabinet } from './render/themes.js?v=26';
-import { chooseDoor as callDoor } from './events.js?v=26';
+         handMult, restoreFloor } from './floor.js?v=27';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=27';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=27';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=27';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=27';
+import { rng as makeRng } from './rng.js?v=27';
+import { offerCabinets, freshSeed } from './cabinets.js?v=27';
+import * as Save from './save.js?v=27';
+import { showState } from './render/reach.js?v=27';
+import { skinForCabinet } from './render/themes.js?v=27';
+import { chooseDoor as callDoor } from './events.js?v=27';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=26');
-  const metaModule = await optional('./meta.js?v=26');
+  const catalogue = await optional('./fittings.js?v=27');
+  const metaModule = await optional('./meta.js?v=27');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -728,6 +728,15 @@ export function frame(game, now) {
   changed(game);
 }
 
+/** 0 while the machine is being played, rising to 1 over the ten seconds after twenty idle. */
+function attractLevel(game, run) {
+  const launched = run && run.stats ? run.stats.launched : 0;
+  const now = Date.now();
+  if (launched !== game.seenLaunched || !game.lastLaunchAt) { game.seenLaunched = launched; game.lastLaunchAt = now; }
+  const idle = (now - game.lastLaunchAt) / 1000;
+  return idle > 20 ? Math.min(1, (idle - 20) / 10) : 0;
+}
+
 /** How many bolted-in parts act on the nails, the slot, the rails and the glass. */
 function partsOnTheFace(run) {
   const out = { nails: 0, slot: 0, rails: 0, glass: 0 };
@@ -757,6 +766,10 @@ export function view(game) {
     // What is bolted in, counted by where it acts, so the picture can show a
     // part on the thing it changes: nails, the slot, the rails, the glass.
     parts: partsOnTheFace(run),
+    // How long the machine has sat without a launch. Past twenty seconds the
+    // picture warms on its own beat, the way a cabinet on a floor never sits
+    // dark just because nobody is at the handle.
+    attract: attractLevel(game, run),
     // The sign on top spells the machine's own name, not the game's. A row
     // of six that all say the same thing is one machine painted six ways;
     // a row that reads differently from across the floor is six machines.
