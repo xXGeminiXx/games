@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=54';
-import { createScene } from './render/scene.js?v=54';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=54';
-import { num, count, duration, mult, pct, fill } from './format.js?v=54';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=54';
-import { nailPos } from './board.js?v=54';
-import { DOORS_ROW } from './render/board-geom.js?v=54';
-import { sketchCabinet } from './cabinets.js?v=54';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=54';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=55';
+import { createScene } from './render/scene.js?v=55';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=55';
+import { num, count, duration, mult, pct, fill } from './format.js?v=55';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=55';
+import { nailPos } from './board.js?v=55';
+import { DOORS_ROW } from './render/board-geom.js?v=55';
+import { sketchCabinet } from './cabinets.js?v=55';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=55';
 
 const SPEEDS = [1, 2, 4];
 
@@ -358,6 +358,12 @@ export async function boot(doc) {
 
     if (r.over) {
       el.hint.textContent = fill(cfg.text.roundLost, { short: num(r.quota - r.won) });
+      // The end of a game is where a player decides what to do next, so if
+      // starting over would pay, the same line says so.
+      const mm = game.metaModule;
+      const offer = mm && typeof mm.canReset === 'function' ? mm.canReset(cfg, game.meta, game.floor) : { ok: false };
+      const stars = offer && offer.ok && typeof game.pendingMarks === 'function' ? game.pendingMarks() : 0;
+      if (stars > 0) el.hint.textContent += ' Or start over from Your arcade: it pays ' + num(stars) + (stars === 1 ? ' star' : ' stars') + ' right now.';
       // The night goes on the board the moment it ends, once.
       const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
       if (seed !== recordedSeed) {
