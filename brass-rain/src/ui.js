@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=41';
-import { createScene } from './render/scene.js?v=41';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=41';
-import { num, count, duration, mult, pct, fill } from './format.js?v=41';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=41';
-import { nailPos } from './board.js?v=41';
-import { sketchCabinet } from './cabinets.js?v=41';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=41';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=42';
+import { createScene } from './render/scene.js?v=42';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=42';
+import { num, count, duration, mult, pct, fill } from './format.js?v=42';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=42';
+import { nailPos } from './board.js?v=42';
+import { sketchCabinet } from './cabinets.js?v=42';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=42';
 
 const SPEEDS = [1, 2, 4];
 
@@ -345,7 +345,7 @@ export async function boot(doc) {
       if (seed !== recordedSeed) {
         recordedSeed = seed;
         const night = {
-          round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0,
+          round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
           machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(),
         };
         const res = recordNight(night);
@@ -968,7 +968,7 @@ export async function boot(doc) {
     if (seed === recordedSeed || !r.stats || !(r.stats.launched > 0)) return;
     recordedSeed = seed;
     const night = {
-      round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0,
+      round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
       machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), cashed: !r.over,
     };
     const res = recordNight(night);

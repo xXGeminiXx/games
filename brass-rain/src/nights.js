@@ -11,6 +11,60 @@
 // ---------------------------------------------------------------------------
 
 const KEY = 'brassrain:nights';
+const SALT_KEY = 'brassrain:nights:salt';
+
+// ---- keeping the board honest ------------------------------------------
+//
+// A night carries a signature over its fields, made with a salt that lives
+// under its own key in the same store. A night edited by hand - a bigger
+// round typed into the browser's storage - no longer matches its signature
+// and is dropped when the board is read. Anyone who can read this file can
+// forge one, so this stops a hand edit, not a determined liar; a board that
+// is shared between players has to be settled by replaying the game from
+// its seed and inputs, and that is a later build.
+//
+// A night also has to be possible: no pull pays more than a few dozen balls
+// and no round takes fewer than a few dozen pulls, so balls won are bounded
+// by pulls made and the round is bounded by pulls made.
+
+function fnv(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h >>> 0;
+}
+
+function canonical(n) {
+  return [n.round, n.won, n.fevers || 0, n.launched || 0, n.machine || '', n.seed, n.at, n.cashed ? 1 : 0].join('|');
+}
+
+function saltOf(store) {
+  const s = storeOf(store);
+  try {
+    let salt = s ? s.getItem(SALT_KEY) : null;
+    if (!salt) {
+      salt = Math.floor(Math.random() * 0xffffffff).toString(36) + Math.floor(Math.random() * 0xffffffff).toString(36);
+      if (s) s.setItem(SALT_KEY, salt);
+    }
+    return salt;
+  } catch (e) { return 'salt'; }
+}
+
+/** The signature a night should carry in this browser. */
+export function signature(night, store) {
+  return fnv(saltOf(store) + '#' + canonical(night)).toString(36);
+}
+
+/** Whether a night is one this browser signed and one the game could have produced. */
+export function honest(night, store) {
+  if (!sound(night)) return false;
+  const launched = Number(night.launched) || 0;
+  if (launched > 0) {
+    if (night.won > launched * 60) return false;          // no pull pays more than a few dozen balls
+    if (night.round > 1 + launched / 20) return false;    // no round takes fewer than a few dozen pulls
+  }
+  if (night.round > 200 || night.won > 1e12) return false;
+  return night.sig === signature(night, store);
+}
 
 /** How many nights the board keeps. */
 export const KEEP = 20;
@@ -30,7 +84,7 @@ export function loadNights(store) {
     const s = storeOf(store);
     const raw = s ? s.getItem(KEY) : null;
     const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list.filter(sound).sort(compare) : [];
+    return Array.isArray(list) ? list.filter(n => honest(n, store)).sort(compare) : [];
   } catch (e) {
     return [];
   }
@@ -56,6 +110,9 @@ export function rankOf(list, night) {
 
 /** Records a finished night and says where it landed. */
 export function recordNight(night, store) {
+  if (sound(night)) night.sig = signature(night, store);
+  // A night the game could not have produced is not placed, signed or not.
+  if (!honest(night, store)) return { list: loadNights(store), rank: 0 };
   const list = withNight(loadNights(store), night);
   try {
     const s = storeOf(store);
