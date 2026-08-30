@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=12';
-import { createScene } from './render/scene.js?v=12';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=12';
-import { num, count, duration, mult, pct, fill } from './format.js?v=12';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=12';
-import { nailPos } from './board.js?v=12';
-import { sketchCabinet } from './cabinets.js?v=12';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=13';
+import { createScene } from './render/scene.js?v=13';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=13';
+import { num, count, duration, mult, pct, fill } from './format.js?v=13';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=13';
+import { nailPos } from './board.js?v=13';
+import { sketchCabinet } from './cabinets.js?v=13';
 
 const SPEEDS = [1, 2, 4];
 
@@ -188,11 +188,19 @@ export async function boot(doc) {
   }
 
   function faceFit() {
-    const rect = el.face.getBoundingClientRect();
-    return {
-      fit: fitBoard(rect.width, rect.height, game.run.board.w, game.run.board.h),
-      rect,
-    };
+    // The mapping from a pointer to the board is taken from the renderer's
+    // own projection, not refitted here: the scene draws the board with a
+    // margin and a lift, and a plain refit put every click a few units off,
+    // which a nail's tolerance forgave and a door's did not.
+    const rect = el.canvas.getBoundingClientRect();
+    const board = game.run.board;
+    if (scene && typeof scene.project === 'function') {
+      const o = scene.project(0, 0, {});
+      const s = scene.project(board.w, 0, {});
+      const scale = (s.x - o.x) / board.w;
+      if (Number.isFinite(scale) && scale > 0) return { fit: { ox: o.x, oy: o.y, scale }, rect };
+    }
+    return { fit: fitBoard(rect.width, rect.height, board.w, board.h), rect };
   }
 
   /** Which door of a lit row a board point is on, or -1. Same geometry the picture draws. */
