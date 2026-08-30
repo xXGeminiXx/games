@@ -500,7 +500,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="725fdd84da27">
+<meta name="build" content="b2f496a83680">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -550,11 +550,11 @@
 <header>
   <div id="brand"><b id="title">Brass Rain</b><span id="tagline"></span></div>
   <div id="tools">
-    <button id="toRow" type="button">Change machine</button>
-    <button id="toFloor" type="button">Your arcade</button>
-    <button id="toSettings" type="button">Settings</button>
-    <button id="toBests" type="button">Best nights</button>
-    <button id="toHelp" type="button">Help</button>
+    <button id="toRow" title="See three other machines and sit at one. Picking one starts a new game." type="button">Change machine</button>
+    <button id="toFloor" title="Buy arcade machines with your coins - they earn on their own, even while you are away - and start over for stars." type="button">Your arcade</button>
+    <button id="toSettings" title="Picture quality, a new game, erasing everything." type="button">Settings</button>
+    <button id="toBests" title="Your best finished games, ranked." type="button">Best nights</button>
+    <button id="toHelp" title="How the machine works, in plain words." type="button">Help</button>
   </div>
 </header>
 
@@ -575,9 +575,9 @@
       <div class="row"><span class="sub">Power</span><b id="strengthOut">0.62</b></div>
       <div class="row"><span class="sub">Balls per pull</span><b id="perPull">1</b></div>
       <div class="knobrow">
-        <button id="pull" type="button">Pull</button>
-        <button id="auto" type="button">Auto</button>
-        <button id="speed" type="button">1x</button>
+        <button id="pull" title="Send one pull of balls down the board. Space bar does the same." type="button">Pull</button>
+        <button id="auto" title="The handle pulls itself until you press this again. A does the same." type="button">Auto</button>
+        <button id="speed" title="How fast the balls fall: 1x, 2x or 4x. Nothing else changes." type="button">1x</button>
       </div>
     </section>
 
@@ -595,7 +595,7 @@
       <div class="row"><span class="sub">Coins a second, even while away</span><b class="live" id="income">0 /s</b></div>
       <div class="row"><span class="sub">Bonus for how far you've played</span><b id="handMult">x1</b></div>
       <div class="knobrow">
-        <button id="cash" type="button">Trade balls for coins</button>
+        <button id="cash" title="Turn the balls you hold into coins for the arcade. That ends this game." type="button">Trade balls for coins</button>
       </div>
       <p class="sub" id="floorHint"></p>
     </section>
@@ -639,9 +639,9 @@
     <p class="lede" id="bendChart"></p>
     <canvas id="bendBars" class="bars" hidden></canvas>
     <div class="sheetfoot">
-      <button id="reroll" type="button" class="ghost">Show different parts</button>
+      <button id="reroll" title="Deal three different parts, for a few balls." type="button" class="ghost">Show different parts</button>
       <button id="straighten" title="Undo every bend you made this round. The bends come back, so you can place them again." type="button" class="ghost">Straighten every nail</button>
-      <button id="leave" type="button">Start the round</button>
+      <button id="leave" title="Close the workbench and play the next round." type="button">Start the round</button>
     </div>
   </div>
 </div>
@@ -667,7 +667,7 @@
     <p class="lede" id="rowLede"></p>
     <div id="cabinets"></div>
     <div class="sheetfoot">
-      <button id="rowLater" type="button" class="ghost">Keep playing the one I'm on</button>
+      <button id="rowLater" title="Back to the machine you are on." type="button" class="ghost">Keep playing the one I'm on</button>
     </div>
   </div>
 </div>
@@ -693,7 +693,7 @@
         <button id="tShadows" type="button">Shadows</button>
         <button id="tReflect" type="button">Reflections</button>
         <button id="tGlass" type="button">Glass</button>
-        <button id="tAuto" type="button">Adjust by itself</button>
+        <button id="tAuto" title="Let the game pick the picture quality for the machine it is running on." type="button">Adjust by itself</button>
       </div>
     </div>
     <h3>Measured right now</h3>
@@ -705,8 +705,8 @@
     </dl>
     <h3>This save</h3>
     <div class="knobrow">
-      <button id="newRun" type="button" class="ghost">Start a new game</button>
-      <button id="wipe" type="button" class="ghost">Erase everything</button>
+      <button id="newRun" title="Throw this game away and start a fresh one on a fresh machine. Your arcade and stars stay." type="button" class="ghost">Start a new game</button>
+      <button id="wipe" title="Erase the save, the arcade, the stars and the board. Nothing comes back." type="button" class="ghost">Erase everything</button>
     </div>
     <div class="sheetfoot"><button id="closeSettings" type="button">Close</button></div>
   </div>
@@ -750,7 +750,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=36';
+  import { boot } from './src/ui.js?v=37';
   boot(document);
 </script>
 </body>
