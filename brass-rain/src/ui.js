@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=17';
-import { createScene } from './render/scene.js?v=17';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=17';
-import { num, count, duration, mult, pct, fill } from './format.js?v=17';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=17';
-import { nailPos } from './board.js?v=17';
-import { sketchCabinet } from './cabinets.js?v=17';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=18';
+import { createScene } from './render/scene.js?v=18';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=18';
+import { num, count, duration, mult, pct, fill } from './format.js?v=18';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=18';
+import { nailPos } from './board.js?v=18';
+import { sketchCabinet } from './cabinets.js?v=18';
 
 const SPEEDS = [1, 2, 4];
 
@@ -757,7 +757,8 @@ export async function boot(doc) {
         + '<div class="warn"></div>';
       d.querySelector('h4').textContent = label;
       const doorCount = cab.skin && Number.isFinite(cab.skin.doors) ? cab.skin.doors : 3;
-      d.querySelector('.theme').textContent = (cab.layout ? cab.layout + ' board' : '') + ' - lights ' + doorCount + ' doors';
+      const sends = cab.skin && cab.skin.summon ? ' - sends ' + String(cab.skin.summon).replace(/^A pair of /i, '').replace(/^An? /i, '').toLowerCase() : '';
+      d.querySelector('.theme').textContent = (cab.layout ? cab.layout + ' board' : '') + ' - lights ' + doorCount + ' doors' + sends;
       drawSketch(d.querySelector('.sketch'), sketchCabinet(cfg, cab.seed), cab.skin);
 
       const big = d.querySelector('.big');
@@ -1168,7 +1169,7 @@ const HELP = [
     + 'can be in the machine at once, and clicking one already in takes it back out. Some parts work '
     + 'together, and the card says so when they do.'],
   ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending steers where balls fall, and there are only a few bends per round, so the good ones are the nails that feed balls into the slot. The chart at the workbench shows where the last round actually ended up, which is how you tell which nails are worth bending.'],
-  ['Picking a machine', 'There are six machines, and the pockets, the slot and the funnel sit somewhere else on each. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
+  ['Picking a machine', 'There are six machines, and the pockets, the slot and the funnel sit somewhere else on each. Each lights its own number of doors and sends its own creature across the board. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
   ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines for your arcade. Those machines earn coins every second on their own, including while the page is closed. What they earn is multiplied by how far you\'ve gotten at the handle, so playing well is the best thing you can do for the arcade.'],
   ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again from nothing. Doing that pays STARS. Stars buy permanent upgrades that survive every restart. The arcade rebuilds far faster the second time, and starting over never takes stars away.'],
 ];
