@@ -18,7 +18,7 @@
 // to read it again.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=28';
+import { rng as makeRng } from './rng.js?v=29';
 
 export const POCKET_OUT = 'out';
 export const POCKET_PAY = 'pay';

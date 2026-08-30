@@ -330,6 +330,8 @@
      whatever gives a machine its own name and color. */
   .cab .theme{font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
   .cab .theme:empty{display:none}
+  /* where the last round's balls ended up, column by column across the board */
+  .bars{display:block;width:100%;height:56px;border-radius:4px;border:1px solid var(--rule);background:#1a0708;margin:4px 0 8px}
   .cab .sketch{display:block;height:150px;width:auto;margin:0 auto;border-radius:4px;border:1px solid var(--rule);background:#000}
   .cab .big small{display:block;font:11px/1.3 var(--narrow);letter-spacing:0;color:var(--dim);margin-top:3px;text-transform:none}
   .cab .warn{font-size:11px;color:#d09a6a}
@@ -483,7 +485,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="2cf3ca6acfe8">
+<meta name="build" content="d64ab34c4042">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -613,6 +615,7 @@
     <h3>Bending the nails</h3>
     <p class="lede" id="bendLede"></p>
     <p class="lede" id="bendChart"></p>
+    <canvas id="bendBars" class="bars" hidden></canvas>
     <div class="sheetfoot">
       <button id="reroll" type="button" class="ghost">Show different parts</button>
       <button id="straighten" type="button" class="ghost">Straighten every nail</button>
@@ -717,7 +720,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=28';
+  import { boot } from './src/ui.js?v=29';
   boot(document);
 </script>
 </body>
