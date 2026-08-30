@@ -500,7 +500,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="5d3796a542d0">
+<meta name="build" content="725fdd84da27">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -640,7 +640,7 @@
     <canvas id="bendBars" class="bars" hidden></canvas>
     <div class="sheetfoot">
       <button id="reroll" type="button" class="ghost">Show different parts</button>
-      <button id="straighten" type="button" class="ghost">Straighten every nail</button>
+      <button id="straighten" title="Undo every bend you made this round. The bends come back, so you can place them again." type="button" class="ghost">Straighten every nail</button>
       <button id="leave" type="button">Start the round</button>
     </div>
   </div>
@@ -750,7 +750,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=35';
+  import { boot } from './src/ui.js?v=36';
   boot(document);
 </script>
 </body>

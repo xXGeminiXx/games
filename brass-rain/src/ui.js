@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=35';
-import { createScene } from './render/scene.js?v=35';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=35';
-import { num, count, duration, mult, pct, fill } from './format.js?v=35';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=35';
-import { nailPos } from './board.js?v=35';
-import { sketchCabinet } from './cabinets.js?v=35';
-import { recordNight, loadNights, ordinal } from './nights.js?v=35';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=36';
+import { createScene } from './render/scene.js?v=36';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=36';
+import { num, count, duration, mult, pct, fill } from './format.js?v=36';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=36';
+import { nailPos } from './board.js?v=36';
+import { sketchCabinet } from './cabinets.js?v=36';
+import { recordNight, loadNights, ordinal } from './nights.js?v=36';
 
 const SPEEDS = [1, 2, 4];
 
@@ -118,7 +118,11 @@ export async function boot(doc) {
 
     on(el.reroll, 'click', () => { game.reroll(); paintBench(); });
     on(el.leave, 'click', () => { game.leaveBench(); hide(el.benchSheet); });
-    on(el.straighten, 'click', () => { game.straightenAll(); paintBench(); });
+    on(el.straighten, 'click', () => {
+      game.straightenAll();
+      say('Every nail stands straight again, and your ' + game.bendsLeft() + ' bends for this round are back.');
+      paintBench();
+    });
 
     on(el.newRun, 'click', () => {
       if (confirm('Start a new game? The one you\'re playing ends right now.')) {
@@ -520,7 +524,7 @@ export async function boot(doc) {
       + 'fall, so bend the ones that feed balls into the slot. '
       + game.bendsLeft() + ' of ' + (cfg.board.bendsPerRound) + ' bends left this round, '
       + r.bends + ' nails bent so far. A nail won\'t go into another nail, into a pocket, '
-      + 'or farther than its head reaches.';
+      + 'or farther than its head reaches. Straighten every nail undoes them all and gives the bends back.';
 
     el.reroll.textContent = 'Show different parts for ' + num(game.rerollPrice()) + ' balls';
     el.reroll.disabled = r.tray < game.rerollPrice();
