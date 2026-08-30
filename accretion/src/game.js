@@ -13,9 +13,9 @@
  * that a player reads more than once.
  */
 
-import * as R from './research.js';
-import * as Stellar from './stellar.js';
-import * as Rebirth from './rebirth.js';
+import * as R from './research.js?v=1';
+import * as Stellar from './stellar.js?v=1';
+import * as Rebirth from './rebirth.js?v=1';
 
 const SAVE_VERSION = 2;
 
