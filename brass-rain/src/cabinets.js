@@ -18,10 +18,10 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=18';
-import { createBalls, launch, stepPhysics } from './physics.js?v=18';
-import { rng as makeRng } from './rng.js?v=18';
-import { skinForCabinet } from './render/themes.js?v=18';
+import { createBoard, nailPos, layoutFor } from './board.js?v=19';
+import { createBalls, launch, stepPhysics } from './physics.js?v=19';
+import { rng as makeRng } from './rng.js?v=19';
+import { skinForCabinet } from './render/themes.js?v=19';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -29,8 +29,12 @@ import { skinForCabinet } from './render/themes.js?v=18';
 // ordinary machine and the best on the floor; at a hundred and sixty it is
 // well under one, and the best of several settings stops being mostly the
 // luckiest of several settings.
-const TRIAL_BALLS = 160;
-const TRIAL_SETTINGS = [0.42, 0.50, 0.58, 0.66, 0.74, 0.82];
+// Two hundred and forty balls at each of five settings across the band the
+// gate actually answers to (the handle sweep puts the gate at zero below 0.45
+// and above 0.80). Fewer, fuller samples: the number on the card moved by
+// twenty points between two seeds of one layout at a hundred and sixty.
+const TRIAL_BALLS = 240;
+const TRIAL_SETTINGS = [0.50, 0.56, 0.62, 0.68, 0.74];
 const TRIAL_STEP_CAP = 1800;
 
 /**
