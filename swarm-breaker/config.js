@@ -117,19 +117,19 @@ export const CONFIG = {
     boardOpen: 'everyone',
     boardCrew: 'crew ',
     boardYou: 'you',
-    boardNote: 'A finished run writes itself down, so anybody can replay it. A row says whether anybody has.',
+    boardNote: 'A finished run writes itself down, so anybody can replay it. Each row says whether anybody has.',
     boardEmpty: 'No runs yet. Finish one and it lands here.',
     boardCheck: 'check the top runs',
     boardChecking: 'replaying...',
     boardStates: {
       unverified: 'unchecked',
       witnessed: 'checked by N',
-      mismatch: 'does not replay',
+      mismatch: 'no replay match',
       unverifiedNote: 'Nobody has replayed this run yet.',
       witnessedNote: 'N other players replayed this run and got the same result.',
       mismatchNote: 'Someone replayed this run and reached a different result. Usually that means it was played on an older build. It keeps its place.',
       truncatedNote: 'This run was too long to write down, so nobody can replay it. It keeps its place.',
-      noLogNote: 'This run posted no replay, so there is nothing to check. It keeps its place.',
+      noLogNote: 'This run posted no replay, so there\'s nothing to check. It keeps its place.',
     },
     dailyName: "today's field",
     dailyBlurb: 'The same field for everyone, every day. No timer, nothing to miss.',
@@ -173,7 +173,7 @@ export const CONFIG = {
         tell: 'the main game',
         blurb: 'Eight columns, one row at a time. The rule drawing the field '
              + 'changes as you go deeper, and the readout names the one '
-             + 'running now. The tuned one, and the one to play first.',
+             + 'running now. Play this one first.',
       },
       {
         id: 'fractal',
@@ -185,8 +185,8 @@ export const CONFIG = {
              + 'are pieces of the picture itself, cut along its bands and rays '
              + 'and never square, and the swarm slips through every gap in the '
              + 'lace. You start close in and the view pulls back until the '
-             + 'whole set is on the screen. Pale lace breaks easily; the dark '
-             + 'rim does not.',
+             + 'whole set is on the screen. Pale lace breaks easily. The dark '
+             + 'rim barely gives.',
       },
       {
         // The earlier fractal field - whole geometric constructions (gasket,
@@ -206,8 +206,8 @@ export const CONFIG = {
         tell: 'it grows where you leave it',
         blurb: 'Nothing descends. Blocks accrete onto whatever is still '
              + 'standing and stay where they land, so a clump you left is the '
-             + 'seed the next one grows from. The run ends when the board is '
-             + 'full, not when something reaches you.',
+             + 'seed the next one grows from. The run ends when the board '
+             + 'fills up. Nothing has to reach you.',
       },
     ],
   },
@@ -577,7 +577,7 @@ export const CONFIG = {
       { id: 'win-3',     track: 'wins',    at: 3,    name: 'three times over',  note: 'outlast a difficulty in three runs' },
       // The ladder is the thing named after water - shallows to abyss - so an
       // award for playing all three MODES could not be named after it.
-      { id: 'modes-3',   track: 'modes',   at: 3,    name: 'well travelled',   note: 'play all three modes' },
+      { id: 'modes-3',   track: 'modes',   at: 3,    name: 'well traveled',   note: 'play all three modes' },
     ],
 
     // The banner over the field when one is won.
@@ -591,7 +591,7 @@ export const CONFIG = {
     // with progress bars looks exactly like a list that does - so it says so
     // once, where the list is read, rather than letting a player wonder what
     // they are missing by not chasing them.
-    note:     'a record of what has happened. none of them changes how the game plays.',
+    note:     'a record of what you have done. none of them change how the game plays.',
   },
 
   // -------------------------------------------------------------------------
@@ -995,7 +995,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 17,
+    build: 18,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.

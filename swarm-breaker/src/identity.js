@@ -217,7 +217,7 @@ async function wrap(appId, record, store) {
       try {
         pkcs8 = new Uint8Array(await subtle().exportKey('pkcs8', record.privateKey));
       } catch (e) {
-        throw new Error('this identity was created non-extractable, so it cannot be claimed on another device');
+        throw new Error('this identity was created non-extractable, so it can\'t be claimed on another device');
       }
       const salt = randomBytes(16);
       const iv = randomBytes(12);
@@ -253,7 +253,7 @@ export function inspectClaim(claim) {
   const parts = String(claim).trim().split('.');
   if (parts.length !== 4 || parts[0] !== CLAIM_PREFIX) throw new Error('not a claim string');
   const header = JSON.parse(new TextDecoder().decode(unb64u(parts[1])));
-  if (header.v !== 1) throw new Error('claim version ' + header.v + ' is not supported');
+  if (header.v !== 1) throw new Error('claim version ' + header.v + " isn't supported");
   return header;
 }
 
@@ -267,10 +267,10 @@ export async function importClaim(claim, passphrase, { storage = null, appId = n
   const [, headerB64, ctB64, sigB64] = parts;
 
   if (!(await verify(header.pub, headerB64 + '.' + ctB64, sigB64))) {
-    throw new Error('this claim is damaged or was edited: its signature does not match its contents');
+    throw new Error('this claim is damaged or was edited: its signature doesn\'t match its contents');
   }
   const expectedId = await playerIdFor(header.pub);
-  if (expectedId !== header.id) throw new Error('this claim names an id that is not the hash of its public key');
+  if (expectedId !== header.id) throw new Error("this claim names an id that isn't the hash of its public key");
 
   const aes = await deriveAes(passphrase, unb64u(header.salt), header.iter || KDF_ITERATIONS);
   let pkcs8;
@@ -287,7 +287,7 @@ export async function importClaim(claim, passphrase, { storage = null, appId = n
   const probe = utf8('claim-probe:' + header.id);
   const proof = new Uint8Array(await subtle().sign(SIGN_ALG, privateKey, probe));
   if (!(await subtle().verify(SIGN_ALG, publicKey, proof, probe))) {
-    throw new Error('the key inside this claim is not the one it advertises');
+    throw new Error("the key inside this claim isn't the one it advertises");
   }
 
   const id = appId || header.app || 'game';

@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=9';
-import { createScene } from './render/scene.js?v=9';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=9';
-import { num, count, duration, mult, pct, fill } from './format.js?v=9';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=9';
-import { nailPos } from './board.js?v=9';
-import { sketchCabinet } from './cabinets.js?v=9';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=10';
+import { createScene } from './render/scene.js?v=10';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=10';
+import { num, count, duration, mult, pct, fill } from './format.js?v=10';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=10';
+import { nailPos } from './board.js?v=10';
+import { sketchCabinet } from './cabinets.js?v=10';
 
 const SPEEDS = [1, 2, 4];
 
@@ -89,7 +89,16 @@ export async function boot(doc) {
     on(el.cash, 'click', () => confirmCash());
 
     on(el.toRow, 'click', () => openRow());
-    on(el.rowLater, 'click', () => hide(el.rowSheet));
+    on(el.rowLater, 'click', () => {
+      // On a finished game this starts the same machine again. Hiding the
+      // sheet alone left a run with no pulls and no way forward.
+      const r = game.reading();
+      if (r.over) {
+        if (r.tray > 0) game.cashOut();
+        game.sitAt(game.run && Number.isFinite(game.run.seed) ? game.run.seed : (Math.random() * 1e9) | 0);
+      }
+      hide(el.rowSheet);
+    });
     on(el.toFloor, 'click', () => openFloor());
     on(el.closeFloor, 'click', () => hide(el.floorSheet));
     on(el.toSettings, 'click', () => openSettings());
@@ -696,6 +705,7 @@ export async function boot(doc) {
         + 'doesn\'t pay on the next. Each was measured by dropping a few hundred balls through it at '
         + 'several handle settings. Picking one starts a new game.';
 
+    el.rowLater.textContent = r.over ? 'Play this machine again' : 'Keep playing the one I\'m on';
     el.cabinets.textContent = '';
     for (const cab of game.cabinets()) {
       const label = cab.title || cab.layout || cab.name;
@@ -1086,7 +1096,7 @@ const HELP = [
   ['Balls', 'Everything is counted in balls. Pulling the handle spends a ball and sends it arcing over the '
     + 'top of the board. Balls that land in a pocket pay balls back into your count, and the count is on '
     + 'the counter rail along the bottom of the screen. Balls are also the money at the workbench between '
-    + 'rounds. Run out of balls before you reach the round goal and the game ends.'],
+    + 'rounds. Run out of pulls before you reach the round goal and the game ends.'],
   ['The board and the nails', 'The board is the tall lit panel filling most of the screen: a field of several '
     + 'hundred brass nails with pockets cut into it. A falling ball bounces off nail after nail, so where the '
     + 'nails stand decides where the balls end up.'],

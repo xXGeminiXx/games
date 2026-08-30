@@ -27,8 +27,8 @@
 // handful of image draws, not a walk over every pixel.
 // ===========================================================================
 
-import { CONFIG } from '../config.js?v=17';
-import { formatTight } from './visual.js?v=17';
+import { CONFIG } from '../config.js?v=18';
+import { formatTight } from './visual.js?v=18';
 
 function parseHex(css) {
   const s = String(css || '').trim().replace('#', '');

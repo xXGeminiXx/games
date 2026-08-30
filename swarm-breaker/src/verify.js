@@ -29,7 +29,7 @@
 // in it and no wall clock reaches it. See docs/LEADERBOARD.md.
 // ---------------------------------------------------------------------------
 
-import { stateHash, hashHex } from './replay.js?v=17';
+import { stateHash, hashHex } from './replay.js?v=18';
 
 export const LOG_VERSION = 1;
 
@@ -274,7 +274,7 @@ export function entryState(entry) {
 /** The words a player reads. Never an accusation, never a score. */
 export function stateLabel(entry, text = {}) {
   const state = entryState(entry);
-  if (state === STATE.mismatch) return text.mismatch || 'does not replay';
+  if (state === STATE.mismatch) return text.mismatch || 'no replay match';
   if (state === STATE.witnessed) {
     const n = entry.witnesses | 0;
     return (text.witnessed || 'checked by N').replace('N', String(n));
@@ -297,7 +297,7 @@ export function stateNote(entry, text = {}) {
     return text.truncatedNote || 'This run was too long to write down, so nobody can replay it. It keeps its place.';
   }
   if (entry && !entry.hasLog) {
-    return text.noLogNote || 'This run posted no replay, so there is nothing to check. It keeps its place.';
+    return text.noLogNote || "This run posted no replay, so there's nothing to check. It keeps its place.";
   }
   return text.unverifiedNote || 'Nobody has replayed this run yet.';
 }

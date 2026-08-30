@@ -373,7 +373,7 @@ const METRICS = {
     id: 'essence', name: 'ESSENCE', unit: 'essence',
     scopes: ['stretch', 'run'],
     read: s => (s && s.essence != null ? s.essence : 0),
-    blurb: 'essence earned, not essence held',
+    blurb: 'essence earned over the run',
     reveal: 'stretch',
   },
   blocks: {
@@ -1527,7 +1527,7 @@ function post(profile, run, req) {
   if (!q.offerable) return { ok: false, reason: q.reason, quote: q };
 
   if (q.scope === 'run' && run.turns > 0) {
-    return { ok: false, reason: 'a run line is posted before the first shot, not after it' };
+    return { ok: false, reason: 'a run line is posted before the first shot' };
   }
   const openNow = run.wagers.filter(w => w.state === 'open');
   if (openNow.length >= TUNING.maxOpen) return { ok: false, reason: 'too many open positions' };
@@ -2185,7 +2185,7 @@ function selftest() {
       const e = endRun(D, run, { depth: 3, essence: 600, blocks: 6, cause: 'overrun' });
       ok(`death loses an open ${side}`, e.wagers[0].state === 'lost', e.wagers[0].state);
       const b = bucketOf(D, lineKey('descent', '-', 'essence', 'stretch'));
-      ok(`a dead stretch records as a bound, not a measurement`, b.cens.length > 0 && b.rows.length === 0,
+      ok(`a dead stretch records as a bound`, b.cens.length > 0 && b.rows.length === 0,
         `rows ${b.rows.length}, censored ${b.cens.length}`);
     }
   }
@@ -2205,7 +2205,7 @@ function selftest() {
       JSON.stringify(ev.events.map(x => x.outcome)));
     ok('winning early still keeps watching for the record', !posted.wager.done);
     for (let d = 4; d <= 16; d++) observe(E, run, { depth: d, essence: nadd(big, N(100 * d)), blocks: 40 + d });
-    ok('the row written is the total at the window close, not the strike',
+    ok('the row written is the total at the window close',
       bucketOf(E, lineKey('descent', '-', 'essence', 'stretch')).rows.length === 1);
     endRun(E, run, { depth: 20, essence: nadd(big, N(9999)), blocks: 90 });
   }

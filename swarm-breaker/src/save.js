@@ -923,7 +923,7 @@ function blankReport(at, error) {
 export function writeSave(key, state, meta) {
   const text = serialize(state, meta);
   if (text === null) {
-    return { ok: false, bytes: 0, error: 'state could not be serialised', quota: false, demoted: false };
+    return { ok: false, bytes: 0, error: "state couldn't be written out", quota: false, demoted: false };
   }
   return writeText(key, text, meta);
 }

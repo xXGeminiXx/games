@@ -164,7 +164,7 @@
 // numbers, so a caller that never goes deep never has to think about this.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=17';
+import { CONFIG } from '../config.js?v=18';
 
 const ZERO = Object.freeze({ m: 0, e: 0 });
 
@@ -1078,10 +1078,10 @@ export function checkLadder() {
       problems.push(`${t.id} starts endless at ${t.dials.endlessFrom} but finishes at ${t.finish}`);
     }
     if (!(t.dials.endlessGrowth > 1)) {
-      problems.push(`${t.id} endless does not ramp, so it never ends`);
+      problems.push(`${t.id} endless never ramps, so it never ends`);
     }
     if (t.requires && !BY_ID[t.requires]) {
-      problems.push(`${t.id} requires ${t.requires}, which is not a tier`);
+      problems.push(`${t.id} requires ${t.requires}, which names no tier`);
     }
     if (t.requires && BY_ID[t.requires].index >= t.index) {
       problems.push(`${t.id} requires a tier at or above it in the ladder`);

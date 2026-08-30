@@ -362,7 +362,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="d8bacc2c8b49">
+<meta name="build" content="14d52a480451">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -510,24 +510,24 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=17';
-import { createJuice } from './src/juice.js?v=17';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=17';
-import { createBlockKinds } from './src/blocks.js?v=17';
-import { safeRows } from './src/arrival.js?v=17';
-import { createAwards } from './src/awards.js?v=17';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=17';
-import { createLeaderboard } from './src/leaderboard.js?v=17';
-import * as Tiers from './src/tiers.js?v=17';
-import { createOnboarding } from './src/onboarding.js?v=17';
-import { createVisual } from './src/visual.js?v=17';
-import * as Economy from './src/economy.js?v=17';
-import * as Powers from './src/powers.js?v=17';
-import * as Meta from './src/meta.js?v=17';
-import { createUI } from './src/ui.js?v=17';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=17';
-import { seedForSync, today as utcToday } from './src/daily.js?v=17';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=17';
+         storageKey, applyIdentity } from './config.js?v=18';
+import { createJuice } from './src/juice.js?v=18';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=18';
+import { createBlockKinds } from './src/blocks.js?v=18';
+import { safeRows } from './src/arrival.js?v=18';
+import { createAwards } from './src/awards.js?v=18';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=18';
+import { createLeaderboard } from './src/leaderboard.js?v=18';
+import * as Tiers from './src/tiers.js?v=18';
+import { createOnboarding } from './src/onboarding.js?v=18';
+import { createVisual } from './src/visual.js?v=18';
+import * as Economy from './src/economy.js?v=18';
+import * as Powers from './src/powers.js?v=18';
+import * as Meta from './src/meta.js?v=18';
+import { createUI } from './src/ui.js?v=18';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=18';
+import { seedForSync, today as utcToday } from './src/daily.js?v=18';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=18';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -2696,7 +2696,7 @@ function paintBoard(){
   const needsName = consent.reason === 'no-name';
   if (wrap) wrap.hidden = !needsName;
   document.getElementById('bdnote').textContent = needsName
-    ? (CONFIG.text.boardNameAsk || 'Pick a name and your runs go on the board. It is only a label; nothing else is sent.')
+    ? (CONFIG.text.boardNameAsk || "Pick a name and your runs go on the board. It's only a label, and nothing else is sent.")
     : (CONFIG.text.boardNote || 'A run can be replayed by anyone. Rows say whether anybody has.');
   list.innerHTML = '';
 

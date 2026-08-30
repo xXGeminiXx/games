@@ -499,7 +499,7 @@ const POWER_LIST = [
     max: Infinity, base: 220, growth: 1.42,
     req: s => doc(s, 'legion') >= 4,
     line: r => `every impact hits harder the larger the swarm is (+${(30 * r)}% per order of magnitude)`,
-    visual: 'impact flashes scale with the swarm readout, not with the ball',
+    visual: 'impact flashes scale with the swarm readout',
     effect: (d, r) => { d.pressure += 0.30 * r; },
   },
   {
@@ -625,7 +625,7 @@ const POWER_LIST = [
     id: 'detonate', name: 'DETONATE', doctrine: 'fracture', tier: 1,
     max: Infinity, base: 145, growth: 1.40,
     req: s => doc(s, 'fracture') >= 2,
-    line: r => `a destroyed block detonates, dealing ${(45 * r)}% of the killing blow to its neighbours`,
+    line: r => `a destroyed block detonates, dealing ${(45 * r)}% of the killing blow to its neighbors`,
     visual: 'a square shockwave expands from every block as it dies',
     effect: (d, r) => { d.detonate += 0.45 * r; d.detonateChains = 3 + 2 * r; },
   },
@@ -867,7 +867,7 @@ const POWER_LIST = [
     max: 4, base: 340, growth: 2.0,
     req: s => doc(s, 'tithe') >= 4,
     line: r => `powers in your most-invested doctrine cost ${(12 * r)}% less`,
-    visual: 'discounted options are marked in their doctrine colour',
+    visual: 'discounted options are marked in their doctrine color',
     effect: (d, r) => { d.duty += 0.12 * r; },
   },
   {

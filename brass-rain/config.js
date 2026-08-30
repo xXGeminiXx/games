@@ -95,7 +95,7 @@ export const CONFIG = {
     firstLine:  'Pull the handle. Balls arc over the top and rain down through the nails. Pockets pay balls back, and the slot in the middle spins the reels.',
     quotaLine:  '{have} of {need}',
     roundWon:   'Round {n} cleared.',
-    roundLost:  'Out of balls, {short} short of the goal.',
+    roundLost:  'Out of pulls, {short} short of the goal. Pick a machine to play again.',
     feverOn:    'BONUS - the jackpot pocket is open for the next {n} balls.',
     feverOff:   'The jackpot pocket closed.',
     gateHit:    'Into the slot.',
