@@ -5,7 +5,8 @@ The index of the games, plus the builds of the ones that are served from here.
 **https://xxgeminixx.github.io/games/**
 
 The games hosted here are plain ES modules: no build step, no package manager, no
-bundler, no dependencies, and nothing fetched from anywhere else while you play. Clone one and it
+bundler, no dependencies, and nothing fetched from anywhere else while you play (each page
+reads its own build.json from this site now and then, so a game left open notices a new build). Clone one and it
 runs, as long as it is served over http rather than opened off the filesystem,
 which is the one thing browsers refuse to do with modules.
 
