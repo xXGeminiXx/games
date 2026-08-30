@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=48';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=48';
+import { digitGlsl } from './digits.js?v=49';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=49';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -1591,6 +1591,9 @@ void main() {
     // A row of doors, one of which is worth opening. Shut they are brass with
     // a seam and a handle; once the row is read the one that pays is open and
     // lit and the rest have gone dull.
+    // The row sits at the foot of the face where the lamp reaches least, so it
+    // carries a floor of light of its own; a dull row reads as a broken one.
+    float lit = max(fall, 0.75);
     float n = floor(extra / 1000.0);
     float pick = floor(mod(extra, 1000.0) / 100.0);
     float called = floor(mod(extra, 100.0) / 10.0);   // 0 for none, else the door and one
@@ -1608,12 +1611,12 @@ void main() {
       sdBox(p - away * doorW * 0.25, vec2(doorW * 0.82, v_half.y * 0.86), doorW * 0.22)) * 0.75 * fade));
 
     // Open, and paying.
-    vec3 open = mix(u_glow, u_lamp, 0.25) * (1.1 + 1.9 * fall);
+    vec3 open = mix(u_glow, u_lamp, 0.25) * (1.1 + 1.9 * lit);
     // Shut, and either still a question or already answered.
     vec2 grad = normalize(vec2(dFdx(d), dFdy(d)) + vec2(1e-6, 0.0));
     vec3 nb = normalize(vec3(grad * 0.9, 0.65));
-    vec3 shut = u_brass * u_lamp * (0.12 + 0.85 * max(dot(nb, L), 0.0) * fall);
-    shut += u_lamp * u_brass * specular(nb, L, 20.0) * 0.32 * fall;
+    vec3 shut = u_brass * u_lamp * (0.12 + 0.85 * max(dot(nb, L), 0.0) * lit);
+    shut += u_lamp * u_brass * specular(nb, L, 20.0) * 0.32 * lit;
     shut *= mix(1.0, 0.42, dull);
     // Before the row is read, every door breathes on its own beat, so a player
     // watches all of them rather than one.
@@ -1626,7 +1629,7 @@ void main() {
     // The door the player called wears a lamp keyline until the row is read.
     float isCalled = step(abs(which + 1.0 - called), 0.4) * (1.0 - step(0.5, shown));
     float ring = abs(d + doorW * 0.10) - doorW * 0.045;
-    c = over(c, vec4(u_lamp * (1.2 + 0.8 * fall), smoothstep(doorW * 0.04, 0.0, ring) * isCalled * fade * 0.9));
+    c = over(c, vec4(u_lamp * (1.2 + 0.8 * lit), smoothstep(doorW * 0.04, 0.0, ring) * isCalled * fade * 0.9));
   }
 
   fragColor = outColour(c.rgb, c.a);
