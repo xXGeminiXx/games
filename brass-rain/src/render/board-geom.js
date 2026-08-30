@@ -44,6 +44,13 @@ export const FLASH_KINDS = ['pin', 'pocket', 'wall', 'gate'];
 /** The quad around a pin, in multiples of its radius, with room for shadow. */
 export const PIN_QUAD = 2.5;
 
+// Where a row of doors lights: centred this far down the face, this tall, and
+// this wide per door, as fractions of the board. It sits on the apron under
+// every mouth, the wide jackpot mouth included (the lowest of them reaches
+// 105 of 116), so a lit row never covers a pocket. The click map in the
+// page reads the same numbers.
+export const DOORS_ROW = { y: 0.957, hh: 0.043, hw: 0.085, maxHw: 0.42 };
+
 /**
  * A Float32Array of at least `floats` entries, reusing `arr` when it is
  * already big enough. Capacity climbs in powers of two so a board that grows
@@ -396,9 +403,9 @@ export function packEvents(events, boardW, boardH, into) {
       const n = Math.max(1, Math.floor(finite(e.doors, 3)));
       const pick = Math.max(0, Math.min(n - 1, Math.floor(finite(e.pick, 0))));
       data[o] = boardW * 0.5;
-      data[o + 1] = boardH * 0.80;
-      data[o + 2] = Math.min(boardW * 0.42, n * boardW * 0.085);
-      data[o + 3] = boardH * 0.055;
+      data[o + 1] = boardH * DOORS_ROW.y;
+      data[o + 2] = Math.min(boardW * DOORS_ROW.maxHw, n * boardW * DOORS_ROW.hw);
+      data[o + 3] = boardH * DOORS_ROW.hh;
       const called = Number.isInteger(e.choice) ? Math.max(0, Math.min(n - 1, e.choice)) + 1 : 0;
       extra = n * 1000 + pick * 100 + called * 10 + (e.revealed ? 1 : 0);
     }

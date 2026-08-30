@@ -15,14 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=46';
-import { createScene } from './render/scene.js?v=46';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=46';
-import { num, count, duration, mult, pct, fill } from './format.js?v=46';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=46';
-import { nailPos } from './board.js?v=46';
-import { sketchCabinet } from './cabinets.js?v=46';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=46';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=47';
+import { createScene } from './render/scene.js?v=47';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=47';
+import { num, count, duration, mult, pct, fill } from './format.js?v=47';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=47';
+import { nailPos } from './board.js?v=47';
+import { DOORS_ROW } from './render/board-geom.js?v=47';
+import { sketchCabinet } from './cabinets.js?v=47';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=47';
 
 const SPEEDS = [1, 2, 4];
 
@@ -246,8 +247,8 @@ export async function boot(doc) {
     if (!e) return -1;
     const b = cfg.board;
     const n = Math.max(2, Math.floor(e.doors || 3));
-    const cx = b.w * 0.5, cy = b.h * 0.80;
-    const hw = Math.min(b.w * 0.42, n * b.w * 0.085), hh = b.h * 0.055;
+    const cx = b.w * 0.5, cy = b.h * DOORS_ROW.y;
+    const hw = Math.min(b.w * DOORS_ROW.maxHw, n * b.w * DOORS_ROW.hw), hh = b.h * DOORS_ROW.hh;
     if (Math.abs(y - cy) > hh || Math.abs(x - cx) > hw) return -1;
     return Math.max(0, Math.min(n - 1, Math.floor((x - (cx - hw)) / (2 * hw / n))));
   }
