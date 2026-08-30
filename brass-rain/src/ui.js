@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=11';
-import { createScene } from './render/scene.js?v=11';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=11';
-import { num, count, duration, mult, pct, fill } from './format.js?v=11';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=11';
-import { nailPos } from './board.js?v=11';
-import { sketchCabinet } from './cabinets.js?v=11';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=12';
+import { createScene } from './render/scene.js?v=12';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=12';
+import { num, count, duration, mult, pct, fill } from './format.js?v=12';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=12';
+import { nailPos } from './board.js?v=12';
+import { sketchCabinet } from './cabinets.js?v=12';
 
 const SPEEDS = [1, 2, 4];
 
@@ -195,7 +195,31 @@ export async function boot(doc) {
     };
   }
 
+  /** Which door of a lit row a board point is on, or -1. Same geometry the picture draws. */
+  function doorAt(x, y) {
+    const run = game.run;
+    const active = run && run.events && Array.isArray(run.events.active) ? run.events.active : [];
+    const e = active.find(q => q.kind === 'doors' && !q.pending && !q.done && !q.revealed);
+    if (!e) return -1;
+    const b = cfg.board;
+    const n = Math.max(2, Math.floor(e.doors || 3));
+    const cx = b.w * 0.5, cy = b.h * 0.80;
+    const hw = Math.min(b.w * 0.42, n * b.w * 0.085), hh = b.h * 0.055;
+    if (Math.abs(y - cy) > hh || Math.abs(x - cx) > hw) return -1;
+    return Math.max(0, Math.min(n - 1, Math.floor((x - (cx - hw)) / (2 * hw / n))));
+  }
+
   function onFacePointer(e) {
+    if (game.view === VIEW_MACHINE) {
+      const { fit, rect } = faceFit();
+      const p = pixelToBoard(fit, e.clientX - rect.left, e.clientY - rect.top);
+      const k = doorAt(p.x, p.y);
+      if (k >= 0) {
+        const r = game.chooseDoor(k);
+        if (r.ok) say('Door ' + (k + 1) + ' called. Right pays three times over, wrong pays nothing.');
+      }
+      return;
+    }
     if (game.view !== VIEW_BENCH) return;
     const { fit, rect } = faceFit();
     const p = pixelToBoard(fit, e.clientX - rect.left, e.clientY - rect.top);

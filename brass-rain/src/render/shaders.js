@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=11';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=11';
+import { digitGlsl } from './digits.js?v=12';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=12';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -1573,8 +1573,9 @@ void main() {
     // A row of doors, one of which is worth opening. Shut they are brass with
     // a seam and a handle; once the row is read the one that pays is open and
     // lit and the rest have gone dull.
-    float n = floor(extra / 100.0);
-    float pick = floor(mod(extra, 100.0) / 10.0);
+    float n = floor(extra / 1000.0);
+    float pick = floor(mod(extra, 1000.0) / 100.0);
+    float called = floor(mod(extra, 100.0) / 10.0);   // 0 for none, else the door and one
     float shown = mod(extra, 10.0);
     float slot = (v_off.x / v_half.x * 0.5 + 0.5) * n;
     float which = clamp(floor(slot), 0.0, n - 1.0);
@@ -1604,6 +1605,10 @@ void main() {
     // The seam down the middle of a shut door, and the handle beside it.
     float seam = max(abs(p.x) - doorW * 0.03, d + doorW * 0.18);
     c = over(c, vec4(u_brass * 0.22, cover(seam) * fade * (1.0 - isPick)));
+    // The door the player called wears a lamp keyline until the row is read.
+    float isCalled = step(abs(which + 1.0 - called), 0.4) * (1.0 - step(0.5, shown));
+    float ring = abs(d + doorW * 0.10) - doorW * 0.045;
+    c = over(c, vec4(u_lamp * (1.2 + 0.8 * fall), smoothstep(doorW * 0.04, 0.0, ring) * isCalled * fade * 0.9));
   }
 
   fragColor = outColour(c.rgb, c.a);

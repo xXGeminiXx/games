@@ -399,7 +399,8 @@ export function packEvents(events, boardW, boardH, into) {
       data[o + 1] = boardH * 0.80;
       data[o + 2] = Math.min(boardW * 0.42, n * boardW * 0.085);
       data[o + 3] = boardH * 0.055;
-      extra = n * 100 + pick * 10 + (e.revealed ? 1 : 0);
+      const called = Number.isInteger(e.choice) ? Math.max(0, Math.min(n - 1, e.choice)) + 1 : 0;
+      extra = n * 1000 + pick * 100 + called * 10 + (e.revealed ? 1 : 0);
     }
     data[o + 4] = kind;
     data[o + 5] = progress;

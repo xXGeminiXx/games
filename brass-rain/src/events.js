@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=11';
-import { summonFor } from './render/themes.js?v=11';
+import { POCKET_PAY } from './board.js?v=12';
+import { summonFor } from './render/themes.js?v=12';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -625,6 +625,34 @@ function buildDoors(state, e, def) {
 // ---------------------------------------------------------------------------
 
 /** The life has run out. Whatever is owed is paid here, once. */
+/**
+ * How a row of doors pays when it closes. Left alone, the paying door opens
+ * and pays its prize. Called - the player clicked a door while the row was
+ * lit - the right door pays three times over and a wrong one pays nothing:
+ * the same average, with the choice in the player's hands.
+ */
+export function settleDoors(e) {
+  const prize = Math.max(0, num(e.prize, 0));
+  if (!Number.isInteger(e.choice)) return { pay: prize, called: false, right: false };
+  const right = e.choice === e.pick;
+  return { pay: right ? prize * 3 : 0, called: true, right };
+}
+
+/** The player calls a door, counting from 0. Only while a row is lit and still shut. */
+export function chooseDoor(state, k) {
+  const ev = state && state.events;
+  if (!ev || !Array.isArray(ev.active)) return { ok: false };
+  for (const e of ev.active) {
+    if (e.kind !== 'doors' || e.pending || e.done || e.revealed) continue;
+    const n = Math.max(2, num(e.doors, 3));
+    if (!Number.isInteger(k) || k < 0 || k >= n) return { ok: false };
+    e.choice = k;
+    pushLine(state, fill(String(state.cfg.events.doorsCalled || ''), { door: String(k + 1) }));
+    return { ok: true, door: k };
+  }
+  return { ok: false };
+}
+
 function end(state, e) {
   if (e.done) return;
   e.done = true;
@@ -635,18 +663,23 @@ function end(state, e) {
   if (e.kind === 'mouth' && e.pocket) e.pocket.open = false;
   if (e.kind === 'doors') {
     e.revealed = true;
-    if (e.prize > 0) {
+    const settled = settleDoors(e);
+    if (settled.pay > 0) {
       const b = state.cfg.board;
-      state.tray += e.prize;
-      state.won += e.prize;
-      state.stats.won += e.prize;
-      state.stats.eventBalls = (state.stats.eventBalls || 0) + e.prize;
-      state.events.marks.push({ kind: 'pay', x: b.w * 0.5, y: b.h * 0.42, amount: e.prize });
+      state.tray += settled.pay;
+      state.won += settled.pay;
+      state.stats.won += settled.pay;
+      state.stats.eventBalls = (state.stats.eventBalls || 0) + settled.pay;
+      state.events.marks.push({ kind: 'pay', x: b.w * 0.5, y: b.h * 0.42, amount: settled.pay });
       if (state.events.marks.length > 32) {
         state.events.marks.splice(0, state.events.marks.length - 32);
       }
     }
-    pushLine(state, fill(String(state.cfg.events.doorsWon || ''), { pay: String(e.prize) }));
+    const text = state.cfg.events || {};
+    const line = !settled.called ? text.doorsWon : settled.right ? text.doorsRight : text.doorsWrong;
+    pushLine(state, fill(String(line || ''), {
+      pay: String(settled.pay), door: String((e.pick | 0) + 1), called: String((e.choice | 0) + 1),
+    }));
   }
 }
 

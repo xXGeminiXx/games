@@ -494,7 +494,10 @@ export const CONFIG = {
     tellBalls: 0,         // warning an entry gets when it does not name its own
 
     // Said when a row of doors closes and one of them opens.
-    doorsWon: 'The middle door opens. It pays {pay} balls.',
+    doorsWon: 'Door {door} opens. It pays {pay} balls.',
+    doorsCalled: 'You called door {door}.',
+    doorsRight: 'Door {door} opens - the one you called. It pays {pay} balls, three times over.',
+    doorsWrong: 'You called door {called}. The prize was behind door {door}. Nothing this time.',
 
     list: [
       {
@@ -625,7 +628,7 @@ export const CONFIG = {
         name: 'Three doors',
         kind: 'doors',
         trigger: { kind: 'pace', share: 0.5 },
-        line: 'Halfway to what the round asks for. Three doors light up, and one of them pays when they close in {n} balls.',
+        line: 'Halfway to what the round asks for. Three doors light up, and one of them pays when they close in {n} balls. Click a door to call it: right pays three times over, wrong pays nothing. Leave it and the paying door opens on its own.',
         balls: 18,
         restBalls: 30,
         tellBalls: 2,
