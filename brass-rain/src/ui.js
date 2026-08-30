@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=55';
-import { createScene } from './render/scene.js?v=55';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=55';
-import { num, count, duration, mult, pct, fill } from './format.js?v=55';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=55';
-import { nailPos } from './board.js?v=55';
-import { DOORS_ROW } from './render/board-geom.js?v=55';
-import { sketchCabinet } from './cabinets.js?v=55';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=55';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=56';
+import { createScene } from './render/scene.js?v=56';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=56';
+import { num, count, duration, mult, pct, fill } from './format.js?v=56';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=56';
+import { nailPos } from './board.js?v=56';
+import { DOORS_ROW } from './render/board-geom.js?v=56';
+import { sketchCabinet } from './cabinets.js?v=56';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=56';
 
 const SPEEDS = [1, 2, 4];
 
@@ -388,7 +388,7 @@ export async function boot(doc) {
       .find(e => e.kind === 'doors' && !e.pending && !e.done && !e.revealed);
     if (lit && lit.key !== litRow) {
       litRow = lit.key;
-      el.hint.textContent = (lit.doors || 3) + ' doors are lit. Click one, or press its number, to call it.';
+      el.hint.textContent = (lit.doors || 3) + ' doors are lit at the foot of the board. Click one, or press its number, to call it.';
     }
 
     if (r.away && r.away.gained > 0) {
