@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=24';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=24';
+import { digitGlsl } from './digits.js?v=25';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=25';
 
 // ---- shared ---------------------------------------------------------------
 

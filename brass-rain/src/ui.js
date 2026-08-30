@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=24';
-import { createScene } from './render/scene.js?v=24';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=24';
-import { num, count, duration, mult, pct, fill } from './format.js?v=24';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=24';
-import { nailPos } from './board.js?v=24';
-import { sketchCabinet } from './cabinets.js?v=24';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=25';
+import { createScene } from './render/scene.js?v=25';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=25';
+import { num, count, duration, mult, pct, fill } from './format.js?v=25';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=25';
+import { nailPos } from './board.js?v=25';
+import { sketchCabinet } from './cabinets.js?v=25';
 
 const SPEEDS = [1, 2, 4];
 
@@ -152,6 +152,12 @@ export async function boot(doc) {
         if (el.primerSheet && !el.primerSheet.hidden) closePrimer();
       }
       else if (e.key === 'f' || e.key === 'F') openFloor();
+      else if (/^[1-8]$/.test(e.key)) {
+        // The number keys call a door while a row is lit, for a player who
+        // would rather not reach for the mouse mid-round.
+        const r = game.chooseDoor(Number(e.key) - 1);
+        if (r.ok) say('Door ' + e.key + ' called. Right pays as many times over as there are doors, wrong pays nothing.');
+      }
     });
 
     on(el.canvas, 'pointerdown', onFacePointer);
@@ -1141,7 +1147,7 @@ const HELP = [
   ['The handle and the power', 'The power slider sets how hard a ball is thrown around the outer rail before '
     + 'it drops onto the nails. It\'s the only thing you control while a round is running, and it\'s worth '
     + 'a lot: the gap between the best power setting and the worst is most of what a machine pays. The arrow '
-    + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself.'],
+    + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself, and the number keys call a door when a row is lit.'],
   ['The pockets', 'A pocket is a cut in the board that catches a ball and pays for it. There are three '
     + 'kinds always on the board. SIDE POCKETS, out at the edges, pay 1 ball. MID POCKETS, the wider ones '
     + 'lower down, pay 2 or 3. The BIG POCKET is the one mouth in a different color from the rest, pays 5, and is the hardest of them to '
