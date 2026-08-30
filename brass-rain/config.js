@@ -496,7 +496,7 @@ export const CONFIG = {
     // Said when a row of doors closes and one of them opens.
     doorsWon: 'Door {door} opens. It pays {pay} balls.',
     doorsCalled: 'You called door {door}.',
-    doorsRight: 'Door {door} opens - the one you called. It pays {pay} balls, three times over.',
+    doorsRight: 'Door {door} opens - the one you called. It pays {pay} balls, {doors} times over.',
     doorsWrong: 'You called door {called}. The prize was behind door {door}. Nothing this time.',
 
     list: [
@@ -628,7 +628,7 @@ export const CONFIG = {
         name: 'Three doors',
         kind: 'doors',
         trigger: { kind: 'pace', share: 0.5 },
-        line: 'Halfway to what the round asks for. Three doors light up, and one of them pays when they close in {n} balls. Click a door to call it: right pays three times over, wrong pays nothing. Leave it and the paying door opens on its own.',
+        line: 'Halfway to what the round asks for. {doors} doors light up, and one of them pays when they close in {n} balls. Click a door to call it: right pays {doors} times over, wrong pays nothing. Leave it and the paying door opens on its own.',
         balls: 18,
         restBalls: 30,
         tellBalls: 2,

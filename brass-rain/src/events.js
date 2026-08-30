@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=13';
-import { summonFor } from './render/themes.js?v=13';
+import { POCKET_PAY } from './board.js?v=14';
+import { summonFor, doorsFor } from './render/themes.js?v=14';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -612,9 +612,14 @@ function buildRide(e, def) {
 function buildDoors(state, e, def) {
   const prizes = Array.isArray(def.prizes) ? def.prizes.filter(v => Number.isFinite(v)) : [];
   if (!prizes.length) return false;
-  e.doors = clampInt(num(def.doors, prizes.length), 2, 8);
-  e.pick = Math.floor(state.rng.next() * prizes.length) % prizes.length;
-  e.prize = Math.max(0, Math.round(prizes[e.pick]));
+  // The row is the machine's own: each cabinet lights its own number of
+  // doors, which is what makes the game different from one machine to the next.
+  const own = doorsFor(state.board && state.board.layout ? state.board.layout.id : '', state.cfg);
+  e.doors = clampInt(num(own, num(def.doors, prizes.length)), 2, 8);
+  // The paying door is any door in the row; what it pays is drawn from the
+  // prize list, so a longer row does not mean a bigger purse.
+  e.pick = Math.floor(state.rng.next() * e.doors) % e.doors;
+  e.prize = Math.max(0, Math.round(prizes[Math.floor(state.rng.next() * prizes.length) % prizes.length]));
   e.revealed = false;
   e.holdBalls = clampInt(num(def.showBalls, 4), 1, 60);
   return true;
@@ -635,7 +640,10 @@ export function settleDoors(e) {
   const prize = Math.max(0, num(e.prize, 0));
   if (!Number.isInteger(e.choice)) return { pay: prize, called: false, right: false };
   const right = e.choice === e.pick;
-  return { pay: right ? prize * 3 : 0, called: true, right };
+  // A right call pays as many times over as there were doors to choose from,
+  // so the average is the prize whatever the row's length.
+  const n = Math.max(2, Math.floor(num(e.doors, 3)));
+  return { pay: right ? prize * n : 0, called: true, right };
 }
 
 /** The player calls a door, counting from 0. Only while a row is lit and still shut. */
@@ -678,7 +686,7 @@ function end(state, e) {
     const text = state.cfg.events || {};
     const line = !settled.called ? text.doorsWon : settled.right ? text.doorsRight : text.doorsWrong;
     pushLine(state, fill(String(line || ''), {
-      pay: String(settled.pay), door: String((e.pick | 0) + 1), called: String((e.choice | 0) + 1),
+      pay: String(settled.pay), door: String((e.pick | 0) + 1), called: String((e.choice | 0) + 1), doors: String(e.doors || 3),
     }));
   }
 }
