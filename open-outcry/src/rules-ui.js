@@ -308,7 +308,7 @@ export function createComposer({ engine, registry, mount, onChange = () => {} })
   }
 
   function opLabel(op) {
-    return { '<': 'is below', '<=': 'is at most', '>': 'is above', '>=': 'is at least', '==': 'is', '!=': 'is not', between: 'is between', changedBy: 'changed by', for: 'has held' }[op] || op;
+    return { '<': 'is below', '<=': 'is at most', '>': 'is above', '>=': 'is at least', '==': 'is', "!=": "isn't", between: 'is between', changedBy: 'changed by', for: 'has held' }[op] || op;
   }
 
   // The value editor depends on the operator: one box, two for a range, an
@@ -414,7 +414,7 @@ export function createComposer({ engine, registry, mount, onChange = () => {} })
     ioErrors.textContent = '';
     let parsed;
     try { parsed = JSON.parse(ioText.value); } catch (e) {
-      ioErrors.appendChild(h('li', { text: `that is not valid data: ${e.message}` }));
+      ioErrors.appendChild(h('li', { text: `that isn't valid data: ${e.message}` }));
       return;
     }
     const incoming = Array.isArray(parsed) ? parsed : (parsed && parsed.rules);

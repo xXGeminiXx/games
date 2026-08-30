@@ -14,8 +14,8 @@
 
 import {
   drawWork, addMoteMark, addMoteTail, drawEmber, addRadialTicks, addHexRing,
-} from './glyphs.js?v=8';
-import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=8';
+} from './glyphs.js?v=9';
+import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=9';
 
 const SQRT2 = Math.SQRT2;
 const clock = (typeof performance !== 'undefined' && performance && performance.now)

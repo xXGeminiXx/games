@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=8';
-import { format } from './economy.js?v=8';
-import { kindDef, costOf } from './works.js?v=8';
-import { idsOf } from './traits.js?v=8';
+import { fill } from '../config.js?v=9';
+import { format } from './economy.js?v=9';
+import { kindDef, costOf } from './works.js?v=9';
+import { idsOf } from './traits.js?v=9';
 
 const LOG_SHOWN = 8;
 

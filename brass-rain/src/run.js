@@ -13,14 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=8';
-import { createBoard, pocket } from './board.js?v=8';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=8';
-import { fire, hasHook } from './hooks.js?v=8';
+import { rng as makeRng } from './rng.js?v=9';
+import { createBoard, pocket } from './board.js?v=9';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=9';
+import { fire, hasHook } from './hooks.js?v=9';
 import {
   createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
   eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
-} from './events.js?v=8';
+} from './events.js?v=9';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';

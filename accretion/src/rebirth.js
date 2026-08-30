@@ -172,7 +172,7 @@ export const AXIOMS = [
   {
     id: 'gravitation',
     label: 'Gravitation',
-    summary: 'How hard matter pulls on matter. Strong gravity collapses everything before it has time to organise; weak gravity permits intricate structure but takes an age to build anything heavy.',
+    summary: 'How hard matter pulls on matter. Strong gravity collapses everything before it has time to organize; weak gravity permits intricate structure but takes an age to build anything heavy.',
     min: 0.1, max: 100, default: 1, scale: 'log', step: 0.5, integer: false,
     apply(v, L) {
       L.gravity *= v;
@@ -273,7 +273,7 @@ export const AXIOMS = [
   {
     id: 'vacuum',
     label: 'Vacuum',
-    summary: 'How unstable the ground state is. An unstable vacuum is dense and violent and quick, and may end without warning at any moment. Some outcomes are only reachable through a universe that does not expect to survive.',
+    summary: 'How unstable the ground state is. An unstable vacuum is dense and violent and quick, and may end without warning at any moment. Some outcomes are only reachable through a universe that doesn\'t expect to survive.',
     min: 0, max: 1, default: 0, scale: 'linear', step: 0.2, integer: false,
     apply(v, L) {
       L.vacuumHazard = v * 0.02;
@@ -284,7 +284,7 @@ export const AXIOMS = [
   {
     id: 'observation',
     label: 'Observation',
-    summary: 'How strongly attention feeds back into the field. What is watched holds together and does not disperse. It also slows: a universe under observation takes longer to become anything.',
+    summary: 'How strongly attention feeds back into the field. What\'s watched holds together and doesn\'t disperse. It also slows: a universe under observation takes longer to become anything.',
     min: 0, max: 2, default: 0, scale: 'linear', step: 0.5, integer: false,
     apply(v, L) {
       L.observerCoupling = v;
@@ -851,10 +851,10 @@ export function selfTest() {
 
   // repeating a universe yields nothing
   const c2 = close(run1, s1);
-  ok(discoveries(c2.state) === 1, 'close: a repeat is not a discovery');
-  ok(slots(c2.state).total === 1, 'slots: repeats do not grow the budget');
+  ok(discoveries(c2.state) === 1, 'close: a repeat isn\'t a discovery');
+  ok(slots(c2.state).total === 1, 'slots: repeats don\'t grow the budget');
   ok(Object.keys(c2.state.written).length === 0, 'close: written laws are consumed');
-  ok(c2.state.phase === PHASE_AUTHORING, 'close: later closures are not endings');
+  ok(c2.state.phase === PHASE_AUTHORING, 'close: later closures aren\'t endings');
 
   // round trip
   const restored = deserialize(serialize(cheap.state));

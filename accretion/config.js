@@ -60,8 +60,8 @@ export const CONFIG = {
     // can add nothing. It names the control that gets out of it rather than
     // pointing at a place on the screen, because a direction goes stale the
     // moment anything moves.
-    promptFull:   'the field will take no more - it holds all the mass a run can carry. start over to begin a new one.',
-    promptNearFull: 'the field is nearly as full as a run can be. what is here will keep working; nothing more can be put in.',
+    promptFull:   'the field is full. it holds all the mass one run can carry. start over for a new one.',
+    promptNearFull: 'the field is nearly full. what is here keeps working, but almost nothing more will fit.',
     // Starting over is not the ending: the ending keeps what was learned and
     // this throws it away, so the question has to say so.
     confirmAgain: 'Start over? This run and everything learned in it are thrown away.',
@@ -82,7 +82,7 @@ export const CONFIG = {
       supernova: 'supernova',
       collapse: 'the core gives way. the star goes dark from the inside',
       detonation: 'the white dwarf detonates',
-      'white dwarf': 'a white dwarf, cooling for ever',
+      'white dwarf': 'a white dwarf, cooling forever',
       'neutron star': 'a neutron star',
       'black hole': 'a black hole',
       'second generation': 'the thrown gas gathers and ignites again',
@@ -122,7 +122,7 @@ export const CONFIG = {
     endingDeaths: 'deaths',
     endingRemnants: 'left behind',
     endingFlux: 'flux earned',
-    endingAgain: 'begin again, knowing what you know',
+    endingAgain: 'begin again, keeping the research',
   },
 
   // -------------------------------------------------------------------------

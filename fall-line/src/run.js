@@ -7,18 +7,18 @@
 // calls the actions.
 // ---------------------------------------------------------------------------
 
-import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=8';
-import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=8';
-import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=8';
-import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=8';
-import { stepWorks } from './works.js?v=8';
-import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=8';
-import { clearBonus, callBonus } from './economy.js?v=8';
-import { checkAwards, awardDef } from './awards.js?v=8';
-import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=8';
-import { stream, hash } from './rng.js?v=8';
-import { idsOf } from './traits.js?v=8';
-import { fill } from '../config.js?v=8';
+import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=9';
+import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=9';
+import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=9';
+import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=9';
+import { stepWorks } from './works.js?v=9';
+import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=9';
+import { clearBonus, callBonus } from './economy.js?v=9';
+import { checkAwards, awardDef } from './awards.js?v=9';
+import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=9';
+import { stream, hash } from './rng.js?v=9';
+import { idsOf } from './traits.js?v=9';
+import { fill } from '../config.js?v=9';
 
 const LOG_KEEP = 40;
 

@@ -77,52 +77,21 @@
   }
   select:hover{color:var(--ink); border-color:var(--swarm)}
   footer{gap:8px}
+  /* The trading desk. It is taller than four buttons ever were, so it takes a
+     bounded share of the window and scrolls inside itself: the field never
+     gets pushed off the bottom and the page itself still never scrolls. */
   #shop{
-    width:100%; max-width:520px; display:none; gap:5px; padding:7px 12px;
+    width:100%; max-width:520px; display:none; padding:0 12px 8px;
     border-top:1px solid var(--line);
+    max-height:min(42vh, 400px); overflow-y:auto; overscroll-behavior:contain;
+    scrollbar-width:thin;
   }
-  #shop.on{display:flex}
-  /* How many a press buys. It only appears once a run has more essence than
-     one of anything costs, so an opening board is not asked to think about it.
-     The chosen number is the only lit thing in the row, so the bar reads as one
-     setting rather than five more buttons to press. */
-  #bulkbar{
-    width:100%; max-width:520px; display:flex; align-items:center; gap:6px;
-    padding:5px 12px 0; font-size:11px;
-  }
-  #bulkbar[hidden]{display:none}
-  #bulklabel{color:var(--dim); letter-spacing:.1em; text-transform:uppercase}
-  #bulk{display:flex; gap:4px; margin-left:auto}
-  #bulk button{
-    font:inherit; font-size:11px; padding:2px 7px; cursor:pointer; border-radius:2px;
-    background:transparent; color:var(--dim); border:1px solid var(--line);
-  }
-  #bulk button:hover:not(:disabled){color:var(--ink)}
-  #bulk button[aria-pressed="true"]{color:var(--bg); background:var(--accent); border-color:var(--accent)}
-  #bulk button:disabled{opacity:.35; cursor:default}
-  /* Four offers across a phone leaves each about 80px, and the second line -
-     the price and what it buys, which is the whole basis of the choice - is
-     cut off mid-word. Below that width the row becomes two columns, which
-     gives every offer twice the room and costs one line of height. */
+  #shop.on{display:block}
+  /* On a narrow screen the desk gets more of the window, because reading a
+     price is what a turn is spent on and the field is still legible smaller. */
   @media (max-width:480px){
-    #shop{flex-wrap:wrap}
-    #shop.on .buy{flex:1 1 calc(50% - 5px)}
+    #shop{max-height:min(50vh, 400px)}
   }
-  /* One row, always. flex-basis 0 with min-width 0 is what stops the longest
-     description deciding the width of everything and wrapping the fourth
-     button onto a second line. */
-  .buy{
-    flex:1 1 0; min-width:0; text-align:left; line-height:1.25;
-    padding:4px 7px; font-size:12px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .buy small{
-    display:block; color:var(--dim); font-size:9.5px; letter-spacing:-0.01em;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  /* The price is the number the decision turns on, so it is the one thing in
-     the offer that is never dimmed and never clipped. */
-  .buy small b{color:var(--pickup); font-weight:600; font-size:11px}
   #over{
     position:fixed; inset:0; background:var(--scrim); display:none;
     flex-direction:column; align-items:center; justify-content:center; gap:14px;
@@ -393,7 +362,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="5b09b7067b06">
+<meta name="build" content="d8bacc2c8b49">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -449,7 +418,6 @@
 
 <div id="stage"><canvas id="c" width="520" height="620"></canvas></div>
 
-<div id="bulkbar" hidden><span id="bulklabel">buy</span><span id="bulk"></span></div>
 <div id="shop"></div>
 
 <footer>
@@ -542,20 +510,24 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, offerCost, applyIdentity } from './config.js?v=16';
-import { createJuice } from './src/juice.js?v=16';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=16';
-import { createBlockKinds } from './src/blocks.js?v=16';
-import { safeRows } from './src/arrival.js?v=16';
-import { createAwards } from './src/awards.js?v=16';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=16';
-import { createLeaderboard } from './src/leaderboard.js?v=16';
-import * as Tiers from './src/tiers.js?v=16';
-import { createOnboarding } from './src/onboarding.js?v=16';
-import { createVisual } from './src/visual.js?v=16';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=16';
-import { seedForSync, today as utcToday } from './src/daily.js?v=16';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=16';
+         storageKey, applyIdentity } from './config.js?v=17';
+import { createJuice } from './src/juice.js?v=17';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=17';
+import { createBlockKinds } from './src/blocks.js?v=17';
+import { safeRows } from './src/arrival.js?v=17';
+import { createAwards } from './src/awards.js?v=17';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=17';
+import { createLeaderboard } from './src/leaderboard.js?v=17';
+import * as Tiers from './src/tiers.js?v=17';
+import { createOnboarding } from './src/onboarding.js?v=17';
+import { createVisual } from './src/visual.js?v=17';
+import * as Economy from './src/economy.js?v=17';
+import * as Powers from './src/powers.js?v=17';
+import * as Meta from './src/meta.js?v=17';
+import { createUI } from './src/ui.js?v=17';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=17';
+import { seedForSync, today as utcToday } from './src/daily.js?v=17';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=17';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -700,7 +672,7 @@ const look = createVisual({
 // draws nothing once a player has played.
 const teach = createOnboarding({
   width: W, height: H, floorY: FLOOR, topY: TOP, cols: COLS, cell: CELL0, ballRadius: R,
-  canAfford: () => OFFERS.some(o => S.gold >= o.cost(S.depth)),
+  canAfford: () => (S && S.econ) ? Economy.offers(S.econ).some(o => o.afford || o.coverable) : false,
 });
 
 let TIER = (() => {
@@ -718,8 +690,8 @@ let MODE = (() => {
 let S;
 function fresh(){
   S = {
-    depth: 1, balls: Tiers.tierOf(TIER).supply.start, gold: 0, tier: TIER,
-    endless: false, won: false,
+    depth: 1, balls: Tiers.tierOf(TIER).supply.start, tier: TIER,
+    endless: false, won: false, broken: 0,
     clears: 0, streak: 0, turnKills: 0, kindsSeen: [],
     // Where the history stood when this run began, so a mid-run check adds
     // this run's totals to it rather than to itself.
@@ -732,7 +704,6 @@ function fresh(){
     aiming: false, aim: {x: W / 2, y: FLOOR - 120},
     dead: false,
     power: CONFIG.swarm.startingPower,
-    gain: CONFIG.swarm.startingGain,   // gain = essence per block destroyed
     seed: 0,
     field: null,
   };
@@ -751,6 +722,18 @@ function fresh(){
   S.form = S.field.dealsSequence ? S.field.source : null;
   S.kinds = createBlockKinds(S.seed, { lattice: S.field.lattice !== false });
   S.dealt = 0;
+  // The market is told how tough a block is at a given depth so it can price
+  // what one is worth without knowing anything about the field.
+  S.econ = Economy.create({ depth: 1, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  // The hand is dealt off the run's own seed, so the same run offers the same
+  // options and a redeal is a decision rather than a spin.
+  S.pow = Powers.createState({ seed: S.seed, swarm: S.balls, essence: 0 });
+  S.pow.hostPool = HAND_POOL;
+  spoilsPool = 0;
+  turnHarvest = [];
+  saidReveals = null;
+  logBroken = false;
+  metaBegin();
   ROWS_TURN = 1;
   bindField();
   // A field that does not widen sits at the starting width for the whole run.
@@ -835,7 +818,7 @@ function addRow(extra){
     // that are obstacles rather than rewards say so, and stand there after the
     // pass that cleared everything around them.
     const bhp = k ? Math.max(1, Math.round(hp * S.kinds.healthScale(k))) : hp;
-    const b = { c: cell.c, r: cell.r, hp: bhp, max: bhp };
+    const b = { c: cell.c, r: cell.r, hp: bhp, max: bhp, d };
     if (k){
       b.k = k;
       // The kind's colour travels with the block, so whatever draws it can
@@ -1024,6 +1007,7 @@ function fireDir(dx, dy){
   S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
   S.turnKills = 0;
   if (rec) rec.fire(dx, dy, CELL, ORIGIN);
+  if (ui && !QUIET) ui.setPhase('firing');
   mark();
   juice.launch(S.origin, FLOOR - R, S.dir.x, S.dir.y);
   return true;
@@ -1050,6 +1034,9 @@ function endTurn(){
   if (S.nextOrigin != null) S.origin = S.nextOrigin;
   step();
   S.depth++;
+  // Prices move once a turn, whatever the player did or did not do with them.
+  if (S.econ) Economy.tick(S.econ, S.depth);
+  growSwarm();
   // THE FIELD NEVER STOPS. What a tier scripts is finite: past its finish depth
   // it has no more rows to give. That used to end the run - the board would
   // clear and a player mid-flow was stopped by a screen that read like a fault.
@@ -1070,8 +1057,11 @@ function endTurn(){
   // Depth and swarm cross their thresholds during a turn, not at the end of a
   // run, so they are checked where they change.
   checkAwards();
+  metaObserve();
   if (S.field.arrival.lost(view())) return die();
   mark();
+  digestTurn();
+  announceReveals();
   paintShop();
 }
 
@@ -1079,7 +1069,7 @@ function endTurn(){
 function perfectClear(){
   const c = CONFIG.economy.clearBonus;
   const bonus = Math.max(1, Math.round(c.base + c.perDepth * S.depth));
-  S.gold += bonus;
+  payCash(bonus);
   S.clears = (S.clears || 0) + 1;
   S.streak = (S.streak || 0) + 1;
   moment(CONFIG.text.clearTitle, CONFIG.text.clearNote + bonus, CONFIG.palette.essence);
@@ -1111,10 +1101,17 @@ function endingWord(){
     ? CONFIG.text.overFull : CONFIG.text.overTitle;
 }
 
+/** What a run finished with: cash plus what the inventory would fetch, which
+ *  is the number that says whether the trading worked. */
+function runWorth(){
+  return S.econ ? Math.round(Economy.toNum(Economy.netWorth(S.econ).value)) : 0;
+}
+
 function die(){
   S.dead = true;
   checkAwards();
   if (QUIET) return;
+  if (ui) ui.setPhase('over');
   document.getElementById('overtitle').textContent = endingWord();
   recordBest();
   recordDailyBest();
@@ -1122,8 +1119,9 @@ function die(){
   // The run posts what it wrote down about itself. A run with no log, or one
   // that outgrew the cap, posts exactly what it always did and reads as
   // unchecked on the board - nothing is withheld and nothing is penalised.
+  metaEnd();
   board.finish({
-    tier: S.tier, depth: S.depth, swarm: S.balls, essence: S.gold,
+    tier: S.tier, depth: S.depth, swarm: S.balls, essence: runWorth(),
     doctrine: 'none', endless: !!S.endless,
   }, { claim: runClaim(), daily: S.daily || null });
   document.getElementById('overdepth').textContent = S.depth;
@@ -1232,12 +1230,12 @@ function takeMarker(j){
   const p = S.drops[j];
   if (!p) return;
   if (p.kind === 'ball'){
-    S.balls += 1;
-    juice.pickup(cx(p.c), cyOf(p.r), 'ball', 1);
+    const n = markerBalls();
+    S.balls += n;
+    juice.pickup(cx(p.c), cyOf(p.r), 'ball', n);
   } else {
-    const n = CONFIG.economy.windfallBase + S.depth;
-    S.gold += n;
-    juice.pickup(cx(p.c), cyOf(p.r), 'gold', n);
+    const w = Economy.windfall(S.econ, S.depth);
+    juice.pickup(cx(p.c), cyOf(p.r), 'gold', w.text);
   }
   S.drops.splice(j, 1);
 }
@@ -1363,15 +1361,25 @@ function damage(b, bl, i, x, y){
   b.clean = false;
   const nx = b.vx, ny = b.vy;
   const shade = shadeOf(bl);
-  bl.hp -= S.power;
-  juice.hit(b.x, b.y, S.power, nx, ny);
+  // A BLOCK'S HEALTH STAYS A WHOLE NUMBER. Powers multiply damage, which makes
+  // the figure fractional, and the board prints health rounded - so a block on
+  // 0.2 would read 0 while it was still standing. The fraction is carried on
+  // the body instead and lands on its next contact, so nothing is lost and
+  // nothing on screen is a lie. With no powers owned this is S.power exactly.
+  b.carry = (b.carry || 0) + hitPower() * sunderMult(bl);
+  const dmg = Math.max(1, Math.floor(b.carry));
+  b.carry -= dmg;
+  bl.hp -= dmg;
+  juice.hit(b.x, b.y, dmg, nx, ny);
   if (bl.hp <= 0){
     juice.destroy(x, y, shade, nx, ny);
     const at = i >= 0 ? i : S.rows.indexOf(bl);
     if (at >= 0) S.rows.splice(at, 1);
     retire(bl);
-    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    harvestBlock(bl);
+    spoilsFor();
     S.turnKills = (S.turnKills || 0) + 1;
+    S.broken = (S.broken || 0) + 1;
     if (bl.k){
       // Breaking one is how a player finds out what it does, so breaking one
       // is what the record is of.
@@ -1491,7 +1499,7 @@ function markArrivals(X){
 function applyBlockEffect(e, x, y, src){
   if (!e) return;
   if (e.burst) spray(x, y, e.burst);
-  if (e.essence) S.gold += e.essence;
+  if (e.essence) payCash(e.essence);
   if (e.balls) S.balls += e.balls;
   if (e.power) S.power += e.power;
 
@@ -1578,8 +1586,10 @@ function sweep(list){
     const x = bl.id !== undefined ? pieceX(bl) : cx(bl.c);
     const y = bl.id !== undefined ? pieceY(bl) : cyOf(bl.r);
     juice.destroy(x, y, shadeOf(bl), 0, -1);
-    S.gold += Math.max(1, Math.round(bl.max * CONFIG.economy.blockShare)) + S.gain;
+    harvestBlock(bl);
+    spoilsFor();
     S.turnKills = (S.turnKills || 0) + 1;
+    S.broken = (S.broken || 0) + 1;
     retire(bl);
   }
   S.rows = S.rows.filter(b => !gone.has(b));
@@ -1609,7 +1619,7 @@ function splinter(src, spec){
     const key = c + ',' + r;
     if (taken.has(key)) continue;
     taken.add(key);
-    S.rows.push({ c, r, hp, max: hp, pop: S.field.arrival.moves ? undefined : 1 });
+    S.rows.push({ c, r, hp, max: hp, d: S.depth, pop: S.field.arrival.moves ? undefined : 1 });
     placed++;
   }
   indexDirty = true;
@@ -1796,9 +1806,19 @@ function drawMoments(X){
   }
 }
 
-// --- shop -------------------------------------------------------------------
-// Essence is the economy seed. Blocks and pickups pay it out; it buys the
-// things that would otherwise be a grind. Buying past tedium is the loop.
+// --- the market, the hand, and the record -----------------------------------
+//
+// Blocks pay MATERIAL, not cash. Cash comes off the markers the field drops
+// and off selling what you mined, and every upgrade is priced in material. So
+// the question each turn stops being "can I afford this" and becomes "is this
+// worth more sold now or in four turns", which is a decision a player gets
+// better at.
+//
+// Four modules do the work and none of them knows what a block is.
+// src/economy.js owns prices, gates, recipes and consignments. src/powers.js
+// deals the hand of powers between turns and works out what owning one means.
+// src/meta.js keeps the record across runs. src/ui.js draws all three and
+// calls back when the player presses something; it changes nothing itself.
 
 // How much field the lowest row is, in cells. A cell is one; a piece of a
 // picture is its area, so a row of thirty slivers of lace is not priced as
@@ -1809,129 +1829,519 @@ function lowestRowSize(){
   return n;
 }
 
-// What each offer DOES. The list itself, its names, its prices and its order
-// live in config.js; this only says what buying one changes.
-const EFFECTS = {
-  ball:  o => { S.balls += o.amount; },
-  power: o => { S.power += o.amount; },
-  gain:  o => { S.gain  += o.amount; },
-  clear: () => { purge(lowestBlocks()); },
-};
+/** Destroy every block in the lowest row. */
+function purgeLowestRow(){ purge(lowestBlocks()); }
 
-// Clearing a row is priced by how much of the field it removes, so a wide row
-// costs more than a thin one. Everything else is priced straight off its entry.
-const PRICING = {
-  clear: (o, d) => Math.round(offerCost(o, d) * Math.max(1, lowestRowSize()) / 2),
-};
+/** Lift the whole field one step back off the swarm line. */
+function liftRows(n){
+  const k = Math.max(1, n | 0);
+  S.rows.forEach(b => { b.r = Math.max(0, b.r - k); });
+  S.drops.forEach(p => { p.r = Math.max(0, p.r - k); });
+  indexDirty = true;
+}
 
-const OFFERS = CONFIG.economy.offers
-  .filter(o => EFFECTS[o.id])
-  .map(o => ({
-    id: o.id, name: o.name, desc: o.desc, long: o.long || o.desc,
-    cost: d => (PRICING[o.id] ? PRICING[o.id](o, d) : offerCost(o, d)),
-    buy: () => EFFECTS[o.id](o),
-  }));
+/** What an upgrade changes about the run. The market decides its price and
+ *  whether it can be bought at all; this is the only part that touches the
+ *  field. Yield and the yield boost are the market's own and are applied
+ *  there, so they are deliberately absent here. */
+function applyEffect(e){
+  if (!e) return;
+  if (e.balls) S.balls += e.balls;
+  if (e.power) S.power += e.power;
+  if (e.clearRow) purgeLowestRow();
+  if (e.liftRows) liftRows(e.liftRows);
+}
 
-// How many one press buys. `0` means every one the essence allows.
-let bulkPick = 1;
-const BULK_STEPS = [1, 10, 100, 1000, 0];
-let bulkBuilt = false;
+// --- cash -------------------------------------------------------------------
+// One pool, held by the market as a magnitude so it keeps working past the
+// point a plain number stops. Everything outside the market reads it as a
+// number, which is all the readout and the board ever needed.
 
-function paintBulk(){
-  const bar = document.getElementById('bulkbar');
-  const box = document.getElementById('bulk');
-  if (!bar || !box) return;
-  if (!bulkBuilt){
-    bulkBuilt = true;
-    for (const n of BULK_STEPS){
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.n = String(n);
-      b.textContent = n === 0 ? 'max' : ('x' + n);
-      b.onclick = () => { bulkPick = n; paintShop(); };
-      box.appendChild(b);
+const cash = () => (S && S.econ ? Economy.toNum(S.econ.essence) : 0);
+const cashText = () => (S && S.econ ? Economy.fmt(S.econ.essence) : '0');
+
+function payCash(n){
+  if (!S.econ || !(n > 0)) return;
+  S.econ.essence = Economy.add(S.econ.essence, Economy.L(n));
+  S.econ.stats.essenceEarned = Economy.add(S.econ.stats.essenceEarned, Economy.L(n));
+}
+
+/** A block broke. It pays material decided by the depth it arrived at and the
+ *  column it stood in, so what the field hands you changes as you descend and
+ *  never matches what the upgrade list wants. */
+function harvestBlock(bl){
+  if (!S.econ) return null;
+  const got = Economy.harvest(S.econ, { depth: bl.d || S.depth, col: bl.c, maxHp: bl.max });
+  // Powers that raise material yield are a multiplier on top of whatever the
+  // market already paid, so the market keeps owning the base number.
+  const mult = S.pow ? Powers.yieldMult(S.pow) : 1;
+  if (got && mult > 1){
+    const extra = Economy.scale(got.qty, mult - 1);
+    S.econ.held[got.id] = Economy.add(S.econ.held[got.id], extra);
+    got.qty = Economy.add(got.qty, extra);
+    got.text = Economy.fmt(got.qty);
+  }
+  if (got) turnHarvest.push(got);
+  return got;
+}
+let turnHarvest = [];
+
+// --- powers -----------------------------------------------------------------
+//
+// ONLY OPTIONS THIS GAME CAN DELIVER ARE DEALT.
+//
+// The pool describes bodies that split, pierce and fall into orbit around a
+// block. This game fires plain circles, so a card promising any of that would
+// be a sentence the field never honours. Rather than trusting a hand-written
+// list to stay right, each option is tested at boot: it is dealt one rank
+// against a scratch copy of the stats and kept only if everything it moved is
+// something the loop reads below. Add the reading and the option deals itself.
+
+const DELIVERS = new Set([
+  'flat',        // damage added to every hit
+  'mult',        // damage multiplied
+  'pressure',    // damage from the size of the swarm
+  'sunder',      // damage against blocks still near full health
+  'requisition', // damage from what the run has spent
+  'growth',      // the swarm grows a share of itself every turn
+  'spoils',      // swarm per block broken
+  'nesting',     // a swarm marker is worth a share of the swarm
+  'yieldBonus',  // more material per block
+  'corner',      // more material the larger the swarm
+  'slots',       // a wider hand
+  'freeRerolls', // redeals that cost nothing
+  'duty',        // a discount on the doctrine you are deepest in
+  'dominant',    // which doctrine that is - read only
+]);
+
+/** The ids this game can honour, worked out by dealing each option one rank
+ *  against a scratch copy of the stats and seeing what it moved. */
+function deliverable(){
+  const probe = Powers.createState({ seed: 1 });
+  const base = probe.derived;
+  const same = (a, b) => (a && typeof a === 'object' && 'm' in a)
+    ? (b && a.m === b.m && a.e === b.e) : a === b;
+  const ok = new Set();
+  for (const def of Powers.POWER_LIST){
+    // An option that hands something over the moment it is taken is only dealt
+    // if all it hands over is swarm, which the loop mirrors straight back.
+    if (def.onTake && def.id !== 'conscript') continue;
+    let keep = true;
+    if (typeof def.effect === 'function'){
+      const scratch = Object.assign({}, base);
+      try { def.effect(scratch, 1, probe); } catch (e) { keep = false; }
+      if (keep) for (const k in scratch) if (!same(scratch[k], base[k]) && !DELIVERS.has(k)) { keep = false; break; }
     }
+    if (keep) ok.add(def.id);
   }
-  // The cheapest thing on the board decides whether buying in bulk is a
-  // question worth putting on screen at all.
-  const cheapest = Math.min(...OFFERS.map(o => o.cost(S.depth)));
-  bar.hidden = !(S.gold >= cheapest * 2);
-  for (const b of box.children){
-    const n = Number(b.dataset.n);
-    b.setAttribute('aria-pressed', String(n === bulkPick));
-    b.disabled = n !== 0 && S.gold < cheapest * n;
+  return ok;
+}
+
+// The pool is narrowed for THIS game's states only. Every option keeps the
+// rule it was written with; one more is added in front of it, and it answers
+// yes for anyone who does not ask to be narrowed.
+const HAND_POOL = deliverable();
+for (const def of Powers.POWER_LIST){
+  if (def.hostGated) continue;
+  const own = def.req;
+  def.hostGated = true;
+  def.req = (s) => {
+    if (s && s.hostPool && !s.hostPool.has(def.id)) return false;
+    return own ? own(s) : true;
+  };
+}
+
+/** The hand, with anything this game cannot deliver taken out of it. The
+ *  filter also drops the echoes a very long run mints, because those are made
+ *  from the whole table of effects rather than the narrowed one. */
+function handNow(){
+  if (!S.pow) return null;
+  const hand = Powers.offer(S.pow, S.depth);
+  hand.slots = hand.slots.filter(s => HAND_POOL.has(s.id));
+  return hand;
+}
+
+/** Damage one body deals on a clean impact, with everything the hand has
+ *  added to it. Without a single power this is exactly S.power. */
+function hitPower(){
+  if (!S.pow || !S.pow.derived) return S.power;
+  const d = S.pow.derived;
+  const flat = Powers.B.toNumber(d.flat) - Powers.TUNING.baseDamage;
+  const mult = Powers.B.toNumber(d.mult);
+  let p = (S.power + (flat > 0 ? flat : 0)) * (mult > 0 ? mult : 1);
+  if (d.pressure > 0) p *= 1 + d.pressure * Math.max(0, Math.log10(S.balls + 10));
+  if (d.requisition > 0) p *= 1 + d.requisition * Math.max(0, Math.log10(Powers.B.toNumber(S.pow.meta.spent) + 10));
+  return p;
+}
+
+/** The extra damage a block takes for being close to full health. */
+function sunderMult(bl){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.sunder > 0) || !(bl.max > 0)) return 1;
+  return 1 + d.sunder * Math.max(0, Math.min(1, bl.hp / bl.max));
+}
+
+/** Swarm the hand adds for a block breaking, banked as a fraction so a small
+ *  share of a ball is never lost or rounded up into a free one. */
+let spoilsPool = 0;
+function spoilsFor(){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.spoils > 0)) return;
+  spoilsPool += d.spoils;
+  const whole = Math.floor(spoilsPool);
+  if (whole >= 1){ spoilsPool -= whole; S.balls += whole; }
+}
+
+/** What a swarm marker is worth. One ball, or a share of the swarm. */
+function markerBalls(){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.nesting > 0)) return 1;
+  return Math.max(1, Math.floor(S.balls * d.nesting));
+}
+
+/** The swarm grows at the end of a turn, if anything in the hand grows it. */
+function growSwarm(){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.growth > 0)) return;
+  S.balls += Math.floor(S.balls * d.growth);
+}
+
+/** The hand is priced in the run's cash, so powers and the market spend the
+ *  same pool. This keeps the two in step around every read and every buy. */
+function syncPowers(){
+  if (!S.pow || !S.econ) return;
+  S.pow.depth = S.depth;
+  S.pow.swarm = Powers.B.of(S.balls);
+  S.pow.essence = Powers.B.of(cash());
+}
+
+/** The hand as plain data. What is left out is rebuilt on load: the flattened
+ *  stats, the cached deal, and the pool this game narrows the deal to. */
+function powSave(){
+  const { derived, offerCache, hostPool, ...rest } = S.pow;
+  return JSON.parse(JSON.stringify(rest));
+}
+
+function powLoad(saved){
+  const st = Powers.createState({
+    seed: saved && saved.seed != null ? saved.seed : S.seed,
+    swarm: S.balls, essence: 0,
+  });
+  if (saved) Object.assign(st, saved);
+  st.hostPool = HAND_POOL;
+  Powers.recompute(st);
+  return st;
+}
+
+/** Take from the run's own cash, and answer whether it was there. */
+function spendCash(n){
+  if (!S.econ) return false;
+  const want = Powers.B.toNumber(n);
+  if (!(cash() >= want)) return false;
+  S.econ.essence = Economy.sub(S.econ.essence, Economy.L(want));
+  S.econ.stats.essenceSpent = Economy.add(S.econ.stats.essenceSpent, Economy.L(want));
+  return true;
+}
+
+/** Take raw material for the material rail, cheapest first, and answer whether
+ *  there was enough of it. A power bought this way costs no cash at all. */
+function spendMaterial(units){
+  if (!S.econ) return false;
+  let need = Powers.B.toNumber(units);
+  if (!(need > 0)) return true;
+  let have = 0;
+  for (const m of Economy.MATERIALS) have += Economy.toNum(S.econ.held[m.id]);
+  if (have < need) return false;
+  for (const m of Economy.MATERIALS){
+    if (need <= 0) break;
+    const got = Economy.toNum(S.econ.held[m.id]);
+    if (!(got > 0)) continue;
+    const take = Math.min(got, need);
+    S.econ.held[m.id] = Economy.sub(S.econ.held[m.id], Economy.L(take));
+    need -= take;
   }
+  return true;
+}
+
+// --- the record across runs -------------------------------------------------
+//
+// It counts runs, keeps the deepest each difficulty has been taken, and hands
+// the readout the best depth to sit beside the current one. It changes nothing
+// about how a run plays, which is the whole reason it is allowed to persist.
+
+let meta = { profile: null, run: null };
+const metaKey = storageKey('meta');
+
+function metaLoad(){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(metaKey) || 'null'); } catch (e) {}
+  meta.profile = saved ? Meta.load(saved) : Meta.create();
+  // Every difficulty is selectable from the first run, so the record opens
+  // every rung too rather than gating what the menu already offers.
+  if (CONFIG.difficulty.unlockAll) Meta.unlockAll(meta.profile);
+}
+
+function metaSave(){
+  if (!meta.profile) return;
+  try { localStorage.setItem(metaKey, JSON.stringify(Meta.save(meta.profile))); } catch (e) {}
+}
+
+function metaBegin(){
+  if (QUIET || !meta.profile) return;
+  const r = Meta.beginRun(meta.profile, { tier: S.tier, seed: S.seed });
+  meta.run = r && r.ok ? r : null;
+  // Written down when the run ENDS. A run counts once it has a result, and
+  // starting one has nothing to say yet.
+}
+
+function metaObserve(){
+  if (QUIET || !meta.run) return;
+  Meta.observe(meta.profile, meta.run, { depth: S.depth, essence: cash(), blocks: S.broken || 0 });
+}
+
+function metaEnd(){
+  if (QUIET || !meta.run) return;
+  Meta.endRun(meta.profile, meta.run, { depth: S.depth, essence: cash(), blocks: S.broken || 0 });
+  meta.run = null;
+  metaSave();
+}
+
+metaLoad();
+
+/** The deepest this difficulty has ever been taken. */
+function metaReach(){
+  return meta.profile ? (meta.profile.reach[S.tier] | 0) : 0;
+}
+
+// --- the deck ---------------------------------------------------------------
+//
+// Presentation only. A page that cannot host it - the headless harness, for
+// one - still gets a complete game; it just gets no desk to trade on.
+
+const ui = makeDeck();
+function makeDeck(){
+  try {
+    return createUI({
+      mount: document.getElementById('shop'),
+      headerMount: false,
+      maxWidth: 520,
+      material: {
+        slag: CONFIG.palette.tithe, ferrite: CONFIG.palette.dim,
+        quartz: CONFIG.palette.swarm, cinder: CONFIG.palette.hot,
+        alloy: CONFIG.palette.trade, lens: CONFIG.palette.force,
+        core: CONFIG.palette.essence,
+      },
+      data: {
+        history: (id, n) => Economy.history(S.econ, id, n),
+        sellPreview: (id, qty) => Economy.sellPreview(S.econ, id, qty),
+        buyPreview: (id, qty) => Economy.buyPreview(S.econ, id, qty),
+        maxAffordable: (id) => Economy.maxAffordable(S.econ, id),
+        consignPreview: (id, qty, term) => Economy.consignPreview(S.econ, id, qty, term),
+        plan: (id, qty, turns) => Economy.planSale(S.econ, id, qty, turns),
+        forecast: (n) => Economy.forecast(S.econ, n),
+      },
+      on: {
+        sell:    ({ id, qty })       => act('s_' + id, units(qty)),
+        buy:     ({ id, qty })       => act('b_' + id, units(qty)),
+        craft:   ({ id, times })     => act('c_' + id, Math.max(1, times | 0)),
+        consign: ({ id, qty, term }) => act('f_' + id + '_' + (term | 0), units(qty)),
+        upgrade: ({ id, cover })     => act((cover ? 'k_' : 'u_') + id, 1),
+        power:   ({ id, rail })      => act((rail === 'material' ? 'm_' : 'p_') + id, 1),
+        reroll:  ()                  => act('pr', 1),
+        restart: ()                  => restart(),
+      },
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+/** A quantity as whole units, which is what a run writes down and a replay
+ *  reads back. Nothing is ever sold in fractions of a unit. */
+function units(qty){
+  const n = Math.floor(Economy.toNum(qty));
+  return Math.max(1, Math.min(1e9, Number.isFinite(n) ? n : 1e9));
+}
+
+// A press the player made: carried out, then saved and redrawn.
+let logBroken = false;
+const LOG_ID = /^[a-z][a-z0-9_-]{0,15}$/;
+
+function act(id, n){
+  const did = purchase(id, n);
+  if (did){ mark(); paintShop(); }
+  return did;
 }
 
 /**
- * Buy `n` of an offer, in order, and answer how many were actually bought.
+ * Carry out `n` of a press and answer how many actually happened.
  *
- * Each one is bought in turn rather than multiplied, because an offer can
- * change what the next of it costs or does - clearing a row changes the row
- * underneath it - and the price is re-read every time.
- *
- * A run writes down the PRESS and the number that press actually bought, so a
- * replay reproduces the same sequence at the same points rather than trusting
- * that the essence worked out the same way twice.
+ * Every press goes through here, live and on replay, so the two cannot drift.
+ * Each one is applied in turn rather than multiplied, because a press changes
+ * what the next of it costs - a sale moves the price of the next sale, and
+ * clearing a row changes the row underneath it.
  */
 function purchase(id, n){
-  const o = OFFERS.find(x => x.id === id);
-  if (!o) return 0;
-  let bought = 0;
-  for (let i = 0; i < (n | 0); i++){
-    const price = o.cost(S.depth);
-    if (S.gold < price) break;
-    S.gold -= price;
-    o.buy();
-    bought++;
+  if (!S || !S.econ) return 0;
+  const did = press(id, n);
+  // The press is written into the run's log as it happens, so a replay makes
+  // the same presses in the same order and arrives at the same market. An id
+  // the log cannot carry is still carried out; what it costs is the run's
+  // claim, which is dropped rather than posted wrong.
+  if (did && rec){
+    if (LOG_ID.test(id)) rec.buy(id, did);
+    else logBroken = true;
   }
-  if (bought && rec) rec.buy(id, bought);
-  return bought;
+  return did;
 }
 
-/** How many of this offer a press would buy, and what that costs. */
-function bulkFor(offer){
-  const each = offer.cost(S.depth);
-  if (!(each > 0)) return { n: 0, cost: 0, each };
-  const n = bulkPick === 0 ? Math.floor(S.gold / each) : bulkPick;
-  return { n: Math.max(0, n), cost: n * each, each };
+function press(id, n){
+  const times = Math.max(0, n | 0);
+  const cut = id.indexOf('_');
+  const verb = cut < 0 ? id : id.slice(0, cut);
+  const rest = cut < 0 ? '' : id.slice(cut + 1);
+  S.econ.depth = S.depth;
+
+  if (verb === 's'){
+    const r = Economy.sell(S.econ, rest, times);
+    return r && r.ok ? times : 0;
+  }
+  if (verb === 'b'){
+    const r = Economy.buy(S.econ, rest, times);
+    return r && r.ok ? times : 0;
+  }
+  if (verb === 'c'){
+    const r = Economy.craft(S.econ, rest, times);
+    return r && r.ok ? times : 0;
+  }
+  if (verb === 'f'){
+    const at = rest.lastIndexOf('_');
+    if (at < 0) return 0;
+    const r = Economy.consign(S.econ, rest.slice(0, at), times, Number(rest.slice(at + 1)) | 0);
+    return r && r.ok ? times : 0;
+  }
+  if (verb === 'u' || verb === 'k'){
+    let done = 0;
+    for (let i = 0; i < times; i++){
+      const r = verb === 'k' ? Economy.purchaseWithCover(S.econ, rest) : Economy.purchase(S.econ, rest);
+      if (!r || !r.ok) break;
+      applyEffect(r.effect);
+      done++;
+    }
+    return done;
+  }
+  if (verb === 'p' || verb === 'm'){
+    if (!S.pow) return 0;
+    syncPowers();
+    const hand = handNow();
+    const slot = hand && hand.slots.find(s => s.id === rest);
+    if (!slot || slot.maxed) return 0;
+    if (verb === 'p'){
+      if (!spendCash(slot.cost)) return 0;
+      const r = Powers.apply(S.pow, rest, { rail: 'free' });
+      if (!r.ok) return 0;
+      S.pow.meta.spent = Powers.B.add(S.pow.meta.spent, slot.cost);
+    } else {
+      if (!spendMaterial(slot.costMaterial)) return 0;
+      const r = Powers.apply(S.pow, rest, { rail: 'material' });
+      if (!r.ok) return 0;
+    }
+    // Anything the option handed over as swarm lands in the run's own count.
+    S.balls = Math.max(1, Math.round(Powers.B.toNumber(S.pow.swarm)));
+    return 1;
+  }
+  if (id === 'pr'){
+    if (!S.pow) return 0;
+    let done = 0;
+    for (let i = 0; i < times; i++){
+      syncPowers();
+      const c = Powers.rerollCost(S.pow, S.depth);
+      const free = Powers.B.toNumber(c) <= 0;
+      if (!free && !spendCash(c)) break;
+      const r = Powers.reroll(S.pow);
+      if (!r.ok) break;
+      if (!free) S.pow.meta.spent = Powers.B.add(S.pow.meta.spent, c);
+      done++;
+    }
+    return done;
+  }
+  return 0;
+}
+
+/** Awards, in the shape the desk lists them. */
+function featRows(){
+  return awards.report().map(a => ({
+    id: a.id, name: a.name, desc: a.note,
+    earned: a.won, progress: a.progress,
+  }));
+}
+
+/** The board, if a run has already fetched one. */
+function boardPanels(){
+  if (!boardRows.length) return null;
+  return [{
+    id: 'depth', name: 'deepest runs',
+    rows: boardRows.slice(0, 10).map((e, i) => ({
+      rank: i + 1, name: e.name || 'someone', value: e.depth,
+      you: !!(myPlayerId && e.player === myPlayerId),
+    })),
+  }];
 }
 
 function paintShop(){
-  if (QUIET) return;
-  const el = document.getElementById('shop');
-  el.classList.add('on');
-  el.innerHTML = '';
-  paintBulk();
-  OFFERS.forEach(o => {
-    const bulk = bulkFor(o);
-    const n = bulk.n, each = bulk.each;
-    // Nothing affordable still has to show a price, and the honest one is what
-    // a single costs. A zero there reads as free.
-    const c = n < 1 ? each : bulk.cost;
-    const many = n > 1;
-    const b = document.createElement('button');
-    b.className = 'buy';
-    // The PRICE goes on the second line with the description, not beside the
-    // name. Four offers share one row, so the top line is about fifteen
-    // characters wide - "conscript" and a three digit price do not both fit,
-    // and what got clipped was the price, which is the half a player is
-    // actually reading.
-    b.innerHTML = `${o.name}${many ? ' x' + n : ''}<small><b>${c}</b> &middot; ${o.desc}</small>`;
-    // The whole sentence, for anyone who hovers. The second line is terse
-    // because it shares fifteen characters with the price.
-    b.title = many ? `${o.name} x${n}: ${o.long} (${each} each, ${c} in all)`
-                   : `${o.name}: ${o.long} (${c})`;
-    b.disabled = n < 1 || S.gold < c || S.firing;
-    b.onclick = () => {
-      // Each one is bought in turn rather than multiplied, because an offer
-      // can change what the next of it costs or does - clearing a row changes
-      // the row underneath it - and the price is re-read every time.
-      const bought = purchase(o.id, n);
-      if (bought){ mark(); paintShop(); }
-    };
-    el.appendChild(b);
+  if (QUIET || !ui || !S || !S.econ) return;
+  S.econ.depth = S.depth;
+  syncPowers();
+  const reach = metaReach();
+  ui.update({
+    run: {
+      depth: S.depth, reach: reach > S.depth ? reach : null,
+      swarm: S.balls, essence: cash(), essenceText: cashText(),
+      damage: hitPower(),
+    },
+    market: Economy.report(S.econ),
+    powers: S.pow ? { offer: handNow(), codex: Powers.codex(S.pow) } : null,
+    feats: featRows(),
+    boards: boardPanels(),
   });
+  ui.setPhase(S.dead ? 'over' : (S.firing ? 'firing' : 'aim'));
+}
+
+/** What the market said about the turn that just finished. */
+function digestTurn(){
+  if (!ui || QUIET) return;
+  const rolled = {};
+  for (const g of turnHarvest){
+    rolled[g.id] = rolled[g.id] ? Economy.add(rolled[g.id], g.qty) : g.qty;
+  }
+  const materials = Object.keys(rolled).map(id => ({ id, qty: rolled[id], text: Economy.fmt(rolled[id]) }));
+  ui.digest(materials.length ? { depth: S.depth, blocks: S.turnKills || 0, materials } : null);
+  turnHarvest = [];
+}
+
+// Anything the market opened up, said once and one at a time. Three of them
+// arriving together buries the thing the player was about to press, so they
+// queue and each one goes away on its own.
+let saidReveals = null;
+const revealQueue = [];
+const REVEAL_LIFE = 14000;
+
+function announceReveals(){
+  if (!ui || QUIET || !S.econ) return;
+  const now = Economy.reveal(S.econ).unlocked;
+  if (!saidReveals){ saidReveals = new Set(now); return; }
+  for (const id of now){
+    if (saidReveals.has(id)) continue;
+    saidReveals.add(id);
+    const r = Economy.REVEALS.find(x => x.id === id);
+    if (r) revealQueue.push(r);
+  }
+  const r = revealQueue.shift();
+  if (!r) return;
+  // One at a time. The desk is what a turn is spent on and three stacked
+  // notices push it off the bottom of a short window.
+  ui.clearNotices();
+  ui.announce({ key: 'rev:' + r.id, kind: 'market', title: r.title, body: r.blurb, ttl: REVEAL_LIFE });
 }
 
 // --- persistence ------------------------------------------------------------
@@ -1972,6 +2382,19 @@ registerMigration(1, 2, (data) => {
   };
 });
 
+// Schema 3: a run carries a market, a hand of powers, and the depth every
+// block on the field arrived at. A run saved before any of that had loose cash
+// and nothing to spend it on, so it comes back with an empty market at the
+// depth it had reached and keeps everything else it was doing.
+registerMigration(2, 3, (data) => {
+  if (!data || typeof data !== 'object') return data;
+  const { gold, gain, ...rest } = data;
+  const rows = Array.isArray(data.rows)
+    ? data.rows.map(b => (b && b.d === undefined ? { ...b, d: data.depth | 0 || 1 } : b))
+    : data.rows;
+  return { ...rest, rows, econ: null, pow: null };
+});
+
 const board = createLeaderboard({
   defaultTier: CONFIG.difficulty.defaultTier,
   endpoint: (CONFIG.boards && CONFIG.boards.endpoint) || '',
@@ -1985,7 +2408,7 @@ const awards = createAwards({ key: storageKey('awards') });
 /** What this run has done, in the shape the award tracks read. */
 function runStats(){
   return {
-    depth: S.depth, swarm: S.balls, essence: S.gold, power: S.power,
+    depth: S.depth, swarm: S.balls, essence: cash(), power: S.power,
     streak: S.streak || 0, clears: S.clears || 0, clearsBefore: S.clearsBefore || 0,
     winsBefore: S.winsBefore || 0, won: !!S.won,
     kinds: S.kindsSeen || [], mode: S.mode,
@@ -2014,13 +2437,17 @@ const store = createSave({
     ? fieldFingerprint(d => S.field.rowFor(d), [1, 7, 23, 61]) : null,
   capture: () => ({
     mode: S.mode, endless: S.endless, won: S.won,
-    seed: S.seed, depth: S.depth, balls: S.balls, gold: S.gold, dealt: S.dealt,
+    seed: S.seed, depth: S.depth, balls: S.balls, dealt: S.dealt, broken: S.broken | 0,
     owed: { ball: S.owed.ball, gold: S.owed.gold },
-    power: S.power, gain: S.gain, origin: S.origin, dead: S.dead,
+    // The market and the hand are the run, as much as the field is. Both are
+    // plain data by the time they get here.
+    econ: S.econ ? Economy.save(S.econ) : null,
+    pow: S.pow ? powSave() : null,
+    power: S.power, origin: S.origin, dead: S.dead,
     clears: S.clears | 0, streak: S.streak | 0, kindsSeen: (S.kindsSeen || []).slice(),
     // A picture block keeps the row it was cut from and the id of its piece,
     // or it comes back faceless.
-    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k, R: b.R, id: b.id })),
+    rows: S.rows.map(b => ({ c: b.c, r: b.r, hp: b.hp, max: b.max, k: b.k, R: b.R, id: b.id, d: b.d })),
     drops: S.drops.map(p => ({ c: p.c, r: p.r, kind: p.kind, t: p.t })),
     // A sprayed body belongs to the turn it was thrown in, and a save is taken
     // between turns, so only the swarm is worth writing down.
@@ -2062,9 +2489,13 @@ const store = createSave({
     retarget(S.field.width());
     CELL = cellT; ORIGIN = originT;
     S.endless = !!v.endless; S.won = !!v.won;
-    S.depth = v.depth | 0; S.balls = v.balls | 0; S.gold = v.gold | 0;
+    S.depth = v.depth | 0; S.balls = v.balls | 0; S.broken = v.broken | 0;
+    S.econ = v.econ
+      ? Economy.load(v.econ, { hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) })
+      : Economy.create({ depth: S.depth, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+    S.pow = powLoad(v.pow);
     S.owed = { ball: (v.owed && v.owed.ball) | 0, gold: (v.owed && v.owed.gold) | 0 };
-    S.power = v.power || CONFIG.swarm.startingPower; S.gain = v.gain || CONFIG.swarm.startingGain;
+    S.power = v.power || CONFIG.swarm.startingPower;
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
     S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
     // A piece is handed back to the field it was cut from; one the replayed
@@ -2083,6 +2514,8 @@ const store = createSave({
     S.dead = !!v.dead;
     juice.clear();
     if (S.dead) die(); else document.getElementById('over').classList.remove('on');
+    saidReveals = null;
+    announceReveals();
     paintShop();
   },
 });
@@ -2494,9 +2927,9 @@ function replayRun(input){
 
     result = {
       ok: true,
-      depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none',
+      depth: S.depth, swarm: S.balls, essence: runWorth(), doctrine: 'none',
       turns: log.turns.length, kills: turnKills.slice(), steps, ended: over,
-      hash: runHashOf({ depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none', kills: turnKills }),
+      hash: runHashOf({ depth: S.depth, swarm: S.balls, essence: runWorth(), doctrine: 'none', kills: turnKills }),
     };
   } finally {
     S = saved.S; MODE = saved.MODE; TIER = saved.TIER; DAILY = saved.DAILY;
@@ -2516,9 +2949,13 @@ function rebuildFrom(seed){
   S.form = S.field.dealsSequence ? S.field.source : null;
   S.kinds = createBlockKinds(seed, { lattice: S.field.lattice !== false });
   S.rows = []; S.drops = []; S.live = []; S.dealt = 0; S.depth = 1;
-  S.balls = Tiers.tierOf(S.tier).supply.start; S.gold = 0;
+  S.balls = Tiers.tierOf(S.tier).supply.start; S.broken = 0;
+  S.econ = Economy.create({ depth: 1, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  S.pow = Powers.createState({ seed, swarm: S.balls, essence: 0 });
+  S.pow.hostPool = HAND_POOL;
+  spoilsPool = 0;
   S.owed = { ball: 0, gold: 0 };
-  S.power = CONFIG.swarm.startingPower; S.gain = CONFIG.swarm.startingGain;
+  S.power = CONFIG.swarm.startingPower;
   S.origin = W / 2; S.nextOrigin = null; S.dead = false;
   S.endless = false; S.won = false; S.clears = 0; S.streak = 0; S.turnKills = 0;
   ROWS_TURN = 1;
@@ -2533,17 +2970,35 @@ function rebuildFrom(seed){
  *  played, never from a replay of it: if the two ever disagree that is a real
  *  mismatch and the whole point is that somebody gets to see it. */
 function runClaim(){
-  if (!rec) return null;
+  if (!rec || logBroken) return null;
   const log = rec.log();
   return {
     log,
-    runHash: runHashOf({ depth: S.depth, swarm: S.balls, essence: S.gold, doctrine: 'none', kills: turnKills }),
+    runHash: runHashOf({ depth: S.depth, swarm: S.balls, essence: runWorth(), doctrine: 'none', kills: turnKills }),
     build: String(CONFIG.dev.build),
     daily: S.daily || null,
   };
 }
 
 // --- loop -------------------------------------------------------------------
+
+// The personal best sits in the footer, beside how many runs it took. Both
+// come from the record, which is the only thing that survives a run.
+let bestWorn = null;
+function paintBest(){
+  const el = document.getElementById('best');
+  if (!el || !S) return;
+  const runs = meta.profile ? (meta.profile.runs | 0) : 0;
+  // Reading the deepest run means parsing what is in storage, and this is
+  // called every frame, so it only happens when one of its inputs has moved.
+  const key = S.tier + ':' + runs + ':' + metaReach();
+  if (key === bestWorn) return;
+  bestWorn = key;
+  const deep = Math.max(metaReach(), (board.best(S.tier) || {}).depth | 0);
+  if (!(deep > 1)) { el.textContent = ''; return; }
+  const label = CONFIG.text.menuBestLabel || 'best depth';
+  el.textContent = runs > 1 ? `${label} ${deep} over ${runs} runs` : `${label} ${deep}`;
+}
 
 // The fourth figure across the top belongs to the FIELD, and each one says
 // whichever thing about itself decides the run. A descending field names the
@@ -2554,7 +3009,7 @@ function runClaim(){
 function hud(){
   document.getElementById('lvl').textContent = S.depth;
   document.getElementById('balls').textContent = S.balls;
-  document.getElementById('gold').textContent = S.gold;
+  document.getElementById('gold').textContent = cashText();
 
   const say = S.field.arrival.readout(view());
   const rule = document.getElementById('rule');
@@ -2566,6 +3021,7 @@ function hud(){
   document.getElementById('hint').textContent = S.firing
     ? CONFIG.text.hintFiring
     : CONFIG.text.hintIdle;
+  paintBest();
 }
 
 // HOW MANY SIMULATION STEPS THIS FRAME.
@@ -2639,7 +3095,8 @@ function tick(now){
     if (!S.firing && S.field.prepare) S.field.prepare(PREPARE_MS);
   }
   draw(); hud(); paintShell();
-  if (++shopT % 12 === 0 && !S.dead) paintShop();   // keep buy buttons in sync
+  // Prices, stock and what is affordable all move while a turn runs.
+  if (++shopT % 20 === 0 && !S.dead && !S.firing) paintShop();
   requestAnimationFrame(tick);
 }
 
@@ -2656,8 +3113,14 @@ if (typeof window !== 'undefined') window.game = {
   claim: runClaim,
   get log(){ return rec ? rec.log() : null; },
   fire: (x, y) => fireDir(x, y),
-  buy: (id, n) => purchase(id, n),
+  buy: (id, n) => act(id, n),
   step: () => sim(),
+  // The desk, so a driver can read what the player is reading: the market as
+  // it is quoted right now, the hand as it is dealt, and the record so far.
+  get market(){ return S.econ ? Economy.report(S.econ) : null; },
+  get hand(){ return handNow(); },
+  get record(){ return meta.profile ? Meta.report(meta.profile) : null; },
+  save: () => store.flush(),
   board,
 };
 // A player with a run in progress is dropped back into it; anyone else is
@@ -2665,17 +3128,6 @@ if (typeof window !== 'undefined') window.game = {
 if (!(resumed && resumed.ok && resumed.found)) openMenu();
 tick();
 
-// The personal best sits in the footer. It works with no server configured.
-// It used to be written to a data attribute that nothing read or styled, so
-// the figure was worked out and thrown away on every load.
-(function showBest(){
-  const b = board.best(TIER);
-  const el = document.getElementById('best');
-  if (!el) return;
-  el.textContent = b && b.depth > 1
-    ? (CONFIG.text.menuBestLabel || 'best depth') + ' ' + b.depth
-    : '';
-})();
 </script>
 </body>
 </html>

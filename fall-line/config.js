@@ -69,7 +69,7 @@ export const CONFIG = {
 
     // The ground panel and the sentences that say why a cell will not move.
     earthNote: 'Raise ground in the road and the Melt has to climb it, which is slow. Raise {raise}+ ore a level, lower {cut} ore.',
-    earthFixed:'The {where} cannot be moved.',
+    earthFixed:'The {where} can\'t be moved.',
     earthTop:  'This is as high as ground goes.',
     earthLow:  'This is the valley floor. Nothing left to take off.',
     toolHint:  '{tool}: click or drag on the ground. Right click to put the tool down.',
@@ -144,17 +144,17 @@ export const CONFIG = {
       called:   'Called early. +{ore} ore.',
       trampled: 'The Melt crawled over a {name}.',
       loaded:   'Resumed on surge {n}.',
-      saveBad:  'The old save could not be read and was set aside.',
+      saveBad:  'The old save couldn\'t be read and was set aside.',
     },
 
     help: [
       'The Melt comes down off the snowline every surge and flows the fastest way to your hearth.',
-      'There is no wall to build and no maze to seal. It will climb anything, but climbing is slow, so it always takes whichever way is quickest.',
+      'There\'s no wall to build and no maze to seal. It climbs anything, and climbing is slow, so it always takes the quickest way down.',
       'Raise ground in its way and it goes around, or climbs over and loses time doing it. Lower ground to draw it where you want it. The dashed line is the road it will take.',
       'Towers stand on the ground you shaped. A tower on high ground has more range.',
       'Ore comes from kills and from surges you hold. It pays for towers and for moving the ground.',
-      'After every surge the Melt looks at what killed it and grows a counter. The panel says what and why.',
-      'Every counter costs it something. Keep changing what you kill with.',
+      'After every surge the Melt looks at what killed it and grows a counter to that. The log names the counter and the reason.',
+      'Every counter it grows costs it speed or health. Keep changing what you kill with.',
       'The run ends when the hearth goes out. The surge you reached is your score.',
       'Space pauses. N calls the next surge early for extra ore. 1-7 pick a tower, R raises the ground, L lowers it, Esc clears the tool.',
     ],
@@ -256,19 +256,19 @@ export const CONFIG = {
     mutations: {
       chitin:   { name: 'Chitin',   line: 'Half damage from bolts. Slower.',
                   kinetic: 0.5, speed: 0.85 },
-      scatter:  { name: 'Scatter',  line: 'Half damage from shells. Frailer.',
+      scatter:  { name: 'Scatter',  line: 'Half damage from shells. Weaker.',
                   blast: 0.5, hp: 0.9 },
-      slick:    { name: 'Slick',    line: 'Barely burns. Frailer.',
+      slick:    { name: 'Slick',    line: 'Barely burns. Weaker.',
                   burn: 0.4, burnTime: 0.5, hp: 0.9 },
-      faraday:  { name: 'Faraday',  line: 'Half damage from coils, and a chain stops on it. Frailer.',
+      faraday:  { name: 'Faraday',  line: 'Half damage from coils, and a chain stops on it. Weaker.',
                   arc: 0.5, stopsChain: true, hp: 0.9 },
-      numb:     { name: 'Numb',     line: 'Cannot be slowed. Frailer.',
+      numb:     { name: 'Numb',     line: 'Can\'t be slowed. Weaker.',
                   immuneSlow: true, hp: 0.9 },
-      ballast:  { name: 'Ballast',  line: 'Cannot be dragged. Slower.',
+      ballast:  { name: 'Ballast',  line: 'Can\'t be dragged. Slower.',
                   immunePull: true, speed: 0.9 },
-      wings:    { name: 'Wings',    line: 'Flies straight over everything. Much frailer.',
+      wings:    { name: 'Wings',    line: 'Flies straight over everything. Much weaker.',
                   ignoreTerrain: true, hp: 0.6 },
-      haste:    { name: 'Haste',    line: 'Much faster. Frailer.',
+      haste:    { name: 'Haste',    line: 'Much faster. Weaker.',
                   speed: 1.4, hp: 0.75 },
       bulk:     { name: 'Bulk',     line: 'A third as many, four times the hp, and each one hurts the hearth three times as much.',
                   count: 0.35, hp: 4, leak: 3, conflicts: 'swarm' },
@@ -299,10 +299,10 @@ export const CONFIG = {
         line: 'Shoots one mote at a time, fast. Always the one nearest the hearth.' },
       { id: 'mortar',    name: 'Mortar',    type: 'blast',   glyph: 'square',   unlock: 0,
         cost: 45, dmg: 14, rate: 0.6, range: 4.6, minRange: 1.2, splash: 1.1, flight: 0.45,
-        line: 'Lobs a shell that bursts where it lands. Cannot fire at what is next to it.' },
+        line: 'Lobs a shell that bursts where it lands. Can\'t hit anything right next to it.' },
       { id: 'kiln',      name: 'Kiln',      type: 'burn',    glyph: 'hexagon',  unlock: 3,
         cost: 40, burnDps: 5, burnSeconds: 3, rate: 1.25, range: 1.9,
-        line: 'Sets everything close to it burning. Burning does not stop when they leave.' },
+        line: 'Sets everything close to it burning. Burning doesn\'t stop when they leave.' },
       { id: 'rime',      name: 'Frost',     type: 'slow',    glyph: 'asterisk', unlock: 6,
         cost: 35, slow: 0.45, slowSeconds: 2, rate: 1.0, range: 2.4,
         line: 'Slows everything in range. Does no damage of its own.' },
@@ -314,7 +314,7 @@ export const CONFIG = {
         line: 'Drags everything in range toward itself, and keeps dragging.' },
       { id: 'lantern',   name: 'Lantern',   type: 'buff',    glyph: 'star',     unlock: 18,
         cost: 70, aura: 1.8, buffDmg: 0.25, buffRange: 0.15,
-        line: 'Towers near it hit harder and reach further. Lanterns do not stack.' },
+        line: 'Towers near it hit harder and reach further. Lanterns don\'t stack.' },
     ],
   },
 
@@ -322,9 +322,9 @@ export const CONFIG = {
   // AWARDS - none of these change play
   // -------------------------------------------------------------------------
   awards: [
-    { id: 'longway',   name: 'Long way round', line: 'A surge walked three times the straight way down.' },
+    { id: 'longway',   name: 'Long way around', line: 'A surge walked three times the straight way down.' },
     { id: 'dry',       name: 'Dry hearth',     line: 'Ten surges in a row without a leak.' },
-    { id: 'unadapted', name: 'Unadapted',      line: 'Held a surge with four counters grown against you.' },
+    { id: 'unadapted', name: 'Four counters',      line: 'Held a surge with four counters grown against you.' },
     { id: 'highground',name: 'High ground',    line: 'A kill from a tower standing six high.' },
     { id: 'earthworks',name: 'Earthworks',     line: 'Two hundred changes to the ground in one run.' },
     { id: 'fullhouse', name: 'Full house',     line: 'Every kind of tower standing at once.' },
@@ -449,7 +449,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 8,
+    build: 9,
   },
 };
 

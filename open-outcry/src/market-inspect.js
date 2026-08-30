@@ -16,7 +16,7 @@
 // exposes each as a method as well.
 // ---------------------------------------------------------------------------
 
-import { BUY } from './orderbook.js?v=1';
+import { BUY } from './orderbook.js?v=2';
 
 export const ROLE_NAMES = ['producer', 'consumer', 'speculator', 'player'];
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -107,7 +107,7 @@ export function why(m, g) {
   const lean = dom.bought > dom.sold ? 'buying' : dom.bought < dom.sold ? 'selling' : 'on both sides';
   const text = vol === 0
     ? `no trades in ${m.goods[g].key}; mid held at ${to.toFixed(1)}`
-    : `${dom.name}s took ${share}% of ${vol} units, mostly ${lean}; net taker flow ${net > 0 ? '+' : ''}${net}; mid ${from.toFixed(1)} to ${to.toFixed(1)}`;
+    : `${dom.name}s took ${share}% of ${vol} units, mostly ${lean}; takers were ${net > 0 ? '+' : ''}${net} net; mid ${from.toFixed(1)} to ${to.toFixed(1)}`;
   return { tick: m.t, good: m.goods[g].key, from, to, dir, volume: vol, net, byRole: byR, dominant: dom.name, text };
 }
 

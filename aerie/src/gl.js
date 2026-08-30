@@ -21,7 +21,7 @@ export function createGL(canvas, opts = {}) {
     preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
     powerPreference: opts.powerPreference ?? 'high-performance',
   });
-  if (!gl) throw new Error('WebGL2 is not available in this browser');
+  if (!gl) throw new Error("WebGL2 isn't available in this browser");
   // Float render targets are needed for simulations (positions, velocities,
   // chemical concentrations). Nearly every device has them; check anyway.
   const floatColor = !!gl.getExtension('EXT_color_buffer_float');

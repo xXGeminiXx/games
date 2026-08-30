@@ -19,8 +19,8 @@
 // wood is waiting in a log the wind brought down. Nothing here draws.
 // ---------------------------------------------------------------------------
 
-import { hash, unit } from './rng.js?v=8';
-import { nearestOpen } from './world.js?v=8';
+import { hash, unit } from './rng.js?v=9';
+import { nearestOpen } from './world.js?v=9';
 
 // These lines belong in content.js, in pools under CONTENT.events, and are
 // read from there as soon as they are written; they sit here so the events
@@ -28,7 +28,7 @@ import { nearestOpen } from './world.js?v=8';
 // what the ground is called at this scale, {n} a count, {level} the scale.
 export const TEXT = {
   drought: [
-    'The rain stops. The ground goes hard, and half of what is in it stays where it is.',
+    'The rain stops. The ground goes hard, and half of what is in it stays there.',
     'A dry season sets in. {Thing} holds on to half of what it would have given.',
   ],
   droughtEnds: [
@@ -45,15 +45,15 @@ export const TEXT = {
   ],
   fireOut: [
     'The burn cools. Charred wood is rich, and nothing is standing in the way of going back.',
-    'The fire is out. What is left of the trees in it will feed better than they traded.',
+    'The fire is out. What\'s left of the trees in it will feed better than they traded.',
   ],
   rival: [
-    'Another fungus is in the ground at the edge of the reach. It is not sharing.',
-    'Something else has come up out there, in {thing} nothing had touched. It is spreading.',
+    'Another fungus is in the ground at the edge of the reach. It isn\'t sharing.',
+    'Something else has come up out there, in {thing} nothing had touched. It\'s spreading.',
   ],
   rivalGains: [
     'The other fungus has taken {n} more places this season.',
-    'It is still spreading: {n} places this season are held against you.',
+    'It\'s still spreading: {n} places this season are held against you.',
   ],
   rivalGone: [
     'The other fungus lets go of the last of its ground.',

@@ -335,14 +335,10 @@ export function showIntensity(show) {
 // The things the machine does back, in the order the shader indexes them.
 export const EVENT_KINDS = ['lane', 'sweep', 'ride', 'doors'];
 
-// What a crossing object is. Named in the configuration, drawn here.
-export const EVENT_SHAPES = ['carp', 'lantern', 'hatch'];
-
 /** How many of these can be on the board at once before the rest are dropped. */
 export const EVENT_CAP = 8;
 
 const kindIndex = (k) => Math.max(0, EVENT_KINDS.indexOf(k));
-const shapeIndex = (s) => Math.max(0, EVENT_SHAPES.indexOf(s));
 
 /**
  * The live events, as one instance each.
@@ -382,10 +378,14 @@ export function packEvents(events, boardW, boardH, into) {
       const r = Math.max(1e-3, finite(e.r, boardW * 0.05));
       data[o] = finite(e.x, boardW * 0.5);
       data[o + 1] = finite(e.y, boardH * 0.5);
-      // Room around it for the tail, the glow and the shadow it lays down.
-      data[o + 2] = r * 1.9;
-      data[o + 3] = r * 1.35;
-      extra = shapeIndex(e.shape) + (finite(e.dir, 1) >= 0 ? 0 : 0.5);
+      // Room for the whole thing rather than for the band it pays over: a
+      // wingtip, a tail, a pouring stream and a dropping stem all reach past
+      // the column of face the mouths under them are counted in.
+      data[o + 2] = r * 2.1;
+      data[o + 3] = r * 1.9;
+      // Which way it is travelling, so it can be turned round rather than
+      // drawn twice. What it looks like is the cabinet's own business.
+      extra = finite(e.dir, 1) >= 0 ? 0 : 0.5;
     } else if (kind === 2) {
       data[o] = boardW * 0.5;
       data[o + 1] = boardH * 0.5;

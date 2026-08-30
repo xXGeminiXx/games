@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=8';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=8';
+import { digitGlsl } from './digits.js?v=9';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=9';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -1294,6 +1294,50 @@ float sdSeg(vec2 p, vec2 a, vec2 b, float r) {
   return length(p - (a + ab * h)) - r;
 }
 
+// A soft union, so a body built out of separate lumps reads as one body.
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+vec2 turn(vec2 p, float a) {
+  float ca = cos(a), sa = sin(a);
+  return vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);
+}
+
+// Distance along a bar and distance across it, plus how long it is, so teeth
+// and running water can be repeated down its length without solving it twice.
+vec3 barFrame(vec2 p, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  float len = max(length(ab), 1e-6);
+  vec2 dir = ab / len;
+  vec2 q = p - a;
+  return vec3(dot(q, dir), dot(q, vec2(-dir.y, dir.x)), len);
+}
+
+// A bar with riffle teeth standing off whichever side faces up the board.
+// The teeth are short bars of their own rather than a varying thickness: a
+// thickness that steps puts a jump in the distance, and a jump in the distance
+// is an edge the coverage cannot resolve.
+float sdRiffle(vec2 p, vec2 a, vec2 b, float r, float tooth) {
+  vec2 ab = b - a;
+  float len = max(length(ab), 1e-6);
+  vec2 dir = ab / len;
+  vec2 up = vec2(dir.y, -dir.x);
+  up *= up.y > 0.0 ? -1.0 : 1.0;
+  float d = sdSeg(p, a, b, r);
+  for (int i = 0; i < 7; i++) {
+    vec2 root = a + ab * ((float(i) + 0.5) / 7.0);
+    d = min(d, sdSeg(p, root, root + up * tooth, r * 0.40));
+  }
+  return d;
+}
+
+// A point along a quadratic curve, which is how a stem bends.
+vec2 curveAt(vec2 a, vec2 b, vec2 c, float s) {
+  return mix(mix(a, b, s), mix(b, c, s), s);
+}
+
 void main() {
   int kind = int(v_data.x + 0.5);
   float progress = v_data.y;
@@ -1319,53 +1363,185 @@ void main() {
     c = over(c, vec4(u_glow * (0.7 + 0.9 * fall), clamp(body * 0.55 + rail * fade * 0.85, 0.0, 1.0)));
 
   } else if (kind == 1) {
-    // Something is crossing the board. Facing is baked into the offset so a
-    // thing swimming left is the same thing turned round, not a second one.
-    float shape = floor(extra);
+    // The machine has sent something out onto the board. What it is belongs to
+    // the cabinet: each paint job summons its own creature or contraption, and
+    // no two send the same one. Facing is baked into the offset so a thing
+    // travelling left is the same thing turned round, not a second drawing.
     float leftward = step(0.25, fract(extra));
     vec2 p = v_off / max(v_half.y, 1e-4);
     p.x *= mix(1.0, -1.0, leftward);
+    int look = int(u_show.w + 0.5);
 
-    float d = 1e9;
-    float trim = 1e9;
-    if (shape < 0.5) {
-      // A carp: a tapered body, a fanned tail, and one fin that beats.
-      float wag = sin(t * 3.4) * 0.30;
-      vec2 spine = vec2(p.x, p.y - sin(p.x * 1.7 + t * 3.4) * 0.13);
-      d = length(vec2(spine.x * 0.62, spine.y)) - 0.52;
-      float tail = sdSeg(p, vec2(-1.05, wag * 0.5), vec2(-1.55, wag), 0.06)
-                 - smoothstep(-1.0, -1.6, p.x) * 0.22;
-      d = min(d, tail);
-      // The eye and the gill, which is all a fish needs to be a fish.
-      trim = min(length(p - vec2(0.62, -0.12)) - 0.075,
-                 abs(sdSeg(p, vec2(0.30, -0.42), vec2(0.30, 0.42), 0.0)) - 0.035);
-    } else if (shape < 1.5) {
-      // A paper lantern: a swollen cylinder, a cap at each end, ribs down it.
-      vec2 q = vec2(p.x, p.y * 0.92);
-      d = length(vec2(q.x / (0.62 + 0.10 * cos(q.y * 2.2)), q.y)) - 0.60;
-      d = min(d, sdSeg(p, vec2(0.0, -0.72), vec2(0.0, 0.72), 0.16));
-      trim = abs(fract(p.x * 2.6 + 0.5) - 0.5) / 2.6 - 0.022;
-      trim = max(trim, d + 0.06);
+    // Three parts, and any of them may be absent: the body, a second material
+    // laid over it, and the one part that takes the machine's hot accent.
+    float d = 100.0;
+    float lit = 100.0;
+    float trim = 100.0;
+    vec3 skinCol = u_brass;
+    vec3 litCol = u_enamel;
+    float gloss = 22.0;
+
+    if (look == 0) {
+      // A manta ray, seen from above: a wing swept back from the nose to two
+      // points, two lobes either side of the mouth, and a whip tail. Beating
+      // narrows and widens the span, which is what a flap looks like from
+      // straight overhead.
+      float beat = 0.5 + 0.5 * sin(t * 2.0);
+      float span = 0.72 + 0.14 * beat;
+      vec2 q = p * 1.20;
+      float yy = abs(q.y) / span;
+      float lead = 0.62 - 1.10 * pow(yy, 1.35);
+      float trail = -0.26 - 0.38 * yy * yy;
+      // The tips are rounded onto the swept edges rather than cut square.
+      d = -smin(-max(q.x - lead, trail - q.x), -(yy - 1.0), 0.11);
+      d = min(d, length(vec2((q.x - 0.58) * 1.5, (abs(q.y) - 0.15) * 1.5)) - 0.16);
+      float tail = sdSeg(q, vec2(-0.26, 0.0), vec2(-0.96, (beat - 0.5) * 0.26), 0.065);
+      d = min(d, tail + smoothstep(-0.26, -0.96, q.x) * 0.048);
+      // The lamp catching the leading edge, which is what keeps a dark shape
+      // off the paint instead of sunk into it.
+      lit = max(max(d + 0.02, -(d + 0.14)), -0.22 - q.x);
+      trim = min(length(q - vec2(0.22, 0.25)) - 0.070,
+                 length(q - vec2(0.22, -0.25)) - 0.070);
+      skinCol = u_lacquer * 0.44;
+      litCol = u_chrome;
+      gloss = 12.0;
+
+    } else if (look == 1) {
+      // A flytrap on a stem: two half discs hinged on one line, teeth down
+      // both rims, chewing. It comes up out of the board and goes back down.
+      float rise = smoothstep(0.0, 0.16, progress) * (1.0 - smoothstep(0.84, 1.0, progress));
+      vec2 q = p + vec2(0.0, (1.0 - rise) * 1.7);
+      float lean = sin(t * 0.9) * 0.09;
+      d = sdSeg(q, vec2(lean * 1.6, 1.35), vec2(lean, 0.30), 0.085);
+      vec2 h = q - vec2(lean, 0.20);
+      float chew = 0.5 + 0.5 * sin(t * 1.7);
+      float ang = mix(0.05, 0.78, chew * chew);
+      vec2 up = turn(h, -ang);
+      vec2 lo = turn(h, ang);
+      float sawU = abs(fract(atan(up.y, up.x) * 9.0 / 6.28318) - 0.5) * 2.0;
+      float sawL = abs(fract(atan(lo.y, lo.x) * 9.0 / 6.28318) - 0.5) * 2.0;
+      float jawU = max(length(vec2(up.x * 0.86, up.y)) - (0.54 + 0.13 * sawU), up.y);
+      float jawL = max(length(vec2(lo.x * 0.86, lo.y)) - (0.54 + 0.13 * sawL), -lo.y);
+      float jaws = min(jawU, jawL);
+      d = min(d, jaws);
+      // The lining inside the trap, which is the only part that is not plant.
+      trim = max(jaws + 0.17, -(jaws + 0.30));
+      skinCol = u_enamel;
+      gloss = 11.0;
+
+    } else if (look == 2) {
+      // Two sluice bars with riffle teeth, dropping in from the upper corners
+      // and closing into a funnel that steers a ball back toward the middle.
+      float drop = smoothstep(0.0, 0.14, progress) * (1.0 - smoothstep(0.86, 1.0, progress));
+      vec2 q = p + vec2(0.0, (1.0 - drop) * 1.9);
+      vec2 a0 = vec2(-1.12, -0.86), a1 = vec2(-0.06, 0.62);
+      vec2 b0 = vec2(1.12, -0.86), b1 = vec2(0.06, 0.62);
+      d = min(sdRiffle(q, a0, a1, 0.13, 0.30), sdRiffle(q, b0, b1, 0.13, 0.30));
+      // Water running down the channel of each bar, which is what a sluice is
+      // for and the only part of it that moves.
+      vec3 fa = barFrame(q, a0, a1);
+      vec3 fb = barFrame(q, b0, b1);
+      float wa = smoothstep(0.26, 0.0, abs(fract(fa.x * 1.3 - t * 0.9) - 0.5) - 0.20);
+      float wb = smoothstep(0.26, 0.0, abs(fract(fb.x * 1.3 - t * 0.9) - 0.5) - 0.20);
+      trim = min(max(sdSeg(q, a0, a1, 0.13) + 0.055, 0.02 - wa),
+                 max(sdSeg(q, b0, b1, 0.13) + 0.055, 0.02 - wb));
+      skinCol = u_brass;
+      gloss = 30.0;
+
+    } else if (look == 3) {
+      // A ladle swings in on its arm, tips, and pours. The stream is a chain
+      // of drops run together, so it falls rather than hangs there as a bar.
+      float swing = smoothstep(0.0, 0.20, progress);
+      float tip = smoothstep(0.26, 0.46, progress) * (1.0 - smoothstep(0.72, 0.92, progress));
+      float arm = mix(1.15, 0.10, swing) + sin(t * 1.3) * 0.04;
+      vec2 pin = vec2(0.10, -1.34);
+      vec2 cup = pin + turn(vec2(0.0, 1.30), arm);
+      float tilt = tip * 1.15;
+      vec2 vq = turn(p - cup, -tilt);
+      float bowl = max(abs(length(vec2(vq.x, vq.y * 0.92)) - 0.40) - 0.105, -vq.y - 0.04);
+      d = min(bowl, sdSeg(p, pin, cup, 0.055));
+      // What it holds, running out over the lip.
+      vec2 lip = cup + turn(vec2(0.40, -0.03), tilt);
+      float stream = length(p - lip) - 0.10;
+      for (int i = 1; i < 9; i++) {
+        float ph = fract(t * 0.65 + float(i) / 8.0);
+        vec2 blob = lip + vec2(sin(ph * 4.0 + t * 2.0) * 0.07, ph * (1.50 - lip.y));
+        stream = smin(stream, length(p - blob) - mix(0.100, 0.055, ph), 0.11);
+      }
+      lit = mix(100.0, stream, step(0.28, tip));
+      // The hoop the bowl hangs in.
+      trim = max(abs(length(vec2(vq.x, vq.y * 0.92)) - 0.52) - 0.030, -vq.y - 0.12);
+      skinCol = u_chrome;
+      litCol = u_enamel;
+      gloss = 34.0;
+
+    } else if (look == 4) {
+      // A pair of cherries, dropped in and bouncing, both stems on one join.
+      float fallIn = smoothstep(0.0, 0.13, progress);
+      float bounce = abs(sin(t * 2.1));
+      float drop = mix(-1.9, mix(0.24, -0.18, bounce), fallIn);
+      vec2 q = p - vec2(0.0, drop);
+      float squash = 1.0 + 0.14 * (1.0 - bounce);
+      vec2 big = vec2(-0.38, 0.36);
+      vec2 small = vec2(0.40, 0.48);
+      d = min(length(vec2(q.x - big.x, (q.y - big.y) * squash)) - 0.40,
+              length(vec2(q.x - small.x, (q.y - small.y) * squash)) - 0.34);
+      // The gloss on each one, which is what makes it fruit and not a bead.
+      lit = min(length(q - big - vec2(-0.15, -0.18)) - 0.125,
+                length(q - small - vec2(-0.13, -0.15)) - 0.105);
+      vec2 join = vec2(0.04, -0.36);
+      float stems = 100.0;
+      for (int i = 0; i < 5; i++) {
+        float s0 = float(i) / 5.0;
+        float s1 = float(i + 1) / 5.0;
+        stems = min(stems, sdSeg(q, curveAt(big, vec2(-0.44, -0.16), join, s0),
+                                    curveAt(big, vec2(-0.44, -0.16), join, s1), 0.030));
+        stems = min(stems, sdSeg(q, curveAt(small, vec2(0.48, 0.04), join, s0),
+                                    curveAt(small, vec2(0.48, 0.04), join, s1), 0.030));
+      }
+      trim = stems;
+      skinCol = u_lacquer * 0.45;
+      litCol = u_chrome;
+      gloss = 50.0;
+
     } else {
-      // A hatch: a ring with bolts round it and a lit gap in the middle.
-      float ring = abs(length(p) - 0.62) - 0.16;
-      d = ring;
-      float a = atan(p.y, p.x);
-      trim = abs(length(p) - 0.62) - 0.05;
-      trim = max(trim, abs(fract(a * 8.0 / 6.28318 + 0.5) - 0.5) * 0.5 - 0.03);
+      // A black hole opens: a ring at two tilts, the dark disc over the middle
+      // of it, and a bright rim where the light bends past the edge. It grows
+      // out of a point and collapses back to one.
+      float open = smoothstep(0.0, 0.16, progress) * (1.0 - smoothstep(0.84, 1.0, progress));
+      vec2 q = p / max(open, 0.05);
+      float r0 = length(q);
+      vec2 e1 = turn(q, 0.24);
+      vec2 e2 = turn(q, -0.58);
+      float ringA = abs(length(vec2(e1.x, e1.y / 0.30)) - 0.80) - 0.13;
+      float ringB = abs(length(vec2(e2.x, e2.y / 0.17)) - 0.97) - 0.085;
+      d = max(min(ringA, ringB), r0 - 1.30);
+      lit = r0 - 0.34;
+      trim = abs(r0 - 0.43) - 0.024;
+      skinCol = u_enamel;
+      litCol = u_lacquer * 0.06;
+      gloss = 9.0;
     }
 
     // The shadow it lays on the board, which is what sets it off the paint.
-    float sd = min(d, trim);
-    c = over(c, vec4(u_lacquer * 0.32, smoothstep(0.24, -0.06, sd + 0.12) * 0.65 * fade));
-    // Brass, lit from the lamp side the way everything else on this board is.
-    vec2 grad = normalize(v_off + vec2(1e-5, 1e-5));
-    vec3 nb = normalize(vec3(grad * clamp(d * 3.2 + 1.0, 0.0, 1.0) * 1.1, 0.6));
-    vec3 body = u_brass * u_lamp * (0.14 + 0.95 * max(dot(nb, L), 0.0) * fall);
-    body += u_lamp * u_brass * specular(nb, L, 22.0) * 0.35 * fall;
-    body += u_glow * 0.30 * fall;
-    c = over(c, vec4(body, cover(d) * fade));
-    c = over(c, vec4(mix(u_glow, u_lamp, 0.30) * (0.8 + 1.4 * fall), cover(trim) * fade * 0.9));
+    float sd = min(min(d, lit), trim);
+    c = over(c, vec4(u_lacquer * 0.28, smoothstep(0.13, -0.02, sd + 0.05) * 0.55 * fade));
+
+    vec2 g1 = normalize(vec2(dFdx(d), dFdy(d)) + vec2(1e-6, 0.0));
+    float in1 = clamp(-d * 2.4, 0.0, 1.0);
+    vec3 n1 = normalize(vec3(g1 * (1.0 - in1) * 1.5, 0.42 + 0.58 * in1));
+    vec3 col1 = skinCol * u_lamp * (0.14 + 0.92 * max(dot(n1, L), 0.0) * fall);
+    col1 += u_lamp * skinCol * specular(n1, L, gloss) * 0.42 * fall;
+    c = over(c, vec4(col1, cover(d) * fade));
+
+    vec2 g2 = normalize(vec2(dFdx(lit), dFdy(lit)) + vec2(1e-6, 0.0));
+    float in2 = clamp(-lit * 2.4, 0.0, 1.0);
+    vec3 n2 = normalize(vec3(g2 * (1.0 - in2) * 1.5, 0.42 + 0.58 * in2));
+    vec3 col2 = litCol * u_lamp * (0.18 + 0.95 * max(dot(n2, L), 0.0) * fall);
+    col2 += u_lamp * litCol * specular(n2, L, 26.0) * 0.40 * fall;
+    c = over(c, vec4(col2, cover(lit) * fade));
+
+    c = over(c, vec4(u_glow * (0.85 + 1.25 * fall), cover(trim) * fade * 0.92));
 
   } else if (kind == 2) {
     // Every mouth is paying more. The whole board is hot, so the board itself

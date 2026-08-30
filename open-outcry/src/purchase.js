@@ -39,7 +39,7 @@
 //    shortfall to show, so the button can explain itself either way.
 // ---------------------------------------------------------------------------
 
-import { big, isBig, sub, mul, div, pow, cmp, log10, toNumber, ZERO } from './bignum.js?v=1';
+import { big, isBig, sub, mul, div, pow, cmp, log10, toNumber, ZERO } from './bignum.js?v=2';
 
 // Everything below 2^53 stays a plain double; past it the arithmetic moves
 // into Big so the answers stay right.

@@ -280,7 +280,7 @@ export function createSave(opts = {}) {
       // Build and verify the whole string before touching storage: a
       // serialiser that throws must not be able to damage the save on disk.
       str = encode(serialize(), version);
-      if (!decode(str).ok) throw new Error('the encoded save did not decode');
+      if (!decode(str).ok) throw new Error("the encoded save didn't decode");
     } catch (e) {
       onError({ stage: 'serialize', error: e, reason });
       return { ok: false, stage: 'serialize', error: e };

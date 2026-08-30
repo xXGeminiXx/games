@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=8';
-import { createSim, restoreSim, openedState } from './sim.js?v=8';
-import * as Save from './save.js?v=8';
-import * as Sp from './spores.js?v=8';
-import * as Lore from './lore.js?v=8';
-import { hash } from './rng.js?v=8';
-import { createUI } from './ui.js?v=8';
-import { createView } from './view.js?v=8';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=8';
+import { storageKey } from '../config.js?v=9';
+import { createSim, restoreSim, openedState } from './sim.js?v=9';
+import * as Save from './save.js?v=9';
+import * as Sp from './spores.js?v=9';
+import * as Lore from './lore.js?v=9';
+import { hash } from './rng.js?v=9';
+import { createUI } from './ui.js?v=9';
+import { createView } from './view.js?v=9';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=9';
 
 /**
  * @param {object} o
@@ -135,7 +135,7 @@ export function createGame(o) {
   const save = () => {
     if (!storage || disposed) return false;
     const ok = Save.write(storage, KEY, sim.snapshot(), now());
-    if (!ok) ui.savedNote('Could not save.');
+    if (!ok) ui.savedNote('Couldn\'t save.');
     return ok;
   };
 

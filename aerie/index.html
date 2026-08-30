@@ -229,7 +229,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="dcc85f5c49f4">
+<meta name="build" content="714907360604">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -321,7 +321,7 @@
     <h2 data-t="sections.voyage">Voyage</h2>
     <div class="stat"><span id="island">island 1</span><span><span class="dim" data-t="labels.richness">land remaining</span> <span id="remaining">100%</span></span></div>
     <div class="row"><button id="castoff" class="big"><b>cast off</b><i id="castoff-cost"></i></button></div>
-    <p class="dim note" data-t="labels.castOffHint">Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You cannot come back.</p>
+    <p class="dim note" data-t="labels.castOffHint">Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You can't come back.</p>
   </div>
   <div class="card">
     <h2 data-t="sections.log">Deck log</h2>
@@ -341,9 +341,9 @@
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=17';
-  import { CONTENT } from './content.js?v=17';
-  import { createGame } from './src/game.js?v=17';
+  import { CONFIG } from './config.js?v=18';
+  import { CONTENT } from './content.js?v=18';
+  import { createGame } from './src/game.js?v=18';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

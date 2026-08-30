@@ -42,7 +42,7 @@ export const CONTENT = {
     island: 'island {n}',
     richness: 'land remaining',
     castOff: 'cast off for island {n}',
-    castOffHint: 'Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You cannot come back.',
+    castOffHint: 'Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You can\'t come back.',
     range: 'range',
     export: 'export save',
     import: 'import save',
@@ -103,9 +103,9 @@ export const CONTENT = {
 
   keyGroupNames: {
     flying: 'Flying the carrier',
-    view: 'The view',
+    view: 'Looking around',
     ship: 'Fleet and upgrades',
-    page: 'The window',
+    page: 'Panels and keys',
   },
 
   // How a key is printed. Anything not named here is printed as itself, in
@@ -123,24 +123,24 @@ export const CONTENT = {
     start: 'The carrier holds station over the island. {n} drones on the deck.',
     resume: 'The carrier is on station over island {n}. The drones are away.',
     contextLost: 'The instruments have gone dark. Your run is saved, and the view comes back on its own.',
-    firstHire: 'A fourth drone. There is room for many more.',
+    firstHire: 'A fourth drone. There\'s room on the deck for many more.',
     hire: 'Drone {n} launched.',
     hireMany: '{n} more drones launched. {total} on the books.',
     wing: 'A wing of {n} launched.',
     holdOpen: 'The hold is filling. Market prices are on the board.',
     specialistsOpen: 'Enough drones to train specialists, each to one trade.',
-    specialist: 'A {kind} specialist trained. It will gather nothing else.',
+    specialist: 'A {kind} specialist trained. It gathers nothing else.',
     carrierOpen: 'The yard will take work on the carrier.',
     upgrade: 'Work on the {name} is finished. Level {n}.',
     priceLow: 'The market is flooded with {kind}. Demand is down to {pct}, and the price with it.',
     priceBack: 'Demand for {kind} has recovered.',
     voyageOpen: 'Charts for the next island are on the table.',
-    castOff: 'Cast off. Island {n} lies ahead, and it is richer.',
+    castOff: 'Cast off. Island {n} lies ahead, and it\'s richer.',
     arrive: 'Land. The drones are away.',
     anchor: 'The carrier is moving to that point.',
     exported: 'Your save is in the box below. Copy it somewhere safe.',
     pasteSave: 'Paste a save into the box below, then press import save again.',
-    badImport: 'That is not a save string.',
+    badImport: 'That isn\'t a save string.',
   },
 
   hints: {
@@ -149,7 +149,7 @@ export const CONTENT = {
     prices: 'Sell a lot of one good and demand for it falls, and the price with it. Demand comes back while you sell something else.',
     range: 'the drones work the land within this radius of the carrier',
     castOff: 'the next island holds {x} times as much and pays {y} times the price. This one is left behind for good',
-    quality: 'how much of the picture is drawn. Auto follows what your machine can hold',
+    quality: 'how much of the picture is drawn. auto follows what your machine can keep up with',
     perf: 'how the game has been running on this machine, kept here and sent nowhere',
   },
 };

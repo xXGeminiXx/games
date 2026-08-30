@@ -45,7 +45,7 @@
 // ids.
 // ===========================================================================
 
-import { CONFIG, leftEdgeAt } from '../config.js?v=16';
+import { CONFIG, leftEdgeAt } from '../config.js?v=17';
 
 const LN2 = Math.LN2;
 const TAU = Math.PI * 2;

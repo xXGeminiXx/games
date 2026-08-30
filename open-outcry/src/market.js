@@ -53,11 +53,11 @@
 // hold and nothing is conjured at settlement.
 // ---------------------------------------------------------------------------
 
-import { rng } from './rng.js?v=1';
-import { OrderBook, BUY, SELL } from './orderbook.js?v=1';
-import * as I from './market-inspect.js?v=1';
-import { DEFAULT_RULES, SHOCKS } from './market-rules.js?v=1';
-import { F64, I32, U8, save, load } from './market-save.js?v=1';
+import { rng } from './rng.js?v=2';
+import { OrderBook, BUY, SELL } from './orderbook.js?v=2';
+import * as I from './market-inspect.js?v=2';
+import { DEFAULT_RULES, SHOCKS } from './market-rules.js?v=2';
+import { F64, I32, U8, save, load } from './market-save.js?v=2';
 
 export { BUY, SELL };
 export const PRODUCER = 0, CONSUMER = 1, SPECULATOR = 2, PLAYER = 3;

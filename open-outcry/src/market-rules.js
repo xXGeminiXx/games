@@ -28,7 +28,7 @@
 // https://www.gamedeveloper.com/design/bazaarbot-an-open-source-economics-engine
 // ---------------------------------------------------------------------------
 
-import { BUY } from './orderbook.js?v=1';
+import { BUY } from './orderbook.js?v=2';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const centreOf = (m, k) => (m.bLo[k] + m.bHi[k]) / 2;

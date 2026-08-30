@@ -780,21 +780,24 @@ export const CONFIG = {
     // What a new run starts with when the difficulty tier does not say
     // otherwise. Tiers normally do say otherwise.
     startingPower: 1,   // damage per hit
-    startingGain:  0,   // bonus essence per block destroyed
   },
 
   // -------------------------------------------------------------------------
-  // ECONOMY - what things pay, and what things cost
+  // ECONOMY - the field's half of it
   //
-  // Costs are linear in depth: cost = base + perDepth * depth. The shop reads
-  // this list in order, so reordering it reorders the buttons and deleting an
-  // entry removes the offer. The `id` is what wires an entry to its effect;
-  // everything else is free to change.
+  // Prices, upgrades and what a block pays live in src/economy.js. What is
+  // here is only what the FIELD decides: how a row's health is divided among
+  // the blocks in it, and what clearing a board to nothing pays.
   // -------------------------------------------------------------------------
   economy: {
-    // Essence a destroyed block pays: max(1, round(blockHealth * blockShare))
-    // plus whatever `harvest` has been bought.
-    blockShare: 0.5,
+    // WHAT A BLOCK PAYS IS NOT HERE ANY MORE.
+    //
+    // A block pays MATERIAL, and which material and how much of it are the
+    // market's business - src/economy.js, from the column the block stood in
+    // and the depth it arrived at. Upgrades are priced there too, in material
+    // rather than cash. What is left in here is the field's own arithmetic:
+    // how a row's health is shared out, and the one payout the field makes
+    // itself for clearing a board.
 
     // HOW MUCH HEALTH A ROW IS WORTH, RATHER THAN A BLOCK.
     //
@@ -829,9 +832,6 @@ export const CONFIG = {
     rowShareMin: 0.5,
     rowShareMax: 2,
 
-    // An essence pickup collected at depth d pays windfallBase + d.
-    windfallBase: 5,
-
     // A BOARD CLEARED TO NOTHING.
     //
     // The field refills every turn, so an empty board is not a state the game
@@ -844,28 +844,6 @@ export const CONFIG = {
     // what it could buy instead of turning into pocket change by depth forty.
     clearBonus: { base: 30, perDepth: 7 },
 
-    // `desc` is the second line of the offer and shares it with the price,
-    // in a button about fifteen characters wide - so it is terse. `long` is
-    // the full sentence, shown on hover.
-    //
-    // TWO THINGS EVERY `long` HAS TO CARRY, because the terse line cannot.
-    // The first is the RATE - what has to happen for the number to apply, so
-    // "+2 essence" is not read as two essence handed over once. The second is
-    // HOW LONG IT LASTS: three of these hold for the rest of the run and one
-    // of them happens once and is spent. A run keeps nothing, so "for good"
-    // would be a promise the game does not make.
-    offers: [
-      { id: 'ball',  name: 'conscript', desc: '+1 swarm',   long: 'one more body in the swarm, for the rest of the run', base: 12, perDepth: 4,  amount: 1 },
-      { id: 'power', name: 'sharpen',   desc: '+1 damage',  long: 'every hit does one more damage, for the rest of the run', base: 25, perDepth: 10, amount: 1 },
-      // "+2 per block" left the unit open, next to an offer whose line reads
-      // "+1 damage" - so the number a player was buying could be read as
-      // damage. The line names the figure that moves; the rate is on hover.
-      { id: 'gain',  name: 'harvest',   desc: '+2 essence', long: 'every block broken pays two more essence, for the rest of the run', base: 30, perDepth: 8,  amount: 2 },
-
-      // Priced by how much it actually removes, so clearing a wide row costs
-      // more than clearing a thin one.
-      { id: 'clear', name: 'purge row', desc: 'lowest row', long: 'clears the lowest row on the board right now. one use, not an upgrade', base: 25, perDepth: 6,  amount: 1 },
-    ],
   },
 
   // -------------------------------------------------------------------------
@@ -1017,7 +995,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 15,
+    build: 17,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
@@ -1150,7 +1128,6 @@ export const MIN_AIM_Y = Math.sin(CONFIG.swarm.minAngleDeg * Math.PI / 180);
 export const storageKey = (slot) => CONFIG.identity.storagePrefix + '.' + slot;
 
 /** Cost of an offer at a given depth, before any per offer multiplier. */
-export const offerCost = (offer, depth) => Math.round(offer.base + offer.perDepth * depth);
 
 
 // ---------------------------------------------------------------------------

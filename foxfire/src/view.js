@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=8';
-import { noise } from './world.js?v=8';
-import { hash, unit } from './rng.js?v=8';
-import { angleGap, burntSet } from './events.js?v=8';
+import { seasonOf } from './season.js?v=9';
+import { noise } from './world.js?v=9';
+import { hash, unit } from './rng.js?v=9';
+import { angleGap, burntSet } from './events.js?v=9';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);

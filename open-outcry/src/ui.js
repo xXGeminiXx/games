@@ -16,15 +16,15 @@
 // the space it was always going to take.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=1';
-import { CONTENT, fill } from '../content.js?v=1';
-import { Game } from './game.js?v=1';
-import { Board } from './board.js?v=1';
-import { format, duration, counter } from './format.js?v=1';
-import { toNumber, cmp, big } from './bignum.js?v=1';
-import { createSave } from './save.js?v=1';
-import { affordability } from './purchase.js?v=1';
-import { createComposer } from './rules-ui.js?v=1';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=2';
+import { CONTENT, fill } from '../content.js?v=2';
+import { Game } from './game.js?v=2';
+import { Board } from './board.js?v=2';
+import { format, duration, counter } from './format.js?v=2';
+import { toNumber, cmp, big } from './bignum.js?v=2';
+import { createSave } from './save.js?v=2';
+import { affordability } from './purchase.js?v=2';
+import { createComposer } from './rules-ui.js?v=2';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -325,7 +325,7 @@ class UI {
             // shortfall of its own to report. What the player wants to know is
             // how far off the next one is.
             const one = k === 'max' ? g.quoteFor(id, 1) : q;
-            b.textContent = `x${k === 'max' ? 1 : k} short ${fmt(one.shortfall || one.price)}`;
+            b.textContent = `x${k === 'max' ? 1 : k} needs ${fmt(one.shortfall || one.price)}`;
           }
         }
       },

@@ -402,7 +402,7 @@ export function createGame(o) {
         `${fmt(research.earned)} ${T.endingFlux || 'flux earned'}`,
       ];
       for (const l of lines) endingEl.appendChild(make('div', 'line', l));
-      const again = make('div', 'again', T.endingAgain || 'again, knowing what you know');
+      const again = make('div', 'again', T.endingAgain || 'begin again, keeping the research');
       again.addEventListener('click', () => newRun());
       endingEl.appendChild(again);
       if (endingEl.style) endingEl.style.display = 'flex';

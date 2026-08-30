@@ -104,19 +104,19 @@ function checkValueType(sensor, value) {
 function checkCondition(c, i, registry, id, index, out, path) {
   if (!isObj(c)) { out.push(err(id, index, path, 'bad-condition', 'a condition must be an object')); return; }
   const sensor = registry.sensor_(c.sensor);
-  if (!sensor) { out.push(err(id, index, `${path}.sensor`, 'unknown-sensor', `no sensor named "${c.sensor}"`)); return; }
+  if (!sensor) { out.push(err(id, index, `${path}.sensor`, 'unknown-sensor', `nothing to read called "${c.sensor}"`)); return; }
   if (!OPS.includes(c.op)) { out.push(err(id, index, `${path}.op`, 'unknown-op', `no operator "${c.op}"`)); return; }
 
   if (c.op === 'for') {
     const v = c.value;
     if (!isObj(v)) { out.push(err(id, index, `${path}.value`, 'bad-value', 'a "for" condition needs { op, value, ticks }')); return; }
-    if (!INNER_OPS.includes(v.op)) { out.push(err(id, index, `${path}.value.op`, 'unknown-op', `"for" cannot hold the operator "${v.op}"`)); return; }
+    if (!INNER_OPS.includes(v.op)) { out.push(err(id, index, `${path}.value.op`, 'unknown-op', `"for" can't hold the operator "${v.op}"`)); return; }
     if (!isInt(v.ticks) || v.ticks < 1) out.push(err(id, index, `${path}.value.ticks`, 'bad-value', 'ticks must be a whole number of 1 or more'));
     checkCondition({ sensor: c.sensor, op: v.op, value: v.value }, i, registry, id, index, out, `${path}.value`);
     return;
   }
   if (NUMERIC_OPS.has(c.op) && sensor.type !== 'number') {
-    out.push(err(id, index, `${path}.op`, 'type-mismatch', `"${c.op}" needs a number sensor, but ${sensor.name} is a ${sensor.type}`));
+    out.push(err(id, index, `${path}.op`, 'type-mismatch', `"${c.op}" needs a number to read, but ${sensor.name} is a ${sensor.type}`));
     return;
   }
   if (c.op === 'between') {
@@ -155,7 +155,7 @@ function checkArgs(then, registry, id, index, out) {
     // can say "rally on whichever face is richest" without naming a face.
     if (isObj(v) && typeof v.sensor === 'string') {
       const s = registry.sensor_(v.sensor);
-      if (!s) out.push(err(id, index, `then.args.${spec.name}.sensor`, 'unknown-sensor', `no sensor named "${v.sensor}"`));
+      if (!s) out.push(err(id, index, `then.args.${spec.name}.sensor`, 'unknown-sensor', `nothing to read called "${v.sensor}"`));
       else if (spec.type && s.type !== spec.type) out.push(err(id, index, `then.args.${spec.name}`, 'type-mismatch', `${spec.name} is a ${spec.type}, ${v.sensor} reads a ${s.type}`));
       continue;
     }
@@ -251,7 +251,7 @@ export function createEngine({ registry, rules = [], maxFiresPerTick = 1, tick =
       if (cache.has(name)) return cache.get(name);
       const s = registry.sensor_(name);
       let v;
-      if (!s) v = { error: `no sensor named "${name}"` };
+      if (!s) v = { error: `nothing to read called "${name}"` };
       else {
         try { v = { value: s.read(ctx) }; } catch (e) { v = { error: (e && e.message) || String(e) }; note('sensor', name, e); }
       }
@@ -346,7 +346,7 @@ export function createEngine({ registry, rules = [], maxFiresPerTick = 1, tick =
       else if (failed >= 0) {
         const f = conditions[failed];
         row.block = 'condition';
-        row.reason = f.observed === undefined ? `${f.sensor} could not be read: ${f.note}` : `${f.sensor} is ${f.observedText}, needs ${f.op} ${f.valueText}${f.note ? ` (${f.note})` : ''}`;
+        row.reason = f.observed === undefined ? `${f.sensor} couldn't be read: ${f.note}` : `${f.sensor} is ${f.observedText}, needs ${f.op} ${f.valueText}${f.note ? ` (${f.note})` : ''}`;
       } else {
         const s = statsOf(rule.id);
         const since = s.lastFiredTick === null ? Infinity : state.tick - s.lastFiredTick;

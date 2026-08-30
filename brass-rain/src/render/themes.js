@@ -41,7 +41,7 @@
 // Nothing here is loaded and nothing here is an image.
 // ---------------------------------------------------------------------------
 
-import { hexToOklch, oklch } from '../palette.js?v=8';
+import { hexToOklch, oklch } from '../palette.js?v=9';
 
 /**
  * A skin from the colors that were actually chosen, plus the three that are
@@ -76,35 +76,35 @@ function skin(t) {
 export const THEMES = {
   // 1. A shallow reef at noon. The genre's home color and the default skin.
   tide: skin({
-    id: 'tide', title: 'Tide Pool', hue: 205, accentHue: 55,
+    id: 'tide', title: 'Tide Pool', hue: 205, accentHue: 55, summon: 'A manta ray',
     room: '#040a12', lacquer: '#00bac9', brass: '#f0e8cb',
     enamel: '#00eeef', pocketMid: '#007dd6', jade: '#ffa658',
     glow: '#e36b00', lamp: '#e9f9f9', oxblood: '#042428',
   }),
   // 2. A glass greenhouse gone feral, and something in it is carnivorous.
   hothouse: skin({
-    id: 'hothouse', title: 'Hot House', hue: 140, accentHue: 335,
+    id: 'hothouse', title: 'Hot House', hue: 140, accentHue: 335, summon: 'A flytrap',
     room: '#050e08', lacquer: '#38b600', brass: '#eaedb6',
     enamel: '#bcf600', pocketMid: '#009f68', jade: '#ed00e6',
     glow: '#ff9dea', lamp: '#eefae4', oxblood: '#092703',
   }),
   // 3. A claim on a dry river. The money colored machine.
   goldrush: skin({
-    id: 'goldrush', title: 'Gold Rush', hue: 90, accentHue: 255,
+    id: 'goldrush', title: 'Gold Rush', hue: 90, accentHue: 255, summon: 'A sluice',
     room: '#150b05', lacquer: '#e6b700', brass: '#f3efdd',
     enamel: '#fcdf00', pocketMid: '#e68100', jade: '#006fd7',
     glow: '#005bb4', lamp: '#f9f5ea', oxblood: '#271e03',
   }),
   // 4. A steel mill at pour. The machine is made of the same stuff as a ball.
   furnace: skin({
-    id: 'furnace', title: 'Blast Furnace', hue: 40, accentHue: 195,
+    id: 'furnace', title: 'Blast Furnace', hue: 40, accentHue: 195, summon: 'A ladle',
     room: '#120303', lacquer: '#eb5200', brass: '#eee3d6',
     enamel: '#ffbb69', pocketMid: '#e50026', jade: '#00d1d2',
     glow: '#00e0e0', lamp: '#f9f4f1', oxblood: '#391103',
   }),
   // 5. A chrome diner at two in the morning, and the jukebox is the machine.
   cherry: skin({
-    id: 'cherry', title: 'Cherry Bomb', hue: 10, accentHue: 180,
+    id: 'cherry', title: 'Cherry Bomb', hue: 10, accentHue: 180, summon: 'A pair of cherries',
     room: '#13040c', lacquer: '#f50063', brass: '#f1e9e8',
     enamel: '#f0c2d6', pocketMid: '#d7008e', jade: '#00dbc1',
     glow: '#00eace', lamp: '#f9f4f4', oxblood: '#3e0516',
@@ -113,7 +113,7 @@ export const THEMES = {
   // row on purpose. Its lettering is the lamp rather than the ink, because
   // ink on a face this dark is not lettering, it is absence.
   stardust: skin({
-    id: 'stardust', title: 'Stardust', hue: 295, accentHue: 150, darkFace: true,
+    id: 'stardust', title: 'Stardust', hue: 295, accentHue: 150, darkFace: true, summon: 'A black hole',
     room: '#060314', lacquer: '#7e00f6', brass: '#e6e2ee',
     enamel: '#e29fff', pocketMid: '#6772ff', jade: '#00f890',
     glow: '#00f272', lamp: '#f2f0f7', oxblood: '#f2f0f7',
@@ -162,6 +162,17 @@ export function resolveTheme(id, cfg) {
 /** The skin a cabinet wears, resolved, with the config's own say laid over it. */
 export function skinForCabinet(id, cfg) {
   return resolveTheme(themeForCabinet(id), cfg);
+}
+
+/**
+ * What this machine sends out onto the board, as a sentence can name it.
+ *
+ * Every one of them is singular, because it starts a sentence the game builds
+ * around it and a pair of cherries has to take the same verb a manta ray does.
+ */
+export function summonFor(id, cfg) {
+  const s = skinForCabinet(id, cfg).summon;
+  return typeof s === 'string' && s ? s : 'Something';
 }
 
 /** The index the screen shader uses to pick a skin's motif. */

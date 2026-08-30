@@ -9,7 +9,7 @@
 // between browsers by paste.
 // ---------------------------------------------------------------------------
 
-import { SAVE_VERSION } from './sim.js?v=8';
+import { SAVE_VERSION } from './sim.js?v=9';
 
 const migrations = new Map();
 
@@ -71,9 +71,9 @@ export function importString(str) {
   // on, rather than as whatever the decoder happened to throw.
   let parsed = null;
   try { parsed = JSON.parse(fromBase64(String(str).trim())); } catch (e) { parsed = null; }
-  if (!parsed || typeof parsed !== 'object' || !parsed.snap) throw new Error('That is not a save.');
+  if (!parsed || typeof parsed !== 'object' || !parsed.snap) throw new Error('That isn\'t a save.');
   const snap = migrate(parsed.snap);
-  if (!snap) throw new Error('That save is from a version this one cannot read.');
+  if (!snap) throw new Error('That save is from a version this one can\'t read.');
   return { wall: Number.isFinite(parsed.wall) ? parsed.wall : null, snap };
 }
 

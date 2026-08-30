@@ -26,9 +26,9 @@
 // game has, and everything else on the slate is still.
 // ---------------------------------------------------------------------------
 
-import { createHand } from './chalk.js?v=1';
-import { alpha as withAlpha } from './oklch.js?v=1';
-import { hash2f } from './rng.js?v=1';
+import { createHand } from './chalk.js?v=2';
+import { alpha as withAlpha } from './oklch.js?v=2';
+import { hash2f } from './rng.js?v=2';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);

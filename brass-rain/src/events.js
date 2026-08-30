@@ -4,8 +4,8 @@
 // A machine that only ever does one thing is a machine with one thing to
 // watch. This is the rest of it: play a certain way and the board answers. A
 // spare mouth is cut into the lacquer somewhere else on the face, a stripe of
-// the board lights up, a brass carp swims across it, three doors light and one
-// of them pays.
+// the board lights up, the cabinet sends something out across it, three doors
+// light and one of them pays.
 //
 // Everything here is DATA. What can happen, what sets it off, what it does and
 // what it says all live in the configuration under `events`; this file only
@@ -97,7 +97,9 @@
 //   'sweep'    x, y     where the object is now, board units
 //              r        how far to each side of it counts, board units
 //              dir      +1 moving right, -1 moving left
-//              shape    string naming what to draw, from the configuration
+//                       What the object looks like is not here. Each cabinet
+//                       sends out its own, and the picture takes that from the
+//                       paint, so nothing about it is worth carrying twice.
 //
 //   'doors'    doors    how many doors are in the row
 //              pick     which door pays, counting from 0
@@ -117,7 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=8';
+import { POCKET_PAY } from './board.js?v=9';
+import { summonFor } from './render/themes.js?v=9';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -446,6 +449,9 @@ function fire(state, e) {
     x: trimNumber(e.mult),
     pay: String(e.pocket ? e.pocket.pay : (e.prize || 0)),
     doors: String(e.doors || 0),
+    // Named from the cabinet, so the sentence says what the player is looking
+    // at rather than one fixed creature the other five machines never send.
+    it: summonFor(state.board && state.board.layout ? state.board.layout.id : '', state.cfg),
   });
   pushLine(state, e.line);
   return true;
@@ -575,7 +581,6 @@ function buildSweep(state, e, def) {
   e.r = Math.max(1, num(def.reach, 9));
   e.dir = state.rng.next() < 0.5 ? 1 : -1;
   e.y = b.fieldTop + clamp01(num(def.y, 0.6)) * (b.outY - b.fieldTop);
-  e.shape = String(def.shape || 'carp');
   e.mult = Math.max(1, num(def.mult, 3));
   moveSweep(state, e);
   return e.mult > 1;

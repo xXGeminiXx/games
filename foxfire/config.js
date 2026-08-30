@@ -64,11 +64,11 @@ export const CONFIG = {
     reachTip:    'Pushes one thread out to the nearest place not yet reached',
     buyTip:      'Grow a tip',
     buyTipMax:   'Max',
-    buyTipTip:   'A tip forages on its own for as long as the organism lives',
+    buyTipTip:   'A tip forages on its own for as long as the fungus lives',
     extend:      'Open the next ring',
     beyond:      'Go beyond',
     fruit:       'Fruit',
-    fruitSure:   'Sure? This organism ends',
+    fruitSure:   'Sure? This fungus ends',
     weightTip:   'How much of the mineral flow goes to this kind, set against the other kinds',
     harvest:     ['Keep', 'Fell grown', 'Fell all'],
     harvestTip:  'What to do with this kind: keep them trading, fell the grown ones, or fell every one',
@@ -88,7 +88,7 @@ export const CONFIG = {
       hints: {
         extend: 'Open the next ring once the front has nothing left to reach',
         tips:   'Grow the front when the ground gives up more than the tips can carry',
-        beyond: 'Go beyond a finished level without being asked. Left off, because ending a level is yours to decide',
+        beyond: 'Go beyond a finished level without being asked. Off until you switch it on',
       },
       acted:  { extend: 'opened a ring', tips: 'grew the front', beyond: 'went beyond' },
       on:     'on',
@@ -97,7 +97,7 @@ export const CONFIG = {
       idle:   'has done nothing yet',
       reserve:    'Reserve',
       reserves:   ['none', '1/4', '1/2', '3/4'],
-      reserveTip: 'The share of the sugar these habits will not spend',
+      reserveTip: 'The share of the sugar these habits won\'t spend',
     },
 
     // Moving a save between browsers.
@@ -108,12 +108,12 @@ export const CONFIG = {
 
     panels: {
       entries: 'Field notes',
-      tips:    'The tips',
-      trees:   'The trees',
-      season:  'The year',
+      tips:    'Tips',
+      trees:   'Trees',
+      season:  'Seasons',
       reach:   'Reach',
       traits:  'Traits',
-      instinct: 'Instinct',
+      instinct: 'Habits',
       spores:  'Fruiting',
       genome:  'What the spore carries',
     },
@@ -781,7 +781,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 8,
+    build: 9,
   },
 };
 

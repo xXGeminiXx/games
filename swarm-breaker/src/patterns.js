@@ -33,7 +33,7 @@
 
 /** Columns in the playfield. Rows are emitted at this width, which is the one
  *  authored in config.js so the generator and the board can never disagree. */
-import { CONFIG } from '../config.js?v=16';
+import { CONFIG } from '../config.js?v=17';
 
 export const COLS = (CONFIG && CONFIG.board && CONFIG.board.cols > 3) ? CONFIG.board.cols : 8;
 

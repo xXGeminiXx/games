@@ -27,8 +27,8 @@
 // first thing the tests check.
 // ---------------------------------------------------------------------------
 
-import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=1';
-import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=1';
+import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=2';
+import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=2';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 

@@ -63,14 +63,14 @@ export const CONFIG = {
     buyTip:     'Buys back a tenth of what the market holds, at today\'s price',
     raise:      'Raise',
     raiseMax:   'Max',
-    raiseTip:   'Bones raise the dead. Each button shows what it costs; Max is all you can afford',
+    raiseTip:   'Bones raise the dead. Each button shows what it costs. Max spends every bone you have.',
     weightMore: '+',
     weightLess: '-',
     weightMoreTip: 'Put more of the horde on this layer',
     weightLessTip: 'Take some of the horde off this layer',
     weightBarTip:  'How hard this layer is worked, and how much of the horde is on it',
-    face:       'The way down',
-    faceLine:   'Put the horde here and they break into the next layer down.',
+    face:       'Digging down',
+    faceLine:   'Put some of them here and they break through to the layer below.',
     export:     'Export',
     import:     'Import',
     reset:      'Start over',
@@ -81,8 +81,8 @@ export const CONFIG = {
     unknownSeam:'Unread',
 
     panels: {
-      horde:   'The horde',
-      market:  'The market',
+      horde:   'Where they dig',
+      market:  'Markets',
       rites:   'What coin buys',
       riteBulk: 'Levels at a time',
       visitor: 'At the gate',
@@ -546,7 +546,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 13,
+    build: 14,
   },
 };
 

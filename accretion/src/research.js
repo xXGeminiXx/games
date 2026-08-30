@@ -58,31 +58,31 @@ export const ERAS = Object.freeze([
 export const NODES = Object.freeze([
   // --- dust ----------------------------------------------------------------
   { id: 'accretion', era: 1, name: 'accretion', cost: 12, needs: null,
-    line: 'Grains that touch, stay. The field may make rock.',
+    line: 'Grains that touch stick together. The field can make rock.',
     does: { unlock: K.ROCK } },
   { id: 'pressure', era: 1, name: 'pressure', cost: 80, needs: 'accretion',
-    line: 'Enough rock presses itself into one body. The field may make planetesimals.',
+    line: 'Enough rock presses itself into one body. The field can make planetesimals.',
     does: { unlock: K.PLANETESIMAL } },
   { id: 'differentiation', era: 1, name: 'differentiation', cost: 400, needs: 'pressure',
-    line: 'Iron sinks, stone floats. The field may make planets.',
+    line: 'Iron sinks and stone floats. The field can make planets.',
     does: { unlock: K.PLANET } },
   { id: 'capture', era: 1, name: 'capture', cost: 1500, needs: 'differentiation',
-    line: 'A world heavy enough holds on to gas. The field may make gas giants.',
+    line: 'A world heavy enough holds on to gas. The field can make gas giants.',
     does: { unlock: K.GAS_GIANT } },
   { id: 'infall', era: 1, name: 'infall', cost: 600, needs: 'pressure',
     line: 'Loose matter falls in on its own, at a rate you set.',
     does: { law: 'infall', dial: { key: 'infall', label: 'infall rate', min: 0, max: 1, def: 0.5,
                                    line: 'matter falls in without a click' } } },
   { id: 'worlds', era: 1, name: 'worlds', cost: 4000, needs: 'capture',
-    line: 'Ends the era. New research replaces this list; infall stays.',
+    line: 'Ends this era. A new list of research takes over. Infall stays.',
     does: { capstone: true } },
 
   // --- stars ---------------------------------------------------------------
   { id: 'deuterium', era: 2, name: 'deuterium', cost: 6000, needs: null,
-    line: 'A gas giant past thirteen Jupiters burns a little. The field may make brown dwarfs.',
+    line: 'A gas giant past thirteen Jupiters starts to burn. The field can make brown dwarfs.',
     does: { unlock: K.BROWN_DWARF } },
   { id: 'fusion', era: 2, name: 'fusion', cost: 15000, needs: 'deuterium',
-    line: 'Hydrogen ignites. The field may make stars.',
+    line: 'Hydrogen ignites. The field can make stars.',
     does: { unlock: K.STAR } },
   { id: 'orbit', era: 2, name: 'orbit', cost: 8000, needs: 'deuterium',
     line: 'What falls in arrives with sideways motion, and makes systems instead of piles.',
@@ -95,18 +95,18 @@ export const NODES = Object.freeze([
     line: 'Starlight pays double.',
     does: { shines: 'star', x: 2 } },
   { id: 'sequence', era: 2, name: 'the main sequence', cost: 50000, needs: 'luminosity',
-    line: 'Ends the era. New research replaces this list; orbit stays.',
+    line: 'Ends this era. A new list of research takes over. Orbit stays.',
     does: { capstone: true } },
 
   // --- remnants ------------------------------------------------------------
   { id: 'helium', era: 3, name: 'helium flash', cost: 120000, needs: null,
-    line: 'A giant burns what a star could not. Giant stars pay triple.',
+    line: 'A giant burns helium, which a young star can\'t. Giant stars pay triple.',
     does: { shines: 'giant', x: 3 } },
   { id: 'nucleosynthesis', era: 3, name: 'nucleosynthesis', cost: 240000, needs: 'helium',
     line: 'Everything heavier than iron is made in a death. Deaths pay triple.',
     does: { pays: 'death', x: 3 } },
   { id: 'degeneracy', era: 3, name: 'degeneracy', cost: 180000, needs: 'helium',
-    line: 'What is left keeps shining. White dwarfs and neutron stars begin to pay.',
+    line: 'What\'s left keeps shining. White dwarfs and neutron stars begin to pay.',
     does: { shines: 'remnant', x: 1 } },
   { id: 'cycle', era: 3, name: 'the stellar cycle', cost: 360000, needs: 'nucleosynthesis',
     line: 'Thrown gas gathers again sooner, at a pace you set.',
@@ -116,7 +116,7 @@ export const NODES = Object.freeze([
     line: 'A black hole that feeds outshines a galaxy. Black holes begin to pay.',
     does: { shines: 'hole', x: 1 } },
   { id: 'horizon', era: 3, name: 'the event horizon', cost: 1200000, needs: 'disc',
-    line: 'Ends the era. New research replaces this list; the stellar cycle stays.',
+    line: 'Ends this era. A new list of research takes over. The stellar cycle stays.',
     does: { capstone: true } },
 
   // --- the cosmos ----------------------------------------------------------
@@ -125,7 +125,7 @@ export const NODES = Object.freeze([
     does: { law: 'formation', dial: { key: 'formation', label: 'cloud size', min: 0, max: 1, def: 0.5,
                                       line: 'the size of each cloud that arrives' } } },
   { id: 'clusters', era: 4, name: 'clusters', cost: 3000000, needs: 'formation',
-    line: 'Too many to draw: the field condenses what it cannot resolve. Condensation pays.',
+    line: 'Too many to draw: the field merges what it can\'t show one by one. Condensation pays.',
     does: { pays: 'condense', x: 1 } },
   { id: 'galaxies', era: 4, name: 'galaxies', cost: 6000000, needs: 'clusters',
     line: 'A million stars in one point of light. Everything pays double.',
@@ -134,10 +134,10 @@ export const NODES = Object.freeze([
     line: 'Structure at every scale. Everything pays double again.',
     does: { pays: 'all', x: 2 } },
   { id: 'universe', era: 4, name: 'universe', cost: 25000000, needs: 'web',
-    line: 'There is no larger thing to make. Only to close.',
+    line: 'Nothing larger can be made. All that is left is to close it.',
     does: { hud: 'universe' } },
   { id: 'close', era: 4, name: 'close the universe', cost: 0, needs: 'universe',
-    line: 'This ends the universe. Everything learned is kept; nothing else is.',
+    line: 'This ends the universe. You keep the research and nothing else.',
     does: { ending: true } },
 ]);
 
@@ -391,15 +391,15 @@ export function assertShape() {
   const problems = [];
   for (let e = 1; e < ERAS.length; e++) {
     const ns = NODES.filter(n => n.era === e);
-    if (ns.length !== 6) problems.push(`era ${e} has ${ns.length} nodes, not six`);
+    if (ns.length !== 6) problems.push(`era ${e} has ${ns.length} rows and needs six`);
     for (const n of ns) {
-      if (n.needs && !(BY_ID.has(n.needs) && BY_ID.get(n.needs).era === e)) problems.push(`${n.id} needs ${n.needs}, which is not in its era`);
+      if (n.needs && !(BY_ID.has(n.needs) && BY_ID.get(n.needs).era === e)) problems.push(`${n.id} needs ${n.needs}, which sits in another era`);
     }
     const ends = ns.filter(n => n.does.capstone || n.does.ending);
     if (ends.length !== 1) problems.push(`era ${e} has ${ends.length} ways to end`);
     const laws = ns.filter(n => n.does.law);
     if (laws.length > 1) problems.push(`era ${e} grants ${laws.length} laws`);
-    if (ERAS[e].law && !laws.find(l => l.id === ERAS[e].law)) problems.push(`era ${e} names a law it does not grant`);
+    if (ERAS[e].law && !laws.find(l => l.id === ERAS[e].law)) problems.push(`era ${e} names a law it never grants`);
   }
   return problems;
 }

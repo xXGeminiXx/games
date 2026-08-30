@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=17';
+import { oklch } from './src/palette.js?v=18';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 17,             // the ?v= tag every import carries; bump on every src change
+    build: 18,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -91,7 +91,7 @@ export const CONFIG = {
       hold:    { name: 'hold',          base: 90,  growth: 2.1, effect: 0.35, max: 30, does: 'each level: +35% to everything the drones bring back' },
       range:   { name: 'range',         base: 140, growth: 2.3, effect: 12,   max: 12, does: 'each level: +12 to how far from the carrier the drones will work' },
       engines: { name: 'drone engines', base: 120, growth: 2.2, effect: 0.18, max: 20, does: 'each level: +18% drone speed, so every trip is quicker' },
-      hangars: { name: 'hangars',       base: 260, growth: 2.6, effect: 1,    max: 12, does: 'the first level lets you hire a wing of ten; every level slows how fast hires get more expensive' },
+      hangars: { name: 'hangars',       base: 260, growth: 2.6, effect: 1,    max: 12, does: 'the first level hires ten drones at once. every level after that slows how fast the next hire gets more expensive' },
     },
     hangarDiscount: 0.94, // hire growth multiplier per hangar level (compounding)
     // casting off to the next island
@@ -161,13 +161,13 @@ export const CONFIG = {
       // sight of the island should be the best one their machine can draw;
       // finding that out by degrading is kinder than by improving, because
       // nobody sees the picture they never got.
-      auto:   { name: 'auto',   scale: 1.0,  dpr: 1.5, adapt: true,  hint: 'opens at the sharpest picture and eases off only if your machine cannot hold the frame you asked for' },
-      low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels; for a slow machine' },
+      auto:   { name: 'auto',   scale: 1.0,  dpr: 1.5, adapt: true,  hint: 'starts at the sharpest picture and eases off only if your machine can\'t keep up' },
+      low:    { name: 'low',    scale: 0.5,  dpr: 1.0, adapt: false, hint: 'a quarter of the pixels, for a slow machine' },
       normal: { name: 'normal', scale: 0.7,  dpr: 1.5, adapt: false, hint: 'a good picture on most machines, at about half the cost of high' },
       high:   { name: 'high',   scale: 1.0,  dpr: 1.5, adapt: false, hint: 'the whole picture drawn at full resolution' },
       // The stored name stays `extra` so a remembered choice survives; only
       // what the button says has changed.
-      extra:  { name: 'ultra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'drawn larger than the window and shrunk back down, which softens hard edges. Costs a great deal, and does nothing on a display too coarse to show it' },
+      extra:  { name: 'ultra',  scale: 1.0,  dpr: 2.0, adapt: false, hint: 'drawn at twice the pixels and shrunk back down, which softens hard edges. the slowest setting here, and it does nothing on a low-resolution display' },
     },
     presetOrder: ['auto', 'low', 'normal', 'high', 'extra'],
 

@@ -12,7 +12,7 @@
 // applies a multiplier of its own.
 // ---------------------------------------------------------------------------
 
-import { fireWork, stepProjectiles } from './works-fire.js?v=8';
+import { fireWork, stepProjectiles } from './works-fire.js?v=9';
 
 // How much longer a status holds, and how much harder the drag pulls, for
 // each tier bought. Read from config when the keys exist; these are the
@@ -53,7 +53,7 @@ export function costOf(cfg, def, tier) {
 export function canBuild(cfg, terrain, works, kindId, i) {
   if (!kindDef(cfg, kindId)) return { ok: false, reason: 'no such work' };
   if (!(i >= 0) || i >= works.byCell.length) return { ok: false, reason: 'off the field' };
-  if (terrain.kind[i] !== 0) return { ok: false, reason: 'the ground here cannot be built on' };
+  if (terrain.kind[i] !== 0) return { ok: false, reason: 'the ground here can\'t be built on' };
   if (works.occupied[i]) return { ok: false, reason: 'something is already here' };
   return { ok: true, reason: '' };
 }
