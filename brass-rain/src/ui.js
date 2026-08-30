@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=29';
-import { createScene } from './render/scene.js?v=29';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=29';
-import { num, count, duration, mult, pct, fill } from './format.js?v=29';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=29';
-import { nailPos } from './board.js?v=29';
-import { sketchCabinet } from './cabinets.js?v=29';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=30';
+import { createScene } from './render/scene.js?v=30';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=30';
+import { num, count, duration, mult, pct, fill } from './format.js?v=30';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=30';
+import { nailPos } from './board.js?v=30';
+import { sketchCabinet } from './cabinets.js?v=30';
 
 const SPEEDS = [1, 2, 4];
 
@@ -521,17 +521,10 @@ export async function boot(doc) {
       return;
     }
     const peak = Math.max(...src);
-    // A column nothing reached still has to be drawn, or the chart collapses
-    // into blanks and reads as broken rather than as empty.
-    const blocks = '.:-=+*oO#@';
-    let bar = '';
-    for (let i = 0; i < src.length; i++) {
-      const t = peak > 0 ? src[i] / peak : 0;
-      bar += blocks[Math.min(blocks.length - 1, Math.round(t * (blocks.length - 1)))];
-    }
     const paid = sum(paidSrc);
-    el.bendChart.textContent = 'Where the balls landed, left to right across the board:  ' + bar
-      + '   (' + count(paid) + ' of ' + count(total) + ' landed in a pocket that paid)';
+    el.bendChart.textContent = 'Where the balls landed, left to right across the board. '
+      + count(paid) + ' of ' + count(total) + ' landed in a pocket that paid; the lit part of each bar is the share that paid.';
+    drawLanding(el.bendBars, src, paidSrc, peak, game.reading().skin);
   }
 
   function sum(arr) { let t = 0; for (let i = 0; i < arr.length; i++) t += arr[i]; return t; }
@@ -828,6 +821,35 @@ export async function boot(doc) {
       });
       d.appendChild(b);
       el.cabinets.appendChild(d);
+    }
+  }
+
+  /**
+   * The landing chart: one bar a column across the board, its height where
+   * the balls ended up, the lit part the share that paid. A column nothing
+   * reached is drawn as a stub so the chart never reads as broken.
+   */
+  function drawLanding(canvas, src, paidSrc, peak, skin) {
+    if (!canvas || !canvas.getContext) return;
+    canvas.hidden = false;
+    const W = 400, H = 56, dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const c = canvas.getContext('2d');
+    if (!c) return;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, H);
+    const n = src.length;
+    const slot = W / n;
+    for (let i = 0; i < n; i++) {
+      const h = peak > 0 ? Math.max(2, (src[i] / peak) * (H - 6)) : 2;
+      const paidH = src[i] > 0 ? h * Math.min(1, (paidSrc[i] || 0) / src[i]) : 0;
+      const x = i * slot + 1, w = Math.max(1, slot - 2);
+      c.fillStyle = '#6a5a4e';
+      c.fillRect(x, H - 3 - h, w, h);
+      if (paidH > 0) {
+        c.fillStyle = (skin && skin.glow) || '#4fa88a';
+        c.fillRect(x, H - 3 - paidH, w, paidH);
+      }
     }
   }
 
@@ -1212,7 +1234,7 @@ function index(doc) {
     cabinets: $('cabinets'), rowLater: $('rowLater'),
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),
     benchSheet: $('bench'), benchLede: $('benchLede'), offers: $('offers'),
-    owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'),
+    owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'), bendBars: $('bendBars'),
     reroll: $('reroll'), leave: $('leave'), straighten: $('straighten'),
     floorSheet: $('floor'), floorLede: $('floorLede'), bulkbar: $('bulkbar'),
     machines: $('machines'), prestigeBox: $('prestigeBox'), closeFloor: $('closeFloor'),
