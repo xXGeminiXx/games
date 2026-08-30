@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=27';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=27';
+import { digitGlsl } from './digits.js?v=28';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=28';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -822,7 +822,13 @@ void main() {
   vec3 midCol = u_chrome * u_lamp * (0.25 + 0.90 * fall) + u_lamp * 0.45 * fall;
   c = over(c, vec4(midCol, cover(d) * middle * 0.9));
 
-  fragColor = outColour(c.rgb, c.a);
+  // The rail is drawn only inside the field's walls. Its circle bulges past
+  // the left wall between the shoulder and the hip, and drawn there it read
+  // as a rail poking through the bar; hidden there it reads as the rail
+  // entering the outer channel behind the bar, which is what it is. The
+  // ball still rides the whole circle.
+  float inField = step(0.06 * u_board.x, v_board.x) * step(v_board.x, 0.94 * u_board.x);
+  fragColor = outColour(c.rgb, c.a * inField);
 }`;
 
 
