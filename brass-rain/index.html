@@ -345,6 +345,7 @@
   #bestsBody td.n{text-align:right;font-variant-numeric:tabular-nums}
   #bestsBody tr.now td{background:rgba(79,168,138,.18);color:var(--lamp)}
   #bestsBody tr.top td:first-child{color:var(--brass-lit);font-weight:700}
+  #bestsLine{flex:1 1 220px;min-width:0;font:12px/1.4 var(--narrow);color:var(--enamel);background:#20090b;border:1px solid var(--rule);border-radius:3px;padding:5px 8px}
   /* where the last round's balls ended up, column by column across the board */
   .bars{display:block;width:100%;height:56px;border-radius:4px;border:1px solid var(--rule);background:#1a0708;margin:4px 0 8px}
   .cab .sketch{display:block;height:150px;width:auto;margin:0 auto;border-radius:4px;border:1px solid var(--rule);background:#000}
@@ -500,7 +501,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="721bcff49629">
+<meta name="build" content="88c7fec3f970">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -738,7 +739,7 @@
     <h1>Best nights</h1>
     <p class="lede" id="bestsLede">Every game you have finished, best first: the round that ended it, then the balls won on the way.</p>
     <div id="bestsBody"></div>
-    <div class="sheetfoot"><button id="closeBests" type="button">Close</button></div>
+    <div class="sheetfoot"><input id="bestsLine" type="text" readonly aria-label="Your best night, as a line to send"><button id="shareBests" type="button" title="Put your best night on the clipboard, to send to someone who thinks they can beat it.">Copy my best night</button><button id="closeBests" type="button">Close</button></div>
   </div>
 </div>
 <div class="sheet" id="help" hidden>
@@ -750,7 +751,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=42';
+  import { boot } from './src/ui.js?v=43';
   boot(document);
 </script>
 </body>

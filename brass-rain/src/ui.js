@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=42';
-import { createScene } from './render/scene.js?v=42';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=42';
-import { num, count, duration, mult, pct, fill } from './format.js?v=42';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=42';
-import { nailPos } from './board.js?v=42';
-import { sketchCabinet } from './cabinets.js?v=42';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=42';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=43';
+import { createScene } from './render/scene.js?v=43';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=43';
+import { num, count, duration, mult, pct, fill } from './format.js?v=43';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=43';
+import { nailPos } from './board.js?v=43';
+import { sketchCabinet } from './cabinets.js?v=43';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=43';
 
 const SPEEDS = [1, 2, 4];
 
@@ -118,6 +118,17 @@ export async function boot(doc) {
     on(el.toHelp, 'click', () => openHelp());
     on(el.toBests, 'click', () => openBests());
     on(el.closeBests, 'click', () => hide(el.bestsSheet));
+    on(el.shareBests, 'click', async () => {
+      // The best night as one line, on the clipboard. Nothing is sent
+      // anywhere; the player pastes it wherever they like.
+      const line = el.bestsLine ? el.bestsLine.value : '';
+      if (!line) return;
+      let done = false;
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(line); done = true; } } catch (e) { done = false; }
+      if (!done && el.bestsLine) { el.bestsLine.focus(); el.bestsLine.select(); }
+      el.shareBests.textContent = done ? 'Copied' : 'Select and copy';
+      setTimeout(() => { el.shareBests.textContent = 'Copy my best night'; }, 1800);
+    });
     on(el.closeHelp, 'click', () => hide(el.helpSheet));
     on(el.primerGo, 'click', () => closePrimer());
 
@@ -1052,6 +1063,14 @@ export async function boot(doc) {
       });
       body.appendChild(t);
     }
+    if (el.bestsLine) {
+      const best = list[0];
+      el.bestsLine.value = best
+        ? 'Brass Rain - my best night: round ' + best.round + ' on ' + (best.machine || 'a machine') + ', ' + num(best.won || 0) + ' balls. Beat it: xxgeminixx.github.io/games/brass-rain/'
+        : '';
+      el.bestsLine.hidden = !best;
+      if (el.shareBests) el.shareBests.hidden = !best;
+    }
     const standing = liveStanding(game.reading());
     if (el.bestsLede) el.bestsLede.textContent = list.length
       ? 'Every game you have finished, best first: the round that ended it, then the balls won on the way.'
@@ -1390,6 +1409,7 @@ function index(doc) {
     newRun: $('newRun'), wipe: $('wipe'), closeSettings: $('closeSettings'),
     helpSheet: $('help'), helpBody: $('helpBody'), closeHelp: $('closeHelp'),
     toBests: $('toBests'), bestsSheet: $('bests'), bestsBody: $('bestsBody'), bestsLede: $('bestsLede'), closeBests: $('closeBests'),
+    bestsLine: $('bestsLine'), shareBests: $('shareBests'),
     primerSheet: $('primer'), primerGo: $('primerGo'),
   };
 }

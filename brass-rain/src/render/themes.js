@@ -41,7 +41,7 @@
 // Nothing here is loaded and nothing here is an image.
 // ---------------------------------------------------------------------------
 
-import { hexToOklch, oklch } from '../palette.js?v=42';
+import { hexToOklch, oklch } from '../palette.js?v=43';
 
 /**
  * A skin from the colors that were actually chosen, plus the three that are
