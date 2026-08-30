@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=14';
+import { loadConfig } from '../config.js?v=15';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=14';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=15';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=14';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=14';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=14';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=14';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=14';
-import { rng as makeRng } from './rng.js?v=14';
-import { offerCabinets } from './cabinets.js?v=14';
-import * as Save from './save.js?v=14';
-import { showState } from './render/reach.js?v=14';
-import { skinForCabinet } from './render/themes.js?v=14';
-import { chooseDoor as callDoor } from './events.js?v=14';
+         handMult, restoreFloor } from './floor.js?v=15';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=15';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=15';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=15';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=15';
+import { rng as makeRng } from './rng.js?v=15';
+import { offerCabinets } from './cabinets.js?v=15';
+import * as Save from './save.js?v=15';
+import { showState } from './render/reach.js?v=15';
+import { skinForCabinet } from './render/themes.js?v=15';
+import { chooseDoor as callDoor } from './events.js?v=15';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=14');
-  const metaModule = await optional('./meta.js?v=14');
+  const catalogue = await optional('./fittings.js?v=15');
+  const metaModule = await optional('./meta.js?v=15');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -728,6 +728,22 @@ export function frame(game, now) {
   changed(game);
 }
 
+/** How many bolted-in parts act on the nails, the slot, the rails and the glass. */
+function partsOnTheFace(run) {
+  const out = { nails: 0, slot: 0, rails: 0, glass: 0 };
+  const ids = run && Array.isArray(run.fittings) ? run.fittings : [];
+  const byId = run && run.bench && run.bench.byId ? run.bench.byId : null;
+  for (const id of ids) {
+    const f = byId ? byId.get(id) : null;
+    const tags = f && Array.isArray(f.tags) ? f.tags : [];
+    if (tags.includes('board')) out.nails++;
+    if (tags.includes('gate')) out.slot++;
+    if (tags.includes('cadence')) out.rails++;
+    if (tags.includes('aim')) out.glass++;
+  }
+  return out;
+}
+
 /** What the renderer is handed. */
 export function view(game) {
   const run = game.run;
@@ -738,6 +754,9 @@ export function view(game) {
     // Which machine this is. A cabinet keeps its paint, so the skin follows
     // the layout rather than the round.
     theme: run.board && run.board.layout ? run.board.layout.id : null,
+    // What is bolted in, counted by where it acts, so the picture can show a
+    // part on the thing it changes: nails, the slot, the rails, the glass.
+    parts: partsOnTheFace(run),
     // The sign on top spells the machine's own name, not the game's. A row
     // of six that all say the same thing is one machine painted six ways;
     // a row that reads differently from across the floor is six machines.

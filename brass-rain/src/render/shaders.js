@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=14';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=14';
+import { digitGlsl } from './digits.js?v=15';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=15';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -57,6 +57,7 @@ uniform vec3  u_glow;     // the hot accent the machine escalates with
 uniform vec3  u_shell;    // the moulded cabinet body
 uniform vec3  u_room;     // the dark the cabinet stands in
 uniform vec4  u_show;     // intensity, revival, win, skin index
+uniform vec4  u_parts;    // parts bolted in: on the nails, on the slot, on the rails, on the glass
 
 const vec3 VIEW = vec3(0.0, 0.0, 1.0);
 
@@ -410,6 +411,9 @@ void main() {
   float wear = 0.90 + seed * 0.20;
   float ndl = max(dot(n, L), 0.0);
   vec3 brass = u_brass * (0.06 * u_lamp + 1.30 * u_lamp * ndl * fall) * wear;
+  // A part on the nails shows on the nails: every head takes on the accent,
+  // more with every such part, so a fitted face is told from a bare one.
+  brass = mix(brass, mix(brass, u_glow * u_lamp * (0.5 + 0.9 * fall), 0.55), clamp(u_parts.x * 0.45, 0.0, 1.0));
   brass += u_lamp * u_brass * specular(n, L, 14.0) * 0.35 * fall;
   brass += u_lamp * specular(n, L, 110.0) * 0.50 * fall;
   // The bounce back off the lacquer keeps the shadowed underside warm rather
@@ -644,7 +648,7 @@ void main() {
       // is lit from within and breathes while the machine rests - brighter
       // than any pay mouth, and the first thing found on a new face.
       float breathe = 0.55 + 0.45 * sin(u_time * 1.6);
-      plaque += u_lamp * (0.16 + 0.22 * breathe) * (0.6 + 0.4 * hb);
+      plaque += u_lamp * (0.16 + 0.22 * breathe) * (0.6 + 0.4 * hb) * (1.0 + 0.5 * clamp(u_parts.y, 0.0, 2.0));
       c = over(c, vec4(u_lamp * 0.9, (cover(dh + lip * 0.55) - cover(dh + lip * 1.35)) * (0.35 + 0.45 * breathe)));
     }
     c = over(c, vec4(plaque, cover(dh + lip * 0.55)));

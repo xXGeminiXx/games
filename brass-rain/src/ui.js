@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=14';
-import { createScene } from './render/scene.js?v=14';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=14';
-import { num, count, duration, mult, pct, fill } from './format.js?v=14';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=14';
-import { nailPos } from './board.js?v=14';
-import { sketchCabinet } from './cabinets.js?v=14';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=15';
+import { createScene } from './render/scene.js?v=15';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=15';
+import { num, count, duration, mult, pct, fill } from './format.js?v=15';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=15';
+import { nailPos } from './board.js?v=15';
+import { sketchCabinet } from './cabinets.js?v=15';
 
 const SPEEDS = [1, 2, 4];
 
@@ -883,6 +883,9 @@ export async function boot(doc) {
     const box = el.mouths;
     if (!box || !scene || !game.run || !game.run.board) return;
     const pockets = game.run.board.pockets || [];
+    // While a row of doors is lit the tags step aside, or JACKPOT sits on a door.
+    const ev = game.run.events && Array.isArray(game.run.events.active) ? game.run.events.active : [];
+    box.hidden = ev.some(e => e.kind === 'doors' && !e.pending && !e.done);
     const seen = new Set();
     for (const p of pockets) {
       seen.add(p.id);

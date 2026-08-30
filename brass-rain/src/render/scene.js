@@ -22,21 +22,21 @@
 // description of what to draw, and it touches nothing else on the page.
 // ---------------------------------------------------------------------------
 
-import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=14';
-import { createColours } from './colours.js?v=14';
-import { fitBoard, clipTransform, lampPosition, reelRect, screenRect, drumStrip } from './layout.js?v=14';
-import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=14';
+import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=15';
+import { createColours } from './colours.js?v=15';
+import { fitBoard, clipTransform, lampPosition, reelRect, screenRect, drumStrip } from './layout.js?v=15';
+import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=15';
 import {
   packPins, packPockets, packRails, packFlashes, packReels, packArc, packScreen,
   packEvents, tellHeat, showIntensity, medianPinRadius,
   POCKET_KINDS, POCKET_TONES, FLASH_KINDS, REEL_WINDOWS, EVENT_CAP,
-} from './board-geom.js?v=14';
+} from './board-geom.js?v=15';
 import {
   INSTANCE_VS, RAIL_VS, BALL_VS, GROUND_FS, PIN_FS, BALL_FS, BALL_SHADOW_FS,
   RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, SCREEN_FS, EVENT_FS, COMPOSITE_FS,
-} from './shaders.js?v=14';
-import { themeForCabinet, themeIndex, DEFAULT_THEME } from './themes.js?v=14';
-import { encode as encodeName, MAX_LETTERS } from './marquee.js?v=14';
+} from './shaders.js?v=15';
+import { themeForCabinet, themeIndex, DEFAULT_THEME } from './themes.js?v=15';
+import { encode as encodeName, MAX_LETTERS } from './marquee.js?v=15';
 
 // The unit quad every instance is stamped from, as a triangle strip so no
 // index buffer is needed.
@@ -157,6 +157,7 @@ export function createScene(canvas, cfg) {
     // How hard the machine is pushing, what it is pushing about, and which
     // skin's motif is on the panel.
     u_show: new Float32Array(4),
+    u_parts: new Float32Array(4),
     u_name: sign.codes,
     u_nameLen: sign.length,
     u_pocketFill: colours.pocketFill,
@@ -479,6 +480,11 @@ export function createScene(canvas, cfg) {
     U.u_show[1] = show ? Math.max(0, Math.min(1, Number(show.revival) || 0)) : 0;
     U.u_show[2] = show ? Math.max(0, Math.min(1, Number(show.win) || 0)) : 0;
     U.u_show[3] = themeIndex(colours.theme());
+    const parts = view.parts || null;
+    U.u_parts[0] = parts ? num(parts.nails, 0) : 0;
+    U.u_parts[1] = parts ? num(parts.slot, 0) : 0;
+    U.u_parts[2] = parts ? num(parts.rails, 0) : 0;
+    U.u_parts[3] = parts ? num(parts.glass, 0) : 0;
 
     const q = quality;
     const size = sceneSize(bufW, bufH, q.scale);
