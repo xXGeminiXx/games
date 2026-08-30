@@ -777,17 +777,20 @@ export const CONFIG = {
   // PRESTIGE - the technician comes in overnight and re-nails every board.
   // -------------------------------------------------------------------------
   prestige: {
-    // marks = scale * (lifetime scrip / divisor) ^ exponent.
+    // stars = scale * (lifetime coins / divisor) ^ exponent.
     //
-    // The exponent sets the whole pace of the layer: at 0.5 the marks double
-    // for every four times the scrip, which is too fast for a tree this size,
-    // and at a third they double for every eight, which puts the fifth night
-    // out past twenty hours. This sits between the two.
-    divisor: 1e7,
+    // Paced on a measured first day: about 25,000 coins over ten games. The
+    // first start-over is offered a few games in and pays enough for the
+    // notebook and one thing that helps (3 stars at about 4,000 coins);
+    // a full first day pays 6 or 7; 100,000 coins pay 12; a million pay 36;
+    // ten million pay about 100. With the exponent at 0.45 the stars double
+    // for every four-and-a-half times the coins, so each start-over is a
+    // few times further out than the last and none is a wall.
+    divisor: 4000,
     exponent: 0.45,
-    scale: 4,
-    minScrip: 1e6,
-    minMarks: 12,
+    scale: 3,
+    minScrip: 2000,       // no start-over is offered below this lifetime
+    minMarks: 3,          // and none that pays fewer stars than this
     minFraction: 0.25,
   },
 

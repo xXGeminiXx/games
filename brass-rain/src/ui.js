@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=51';
-import { createScene } from './render/scene.js?v=51';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=51';
-import { num, count, duration, mult, pct, fill } from './format.js?v=51';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=51';
-import { nailPos } from './board.js?v=51';
-import { DOORS_ROW } from './render/board-geom.js?v=51';
-import { sketchCabinet } from './cabinets.js?v=51';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=51';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=52';
+import { createScene } from './render/scene.js?v=52';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=52';
+import { num, count, duration, mult, pct, fill } from './format.js?v=52';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=52';
+import { nailPos } from './board.js?v=52';
+import { DOORS_ROW } from './render/board-geom.js?v=52';
+import { sketchCabinet } from './cabinets.js?v=52';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=52';
 
 const SPEEDS = [1, 2, 4];
 
