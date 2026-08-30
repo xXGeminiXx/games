@@ -10,7 +10,7 @@
 // that is not a list reads as an empty board.
 // ---------------------------------------------------------------------------
 
-const KEY = 'brass-rain:nights';
+const KEY = 'brassrain:nights';
 
 /** How many nights the board keeps. */
 export const KEEP = 20;

@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=34';
-import { createScene } from './render/scene.js?v=34';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=34';
-import { num, count, duration, mult, pct, fill } from './format.js?v=34';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=34';
-import { nailPos } from './board.js?v=34';
-import { sketchCabinet } from './cabinets.js?v=34';
-import { recordNight, loadNights, ordinal } from './nights.js?v=34';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=35';
+import { createScene } from './render/scene.js?v=35';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=35';
+import { num, count, duration, mult, pct, fill } from './format.js?v=35';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=35';
+import { nailPos } from './board.js?v=35';
+import { sketchCabinet } from './cabinets.js?v=35';
+import { recordNight, loadNights, ordinal } from './nights.js?v=35';
 
 const SPEEDS = [1, 2, 4];
 
@@ -1050,8 +1050,9 @@ export async function boot(doc) {
 
   function paintFloor() {
     const r = game.reading();
-    const played = game.floor && game.floor.games ? game.floor.games : 0;
-    el.floorLede.textContent = (played ? 'Games finished: ' + played + '. ' : '') + 'You own these machines. They earn '
+    const started = game.meta && game.meta.lifetime ? Math.floor(game.meta.lifetime.runs || 0) : 0;
+    const finished = game.floor && game.floor.games ? game.floor.games : 0;
+    el.floorLede.textContent = (started ? 'Games played: ' + started + (finished ? ', finished: ' + finished : '') + '. ' : '') + 'You own these machines. They earn '
       + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
       + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
       + ' because your best game reached round ' + Math.max(r.bestRound, 0)

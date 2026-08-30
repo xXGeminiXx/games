@@ -489,8 +489,8 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'reel_detent', name: 'Middle Reel Detent',
-    text: 'When the two outer reels match, the middle reel lands on the same symbol {middleWeight%} of the time. A detent slows it.',
+    id: 'reel_detent', name: 'Middle Reel Catch',
+    text: 'When the two outer reels match, the middle reel lands on the same symbol {middleWeight%} of the time. A catch slows it.',
     rarity: 'common', price: 30, hook: 'static', tags: ['reel', 'fever'],
     mods: { middleWeight: ['+', 0.04] },
     bound: 'It does nothing until the outer reels match on their own, and it tops out at 75 percent.'

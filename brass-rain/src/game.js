@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=34';
+import { loadConfig } from '../config.js?v=35';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=34';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=35';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=34';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=34';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=34';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=34';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=34';
-import { rng as makeRng } from './rng.js?v=34';
-import { offerCabinets, freshSeed } from './cabinets.js?v=34';
-import * as Save from './save.js?v=34';
-import { showState } from './render/reach.js?v=34';
-import { skinForCabinet } from './render/themes.js?v=34';
-import { chooseDoor as callDoor } from './events.js?v=34';
+         handMult, restoreFloor } from './floor.js?v=35';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=35';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=35';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=35';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=35';
+import { rng as makeRng } from './rng.js?v=35';
+import { offerCabinets, freshSeed } from './cabinets.js?v=35';
+import * as Save from './save.js?v=35';
+import { showState } from './render/reach.js?v=35';
+import { skinForCabinet } from './render/themes.js?v=35';
+import { chooseDoor as callDoor } from './events.js?v=35';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +49,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=34');
-  const metaModule = await optional('./meta.js?v=34');
+  const catalogue = await optional('./fittings.js?v=35');
+  const metaModule = await optional('./meta.js?v=35');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -216,6 +216,9 @@ export function newRun(game, seed, withFittings) {
     bench: game.bench, model: modelFor(game, ids), fittings: ids, mods: fitted.mods,
   });
   game.run.speed = keepSpeed;
+  // Every game started is a game played. The count lives with the rest of
+  // what outlasts a game, so a fresh start never zeroes it.
+  if (game.meta && game.meta.lifetime) game.meta.lifetime.runs = Math.floor(game.meta.lifetime.runs || 0) + 1;
   game.run.board = buildFittedBoard(fitted.cfg, seed >>> 0, fitted.shape);
   useCabinet(fitted.cfg, game.run.board);
   // Anything the technician has learned to bolt in before the night starts is
