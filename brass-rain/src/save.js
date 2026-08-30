@@ -18,11 +18,11 @@
 //   another program wrote, and none of those may stop the game from starting.
 // ---------------------------------------------------------------------------
 
-import { signBlob } from './nights.js?v=49';
-import { serializeBends, restoreBends } from './board.js?v=49';
-import { serializeBalls, restoreBalls } from './physics.js?v=49';
-import { serializeFloor, restoreFloor } from './floor.js?v=49';
-import { serializeQuality } from './quality.js?v=49';
+import { signBlob } from './nights.js?v=50';
+import { serializeBends, restoreBends } from './board.js?v=50';
+import { serializeBalls, restoreBalls } from './physics.js?v=50';
+import { serializeFloor, restoreFloor } from './floor.js?v=50';
+import { serializeQuality } from './quality.js?v=50';
 
 export function saveKey(cfg) { return cfg.identity.storagePrefix + ':save'; }
 
