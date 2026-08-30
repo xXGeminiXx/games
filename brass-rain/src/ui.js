@@ -15,13 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=30';
-import { createScene } from './render/scene.js?v=30';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=30';
-import { num, count, duration, mult, pct, fill } from './format.js?v=30';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=30';
-import { nailPos } from './board.js?v=30';
-import { sketchCabinet } from './cabinets.js?v=30';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=31';
+import { createScene } from './render/scene.js?v=31';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=31';
+import { num, count, duration, mult, pct, fill } from './format.js?v=31';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=31';
+import { nailPos } from './board.js?v=31';
+import { sketchCabinet } from './cabinets.js?v=31';
+import { recordNight, loadNights, ordinal } from './nights.js?v=31';
 
 const SPEEDS = [1, 2, 4];
 
@@ -40,6 +41,10 @@ export async function boot(doc) {
 
   let bulk = 10;
   let speedIndex = 0;
+  // The night already written to the board, and where it landed.
+  let recordedSeed = null;
+  let lastRank = 0;
+  let lastNightAt = 0;
   // The last lit row the hint spoke for, so it speaks once per row.
   let litRow = null;
   // The tags on the mouths, keyed by mouth id. Declared here with the rest
@@ -315,6 +320,18 @@ export async function boot(doc) {
 
     if (r.over) {
       el.hint.textContent = fill(cfg.text.roundLost, { short: num(r.quota - r.won) });
+      // The night goes on the board the moment it ends, once.
+      const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
+      if (seed !== recordedSeed) {
+        recordedSeed = seed;
+        const night = {
+          round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0,
+          machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(),
+        };
+        const res = recordNight(night);
+        lastRank = res.rank; lastNightAt = night.at;
+        paintNights(res.list);
+      }
       if (el.rowSheet.hidden && !shownRow) { shownRow = true; openRow(); }
     } else if (!el.helpSheet.hidden || r.stats.launched > 6) {
       // once the player is going, the hint belongs to whatever is happening
@@ -746,7 +763,7 @@ export async function boot(doc) {
     const r = game.reading();
     el.rowTitle.textContent = r.over ? 'That game is over' : 'Pick a machine to play';
     el.rowLede.textContent = r.over
-      ? 'Round ' + r.round + ' beat you. Pick where to play next. Every machine has its nails, its '
+      ? 'Round ' + r.round + ' beat you' + (lastRank > 0 ? ' - your ' + ordinal(lastRank) + ' best night. ' : '. ') + 'Pick where to play next. Every machine has its nails, its '
         + 'pockets and its slot in different places, so what pays on one doesn\'t pay on the next. '
         + 'Each machine below was measured by dropping a few hundred balls through it.'
       : 'Every machine has its nails, its pockets and its slot in different places, so what pays on one '
@@ -918,6 +935,36 @@ export async function boot(doc) {
       }
     }
   }
+
+  // ---- the board of best nights -------------------------------------------
+  //
+  // The best finished games this browser has played, best first, always in
+  // view under the arcade. The night just finished is marked.
+  function paintNights(list) {
+    const box = el.nights;
+    if (!box) return;
+    const rows = (list || loadNights()).slice(0, 5);
+    box.textContent = '';
+    for (const n of rows) {
+      const li = doc.createElement('li');
+      if (n.at === lastNightAt) li.className = 'now';
+      const b = doc.createElement('b');
+      b.textContent = 'Round ' + n.round;
+      li.appendChild(b);
+      li.appendChild(doc.createTextNode(' ' + (n.machine || '') + ', ' + num(n.won || 0) + ' balls'));
+      const s = doc.createElement('small');
+      const d = new Date(n.at || 0);
+      s.textContent = Number.isFinite(d.getTime()) && n.at ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+      li.appendChild(s);
+      box.appendChild(li);
+    }
+    if (el.nightsLede) {
+      el.nightsLede.textContent = rows.length
+        ? 'Best first: the round that ended the game, then the balls won. Beat round ' + rows[0].round + ' to take the top.'
+        : 'Finish a game and it goes on the board. Beat your best round to climb it.';
+    }
+  }
+  paintNights();
 
   // ---- the lettering on the mouths ------------------------------------
   //
@@ -1235,6 +1282,7 @@ function index(doc) {
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),
     benchSheet: $('bench'), benchLede: $('benchLede'), offers: $('offers'),
     owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'), bendBars: $('bendBars'),
+    nights: $('nights'), nightsLede: $('nightsLede'),
     reroll: $('reroll'), leave: $('leave'), straighten: $('straighten'),
     floorSheet: $('floor'), floorLede: $('floorLede'), bulkbar: $('bulkbar'),
     machines: $('machines'), prestigeBox: $('prestigeBox'), closeFloor: $('closeFloor'),

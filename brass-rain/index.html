@@ -330,6 +330,12 @@
      whatever gives a machine its own name and color. */
   .cab .theme{font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
   .cab .theme:empty{display:none}
+  /* the board of best nights */
+  #nights{margin:2px 0 4px;padding-left:18px;font-size:11px;line-height:1.55}
+  #nights li b{color:var(--oxblood);font-weight:700}
+  #nights li small{color:var(--dim);margin-left:4px}
+  #nights li.now{background:rgba(79,168,138,.22);border-radius:3px;margin-left:-4px;padding-left:4px}
+  #nights:empty{display:none}
   /* where the last round's balls ended up, column by column across the board */
   .bars{display:block;width:100%;height:56px;border-radius:4px;border:1px solid var(--rule);background:#1a0708;margin:4px 0 8px}
   .cab .sketch{display:block;height:150px;width:auto;margin:0 auto;border-radius:4px;border:1px solid var(--rule);background:#000}
@@ -485,7 +491,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="f37fb645ca74">
+<meta name="build" content="6faab9648f16">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -581,6 +587,11 @@
       <div class="knobrow">
         <button id="cash" type="button">Trade balls for coins</button>
       </div>
+    </section>
+    <section class="plaque" id="pNights">
+      <h2>Best nights</h2>
+      <ol id="nights"></ol>
+      <p class="sub" id="nightsLede">Finish a game and it goes on the board. Beat your best round to climb it.</p>
     </section>
 
     <section class="plaque" id="pLog">
@@ -720,7 +731,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=30';
+  import { boot } from './src/ui.js?v=31';
   boot(document);
 </script>
 </body>
