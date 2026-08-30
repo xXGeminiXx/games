@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=15';
-import { createScene } from './render/scene.js?v=15';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=15';
-import { num, count, duration, mult, pct, fill } from './format.js?v=15';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=15';
-import { nailPos } from './board.js?v=15';
-import { sketchCabinet } from './cabinets.js?v=15';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=16';
+import { createScene } from './render/scene.js?v=16';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=16';
+import { num, count, duration, mult, pct, fill } from './format.js?v=16';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=16';
+import { nailPos } from './board.js?v=16';
+import { sketchCabinet } from './cabinets.js?v=16';
 
 const SPEEDS = [1, 2, 4];
 

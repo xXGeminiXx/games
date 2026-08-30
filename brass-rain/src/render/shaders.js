@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=15';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=15';
+import { digitGlsl } from './digits.js?v=16';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=16';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -812,7 +812,15 @@ void main() {
   col += u_lamp * specular(n, L, 240.0) * 1.00 * fall;
   float inside = smoothstep(-0.60, -0.95, across);
   col += u_lamp * inside * 0.55 * fall;
+  // A part on the rails shows on the rails: the chrome warms toward the
+  // accent with each one, and a second rail runs down the middle of the
+  // channel once any is bolted in.
+  float railParts = clamp(u_parts.z, 0.0, 2.0);
+  col = mix(col, u_glow * u_lamp * (0.45 + 0.85 * fall), 0.30 * railParts);
   c = over(c, vec4(col, cover(d) * onRail));
+  float middle = smoothstep(0.09, 0.0, abs(across)) * step(0.5, railParts);
+  vec3 midCol = u_chrome * u_lamp * (0.25 + 0.90 * fall) + u_lamp * 0.45 * fall;
+  c = over(c, vec4(midCol, cover(d) * middle * 0.9));
 
   fragColor = outColour(c.rgb, c.a);
 }`;
@@ -1827,6 +1835,8 @@ void main() {
     float wide = smoothstep(0.55, 0.0, abs(t + 0.18));
     float tight = smoothstep(0.10, 0.0, abs(t - 0.34));
     float sheen = wide * 0.014 + tight * 0.030;
+    // Parts on the glass show on the glass: a heavier, brighter sheet.
+    sheen *= 1.0 + 0.9 * clamp(u_parts.w, 0.0, 2.0);
     // The light pools where the sheet is thickest.
     sheen += (1.0 - bevel) * 0.030;
     sheen *= clamp(fall, 0.0, 1.6) * step(d, 0.0);
