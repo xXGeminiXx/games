@@ -117,7 +117,7 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=7';
+import { POCKET_PAY } from './board.js?v=8';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {

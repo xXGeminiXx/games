@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=7';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=7';
+import { digitGlsl } from './digits.js?v=8';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=8';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -626,6 +626,14 @@ void main() {
     vec3 plaque = hc * u_lamp * (0.09 + 0.90 * max(dot(hn, L), 0.0) * fall) * 0.80;
     plaque += u_lamp * specular(hn, L, 90.0) * 0.30 * fall;
     plaque += u_lamp * hc * specular(hn, L, 16.0) * 0.18 * fall;
+    if (gate) {
+      // The slot is the one mouth the whole game is aimed at, so its plaque
+      // is lit from within and breathes while the machine rests - brighter
+      // than any pay mouth, and the first thing found on a new face.
+      float breathe = 0.55 + 0.45 * sin(u_time * 1.6);
+      plaque += u_lamp * (0.16 + 0.22 * breathe) * (0.6 + 0.4 * hb);
+      c = over(c, vec4(u_lamp * 0.9, (cover(dh + lip * 0.55) - cover(dh + lip * 1.35)) * (0.35 + 0.45 * breathe)));
+    }
     c = over(c, vec4(plaque, cover(dh + lip * 0.55)));
   }
 

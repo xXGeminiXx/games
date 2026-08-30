@@ -129,6 +129,14 @@
     text-shadow:0 1px 3px #000;
   }
   #flyer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  /* Every mouth is named on the face, from the board's own geometry: the
+     slot says SLOT, a pay mouth says what it pays, the jackpot pocket says
+     JACKPOT. */
+  #mouths{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .mouth{position:absolute;left:0;top:0;font:700 9px/1 var(--narrow);letter-spacing:.12em;color:#fff;
+    text-shadow:0 1px 2px #000,0 0 4px #000;padding:2px 4px;border-radius:3px;background:rgba(0,0,0,.42);white-space:nowrap}
+  .mouth.slot{color:#ffe08a;font-size:10px}
+  .mouth.jackpot{color:#7fe0bd}
   .fly{
     position:absolute;font:600 12px/1 var(--narrow);color:var(--brass-lit);
     text-shadow:0 1px 3px #000;animation:rise 1s ease-out forwards;
@@ -475,7 +483,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="6d30f863fd75">
+<meta name="build" content="0cf8e39fd2ce">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -583,6 +591,7 @@
   <section id="face">
     <canvas id="view"></canvas>
     <div id="flyer"></div>
+    <div id="mouths"></div>
     <div id="banner" hidden></div>
     <div id="hint"></div>
   </section>
@@ -707,7 +716,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=7';
+  import { boot } from './src/ui.js?v=8';
   boot(document);
 </script>
 </body>

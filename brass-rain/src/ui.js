@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=7';
-import { createScene } from './render/scene.js?v=7';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=7';
-import { num, count, duration, mult, pct, fill } from './format.js?v=7';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=7';
-import { nailPos } from './board.js?v=7';
-import { sketchCabinet } from './cabinets.js?v=7';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=8';
+import { createScene } from './render/scene.js?v=8';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=8';
+import { num, count, duration, mult, pct, fill } from './format.js?v=8';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=8';
+import { nailPos } from './board.js?v=8';
+import { sketchCabinet } from './cabinets.js?v=8';
 
 const SPEEDS = [1, 2, 4];
 
@@ -40,6 +40,10 @@ export async function boot(doc) {
 
   let bulk = 10;
   let speedIndex = 0;
+  // The tags on the mouths, keyed by mouth id. Declared here with the rest
+  // of the state because the first paint runs before boot has finished.
+  const mouthTags = new Map();
+  const mouthPoint = { x: 0, y: 0 };
   // Declared with the rest of the state rather than beside the function that
   // uses it: the first paint happens before boot has finished running, so
   // anything it reads has to already exist.
@@ -219,6 +223,7 @@ export async function boot(doc) {
     // machine in front of you is a particular machine, so it says which.
     if (el.cabinet) el.cabinet.textContent = r.skin ? r.skin.title : (r.cabinet ? r.cabinet.name : '');
     el.wonNow.textContent = num(r.won);
+    paintMouths();
     el.quotaNo.textContent = num(r.quota);
     const done = Math.min(1, r.quota > 0 ? r.won / r.quota : 0);
     el.quotaTube.firstElementChild.style.width = (done * 100).toFixed(1) + '%';
@@ -825,6 +830,35 @@ export async function boot(doc) {
     }
   }
 
+  // ---- the lettering on the mouths ------------------------------------
+  //
+  // Every mouth is named on the face: the slot says SLOT, a pay mouth says
+  // what it pays, the jackpot pocket says JACKPOT. A face of brass
+  // rectangles asks a new player to learn which is which; this tells them,
+  // from the board's own geometry, so it is right on every machine.
+  function paintMouths() {
+    const box = el.mouths;
+    if (!box || !scene || !game.run || !game.run.board) return;
+    const pockets = game.run.board.pockets || [];
+    const seen = new Set();
+    for (const p of pockets) {
+      seen.add(p.id);
+      const kind = p.kind === 'gate' ? 'slot' : p.kind === 'attacker' ? 'jackpot' : 'pay';
+      const want = kind === 'slot' ? 'SLOT' : kind === 'jackpot' ? 'JACKPOT' : String(p.pay);
+      let t = mouthTags.get(p.id);
+      if (!t) {
+        t = doc.createElement('div');
+        box.appendChild(t);
+        mouthTags.set(p.id, t);
+      }
+      if (t.className !== 'mouth ' + kind) t.className = 'mouth ' + kind;
+      if (t.textContent !== want) t.textContent = want;
+      const pt = scene.project(p.x, p.y - p.h * 0.5 - 1.4, mouthPoint);
+      t.style.transform = 'translate(' + pt.x.toFixed(1) + 'px,' + pt.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    }
+    for (const [id, t] of mouthTags) if (!seen.has(id)) { t.remove(); mouthTags.delete(id); }
+  }
+
   // ---- the arcade ----------------------------------------------------
   //
   // A second, separate set of machines. These are not played and never appear
@@ -1093,7 +1127,7 @@ function index(doc) {
     roundNo: $('roundNo'), cabinet: $('cabinet'), wonNow: $('wonNow'), quotaNo: $('quotaNo'),
     quotaTube: $('quotaTube'), perBall: $('perBall'),
     handle: $('handle'), strengthOut: $('strengthOut'), perPull: $('perPull'),
-    pull: $('pull'), auto: $('auto'), speed: $('speed'),
+    pull: $('pull'), auto: $('auto'), speed: $('speed'), mouths: $('mouths'),
     oddsMatch: $('oddsMatch'), oddsCont: $('oddsCont'), oddsGate: $('oddsGate'), oddsBack: $('oddsBack'),
     scrip: $('scrip'), income: $('income'), handMult: $('handMult'), cash: $('cash'),
     log: $('log'), rail: $('rail'), face: $('face'), canvas: $('view'),

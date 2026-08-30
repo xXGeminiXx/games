@@ -29,7 +29,7 @@
 // a part that is wrong should cost its own effect and nothing else.
 // ---------------------------------------------------------------------------
 
-import { baseMods } from './run.js?v=7';
+import { baseMods } from './run.js?v=8';
 
 export const MOMENTS = [
   'onRunStart', 'onRoundStart', 'onShopOpen', 'onLaunch', 'onPinHit', 'onPocket',
