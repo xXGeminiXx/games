@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=52';
-import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=52';
+import { POCKET_PAY } from './board.js?v=53';
+import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=53';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {

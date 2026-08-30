@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=52';
-import { createScene } from './render/scene.js?v=52';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=52';
-import { num, count, duration, mult, pct, fill } from './format.js?v=52';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=52';
-import { nailPos } from './board.js?v=52';
-import { DOORS_ROW } from './render/board-geom.js?v=52';
-import { sketchCabinet } from './cabinets.js?v=52';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=52';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=53';
+import { createScene } from './render/scene.js?v=53';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=53';
+import { num, count, duration, mult, pct, fill } from './format.js?v=53';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=53';
+import { nailPos } from './board.js?v=53';
+import { DOORS_ROW } from './render/board-geom.js?v=53';
+import { sketchCabinet } from './cabinets.js?v=53';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=53';
 
 const SPEEDS = [1, 2, 4];
 
@@ -306,7 +306,13 @@ export async function boot(doc) {
     // machines has not been told. The plaque says so until the first is bought.
     if (el.floorHint) {
       const cheapest = cfg.floor && cfg.floor.machines && cfg.floor.machines[0] ? cfg.floor.machines[0].cost : 0;
-      el.floorHint.textContent = r.income > 0 ? ''
+      // A start-over that would pay is the biggest thing the plaque can say,
+      // so it says that first; the sheet has the full terms.
+      const mm = game.metaModule;
+      const offer = mm && typeof mm.canReset === 'function' ? mm.canReset(cfg, game.meta, game.floor) : { ok: false };
+      const stars = offer && offer.ok && typeof game.pendingMarks === 'function' ? game.pendingMarks() : 0;
+      el.floorHint.textContent = stars > 0 ? 'Starting over pays ' + num(stars) + (stars === 1 ? ' star' : ' stars') + ' right now - open Your arcade. Stars buy upgrades that never go away.'
+        : r.income > 0 ? ''
         : r.scrip >= cheapest && cheapest > 0 ? 'You can buy your first arcade machine now - open Your arcade. Machines earn coins on their own, even while you are away.'
         : 'Trade balls for coins, then buy arcade machines. They earn while you are away, and that is what earns stars.';
     }
