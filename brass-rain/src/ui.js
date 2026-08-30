@@ -15,14 +15,14 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=38';
-import { createScene } from './render/scene.js?v=38';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=38';
-import { num, count, duration, mult, pct, fill } from './format.js?v=38';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=38';
-import { nailPos } from './board.js?v=38';
-import { sketchCabinet } from './cabinets.js?v=38';
-import { recordNight, loadNights, ordinal } from './nights.js?v=38';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=39';
+import { createScene } from './render/scene.js?v=39';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=39';
+import { num, count, duration, mult, pct, fill } from './format.js?v=39';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=39';
+import { nailPos } from './board.js?v=39';
+import { sketchCabinet } from './cabinets.js?v=39';
+import { recordNight, loadNights, ordinal } from './nights.js?v=39';
 
 const SPEEDS = [1, 2, 4];
 
@@ -986,7 +986,7 @@ export async function boot(doc) {
       const b = doc.createElement('b');
       b.textContent = 'Round ' + n.round;
       li.appendChild(b);
-      li.appendChild(doc.createTextNode(' ' + (n.machine || '') + ', ' + num(n.won || 0) + ' balls'));
+      li.appendChild(doc.createTextNode(' ' + (n.machine || '') + ', ' + num(n.won || 0) + ' balls' + (n.cashed ? ', banked' : '')));
       const s = doc.createElement('small');
       const d = new Date(n.at || 0);
       s.textContent = Number.isFinite(d.getTime()) && n.at ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
@@ -1014,14 +1014,14 @@ export async function boot(doc) {
       body.appendChild(p);
     } else {
       const t = doc.createElement('table');
-      t.innerHTML = '<thead><tr><th>#</th><th>Round</th><th>Machine</th><th class="n">Balls won</th><th class="n">Bonuses</th><th>When</th></tr></thead><tbody></tbody>';
+      t.innerHTML = '<thead><tr><th>#</th><th>Round</th><th>Machine</th><th class="n">Balls won</th><th class="n">Bonuses</th><th>Ended</th><th>When</th></tr></thead><tbody></tbody>';
       const tb = t.tBodies[0];
       list.forEach((n, i) => {
         const tr = doc.createElement('tr');
         tr.className = (i === 0 ? 'top' : '') + (n.at === lastNightAt ? ' now' : '');
         const d = new Date(n.at || 0);
         const when = n.at && Number.isFinite(d.getTime()) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-        const cells = [String(i + 1), 'Round ' + n.round, n.machine || '', num(n.won || 0), num(n.fevers || 0), when];
+        const cells = [String(i + 1), 'Round ' + n.round, n.machine || '', num(n.won || 0), num(n.fevers || 0), n.cashed ? 'Banked' : 'Lost', when];
         cells.forEach((v, k) => { const td = doc.createElement('td'); if (k === 3 || k === 4) td.className = 'n'; td.textContent = v; tr.appendChild(td); });
         tb.appendChild(tr);
       });
