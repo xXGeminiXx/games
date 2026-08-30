@@ -15,13 +15,13 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=16';
-import { createScene } from './render/scene.js?v=16';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=16';
-import { num, count, duration, mult, pct, fill } from './format.js?v=16';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=16';
-import { nailPos } from './board.js?v=16';
-import { sketchCabinet } from './cabinets.js?v=16';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=17';
+import { createScene } from './render/scene.js?v=17';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=17';
+import { num, count, duration, mult, pct, fill } from './format.js?v=17';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=17';
+import { nailPos } from './board.js?v=17';
+import { sketchCabinet } from './cabinets.js?v=17';
 
 const SPEEDS = [1, 2, 4];
 
@@ -756,7 +756,8 @@ export async function boot(doc) {
         + '<dt>Machine number</dt><dd class="n3"></dd></dl>'
         + '<div class="warn"></div>';
       d.querySelector('h4').textContent = label;
-      d.querySelector('.theme').textContent = cab.layout ? cab.layout + ' board' : '';
+      const doorCount = cab.skin && Number.isFinite(cab.skin.doors) ? cab.skin.doors : 3;
+      d.querySelector('.theme').textContent = (cab.layout ? cab.layout + ' board' : '') + ' - lights ' + doorCount + ' doors';
       drawSketch(d.querySelector('.sketch'), sketchCabinet(cfg, cab.seed), cab.skin);
 
       const big = d.querySelector('.big');
@@ -1155,6 +1156,12 @@ const HELP = [
     + 'and it pays hard for the next hundred balls or so. A bonus can roll straight into another one, which '
     + 'the banner counts as a streak. This is the whole point of the game. Played straight the board pays '
     + 'back less than it takes, so a bonus is the only way a round finishes ahead.'],
+  ['What the machine sends back', 'Now and then the machine sends something out: a lit stripe that pays more for a while, '
+    + 'its own creature crossing the board, a spare pocket, or a row of doors. The doors are a game. Click a door '
+    + 'to call it while the row is lit: right pays as many times over as there are doors, wrong pays nothing, and '
+    + 'left alone the paying door opens by itself. Every machine lights its own number of doors. Parts you bolt in '
+    + 'show on the machine too: nail parts warm the nails, slot parts brighten the slot, rail parts run a second '
+    + 'rail, and glass parts thicken the sheet.'],
   ['A round and its goal', 'A round rents the machine for a set number of PULLS and asks you to win a set number of balls back, which is the GOAL. Meet the goal and the counter pays a bonus of balls and the next round starts, harder. Miss it and the game is over. Later rounds send several balls per pull, so the same number of pulls puts far more on the board.'],
   ['The workbench', 'Between rounds the machine opens up. Parts are for sale, paid for with the balls you '
     + 'haven\'t launched, and a part changes how this machine behaves for the rest of the game. Up to five '
