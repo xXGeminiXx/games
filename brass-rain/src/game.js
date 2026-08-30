@@ -11,22 +11,23 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=6';
+import { loadConfig } from '../config.js?v=7';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=6';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=7';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=6';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=6';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=6';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=6';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=6';
-import { rng as makeRng } from './rng.js?v=6';
-import { offerCabinets } from './cabinets.js?v=6';
-import * as Save from './save.js?v=6';
-import { showState } from './render/reach.js?v=6';
+         handMult, restoreFloor } from './floor.js?v=7';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=7';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=7';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=7';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=7';
+import { rng as makeRng } from './rng.js?v=7';
+import { offerCabinets } from './cabinets.js?v=7';
+import * as Save from './save.js?v=7';
+import { showState } from './render/reach.js?v=7';
+import { skinForCabinet } from './render/themes.js?v=7';
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -47,8 +48,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=6');
-  const metaModule = await optional('./meta.js?v=6');
+  const catalogue = await optional('./fittings.js?v=7');
+  const metaModule = await optional('./meta.js?v=7');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -205,11 +206,15 @@ export function newRun(game, seed, withFittings) {
   // layout keeps clear of whatever furniture a part adds, and furniture added
   // after the nails would have nails standing in it.
   game.pendingFittings = Array.isArray(withFittings) ? withFittings.slice() : null;
+  // The speed the player chose is theirs, not the run's: a new machine
+  // starts at the speed the last one was left at rather than dropping to 1x.
+  const keepSpeed = game.run && Number.isFinite(game.run.speed) ? game.run.speed : 1;
   const fitted = refit(game, seed);
   const ids = game.pendingFittings ? game.pendingFittings.slice() : [];
   game.run = createRun(fitted.cfg, seed >>> 0, game.meta, {
     bench: game.bench, model: modelFor(game, ids), fittings: ids, mods: fitted.mods,
   });
+  game.run.speed = keepSpeed;
   game.run.board = buildFittedBoard(fitted.cfg, seed >>> 0, fitted.shape);
   useCabinet(fitted.cfg, game.run.board);
   // Anything the technician has learned to bolt in before the night starts is
@@ -624,6 +629,9 @@ export function reading(game) {
     pulls: pullsFor(cfg, run.round, run.mods),
     nextBonus: clearBonusFor(cfg, run.round, run.mods),
     cabinet: run.board && run.board.layout ? run.board.layout : null,
+    // The skin that cabinet wears: its name, its colours. The page letters
+    // the plaque and the row from this so they agree with the sign.
+    skin: run.board && run.board.layout ? skinForCabinet(run.board.layout.id, cfg) : null,
     lent: run.lent || 0,
     strength: run.strength,
     locked: !!cfg.launch.locked,
@@ -723,7 +731,11 @@ export function view(game) {
     // Which machine this is. A cabinet keeps its paint, so the skin follows
     // the layout rather than the round.
     theme: run.board && run.board.layout ? run.board.layout.id : null,
-    name: cfg.identity ? cfg.identity.name : null,
+    // The sign on top spells the machine's own name, not the game's. A row
+    // of six that all say the same thing is one machine painted six ways;
+    // a row that reads differently from across the floor is six machines.
+    name: run.board && run.board.layout ? skinForCabinet(run.board.layout.id, cfg).title
+      : (cfg.identity ? cfg.identity.name : null),
     // What the screen in the middle of it should be doing. Derived from the
     // spin that is already under way and never able to change it.
     show: showState(run.reel, {

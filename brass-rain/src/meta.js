@@ -146,7 +146,7 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=6';
+import { priceAt } from './economy.js?v=7';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -221,8 +221,8 @@ export const NODES = [
   // -- the first page -------------------------------------------------------
 
   {
-    id: 'notebook', name: 'The Notebook', tier: 0, cost: 1, needs: [], resets: 1,
-    text: 'A notebook of everything you have learned. Every star you own raises what your whole arcade earns: 12 stars makes it x1.87, 60 stars x2.94, 400 stars x6.',
+    id: 'notebook', name: 'Notebook', tier: 0, cost: 1, needs: [], resets: 1,
+    text: 'A notebook of everything you\'ve learned. Every star you own raises what your whole arcade earns: 12 stars makes it x1.87, 60 stars x2.94, 400 stars x6.',
     visible: 'A bound notebook on the workbench, open at the current page, with the star count written on it.',
     gives: { perMark: true },
   },
@@ -231,13 +231,13 @@ export const NODES = [
 
   {
     id: 'first_row', name: 'A Row to Start With', tier: 1, cost: 3, needs: ['notebook'], resets: 1,
-    text: 'Ten Upright Tens stay in your arcade when you sell the rest. Every fresh start opens with a row already earning, and ten is enough for the first doubling, so they run at double rate from the first second.',
+    text: 'Ten Upright Tens stay in your arcade when you start over, already at their first doubling, so they earn at double rate from the first second.',
     visible: 'Ten machines standing in the arcade the moment a restart finishes, where there used to be an empty row and a price.',
     gives: { startMachines: { upright: 10 } },
   },
   {
     id: 'spare_tray', name: 'Start Every Round With More Balls', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'The machine is loaded fuller before every round. Each one starts with 60 more balls than it would have.',
+    text: 'Every round starts with 60 more balls.',
     visible: 'A second tray under the machine, already full, before the first ball is sent.',
     gives: { trayBonus: 60 },
   },
@@ -249,13 +249,13 @@ export const NODES = [
   },
   {
     id: 'pin_hammer', name: 'Your Own Hammer', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'A hammer of your own. Four nails can be bent each round instead of three.',
+    text: 'Four nails can be bent each round instead of three.',
     visible: 'A fourth bend token on the nail rail, and a fourth nail that will take a bend.',
     gives: { bendsPerRound: 1 },
   },
   {
     id: 'counter_rail', name: 'A Better Counter', tier: 1, cost: 2, needs: ['notebook'], resets: 1,
-    text: 'A rail running straight from the tray to the counter. Cashing balls in pays 30 percent more coins per ball.',
+    text: 'Cashing balls in pays 30 percent more coins per ball.',
     visible: null,
     gives: { cashMult: 1.30 },
   },
@@ -263,14 +263,14 @@ export const NODES = [
   // -- the second page, from the second reset -------------------------------
 
   {
-    id: 'floor_ledger', name: 'The Arcade Ledger', tier: 2, cost: 8, needs: ['counter_rail'], resets: 2,
-    text: 'Your arcade keeps its own books. Every arcade machine earns 50 percent more, and six more hours away are paid for, 18 instead of 12.',
+    id: 'floor_ledger', name: 'Arcade Ledger', tier: 2, cost: 8, needs: ['counter_rail'], resets: 2,
+    text: 'Every arcade machine earns 50 percent more, and you\'re paid for 18 hours away instead of 12.',
     visible: null,
     gives: { floorMult: 1.50, idleHours: 6 },
   },
   {
     id: 'wider_gate', name: 'A Wider Slot', tier: 2, cost: 6, needs: ['pin_hammer'], resets: 2,
-    text: 'The slot filed wider, from 3.6 across to 4.4. The two nails guarding its shoulders stand further apart to match, so more balls find their way in.',
+    text: 'The slot filed wider, from 3.6 across to 4.4. The two nails guarding its shoulders stand farther apart to match, so more balls find their way in.',
     visible: 'A measurably wider slot, with the two shoulder nails that guard it visibly pushed out.',
     gives: { gateWidth: 0.8 },
   },
@@ -282,7 +282,7 @@ export const NODES = [
   },
   {
     id: 'worn_reroll', name: 'Cheaper New Parts', tier: 2, cost: 5, needs: ['bench_stool'], resets: 2,
-    text: 'A well-thumbed deck of cards. Asking the workbench for different parts costs 30 percent fewer balls, including after the price has already climbed.',
+    text: 'Asking the workbench for different parts costs 30 percent fewer balls, including after the price has already climbed.',
     visible: null,
     gives: { rerollDiscount: 0.30 },
   },
@@ -294,7 +294,7 @@ export const NODES = [
   },
   {
     id: 'first_fitting', name: 'Start With a Part', tier: 2, cost: 8, needs: ['bench_stool'], resets: 2,
-    text: 'A Brass Lip stays in the machine. Round one is played with a part already fitted, before you have seen the workbench at all.',
+    text: 'A Mid Pocket Lip stays in the machine, so round one starts with a part already fitted.',
     visible: 'A part already in slot one of the part rail when a game opens.',
     gives: { startFittings: ['brass_lip'] },
   },
@@ -308,8 +308,8 @@ export const NODES = [
     gives: { startMachines: { handle: 10, digital: 5 } },
   },
   {
-    id: 'nail_gauge', name: 'Bend Nails Further', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
-    text: 'A gauge for the bend. A nail head will travel half again as far, 2.4 across instead of 1.6.',
+    id: 'nail_gauge', name: 'Bend Nails Farther', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
+    text: 'A nail head travels half again as far, 2.4 across instead of 1.6.',
     visible: 'The ring drawn around a picked nail is half again as wide, and covers nails it could not before.',
     gives: { bendReach: 1.5 },
   },
@@ -321,7 +321,7 @@ export const NODES = [
   },
   {
     id: 'detent_file', name: 'Reels Match More Often', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
-    text: 'The catch inside the reels filed back. All three digits match 14 percent of the time instead of 11.',
+    text: 'All three digits match 14 percent of the time instead of 11.',
     visible: null,
     gives: { matchBonus: 0.03 },
   },
@@ -333,13 +333,13 @@ export const NODES = [
   },
   {
     id: 'standing_order', name: 'Every Machine Earns More', tier: 3, cost: 18, needs: ['floor_ledger'], resets: 5,
-    text: 'A standing order with the supplier. Every arcade machine you own earns another 75 percent on top.',
+    text: 'Every arcade machine you own earns another 75 percent on top.',
     visible: null,
     gives: { floorMult: 1.75 },
   },
   {
     id: 'two_hands', name: 'Two Balls a Pull', tier: 3, cost: 22, needs: ['first_fitting'], resets: 5,
-    text: 'Two balls leave the rail on every pull instead of one. Your balls run out twice as fast, so this is a cost as well as a gift.',
+    text: 'Two balls leave the rail on every pull instead of one. Your balls run out twice as fast.',
     visible: 'Two balls riding the top rail together on every pull, and a ball count that falls twice as fast.',
     gives: { launchPer: 1 },
   },
@@ -348,7 +348,7 @@ export const NODES = [
 
   {
     id: 'short_night', name: 'Smaller Round Goals', tier: 4, cost: 40, needs: ['standing_order'], resets: 9,
-    text: 'The arcade closes early. Every round asks for 12 percent fewer balls, in every round of every game.',
+    text: 'Every round asks for 12 percent fewer balls, in every round of every game.',
     visible: null,
     gives: { quotaDiscount: 0.12 },
   },
@@ -360,13 +360,13 @@ export const NODES = [
   },
   {
     id: 'bolted_pair', name: 'Start With Three Parts', tier: 4, cost: 50, needs: ['first_fitting', 'two_hands'], resets: 9,
-    text: 'A Lamp Reflector and a Felt Strip stay in the machine as well. Round one is played with three parts already fitted.',
+    text: 'A Bonus Reflector and a Felt Strip stay in the machine too, so round one starts with three parts fitted.',
     visible: 'Three slots on the part rail filled before the first workbench, not one.',
     gives: { startFittings: ['lamp_reflector', 'felt_strip'] },
   },
   {
     id: 'whole_row', name: 'The Whole Arcade Earns More', tier: 4, cost: 55, needs: ['standing_order', 'second_row'], resets: 9,
-    text: 'The work goes into the whole arcade, not one machine. Every arcade machine earns another 125 percent on top, and cashing balls in pays double.',
+    text: 'Every arcade machine earns another 125 percent on top, and cashing balls in pays double.',
     visible: null,
     gives: { floorMult: 2.25, cashMult: 2.00 },
   },
@@ -650,8 +650,8 @@ export function nodeStatus(cfg, meta, id) {
   if (resets < needResets) {
     unlocked = false;
     why = needResets === 1
-      ? 'The technician hasn\'t been out yet.'
-      : 'Not until the technician has been out ' + needResets + ' times.';
+      ? 'You haven\'t started over yet.'
+      : 'Not until you\'ve started over ' + needResets + ' times.';
   } else {
     for (const req of node.needs || []) {
       if (levelOf(meta, req) <= 0) {

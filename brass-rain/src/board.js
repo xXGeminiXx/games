@@ -18,7 +18,7 @@
 // to read it again.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=6';
+import { rng as makeRng } from './rng.js?v=7';
 
 export const POCKET_OUT = 'out';
 export const POCKET_PAY = 'pay';
@@ -68,6 +68,7 @@ export function createBoard(cfg, seed) {
   // that can only be checked against furniture that is already placed.
   layOutPockets(cfg, board, layout);
   layOutRails(cfg, board, layout);
+  liftPocketsOffScreen(cfg, board);
   liftPocketsOffPlates(cfg, board);
   layOutNails(cfg, board, makeRng(seed).next, layout);
   rebuild(board);
@@ -246,6 +247,57 @@ function layOutRails(cfg, board, layout) {
  * far too easy to do by accident, so it is corrected here rather than trusted
  * to whoever writes the next cabinet.
  */
+/**
+ * Where the extra reel windows open around the show screen, in multiples of
+ * the screen's half extent. The same table the renderer arranges them by
+ * (REEL_RING in render/board-geom.js); a test holds the two together.
+ */
+export const SCREEN_RING = [
+  [-1.38, 0.10], [1.38, 0.10],
+  [-1.30, 0.86], [1.30, 0.86],
+  [-1.20, -0.60], [1.20, -0.60],
+];
+
+/**
+ * Every rectangle the picture can paint over the face: the show screen and
+ * the six reel windows that open around it while spins are waiting.
+ */
+export function screenCover(cfg) {
+  const scr = cfg.board.reel;
+  if (!scr) return [];
+  const win = { w: cfg.board.w * 0.135, h: cfg.board.h * 0.046 };
+  const out = [{ x: scr.x, y: scr.y, w: scr.w, h: scr.h }];
+  for (const o of SCREEN_RING) out.push({ x: scr.x + o[0] * scr.w * 0.5, y: scr.y + o[1] * scr.h * 0.5, w: win.w, h: win.h });
+  return out;
+}
+
+/**
+ * A mouth under the show screen or under a reel window is a mouth nobody can
+ * see: the picture is painted over the mouths, and a ball still falls into
+ * it. Any mouth the picture would cover is moved down to just under the
+ * screen, and sideways if that spot is taken, so every mouth on every machine
+ * is in plain view. Runs before the plates are checked, since the plates are
+ * lower and have the final say.
+ */
+function liftPocketsOffScreen(cfg, board) {
+  const cover = screenCover(cfg);
+  if (!cover.length) return;
+  const clear = cfg.physics.ballRadius * 1.5;
+  const scr = cover[0];
+  const overlaps = (p, r) => Math.abs(p.x - r.x) < (p.w + r.w) * 0.5 + clear && Math.abs(p.y - r.y) < (p.h + r.h) * 0.5 + clear;
+  const b = cfg.board;
+  for (const p of board.pockets) {
+    if (!cover.some(r => overlaps(p, r))) continue;
+    p.y = scr.y + scr.h * 0.5 + clear + p.h * 0.5 + 1.0;
+    for (let tries = 0; tries < 12; tries++) {
+      const busy = board.pockets.some(q => q !== p && Math.abs(q.x - p.x) < (q.w + p.w) * 0.5 + clear * 2 && Math.abs(q.y - p.y) < (q.h + p.h) * 0.5 + clear * 2);
+      if (!busy) break;
+      p.x += (tries % 2 === 0 ? 1 : -1) * 8 * (tries + 1);
+      p.x = Math.max(b.fieldLeft + 6, Math.min(b.fieldRight - 6, p.x));
+    }
+  }
+}
+
 function liftPocketsOffPlates(cfg, board) {
   const clear = cfg.physics.ballRadius * 2.6;
   for (const p of board.pockets) {

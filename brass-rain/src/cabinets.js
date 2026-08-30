@@ -18,9 +18,10 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=6';
-import { createBalls, launch, stepPhysics } from './physics.js?v=6';
-import { rng as makeRng } from './rng.js?v=6';
+import { createBoard, nailPos, layoutFor } from './board.js?v=7';
+import { createBalls, launch, stepPhysics } from './physics.js?v=7';
+import { rng as makeRng } from './rng.js?v=7';
+import { skinForCabinet } from './render/themes.js?v=7';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
@@ -58,6 +59,25 @@ export function offerCabinets(cfg, seedFrom, count) {
   return out;
 }
 
+/**
+ * The face of one machine, reduced to what a small picture of it needs: the
+ * field, the screen, every mouth, the plates and the nails. Built on demand
+ * for the row and never saved, because a card is drawn far less often than a
+ * save is written.
+ */
+export function sketchCabinet(cfg, seed) {
+  const board = createBoard(cfg, seed);
+  const b = cfg.board;
+  return {
+    w: board.w, h: board.h,
+    field: { left: b.fieldLeft, right: b.fieldRight, top: b.fieldTop, bottom: b.fieldBottom },
+    screen: b.reel ? { x: b.reel.x, y: b.reel.y, w: b.reel.w, h: b.reel.h } : null,
+    pockets: board.pockets.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, kind: p.kind, pay: p.pay || 0, tone: p.tone || '' })),
+    guides: (board.guides || []).map(g => [g.x1, g.y1, g.x2, g.y2]),
+    nails: board.nails.map(n => { const p = nailPos(n); return [p.x, p.y]; }),
+  };
+}
+
 function layoutCount(cfg) {
   return Array.isArray(cfg.board.layouts) && cfg.board.layouts.length ? cfg.board.layouts.length : 1;
 }
@@ -71,6 +91,8 @@ export function readCabinet(cfg, seed, index) {
     seed,
     name: cabinetName(seed, index),
     layout: board.layout ? board.layout.name : '',
+    skin: board.layout ? skinForCabinet(board.layout.id, cfg) : null,
+    title: board.layout ? skinForCabinet(board.layout.id, cfg).title : '',
     note: board.layout ? board.layout.note : '',
     nails: board.pinCount,
     lean: shape.lean,

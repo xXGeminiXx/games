@@ -490,7 +490,7 @@ export const FITTINGS = [
 
   fit({
     id: 'reel_detent', name: 'Middle Reel Detent',
-    text: 'When the two outer reels match, the middle reel lands on the same board {middleWeight%} of the time. A detent slows it.',
+    text: 'When the two outer reels match, the middle reel lands on the same symbol {middleWeight%} of the time. A detent slows it.',
     rarity: 'common', price: 30, hook: 'static', tags: ['reel', 'fever'],
     mods: { middleWeight: ['+', 0.04] },
     bound: 'It does nothing until the outer reels match on their own, and it tops out at 75 percent.'
@@ -555,8 +555,8 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'till_rail', name: 'Till Window',
-    text: 'The bonus for clearing a round is x{mul~}. A second window opens on the till.',
+    id: 'till_rail', name: 'Register Window',
+    text: 'The bonus for clearing a round is x{mul~}. A second window opens on the register.',
     rarity: 'common', price: 35, hook: 'onRoundEnd', tags: ['economy'],
     n: { mul: 1.12 },
     bound: 'Pays nothing on a round you fail, and the clear bonus never counts toward the goal you needed.',
@@ -630,7 +630,7 @@ export const FITTINGS = [
 
   fit({
     id: 'slope_plate', name: 'Slope Plate',
-    text: 'Side pockets catch 5 more balls in every 100, but the big pocket catches half a ball fewer. The lower field leans left.',
+    text: 'Side pockets catch 5 more balls in every 100, but the big pocket catches half a ball fewer. The lower board leans left.',
     rarity: 'uncommon', price: 60, hook: 'static', tags: ['board', 'pocket', 'cost'],
     mods: { sideProb: ['+', 0.05], jadeProb: ['+', -0.005] }, board: { slope: -0.06 },
     bound: 'It trades 5 ball hits for 1 ball hits. That\'s a downgrade the moment you own anything feeding the big pocket.'
@@ -669,7 +669,7 @@ export const FITTINGS = [
 
   fit({
     id: 'reel_brake', name: 'Middle Reel Brake',
-    text: 'When the outer reels match, the middle reel lands on the same board {middleWeight%} of the time. A brake shoe drags on it.',
+    text: 'When the outer reels match, the middle reel lands on the same symbol {middleWeight%} of the time. A brake shoe drags on it.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['reel', 'fever'],
     mods: { middleWeight: ['+', 0.10] },
     bound: 'Tops out at 75 percent, and the outer reels still have to match first before this does anything.'
@@ -751,7 +751,7 @@ export const FITTINGS = [
 
   fit({
     id: 'escapement', name: 'Bonus Climber',
-    text: 'Every ball of a BONUS raises the BONUS multiplier by +{step~}. It drops back when the lamp cools.',
+    text: 'Every ball of a BONUS raises the BONUS multiplier by +{step~}. It drops back when the BONUS ends.',
     rarity: 'uncommon', price: 65, hook: 'onFeverBall', tags: ['fever'],
     n: { step: 0.03 },
     bound: 'It resets at the end of every BONUS, so it pays on long ones and almost nothing on short ones.',
@@ -760,7 +760,7 @@ export const FITTINGS = [
 
   fit({
     id: 'counter_wheel', name: 'Doubling Wheel',
-    text: 'Every {every#}th pocket you hit in a round pays double. A counting wheel is fitted to the till.',
+    text: 'Every {every#}th pocket you hit in a round pays double. A counting wheel is fitted to the register.',
     rarity: 'uncommon', price: 60, hook: 'onPocket', tags: ['pocket', 'economy'],
     scope: 'round',
     n: { every: 8 },
@@ -794,7 +794,7 @@ export const FITTINGS = [
 
   fit({
     id: 'diverter', name: 'Off-Center Slot',
-    text: 'The slot takes 3 more balls in every 100, but the handle range that finds it\'s 30 percent narrower.',
+    text: 'The slot takes 3 more balls in every 100, but the handle range that finds it is 30 percent narrower.',
     rarity: 'uncommon', price: 65, hook: 'static', tags: ['board', 'gate', 'cost'],
     mods: { gateProb: ['+', 0.03], aimWindow: ['*', 0.7] },
     board: { diverter: true },
@@ -829,7 +829,7 @@ export const FITTINGS = [
 
   fit({
     id: 'anchor_plate', name: 'Early Finish Plate',
-    text: 'Clear a round with {spare#} or more pulls unused and the till pays you {balls#} balls.',
+    text: 'Clear a round with {spare#} or more pulls unused and the register pays you {balls#} balls.',
     rarity: 'uncommon', price: 60, hook: 'onRoundEnd', tags: ['economy'],
     n: { spare: 20, balls: 40 },
     bound: 'A flat 40 balls. By round 12 the goal runs into the hundreds and this barely registers.',
@@ -861,7 +861,7 @@ export const FITTINGS = [
 
   fit({
     id: 'magnet_coil', name: 'Bonus Coil',
-    text: 'During a BONUS every pocket pays x{mul~}. A coil energizes while the lamp is warm.',
+    text: 'During a BONUS every pocket pays x{mul~}. A coil energizes during a BONUS.',
     rarity: 'rare', price: 110, hook: 'onPocket', tags: ['fever', 'pocket'],
     n: { mul: 1.5 },
     bound: 'BONUS balls only, which on most machines is well under a fifth of the balls you fire.',
@@ -1031,8 +1031,8 @@ export const FITTINGS = [
   // ---- brass ----------------------------------------------------------- //
 
   fit({
-    id: 'brass_seven', name: 'The Brass Seven',
-    text: 'Match three sevens and the BONUS runs {balls#} balls at x{mult~}. One board in twelve on each reel is a seven.',
+    id: 'brass_seven', name: 'Brass Seven',
+    text: 'Match three sevens and the BONUS runs {balls#} balls at x{mult~}. One symbol in twelve on each reel is a seven.',
     rarity: 'brass', price: 220, hook: 'onReelSpin', tags: ['reel', 'fever'],
     n: { balls: 40, mult: 2.0 },
     bound: 'A seven on both outer reels comes up about once in 144 spins, so unaided this fires about once in 3,400 balls.',
@@ -1074,8 +1074,8 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'counter_till', name: 'Second Till',
-    text: 'The bonus for clearing a round is x{mul~}. A second till opens behind the counter.',
+    id: 'counter_till', name: 'Second Register',
+    text: 'The bonus for clearing a round is x{mul~}. A second register opens behind the counter.',
     rarity: 'brass', price: 200, hook: 'onRoundEnd', tags: ['economy'],
     n: { mul: 2.0 },
     bound: 'It pays nothing on the round that ends your run, which is the round you needed it most.',
@@ -1103,7 +1103,7 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'technicians_plan', name: 'The Bench Plan',
+    id: 'technicians_plan', name: 'Bench Plan',
     text: 'One more bolt point on the machine, and the bench always offers at least one rare part.',
     rarity: 'brass', price: 230, hook: 'onShopOpen', tags: ['shop', 'economy'],
     mods: { slots: ['+', 1] },
@@ -1147,11 +1147,11 @@ export const SYNERGIES = [
   },
   {
     ids: ['warm_lamp', 'holding_plate'], name: 'Long Afterglow', on: 'afterglow', mult: 1.60,
-    text: 'Everything paid in the balls right after a BONUS is worth x1.60. The lamp is still warm and the slot is still open.'
+    text: 'Everything paid in the balls right after a BONUS is worth x1.60. The BONUS just ended and the slot is still open.'
   },
   {
     ids: ['holding_plate', 'gate_widener', 'continuation_lock'], name: 'Bonus Chain', on: 'feverLen', mult: 2.20,
-    text: 'BONUSes run x2.20 longer. Held open, widened, and locked so a reel match stretches them further.'
+    text: 'BONUSes run x2.20 longer. Held open, widened, and locked so a reel match stretches them farther.'
   },
   {
     ids: ['twin_gate', 'horseshoe_magnet'], name: 'Double Slot Pull', on: 'gateProb', mult: 1.25,

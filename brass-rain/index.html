@@ -32,7 +32,7 @@
   }
   button:hover:not(:disabled){background:#fff}
   button:active:not(:disabled){transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(0,0,0,.35)}
-  button:disabled{opacity:.38;cursor:default;box-shadow:none}
+  button:disabled{opacity:.65;cursor:default;box-shadow:none}
   button.on{background:var(--jade);color:#08201a}
   button.ghost{background:transparent;color:var(--enamel);border-color:rgba(233,230,214,.3);box-shadow:none}
   button.ghost:hover:not(:disabled){background:rgba(233,230,214,.1)}
@@ -210,8 +210,13 @@
   .cab{
     background:linear-gradient(#2a0f12,#1d090b);border:1px solid var(--rule);border-radius:5px;
     padding:11px 12px 12px;display:flex;flex-direction:column;gap:7px;text-align:left;
+    border-top:6px solid var(--face,var(--rule));
   }
-  .cab h4{margin:0;font:600 16px/1 var(--narrow);letter-spacing:.1em;color:var(--brass-lit)}
+  .cab h4{
+    margin:0;font:600 18px/1 var(--narrow);letter-spacing:.1em;
+    color:var(--face,var(--brass-lit));
+    color:color-mix(in srgb, var(--face, var(--brass-lit)) 60%, var(--lamp));
+  }
   .cab .big{font:600 24px/1 var(--narrow);color:var(--lamp)}
   .cab p{margin:0;font-size:12px;color:var(--dim);flex:1 1 auto}
   .cab dl{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin:0;font-size:11px}
@@ -239,7 +244,7 @@
   }
   td{padding:5px 8px 5px 0;border-top:1px solid rgba(176,134,55,.2);color:var(--enamel)}
   td.n{text-align:right;font-variant-numeric:tabular-nums}
-  tr.poor td{color:#7d6a60}
+  tr.poor td{color:#8a7970}
   #bulkbar{display:flex;gap:5px;margin:0 0 10px}
   #bulkbar button{font-size:11px;padding:3px 11px}
 
@@ -269,6 +274,16 @@
   }
   .chip:hover,.chip:focus-visible{background:rgba(176,134,55,.34)}
   .chip i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;font-style:normal}
+  /* An offer wears its rarity round the box, in the bead's colour, and in
+     its label as a darker ink that still reads on the plaque. */
+  .card.r-common{box-shadow:0 0 0 2px #9a9382,var(--plaque-shadow)}
+  .card.r-uncommon{box-shadow:0 0 0 2px #5fbf9c,var(--plaque-shadow)}
+  .card.r-rare{box-shadow:0 0 0 2px #6ea8dc,var(--plaque-shadow)}
+  .card.r-brass{box-shadow:0 0 0 2px #b08637,0 0 0 4px rgba(240,207,131,.55),var(--plaque-shadow)}
+  .card.r-common .rar{color:#6a6357}
+  .card.r-uncommon .rar{color:#2a7a5a}
+  .card.r-rare .rar{color:#2c6a9c}
+  .card.r-brass .rar{color:#8a5a14}
   .chip.r-common i{background:#9a9382}
   .chip.r-uncommon i{background:#5fbf9c}
   .chip.r-rare i{background:#6ea8dc}
@@ -289,9 +304,11 @@
   #tip .rar{font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:#8a4a3a;margin-bottom:5px}
   #tip .rar b{color:#7a5c50;font-weight:600;letter-spacing:0;text-transform:none;font-size:11px}
   #tip p{margin:0 0 5px;color:#4a342c}
-  #tip .bound{color:#7a6a60;font-style:italic;border-top:1px dotted rgba(92,29,32,.25);padding-top:5px;margin-top:2px}
+  #tip .bound{color:#6e5f56;font-style:italic;border-top:1px dotted rgba(92,29,32,.25);padding-top:5px;margin-top:2px}
   #tip .combos{color:#1d6b55;font-weight:600;margin-top:4px}
-  #tip .tags{color:#8a7f74;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
+  /* a combination that is still missing a part, rather than one in hand */
+  #tip .combos.need{color:#795d33}
+  #tip .tags{color:#685f57;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
 
   /* the first-run card */
   #primer{z-index:30}
@@ -305,6 +322,7 @@
      whatever gives a machine its own name and color. */
   .cab .theme{font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
   .cab .theme:empty{display:none}
+  .cab .sketch{display:block;height:150px;width:auto;margin:0 auto;border-radius:4px;border:1px solid var(--rule);background:#000}
   .cab .big small{display:block;font:11px/1.3 var(--narrow);letter-spacing:0;color:var(--dim);margin-top:3px;text-transform:none}
   .cab .warn{font-size:11px;color:#d09a6a}
 
@@ -457,7 +475,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="a514396acd5c">
+<meta name="build" content="6d30f863fd75">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -540,7 +558,7 @@
     <section class="plaque" id="pOdds">
       <h2>The odds, printed on the glass</h2>
       <div class="row"><span class="sub">All three reels match</span><b id="oddsMatch">11%</b></div>
-      <div class="row"><span class="sub">A bonus runs on again</span><b id="oddsCont">30%</b></div>
+      <div class="row"><span class="sub">A bonus rolls into another</span><b id="oddsCont">30%</b></div>
       <div class="row"><span class="sub">Balls reaching the slot</span><b id="oddsGate">-</b></div>
       <div class="row"><span class="sub">Balls back per ball spent</span><b id="oddsBack">-</b></div>
     </section>
@@ -549,7 +567,7 @@
       <h2>Your arcade</h2>
       <div class="row"><span class="big" id="scrip">0</span><span class="sub">coins</span></div>
       <div class="row"><span class="sub">Coins a second, even while away</span><b class="live" id="income">0 /s</b></div>
-      <div class="row"><span class="sub">Bonus for how far you have played</span><b id="handMult">x1</b></div>
+      <div class="row"><span class="sub">Bonus for how far you've played</span><b id="handMult">x1</b></div>
       <div class="knobrow">
         <button id="cash" type="button">Trade balls for coins</button>
       </div>
@@ -615,7 +633,7 @@
     <p class="lede" id="rowLede"></p>
     <div id="cabinets"></div>
     <div class="sheetfoot">
-      <button id="rowLater" type="button" class="ghost">Keep playing the one I am on</button>
+      <button id="rowLater" type="button" class="ghost">Keep playing the one I'm on</button>
     </div>
   </div>
 </div>
@@ -624,7 +642,7 @@
 <div class="sheet" id="settings" hidden>
   <div class="panel">
     <h1>Settings</h1>
-    <p class="lede">The picture adapts to whatever it is running on. Everything here overrides that.</p>
+    <p class="lede">The picture adapts to whatever it's running on. Everything here overrides that.</p>
     <div class="settingrow">
       <label for="fpsTarget">Frame rate aim</label>
       <input id="fpsTarget" type="range" min="0" max="5" step="1" value="2">
@@ -664,14 +682,14 @@
 <div class="sheet" id="primer" hidden>
   <div class="panel primer">
     <h1 id="primerTitle">How this game works</h1>
-    <p class="lede">Six lines, then you are playing.</p>
+    <p class="lede">Six lines, then you're playing.</p>
     <ol id="primerList">
       <li><b>Pull the handle.</b> Balls arc over the top and rain down through the nails.</li>
       <li><b>Pockets pay.</b> A ball that drops into a pocket pays balls back. Most balls miss, so playing straight slowly loses.</li>
       <li><b>The slot in the middle spins the reels.</b> That narrow mouth is the one worth aiming at.</li>
       <li><b>Three matching reels start a BONUS.</b> The jackpot pocket swings open and pays hard for the next hundred balls or so. This is how you get ahead.</li>
-      <li><b>Between rounds you shop.</b> Balls you have not launched buy parts at the workbench, and you can bend nails to steer the rain toward the slot.</li>
-      <li><b>Cash balls out for coins.</b> Coins buy machines for your arcade, and those earn coins around the clock, even while you are away.</li>
+      <li><b>Between rounds you shop.</b> Balls you haven't launched buy parts at the workbench, and you can bend nails to steer the rain toward the slot.</li>
+      <li><b>Cash balls out for coins.</b> Coins buy machines for your arcade, and those earn coins around the clock, even while you're away.</li>
     </ol>
     <div class="sheetfoot">
       <button id="primerGo" type="button">Got it, let me play</button>
@@ -689,7 +707,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=6';
+  import { boot } from './src/ui.js?v=7';
   boot(document);
 </script>
 </body>

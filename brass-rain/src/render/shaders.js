@@ -30,8 +30,8 @@
 // positions arrive as five separate arrays that go to the GPU untouched.
 // ---------------------------------------------------------------------------
 
-import { digitGlsl } from './digits.js?v=6';
-import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=6';
+import { digitGlsl } from './digits.js?v=7';
+import { marqueeGlsl, MAX_LETTERS } from './marquee.js?v=7';
 
 // ---- shared ---------------------------------------------------------------
 
@@ -225,6 +225,128 @@ void main() {
   float wash = smoothstep(u_board.y * 0.55, 0.0, p.y);
   lac = mix(lac, mix(lac, u_glow * (0.55 + 0.45 * fall), 0.085), wash);
   lac += u_glow * u_show.x * wash * 0.07 * fall;
+
+  // ---- the livery ---------------------------------------------------------
+  // What is painted on the face under the nails. A cabinet is not a colour, it
+  // is a picture: the same six shapes of machine wear six different pictures,
+  // and this is the part a player can tell apart from across the room. Every
+  // shape is distance-field or noise in the face's own paint - a darker shade
+  // and a lighter one - with the accent kept for one thing per picture, so the
+  // nails and the balls still read on top of it.
+  {
+  int look = int(u_show.w + 0.5);
+  float t = u_time;
+  vec2 n = p / max(u_board, vec2(1e-4));
+  vec2 a = vec2(n.x * u_board.x / max(u_board.y, 1e-4), n.y);
+  float dark = 0.0, light = 0.0, acc = 0.0;
+
+  if (look == 0) {
+    // Tide Pool: a sun high on one side, and rows of swell across the lower
+    // face, each crest catching the lamp.
+    float wv = sin(a.x * 14.0 + t * 0.25) * 0.5 + sin(a.x * 23.0 - t * 0.17) * 0.25;
+    float rowy = fract(n.y * 7.0 + wv * 0.10);
+    float low = smoothstep(0.34, 0.58, n.y);
+    light += smoothstep(0.10, 0.0, abs(rowy - 0.5)) * low * 0.55;
+    dark += smoothstep(0.30, 0.12, abs(rowy - 0.5)) * smoothstep(0.10, 0.0, abs(rowy - 0.5) - 0.10) * low * 0.30;
+    vec2 sc = a - vec2(0.70, 0.10);
+    float sun = length(sc) - 0.085;
+    light += smoothstep(0.012, 0.0, sun) * 0.9;
+    float rayA = atan(sc.y, sc.x);
+    light += pow(max(sin(rayA * 9.0 + t * 0.1), 0.0), 14.0) * smoothstep(0.0, 0.10, sun) * smoothstep(0.50, 0.0, sun) * 0.35;
+  } else if (look == 1) {
+    // Hot House: big leaves climbing both edges, a pale rib down each, and a
+    // blossom or two in the accent where a stem ends.
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      float side = i < 2 ? -1.0 : 1.0;
+      float k = mod(fi, 2.0);
+      vec2 c = vec2(0.431 + side * (0.30 + k * 0.08), 0.90 - k * 0.30 - (fi < 2.0 ? 0.0 : 0.12));
+      float ang = side * (0.75 - k * 0.25) + sin(t * 0.3 + fi) * 0.03;
+      vec2 d2 = a - c;
+      vec2 r = vec2(cos(ang) * d2.x - sin(ang) * d2.y, sin(ang) * d2.x + cos(ang) * d2.y);
+      float leaf = length(r / vec2(0.075, 0.17)) - 1.0;
+      dark += smoothstep(0.05, 0.0, leaf) * 0.8;
+      light += smoothstep(0.006, 0.0, abs(r.x)) * step(leaf, 0.0) * 0.55;
+      // the veins
+      light += smoothstep(0.004, 0.0, abs(fract(r.y * 9.0) - 0.5) - 0.02) * step(leaf, 0.0) * smoothstep(0.0, 0.03, abs(r.x)) * 0.18;
+    }
+    vec2 b1 = a - vec2(0.09, 0.17), b2 = a - vec2(0.77, 0.24);
+    float blossom = min(length(b1) - 0.03, length(b2) - 0.026);
+    acc += smoothstep(0.008, 0.0, blossom) * 0.9;
+    dark += smoothstep(0.014, 0.0, abs(blossom) - 0.004) * 0.6;
+  } else if (look == 2) {
+    // Gold Rush: a sunburst off the top of the face, a river of the accent
+    // across it, and nuggets heaped along the bottom.
+    vec2 sc = a - vec2(0.431, -0.06);
+    float ang = atan(sc.x, sc.y);
+    float ray = smoothstep(0.30, 0.70, 0.5 + 0.5 * sin(ang * 18.0 + t * 0.05));
+    light += ray * 0.26 * smoothstep(0.85, 0.15, n.y);
+    float river = abs(n.y - 0.79 - sin(a.x * 7.0 + 0.6) * 0.025) - 0.018;
+    acc += smoothstep(0.008, 0.0, river) * 0.75;
+    dark += smoothstep(0.012, 0.0, abs(river) - 0.006) * 0.5;
+    vec2 g = vec2(a.x * 9.0, (n.y - 0.86) * 13.0);
+    vec2 gi = floor(g), gf = fract(g) - 0.5;
+    float band = step(0.86, n.y);
+    float nug = length(gf + (vec2(hash21(gi), hash21(gi + 7.0)) - 0.5) * 0.4) - 0.26;
+    light += smoothstep(0.04, 0.0, nug) * band * 0.7;
+    dark += smoothstep(0.05, 0.0, abs(nug) - 0.03) * band * 0.4;
+  } else if (look == 3) {
+    // Blast Furnace: the face is riveted steel plate, and a hazard chevron runs
+    // along the foot of it.
+    float seam = abs(fract(n.y * 5.0 + 0.5) - 0.5);
+    dark += smoothstep(0.022, 0.0, seam) * 0.75;
+    light += smoothstep(0.045, 0.022, seam) * step(0.0, fract(n.y * 5.0 + 0.5) - 0.5) * 0.18;
+    vec2 rv = vec2(fract(a.x * 11.0 + 0.5) - 0.5, seam * 5.0);
+    float rivet = length(rv) - 0.09;
+    light += smoothstep(0.05, 0.0, rivet) * 0.7;
+    dark += smoothstep(0.05, 0.0, abs(rivet) - 0.03) * 0.5;
+    float foot = step(0.93, n.y);
+    float chev = step(0.5, fract((a.x + abs(n.y - 0.965) * 1.2) * 7.0));
+    dark += foot * chev * 0.85;
+  } else if (look == 4) {
+    // Cherry Bomb: a checkered diner floor along the foot, chrome trim lines,
+    // and the pair of cherries every slot player knows, up in one corner.
+    float foot = step(0.90, n.y);
+    float chk = mod(floor(a.x * 14.0) + floor((n.y - 0.90) * 16.2), 2.0);
+    dark += foot * chk * 0.75;
+    light += foot * (1.0 - chk) * 0.40;
+    light += smoothstep(0.005, 0.0, abs(n.y - 0.892)) * 0.9;
+    light += smoothstep(0.004, 0.0, abs(n.y - 0.050)) * 0.5 + smoothstep(0.004, 0.0, abs(n.y - 0.068)) * 0.35;
+    vec2 c1 = a - vec2(0.105, 0.145), c2 = a - vec2(0.175, 0.170);
+    float ch = min(length(c1) - 0.042, length(c2) - 0.042);
+    dark += smoothstep(0.008, 0.0, ch) * 0.9;
+    light += (smoothstep(0.016, 0.0, length(c1 - vec2(-0.014, -0.014)) - 0.010)
+            + smoothstep(0.016, 0.0, length(c2 - vec2(-0.014, -0.014)) - 0.010)) * 0.8;
+    float s1 = abs((a.x - 0.105) - (0.145 - a.y) * 0.75) - 0.004;
+    float s2 = abs((a.x - 0.175) - (0.170 - a.y) * 0.25) - 0.004;
+    float stem = min(s1 * step(a.y, 0.145), s2 * step(a.y, 0.170));
+    dark += smoothstep(0.004, 0.0, stem) * step(0.06, a.y) * 0.8;
+  } else {
+    // Stardust: a field of stars that twinkle, a ringed planet up in one
+    // corner, and the one dark face on the floor, so the picture is mostly
+    // light on dark.
+    vec2 sg = a * 26.0;
+    vec2 si = floor(sg), sf = fract(sg) - 0.5;
+    float sh = hash21(si);
+    float star = step(0.90, sh) * smoothstep(0.12, 0.0, length(sf + (vec2(hash21(si + 3.0), hash21(si + 9.0)) - 0.5) * 0.6) - 0.02);
+    light += star * (0.45 + 0.55 * sin(t * 1.7 + sh * 50.0)) * 0.9;
+    vec2 pc = a - vec2(0.72, 0.13);
+    float pl = length(pc) - 0.075;
+    dark += smoothstep(0.008, 0.0, pl) * 0.85;
+    light += smoothstep(0.03, 0.0, length(pc - vec2(-0.028, -0.028)) - 0.018) * step(pl, 0.0) * 0.35;
+    vec2 rr = vec2(pc.x * 0.82 + pc.y * 0.57, -pc.x * 0.57 + pc.y * 0.82);
+    float ring = abs(length(rr / vec2(0.165, 0.05)) - 1.0);
+    float front = max(step(0.0, pl), step(0.0, rr.y));
+    light += smoothstep(0.14, 0.0, ring) * front * 0.75;
+    acc += smoothstep(0.05, 0.0, ring) * front * 0.25;
+  }
+
+  lac *= 1.0 - clamp(dark, 0.0, 1.0) * 0.45;
+  lac = mix(lac, u_lamp * (0.55 + 0.45 * fall), clamp(light, 0.0, 1.0) * 0.42);
+  // The accent replaces the paint rather than adding to it: blue added to
+  // gold is grey, blue painted over gold is blue.
+  lac = mix(lac, u_glow * (0.50 + 0.50 * fall), clamp(acc, 0.0, 1.0) * 0.85);
+  }
 
   // The lacquer turns down into the frame at the rim: a dark seam with the
   // lamp catching the fold just inside it.
@@ -461,6 +583,7 @@ in vec2 v_board;
 in vec4 v_data;   // kind, open, tone, lip width
 out vec4 fragColor;
 uniform vec3 u_pocketFill[4];
+uniform vec2 u_pad;   // the room the quad has around the mouth, board units
 ` + COMMON + `
 void main() {
   vec2 hs = v_half;
@@ -478,6 +601,33 @@ void main() {
   bool attacker = kind == 3;
   float radius = min(hs.x, hs.y) * (gate ? 0.16 : 0.30);
   float d = sdBox(v_off, hs, radius);
+
+  // The housing. A mouth on its own is a few pixels of brass on a busy face,
+  // and where the mouths sit is most of what makes one machine a different
+  // machine from the next. Set into a lit plaque the better part of a ball
+  // wide either side, every mouth reads from across the room, which is what a
+  // parlour does with moulded plastic. The plaque is picture only - a ball
+  // cannot land on it - so the mouth the simulation uses is untouched.
+  {
+    vec2 grow = attacker ? vec2(0.55, 0.70) : gate ? vec2(1.35, 0.95) : vec2(1.25, 0.95);
+    vec2 hh = hs + min(grow, u_pad * 0.72);
+    float rh = radius * 1.8 + lip;
+    float dh = sdBox(v_off, hh, rh);
+    float hsd = sdBox(v_off - away * lip * 1.8, hh, rh);
+    c = over(c, vec4(u_lacquer * 0.28, smoothstep(lip * 2.2, -lip * 0.3, hsd) * 0.80));
+    c = over(c, vec4(u_oxblood * (0.30 + 0.45 * fall), cover(dh) * 0.92));
+    float hb = clamp(-(dh + lip * 0.55) / max(lip * 1.7, 1e-4), 0.0, 1.0);
+    vec2 hg = normalize(vec2(dFdx(dh), dFdy(dh)) + vec2(1e-6, 0.0));
+    vec3 hn = normalize(vec3(hg * (1.0 - hb) * 1.3, 0.55 + 0.45 * hb));
+    // The plaque takes the mouth's own colour: brass for the slot, the jade
+    // for the jackpot pocket, the enamel a pay mouth is pressed in.
+    vec3 hc = gate ? u_brass : attacker ? u_pocketFill[1] : u_pocketFill[tone];
+    if (attacker) hc = mix(hc * 0.45, hc, open);
+    vec3 plaque = hc * u_lamp * (0.09 + 0.90 * max(dot(hn, L), 0.0) * fall) * 0.80;
+    plaque += u_lamp * specular(hn, L, 90.0) * 0.30 * fall;
+    plaque += u_lamp * hc * specular(hn, L, 16.0) * 0.18 * fall;
+    c = over(c, vec4(plaque, cover(dh + lip * 0.55)));
+  }
 
   // Everything standing off the face throws the same hard little shadow.
   float sd = sdBox(v_off - away * lip * 1.4, hs, radius);
@@ -683,6 +833,41 @@ float fbm(vec2 p) {
   return s * 1.143;
 }
 
+// Turn, for anything that swings, sloshes or lies along an arm.
+mat2 turn(float a) { float s = sin(a), c = cos(a); return mat2(c, -s, s, c); }
+
+// Distance to a segment. Every stem, arm, needle and tail on these panels is
+// a chain of these, which is what lets a thing be built a piece at a time
+// while it is being watched instead of being fetched whole from a texture.
+float sdSeg(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
+// The two nearest points of a scattered set. The gap between them is the web
+// that runs along the walls between cells, which is the shape sunlight makes
+// on a sand bottom, and it costs nine cells rather than an image.
+vec2 web(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float m1 = 8.0, m2 = 8.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = vec2(hash21(i + g), hash21(i + g + vec2(41.7, 19.3)));
+      float d = length(g + o - f);
+      if (d < m1) { m2 = m1; m1 = d; } else if (d < m2) { m2 = d; }
+    }
+  }
+  return vec2(m1, m2);
+}
+
+// A small fish: a wedge with its point along +x.
+float sdFish(vec2 p, float r) {
+  p /= max(r, 1e-5);
+  return max(max(dot(p, vec2(0.80, 0.60)), dot(p, vec2(0.80, -0.60))), -p.x - 0.95) * r;
+}
+
 void main() {
   vec2 hs = v_half;
   float phase = v_data.x;
@@ -731,95 +916,337 @@ void main() {
   // straining and a machine playing an animation.
   float shudder = phase > 1.5 && phase < 2.5 ? heat * 0.010 * sin(t * 57.0) : 0.0;
   vec2 q = uv + vec2(shudder, shudder * 0.4);
+  // Square units, so a disc is round on a panel that is not. Board y runs
+  // downward, so +y here is the near edge of the panel and -y is the far one.
+  float asp = hs.x / max(hs.y, 1e-5);
+  vec2 p = q * vec2(asp, 1.0);
+  // The last drum still turning is the one moment the panel is built around.
+  float reach = phase > 1.5 && phase < 2.5 ? clamp(beat, 0.0, 1.0) : 0.0;
 
   vec3 field = u_screen * (0.60 + 0.40 * fall);
   int look = int(u_show.w + 0.5);
 
+  // Every panel below is drawn in its own machine's colours - the bright
+  // enamel, the body lacquer, the near white lamp - and spends the hot accent
+  // on exactly one thing, so the accent stays the thing the eye goes to
+  // instead of becoming the picture.
   if (look == 0) {
-    // A shallow reef at noon. Two scrolling noise layers thresholded together
-    // are a caustic net, and things drift through it.
-    float ca = fbm(q * 3.2 + vec2(t * 0.07, t * 0.04));
-    if (u_reflect > 0.5) ca += fbm(q * 4.7 - vec2(t * 0.05, t * 0.09)); else ca += 0.5;
-    field += u_lamp * pow(max(ca - 0.86, 0.0), 2.0) * 2.2 * (0.35 + 0.65 * heat);
+    // Looking down into a lit shallow. Two webs of scattered points, drifting
+    // against each other, are the net the sun lays on a sand bottom.
+    vec2 w1 = web(p * 5.4 + vec2(t * 0.075, t * 0.045));
+    float net = 1.0 - smoothstep(0.0, 0.115, w1.y - w1.x);
+    net *= net;
+    if (u_reflect > 0.5) {
+      vec2 w2 = web(p * 8.6 + vec2(17.0 - t * 0.058, 5.0 + t * 0.092));
+      float fine = 1.0 - smoothstep(0.0, 0.090, w2.y - w2.x);
+      net = net * 0.80 + fine * fine * 0.55;
+    }
+    // The light does not land evenly. It gathers and thins as the surface
+    // moves over it, which is the difference between water and cracked glass.
+    net *= 0.10 + 1.70 * smoothstep(0.30, 0.86, fbm(p * 1.25 + vec2(t * 0.035, -t * 0.022)));
+    field += u_lamp * net * (0.44 + 0.60 * heat);
+    // The water is deeper at the far edge, so the far edge is darker.
+    field += u_lacquer * smoothstep(-1.0, 1.0, q.y) * 0.10;
+
+    // A shoal, on one heading. They turn together because there is only one
+    // heading, and on a reach the heading straightens and they leave.
+    float head = sin(t * 0.31) * 0.85 - reach * 2.0;
+    vec2 dir = vec2(cos(head), sin(head));
+    vec2 sc = vec2(-0.10, -0.45) + dir * (0.30 + reach * 2.2) + vec2(sin(t * 0.31) * 0.20, 0.0);
+    for (int i = 0; i < 6; i++) {
+      float fi = float(i);
+      vec2 o = vec2(hash21(vec2(fi, 3.0)), hash21(vec2(fi, 7.0))) - 0.5;
+      vec2 fp = turn(-head) * (p - sc - o * vec2(0.46, 0.29));
+      fp.y += sin(t * 6.0 + fi * 1.9) * 0.010;
+      field += mix(u_enamel, u_lamp, 0.45) * smoothstep(0.007, -0.005, sdFish(fp, 0.042)) * 0.75;
+    }
+
+    // Jellyfish, pulsing on their own clocks. The one thing on this panel in
+    // the hot accent.
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
-      vec2 jc = vec2(sin(t * 0.23 + fi * 2.1) * 0.60, cos(t * 0.17 + fi * 1.7) * 0.42 - 0.10);
-      float jd = length((q - jc) / vec2(1.0, 0.62)) - 0.13;
-      field += u_glow * smoothstep(0.09, -0.02, jd) * 0.55;
-      // tentacles, as a sine trailing below the bell
-      float tx = jc.x + sin((q.y - jc.y) * 9.0 + t * 2.0 + fi) * 0.05;
-      field += u_glow * smoothstep(0.020, 0.0, abs(q.x - tx))
-             * smoothstep(0.0, -0.34, q.y - jc.y) * 0.35;
+      float pulse = 0.5 + 0.5 * sin(t * (1.35 + 0.22 * fi) + fi * 2.3);
+      vec2 jc = vec2(sin(t * 0.21 + fi * 2.1) * 0.62, cos(t * 0.16 + fi * 1.7) * 0.34 - 0.34);
+      vec2 jp = p - jc;
+      float bell = length(jp / vec2(0.155 + 0.030 * pulse, 0.125 - 0.028 * pulse)) - 1.0;
+      float dome = smoothstep(0.30, -0.20, bell) * smoothstep(0.05, -0.02, jp.y);
+      field += u_glow * dome * 0.45;
+      field += u_lamp * smoothstep(0.05, -0.30, bell) * smoothstep(-0.02, -0.07, jp.y) * 0.10;
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k) - 1.0;
+        float tx = jc.x + fk * 0.050 + sin(jp.y * 12.0 - t * 2.6 + fi + fk) * 0.030;
+        field += u_glow * smoothstep(0.011, 0.0, abs(p.x - tx))
+               * smoothstep(0.02, 0.06, jp.y) * smoothstep(0.40, 0.14, jp.y) * 0.40;
+      }
+    }
+
+    // Something big is over the shallow. Its shadow arrives first.
+    float sweep = clamp(beat, 0.0, 1.0);
+    float cx = -1.7 + 3.4 * sweep;
+    float shade = smoothstep(0.9, 0.0, length((p - vec2(cx, -0.20)) * vec2(0.75, 1.7)));
+    field *= 1.0 - shade * step(1.5, tier) * 0.55;
+    if (tier > 2.5) {
+      // Then the ray itself: two wings on one body, beating along their span.
+      vec2 mp = p - vec2(cx, -0.16);
+      mp.y -= sin(abs(mp.x) * 5.5 - t * 3.2) * 0.075 - 0.02;
+      float wing = length(mp / vec2(0.60, 0.17)) - 1.0;
+      float tail = sdSeg(mp, vec2(0.0, 0.0), vec2(-0.62, 0.10)) - 0.012;
+      float body = max(smoothstep(0.04, -0.04, wing), smoothstep(0.008, -0.006, tail));
+      field = mix(field, u_screen * 0.20, body * sweep);
+      field += u_lamp * smoothstep(0.05, 0.0, abs(wing) - 0.03) * 0.30 * sweep;
     }
   } else if (look == 1) {
-    // A greenhouse gone feral. Vines climb from the floor of the panel, and
-    // how far up they have got is how far the machine has climbed.
-    float grew = -1.0 + 2.0 * (0.30 + 0.70 * heat);
-    for (int i = 0; i < 3; i++) {
-      float fi = float(i) - 1.0;
-      float x = fi * 0.44 + sin(q.y * 3.1 + t * 0.45 + fi * 2.0) * 0.17;
-      float w = 0.050 * (1.0 - (q.y * 0.5 + 0.5) * 0.55);
-      float stem = smoothstep(w, 0.0, abs(q.x - x)) * step(q.y, grew);
-      field += u_glow * stem * 0.60;
-      // leaves, as discs pinned along the stem
-      float ly = fract(q.y * 2.6 + fi) - 0.5;
-      float leaf = length(vec2((q.x - x) * 1.6, ly * 0.35)) - 0.055;
-      field += u_lamp * smoothstep(0.02, -0.01, leaf) * step(q.y, grew) * 0.22;
+    // A greenhouse gone feral. The vine puts out one segment at a time from
+    // the floor of the panel, tapering as it climbs, and is cut back when it
+    // tops out. It climbs faster the harder the machine is pushing.
+    float cycle = fract(t * (0.040 + 0.075 * heat) + 0.12);
+    // Cutting back leaves a stub rather than bare soil, so the glass is never
+    // empty and what a player watches is the climb rather than a blank pane.
+    float seg = clamp(3.6 + cycle * 3.6, 0.0, 7.0);
+    float open = tier > 2.5 ? clamp(beat * 1.6, 0.0, 1.0)
+                            : clamp(seg - 5.5, 0.0, 1.0) * (0.20 + 0.45 * heat);
+
+    // The house around it: daylight through the roof, and glass in a frame.
+    field += u_lamp * smoothstep(1.1, -1.1, q.y) * 0.045;
+    field += u_lacquer * 0.10 * smoothstep(0.026, 0.008, abs(fract(p.x * 1.25 + 0.5) - 0.5));
+    field += u_lacquer * 0.07 * smoothstep(0.026, 0.008, abs(fract(p.y * 1.10 + 0.5) - 0.5));
+    // Seed and pollen adrift in the house, so the glass is never empty.
+    for (int m = 0; m < 4; m++) {
+      float fm = float(m);
+      vec2 mp = vec2(sin(t * (0.13 + 0.04 * fm) + fm * 2.4) * 0.80,
+                     fract(0.27 * fm - t * 0.045) * 2.2 - 1.1);
+      field += u_lamp * smoothstep(0.016, 0.0, length(p - mp)) * 0.28;
     }
-    if (u_reflect > 0.5) field += u_lamp * fbm(q * 2.4 + t * 0.04) * 0.10;
+    if (u_reflect > 0.5) field += u_enamel * fbm(p * 2.2 + vec2(t * 0.05, -t * 0.03)) * 0.16;
+
+    for (int v = 0; v < 2; v++) {
+      float fv = float(v) * 2.0 - 1.0;
+      vec2 a = vec2(fv * 0.66 * asp, 1.06);
+      for (int s = 0; s < 7; s++) {
+        float fs = float(s);
+        float on = clamp(seg - fs, 0.0, 1.0);
+        // Each piece takes its own lean rather than adding to the last one, so
+        // the vine snakes without ever walking off the side of the panel, and
+        // it leans outward to leave the middle of the panel clear.
+        float ang = -1.5708 + sin(t * 0.40 + fs * 1.25 + fv * 2.1) * 0.34 + fv * 0.09;
+        vec2 b = a + vec2(cos(ang), sin(ang)) * 0.31 * on;
+        field += u_enamel * smoothstep(0.010, -0.010, sdSeg(p, a, b) - (0.040 - fs * 0.0038)) * 0.85 * on;
+        // A leaf at every other joint: two arcs meeting at a point, which is
+        // what the overlap of two discs is.
+        float has = mod(fs, 2.0);
+        float la = ang + fv * 1.35;
+        vec2 lp = turn(-la) * (p - b - vec2(cos(la), sin(la)) * 0.150);
+        float leaf = max(length(lp - vec2(0.0, 0.140)) - 0.205, length(lp - vec2(0.0, -0.140)) - 0.205);
+        field += mix(u_lacquer, u_enamel, 0.30) * smoothstep(0.006, -0.008, leaf) * 1.10 * on * has;
+        field += u_enamel * smoothstep(0.005, 0.0, abs(lp.y)) * smoothstep(0.15, 0.0, abs(lp.x)) * 0.45 * on * has;
+        a = b;
+      }
+      // The flower at the tip. Five petals round a disc, and the one thing on
+      // this panel in the hot accent.
+      for (int k = 0; k < 5; k++) {
+        float ak = float(k) * 1.2566 + t * 0.18 + fv;
+        vec2 pc = a + vec2(cos(ak), sin(ak)) * (0.038 + 0.075 * open);
+        vec2 e = turn(-ak) * (p - pc);
+        float petal = length(e / vec2(0.058 + 0.070 * open, 0.038 + 0.026 * open)) - 1.0;
+        field += u_glow * smoothstep(0.30, -0.20, petal) * (0.22 + 0.60 * open);
+      }
+      field += u_lamp * smoothstep(0.030, 0.012, length(p - a)) * (0.25 + 0.55 * open);
+    }
   } else if (look == 2) {
-    // A pan of gravel worked under running water. Every so often a grain is
-    // gold and takes the light.
-    vec2 g = q * 5.4 + vec2(sin(t * 0.55) * 0.28, t * 0.10);
-    float grain = smoothstep(0.52, 0.86, vnoise(g));
-    field += u_lamp * grain * 0.20;
-    field += u_glow * step(0.94, vnoise(floor(g) * 1.7)) * grain * (0.9 + 1.6 * heat);
-    float sheet = smoothstep(0.17, 0.0, abs(q.y - sin(t * 0.5) * 0.66));
-    field += u_screen * sheet * 1.6 + u_lamp * sheet * 0.12;
+    // A pan of gravel worked under running water, seen from above. The pan
+    // rocks, the gravel rides with it, and the water takes the light stuff
+    // off the near edge a grain at a time.
+    float clear = clamp(heat * 0.75 + step(2.5, tier) * beat, 0.0, 1.0);
+    float rock = sin(t * 0.55) * 0.10;
+    vec2 g = turn(rock) * p + vec2(sin(t * 0.55) * 0.09, cos(t * 0.47) * 0.05);
+
+    // One lumpy grain per cell, kept inside its own cell so a dense bed costs
+    // a single lookup. Two beds at different scales and turned against each
+    // other, because one grid of them on its own reads as a printed pattern.
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec2 cellp = turn(rock + fi * 1.15) * g * (6.5 + fi * 5.5) + vec2(fi * 13.7, fi * 7.3);
+      vec2 ci = floor(cellp), cf = fract(cellp) - 0.5;
+      float r1 = hash21(ci + vec2(fi * 31.0, 0.0));
+      float r2 = hash21(ci + vec2(19.7 + fi, 7.3));
+      float r3 = hash21(ci + vec2(3.1, 91.7 + fi));
+      vec2 gp = cf - (vec2(r1, r2) - 0.5) * 0.40;
+      float ga = atan(gp.y, gp.x) + r1 * 6.283;
+      float rad = 0.34 * (0.32 + 0.68 * r3)
+                * (1.0 + 0.10 * sin(ga * 3.0 + r2 * 21.0) + 0.07 * sin(ga * 5.0 - r1 * 14.0)
+                       + 0.05 * sin(ga * 7.0 + r3 * 9.0));
+      float grain = smoothstep(0.035, -0.006, length(gp) - rad) * step(0.10 + 0.16 * fi, r3);
+      // The light stuff goes first, and it goes off the near edge.
+      grain *= step(clear, 0.28 + 0.46 * r3 + (0.5 - g.y * 0.35) * 0.35);
+      vec3 stone = mix(u_screen * 3.0, u_brass * 0.20, r1) * (0.45 + 0.55 * smoothstep(0.3, -0.4, gp.y));
+      field = mix(field, stone, grain);
+      // Now and then one of them is gold, and it takes the light.
+      float au = step(0.955, r2) * grain;
+      field = mix(field, u_enamel * (0.55 + 1.25 * heat), au);
+      field += u_lamp * au * pow(max(sin(t * 1.7 + r1 * 30.0), 0.0), 24.0) * 1.5;
+    }
+
+    // Water sheets across the pan as a band with a working edge, and it is the
+    // one thing on this panel in the hot accent.
+    float wy = -1.55 + fract(t * 0.22) * 3.15;
+    float ahead = p.y - wy - sin(p.x * 5.5 + t * 1.6) * 0.022;
+    float sheet = smoothstep(0.0, -0.14, ahead) * smoothstep(-1.40, -0.55, ahead);
+    field = mix(field, mix(field, u_glow, 0.45), sheet * 0.75);
+    field += u_lamp * sheet * 0.07 * (0.5 + 0.5 * sin(p.x * 9.0 + p.y * 4.0 - t * 2.4));
+    field += u_glow * smoothstep(0.10, 0.0, abs(ahead)) * 0.40;
+    field += u_lamp * smoothstep(0.024, 0.0, abs(ahead)) * 0.60;
+
+    // The pan itself, over the top of everything in it.
+    float pr = length(p * vec2(1.0, 1.04));
+    field *= 1.0 - smoothstep(0.90, 1.00, pr) * 0.80;
+    field += u_brass * u_lamp * smoothstep(0.022, -0.014, abs(pr - 0.945) - 0.035) * (0.30 + 0.85 * fall);
+
+    if (tier > 2.5) {
+      // The pan worked out: everything gone but the one lump worth keeping.
+      vec2 np = p - vec2(0.0, -0.26);
+      float na = atan(np.y, np.x);
+      float nug = length(np * vec2(1.0, 1.12))
+                - 0.17 * (1.0 + 0.16 * sin(na * 4.0 + 1.3) + 0.10 * sin(na * 7.0));
+      float nm = smoothstep(0.020, -0.012, nug) * beat;
+      field = mix(field, u_enamel * 1.30, nm);
+      field += u_lamp * smoothstep(0.060, 0.0, length(np - vec2(-0.05, -0.06))) * nm * 1.3;
+    }
   } else if (look == 3) {
-    // The inside of a furnace: one heat field, warped, read through a
-    // temperature ramp. A hotter panel is a better spin and it is legible.
-    vec2 h = q * 2.0;
-    if (u_reflect > 0.5) h += vec2(fbm(h * 1.5 + t * 0.22), fbm(h * 1.5 - t * 0.19)) * 0.55;
-    float temp = clamp(fbm(h + vec2(0.0, -t * 0.30)) * (0.85 + 0.95 * heat), 0.0, 1.0);
-    field = mix(field, u_glow, smoothstep(0.34, 0.88, temp) * 0.85);
-    field += u_lamp * smoothstep(0.80, 1.0, temp) * 0.95;
-    field += u_lamp * step(0.988, hash21(floor(vec2(q.x * 22.0, q.y * 18.0 - t * 6.0)))) * 0.85;
+    // The inside of a furnace: one scalar heat field, dragged about by a
+    // second noise field, read through a ramp from dark red through ember to
+    // white. A hotter panel is a better spin, which makes the ramp a readout.
+    vec2 h = p * 1.7 + vec2(0.0, t * 0.30);
+    if (u_reflect > 0.5) {
+      vec2 drag = vec2(fbm(p * 1.35 + t * 0.19), fbm(p * 1.35 + vec2(4.7, 1.9) - t * 0.16)) - 0.5;
+      h += drag * (1.1 + 0.9 * heat);
+    }
+    // The noise is stretched over the whole ramp first: an unstretched field
+    // sits in the middle of it and reads as one flat orange with no cold iron
+    // at one end and no white at the other.
+    float temp = smoothstep(0.20, 0.82, fbm(h)) * 0.95 + (q.y * 0.5 + 0.5) * 0.32 - 0.10;
+    temp = clamp(temp * (0.90 + 0.45 * heat + 0.06 * tier), 0.0, 1.35);
+    field = mix(field, u_lacquer * 0.10, smoothstep(0.0, 0.26, temp));
+    field = mix(field, u_lacquer * 0.30, smoothstep(0.14, 0.44, temp));
+    field = mix(field, u_lacquer * 0.95, smoothstep(0.36, 0.70, temp));
+    field = mix(field, u_enamel * 1.20, smoothstep(0.66, 0.94, temp));
+    field = mix(field, u_lamp * 1.45, smoothstep(0.92, 1.18, temp));
+
+    // Sparks off the charge, rising and turning over in the draught.
+    for (int i = 0; i < 9; i++) {
+      float fi = float(i);
+      float life = fract(t * (0.26 + 0.045 * fi) + hash21(vec2(fi, 2.0)) * 9.0);
+      float sx = (hash21(vec2(fi, 5.0)) - 0.5) * 1.75 * asp + sin(life * 7.0 + fi * 2.0) * 0.11;
+      float sy = 1.05 - life * 2.25;
+      vec2 sp = (p - vec2(sx, sy)) * vec2(1.5, 0.42);
+      field += u_enamel * smoothstep(0.075, 0.0, length(sp)) * (1.0 - life) * (0.55 + 0.70 * heat);
+      field += u_lamp * smoothstep(0.028, 0.0, length(sp)) * (1.0 - life) * (1.20 + 1.30 * heat);
+    }
+
+    // The water cooled pipe along the roof: the one cold thing in here, and
+    // the one thing on this panel in the hot accent.
+    float pipe = abs(p.y + 0.78 + sin(p.x * 6.0 + t * 0.9) * 0.012) - 0.008;
+    field = mix(field, u_glow * 0.75, smoothstep(0.008, -0.006, pipe) * 0.75);
+    field += u_glow * smoothstep(0.030, 0.0, pipe) * (0.14 + 0.12 * sin(t * 0.8 + p.x * 3.0));
   } else if (look == 4) {
-    // A jukebox seen through its glass: records on their arcs, and a tube of
-    // bubbles round the whole panel.
-    float rad = length(q * vec2(1.0, 1.35));
-    float ring = abs(fract(rad * 3.3 - t * 0.22) - 0.5);
-    field += u_glow * smoothstep(0.09, 0.0, ring) * (0.32 + 0.55 * heat);
-    float edge = max(abs(q.x), abs(q.y));
-    float tube = smoothstep(0.055, 0.0, abs(edge - 0.90));
-    float bub = step(0.70, fract((q.x + q.y * 1.7) * 2.2 - t * 0.5));
-    field += u_lamp * tube * (0.22 + 0.85 * bub);
+    // A jukebox mechanism behind its glass: the stack standing on its arcs
+    // across the top, one record out on the deck below it, and the arm coming
+    // down on that one.
+    vec2 hub = vec2(0.0, 2.55);
+    float hr = length(p - hub);
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float rr = 2.62 + fi * 0.115 + sin(t * 0.45 + fi * 1.1) * 0.008;
+      field += u_lacquer * 0.55 * smoothstep(0.016, -0.012, abs(hr - rr) - 0.030);
+      field += u_lamp * 0.22 * smoothstep(0.008, 0.0, abs(hr - rr - 0.028));
+    }
+
+    // The one that was pulled, turning on the deck. Its grooves are rings and
+    // the sheen goes round with it, which is how a record reads as spinning.
+    vec2 dp = p - vec2(0.0, -0.16);
+    float dr = length(dp);
+    float da = atan(dp.y, dp.x);
+    float disc = dr - 0.36;
+    float onDisc = smoothstep(0.010, -0.010, disc);
+    field = mix(field, u_lacquer * (0.16 + 0.10 * (0.5 + 0.5 * sin(dr * 210.0))), onDisc);
+    field += u_lamp * pow(max(cos(da - t * 2.3), 0.0), 16.0) * onDisc * 0.55;
+    field += u_lamp * smoothstep(0.012, -0.006, abs(disc) - 0.008) * 0.35;
+    field = mix(field, u_enamel * (0.85 + 0.25 * sin(da * 3.0 + t * 2.3)),
+                smoothstep(0.006, -0.006, dr - 0.115));
+    field += u_lamp * smoothstep(0.016, 0.004, dr) * 0.60;
+
+    // The arm comes down as the last drum is watched, and it stays down once
+    // the machine has committed.
+    float down = max(reach, step(2.5, tier) * clamp(beat * 1.4, 0.0, 1.0));
+    vec2 piv = vec2(0.80 * asp, 0.34);
+    vec2 tip = piv + turn(mix(-0.95, -0.30, down)) * vec2(-0.66, 0.00);
+    field += u_chrome * u_lamp * smoothstep(0.010, -0.008, sdSeg(p, piv, tip) - 0.022) * (0.35 + 0.65 * fall);
+    field += u_lamp * smoothstep(0.055, 0.022, length(p - piv)) * 0.40;
+    field += u_lamp * smoothstep(0.024, 0.0, length(p - tip)) * (0.40 + 0.70 * down);
+
+    // The tube round the whole panel, with the bubbles going up it. The one
+    // thing on this panel in the hot accent, and the shape that says diner.
+    float tubed = abs(sdBox(v_off, hs * 0.855, min(hs.x, hs.y) * 0.26)) / max(hs.y, 1e-5);
+    float tube = smoothstep(0.050, 0.016, tubed);
+    field = mix(field, u_glow * 0.80, tube * 0.75);
+    float upright = smoothstep(0.52, 0.74, abs(p.x) / max(asp, 1e-5));
+    float rise = fract(-p.y * 1.5 + t * 0.42 + step(0.0, v_off.x) * 0.5);
+    field += mix(u_glow, u_lamp, 0.75) * tube * upright * smoothstep(0.20, 0.02, abs(rise - 0.5)) * 1.20;
+
+    // The whole panel keeps time once the record is playing.
+    field *= 1.0 + step(2.5, tier) * beat * 0.22 * pow(max(sin(t * 6.2), 0.0), 3.0);
   } else {
-    // A window into deep space. Warped noise for the cloud, points with a
-    // four way cross for the stars.
-    vec2 wq = q * 1.6;
-    if (u_reflect > 0.5) wq += vec2(fbm(wq + t * 0.030), fbm(wq.yx - t * 0.024)) * 0.9;
+    // A window on deep space: a warped cloud, a nearer sheet of dust sliding
+    // across it at its own speed, and stars with the four way cross a real
+    // lens puts on them.
+    vec2 wq = p * 1.5 + vec2(t * 0.010, 0.0);
+    if (u_reflect > 0.5) {
+      wq += (vec2(fbm(wq * 0.9 + t * 0.030), fbm(wq.yx * 0.9 - t * 0.026)) - 0.5) * 1.7;
+    }
     float neb = fbm(wq);
-    field = mix(field, u_lacquer * 0.50, smoothstep(0.34, 0.86, neb) * 0.70);
-    field += u_glow * pow(max(neb - 0.62, 0.0), 2.0) * 1.8;
-    vec2 cellf = fract(q * 13.0) - 0.5;
-    float star = hash21(floor(q * 13.0));
-    float tw = 0.55 + 0.45 * sin(t * 2.1 + star * 40.0);
-    field += u_lamp * step(0.982, star) * tw * 1.6
-           * smoothstep(0.045, 0.0, min(abs(cellf.x), abs(cellf.y)))
-           * smoothstep(0.44, 0.0, length(cellf));
+    field = mix(field, u_screen * 0.30, smoothstep(0.52, 0.16, neb) * 0.85);
+    field = mix(field, u_lacquer * 0.46, smoothstep(0.34, 0.84, neb) * 0.85);
+    field += u_enamel * pow(max(neb - 0.56, 0.0), 2.0) * 2.2 * (0.7 + 0.6 * heat);
+    if (u_reflect > 0.5) {
+      float dust = fbm(p * 3.2 + vec2(t * 0.055, -t * 0.020));
+      field += u_enamel * pow(max(dust - 0.68, 0.0), 2.0) * 1.4;
+      field = mix(field, u_screen * 0.60, smoothstep(0.74, 0.96, dust) * 0.35);
+    }
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec2 sp = p * (9.5 + fi * 8.0) + vec2(fi * 3.7, t * (0.02 + 0.035 * fi));
+      vec2 si = floor(sp), sf = fract(sp) - 0.5;
+      float r = hash21(si + vec2(fi * 17.0));
+      float on = step(0.895 + 0.03 * fi, r);
+      float tw = 0.40 + 0.60 * (0.5 + 0.5 * sin(t * (1.3 + r * 3.0) + r * 40.0));
+      float core = smoothstep(0.055, 0.0, length(sf));
+      float spike = smoothstep(0.014, 0.0, abs(sf.x)) * smoothstep(0.46, 0.0, abs(sf.y))
+                  + smoothstep(0.014, 0.0, abs(sf.y)) * smoothstep(0.46, 0.0, abs(sf.x));
+      field += u_lamp * on * tw * (core * 1.40 + spike * 0.70) * (1.0 - 0.35 * fi);
+    }
+    if (tier > 2.5) {
+      // A comet crosses the frame: the one thing on this panel in the hot
+      // accent, and it only ever comes out at the top of the ladder.
+      float run = clamp(beat, 0.0, 1.0);
+      vec2 head = mix(vec2(-asp - 0.35, 0.55), vec2(asp + 0.35, -0.80), run);
+      vec2 dir = normalize(vec2(2.0 * asp + 0.70, -1.35));
+      float s = clamp(dot(p - head, -dir), 0.0, 1.0);
+      float td = length(p - (head - dir * s));
+      field += u_glow * smoothstep(0.020 + 0.055 * s, 0.0, td) * (1.0 - s) * 0.90;
+      field += u_lamp * smoothstep(0.032, 0.0, length(p - head)) * 1.10;
+    }
   }
 
   // Rays running into the middle. Their count and their speed are the rung of
-  // the ladder made visible, which is the whole point of having rungs.
+  // the ladder made visible, which is the whole point of having rungs, and
+  // they are in the machine's own bright so the hot accent stays spent on the
+  // one thing the panel's own picture spends it on.
   float ang = atan(uv.y, uv.x);
   float rays = pow(max(sin(ang * (6.0 + 5.0 * tier) + t * (1.1 + 0.9 * tier)), 0.0), 6.0);
-  field += u_glow * rays * heat * heat * 0.60 * smoothstep(0.12, 0.95, length(uv));
+  field += mix(u_enamel, u_lamp, 0.35) * rays * heat * heat * 0.55 * smoothstep(0.12, 0.95, length(uv));
 
   // The panel lifts as a whole, and a paid spin floods it.
   field *= 1.0 + heat * 0.60;
-  field += u_glow * step(3.5, phase) * beat * 0.75;
+  field += u_enamel * step(3.5, phase) * beat * 0.65;
   field += u_lamp * step(3.5, phase) * pow(beat, 3.0) * 0.45;
 
   // It is a panel behind glass, not a hole in the machine.
@@ -1083,13 +1510,50 @@ void main() {
   vec3 drum = body * u_lamp * (0.08 + mix(0.30, 0.86, on) * max(dot(n, L), 0.0) * fall);
   drum += u_lamp * body * specular(n, L, 16.0) * mix(0.25, 0.6, on) * fall;
 
+  // The drum face is pressed with this machine's own mark, so a set of three
+  // reads as the cabinet's drums rather than as three blank discs. It is a
+  // shallow relief in the face's own colour, held well away from the depth of
+  // the ink, because the figure has to stay the only dark thing in the window.
+  int look = int(u_show.w + 0.5);
+  float mark = 0.0;
+  if (look == 0) {
+    // Rings running out from the middle, the way water leaves them.
+    float rr = length(p * vec2(0.62, 1.0));
+    mark = smoothstep(0.030, 0.008, abs(fract(rr * 2.4 + 0.5) - 0.5) / 2.4);
+  } else if (look == 1) {
+    // A leaf, veined down its length.
+    mark = smoothstep(0.045, 0.010, abs(abs(p.x) * 0.62 - (p.y + 0.60)))
+         + smoothstep(0.035, 0.008, abs(p.x)) * smoothstep(0.90, 0.20, abs(p.y));
+  } else if (look == 2) {
+    // The rim of a pan.
+    mark = smoothstep(0.045, 0.012, abs(length(p * vec2(0.62, 1.0)) - 0.72));
+  } else if (look == 3) {
+    // An ingot, chamfered off at its corners.
+    mark = smoothstep(0.045, 0.012, abs(sdBox(p, vec2(0.48, 0.72), 0.22)));
+  } else if (look == 4) {
+    // A record label: the paper and the run out groove around it.
+    float rr = length(p * vec2(0.62, 1.0));
+    mark = smoothstep(0.045, 0.012, abs(rr - 0.74)) + smoothstep(0.045, 0.012, abs(rr - 0.42));
+  } else {
+    // Three stars, which is as much constellation as a drum holds.
+    mark = smoothstep(0.070, 0.030, length(p - vec2(-0.40, -0.56)))
+         + smoothstep(0.070, 0.030, length(p - vec2(0.34, -0.10)))
+         + smoothstep(0.070, 0.030, length(p - vec2(-0.16, 0.62)));
+  }
+  drum = mix(drum, drum * 0.82, clamp(mark, 0.0, 1.0) * on);
+
   // The figure, pressed into the drum: dark ink with a lit shoulder on the
   // lamp side, the way a stamped numeral catches light.
   float em = v_half.y * 1.30;
   float gd = digitDistance(int(abs(v_data.x) + 0.5), vec2(p.x, -p.y) * v_half.y / em * 2.0);
   float ink = cover(gd * em) * on;
   float shoulder = (cover((gd + em * 0.05) * em) - cover(gd * em)) * on;
-  drum = mix(drum, u_oxblood * (0.12 + 0.5 * fall), ink);
+  // The ink is a deep shade of the machine's own colour rather than its
+  // lettering colour: the drum face is the skin's bright enamel on every
+  // machine, so the figure has to be dark on all six - including the one
+  // whose lettering elsewhere is light because its face is dark. A figure
+  // lit by the lamp fraction went grey on the pale drums and read as mud.
+  drum = mix(drum, u_lacquer * (0.07 + 0.08 * fall), ink);
   drum += u_lamp * u_enamel * shoulder * 0.35 * fall;
 
   // The glass over the window takes a streak.

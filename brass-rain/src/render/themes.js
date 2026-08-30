@@ -41,7 +41,7 @@
 // Nothing here is loaded and nothing here is an image.
 // ---------------------------------------------------------------------------
 
-import { hexToOklch, oklch } from '../palette.js?v=6';
+import { hexToOklch, oklch } from '../palette.js?v=7';
 
 /**
  * A skin from the colors that were actually chosen, plus the three that are
@@ -157,6 +157,11 @@ export function resolveTheme(id, cfg) {
   const over = cfg && cfg.themes && typeof cfg.themes === 'object' ? cfg.themes[base.id] : null;
   if (!over || typeof over !== 'object') return base;
   return Object.assign({}, base, over, { id: base.id, title: over.title || base.title });
+}
+
+/** The skin a cabinet wears, resolved, with the config's own say laid over it. */
+export function skinForCabinet(id, cfg) {
+  return resolveTheme(themeForCabinet(id), cfg);
 }
 
 /** The index the screen shader uses to pick a skin's motif. */

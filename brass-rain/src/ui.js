@@ -15,17 +15,21 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=6';
-import { createScene } from './render/scene.js?v=6';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=6';
-import { num, count, duration, mult, pct, fill } from './format.js?v=6';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=6';
-import { nailPos } from './board.js?v=6';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=7';
+import { createScene } from './render/scene.js?v=7';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=7';
+import { num, count, duration, mult, pct, fill } from './format.js?v=7';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=7';
+import { nailPos } from './board.js?v=7';
+import { sketchCabinet } from './cabinets.js?v=7';
 
 const SPEEDS = [1, 2, 4];
 
 export async function boot(doc) {
   const game = await createGame({});
+  // On the window for the screenshot and save tools, which drive the game
+  // from outside the page. Nothing in the page reads it from here.
+  globalThis.game = game;
   const cfg = game.cfg;
   const el = index(doc);
 
@@ -69,7 +73,12 @@ export async function boot(doc) {
     on(el.pull, 'click', () => game.pull());
     on(el.auto, 'click', () => game.setAuto(!game.run.auto));
     on(el.speed, 'click', () => {
-      speedIndex = (speedIndex + 1) % SPEEDS.length;
+      // The next step is taken from the speed the run is actually at, never
+      // from a counter of clicks: a new run starts at 1x and a reload brings
+      // back whatever was saved, and a button that counted clicks instead
+      // showed 4x over a machine running at 1x until it was toggled again.
+      const cur = SPEEDS.indexOf(game.reading().speed);
+      speedIndex = ((cur < 0 ? 0 : cur) + 1) % SPEEDS.length;
       game.setSpeed(SPEEDS[speedIndex]);
     });
     on(el.handle, 'input', () => game.setStrength(Number(el.handle.value)));
@@ -208,7 +217,7 @@ export async function boot(doc) {
     el.roundNo.textContent = r.round;
     // Which cabinet this is. The whole point of walking the row is that the
     // machine in front of you is a particular machine, so it says which.
-    if (el.cabinet) el.cabinet.textContent = r.cabinet ? r.cabinet.name : '';
+    if (el.cabinet) el.cabinet.textContent = r.skin ? r.skin.title : (r.cabinet ? r.cabinet.name : '');
     el.wonNow.textContent = num(r.won);
     el.quotaNo.textContent = num(r.quota);
     const done = Math.min(1, r.quota > 0 ? r.won / r.quota : 0);
@@ -224,7 +233,7 @@ export async function boot(doc) {
     el.handle.disabled = !!r.locked;
     el.perPull.textContent = num(r.perPull);
     el.auto.classList.toggle('on', r.auto);
-    el.speed.textContent = SPEEDS[speedIndex] + 'x';
+    el.speed.textContent = (Number.isFinite(r.speed) ? r.speed : SPEEDS[speedIndex]) + 'x';
     el.pull.disabled = r.auto || r.over;
 
     el.oddsMatch.textContent = pct(r.matchChance);
@@ -357,6 +366,9 @@ export async function boot(doc) {
         + (offer.partners.length ? '<div class="combos"></div>' : '')
         + '<div class="price"><span></span></div>';
       card.querySelector('.rar').textContent = f.rarity;
+      // The rarity goes round the box as well as into the label, in the same
+      // colour the bolted-in bead uses, so a rare part is found at a glance.
+      card.classList.add('r-' + f.rarity);
       card.querySelector('h4').textContent = f.name;
       card.querySelector('p').textContent = text;
       if (offer.partners.length) {
@@ -411,7 +423,7 @@ export async function boot(doc) {
       + 'fall, so bend the ones that feed balls into the slot. '
       + game.bendsLeft() + ' of ' + (cfg.board.bendsPerRound) + ' bends left this round, '
       + r.bends + ' nails bent so far. A nail won\'t go into another nail, into a pocket, '
-      + 'or further than its head reaches.';
+      + 'or farther than its head reaches.';
 
     el.reroll.textContent = 'Show different parts for ' + num(game.rerollPrice()) + ' balls';
     el.reroll.disabled = r.tray < game.rerollPrice();
@@ -524,8 +536,7 @@ export async function boot(doc) {
       }
       for (const p of t.partners) {
         const d = doc.createElement('div');
-        d.className = 'combos';
-        d.style.color = '#8a6a3a';
+        d.className = 'combos need';
         d.textContent = p.name + ' needs ' + p.missing.join(' and ');
         el.tip.appendChild(d);
       }
@@ -538,7 +549,7 @@ export async function boot(doc) {
       if (t.tags.length) {
         const g = doc.createElement('div');
         g.className = 'tags';
-        g.textContent = t.tags.join('  ');
+        g.textContent = t.tags.map(tagWord).join('  ');
         el.tip.appendChild(g);
       }
       el.tip.hidden = false;
@@ -682,17 +693,23 @@ export async function boot(doc) {
 
     el.cabinets.textContent = '';
     for (const cab of game.cabinets()) {
-      const label = cab.layout || cab.name;
+      const label = cab.title || cab.layout || cab.name;
       const d = doc.createElement('div');
       d.className = 'cab';
-      // .theme is left empty here. Whatever gives a machine its own name and
-      // color fills it without this code having to know about it.
-      d.innerHTML = '<h4></h4><div class="theme"></div><div class="big"></div><p></p>'
+      // The card wears the machine's own colour, so the row reads from across
+      // the room the way a row of cabinets does.
+      if (cab.skin) {
+        d.style.setProperty('--face', cab.skin.lacquer);
+        d.style.setProperty('--face-glow', cab.skin.glow);
+      }
+      d.innerHTML = '<h4></h4><div class="theme"></div><canvas class="sketch"></canvas><div class="big"></div><p></p>'
         + '<dl><dt>Balls reaching the slot</dt><dd class="n1"></dd>'
         + '<dt>Nails on the board</dt><dd class="n2"></dd>'
         + '<dt>Machine number</dt><dd class="n3"></dd></dl>'
         + '<div class="warn"></div>';
       d.querySelector('h4').textContent = label;
+      d.querySelector('.theme').textContent = cab.layout ? cab.layout + ' board' : '';
+      drawSketch(d.querySelector('.sketch'), sketchCabinet(cfg, cab.seed), cab.skin);
 
       const big = d.querySelector('.big');
       big.textContent = cab.back.toFixed(2) + ' balls back';
@@ -708,7 +725,10 @@ export async function boot(doc) {
           + 'Under 1.00, so this machine keeps the difference and a bonus is the only way to finish ahead.';
       big.appendChild(small);
 
-      d.querySelector('p').textContent = 'It ' + plain(DROP_WORDS, cab.leanWord) + ', and '
+      // The layout's own line leads, because it is the thing that differs
+      // between two cards; the measured reading follows.
+      const note = cab.note ? cab.note.charAt(0).toUpperCase() + cab.note.slice(1) + '. ' : '';
+      d.querySelector('p').textContent = note + 'It ' + plain(DROP_WORDS, cab.leanWord) + ', and '
         + plain(FUNNEL_WORDS, cab.funnelWord) + '. It paid best on ' + plain(POWER_WORDS, cab.where) + '.';
       d.querySelector('.n1').textContent = pct(cab.gate);
       d.querySelector('.n2').textContent = count(cab.nails);
@@ -739,6 +759,72 @@ export async function boot(doc) {
     }
   }
 
+  /**
+   * A small picture of a machine's face, drawn from its real geometry: where
+   * the screen is, where every mouth is, how the plates run, where the nails
+   * stand. This is how a row of machines is told apart before sitting down -
+   * the slot high or low, one slot or two, the pockets stacked or spread -
+   * and it is the same drawing the board is built from, so it cannot lie.
+   */
+  // The tag a part carries is a code word; the card shows the game's word for it.
+  const TAG_WORDS = { cadence: 'speed', fever: 'bonus', gate: 'slot', economy: 'coins', cost: 'price', reel: 'reels', static: 'always on' };
+  function tagWord(t) { return TAG_WORDS[t] || t; }
+
+  function drawSketch(canvas, sk, skin) {
+    if (!canvas || !sk || !canvas.getContext) return;
+    const W = 200, H = Math.round(W * sk.h / sk.w);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const c = canvas.getContext('2d');
+    if (!c) return;
+    const s = W * dpr / sk.w;
+    c.setTransform(s, 0, 0, s, 0, 0);
+    const col = (role, fallback) => (skin && skin[role]) || fallback;
+    // the face
+    c.fillStyle = col('lacquer', '#555');
+    c.fillRect(0, 0, sk.w, sk.h);
+    // the nails, faint, so the mouths and the screen read over them
+    c.fillStyle = col('brass', '#eee');
+    c.globalAlpha = 0.55;
+    for (const n of sk.nails) c.fillRect(n[0] - 0.4, n[1] - 0.4, 0.8, 0.8);
+    c.globalAlpha = 1;
+    // the screen
+    if (sk.screen) {
+      const r = sk.screen;
+      c.fillStyle = col('screen', '#111');
+      c.fillRect(r.x - r.w / 2, r.y - r.h / 2, r.w, r.h);
+      c.strokeStyle = col('chrome', '#ddd');
+      c.lineWidth = 0.9;
+      c.strokeRect(r.x - r.w / 2, r.y - r.h / 2, r.w, r.h);
+    }
+    // the rails and the plates
+    c.strokeStyle = col('chrome', '#ddd');
+    c.lineWidth = 1.1;
+    c.lineCap = 'round';
+    for (const g of sk.guides) { c.beginPath(); c.moveTo(g[0], g[1]); c.lineTo(g[2], g[3]); c.stroke(); }
+    // every mouth, drawn larger than life so it can be seen at this size, in
+    // the colour the board itself gives it
+    for (const p of sk.pockets) {
+      const gate = p.kind === 'gate';
+      const attacker = p.kind === 'attacker';
+      const w = Math.max(p.w * 1.6, 5), h = Math.max(p.h * 2.2, 3.2);
+      c.fillStyle = col('oxblood', '#000');
+      c.fillRect(p.x - w / 2 - 0.7, p.y - h / 2 - 0.7, w + 1.4, h + 1.4);
+      c.fillStyle = gate ? col('lamp', '#fff') : attacker ? col('glow', '#f80')
+        : p.tone === 'jade' ? col('jade', '#0f8') : col('enamel', '#eee');
+      c.fillRect(p.x - w / 2, p.y - h / 2, w, h);
+      if (gate) {
+        // the funnel over the slot, which is what a player is looking for
+        c.strokeStyle = col('lamp', '#fff');
+        c.lineWidth = 1.2;
+        c.beginPath();
+        c.moveTo(p.x - 7, p.y - 9); c.lineTo(p.x - w / 2, p.y - h / 2);
+        c.moveTo(p.x + 7, p.y - 9); c.lineTo(p.x + w / 2, p.y - h / 2);
+        c.stroke();
+      }
+    }
+  }
+
   // ---- the arcade ----------------------------------------------------
   //
   // A second, separate set of machines. These are not played and never appear
@@ -748,7 +834,7 @@ export async function boot(doc) {
 
   function paintFloor() {
     const r = game.reading();
-    el.floorLede.textContent = 'These are machines you OWN, not machines you play. They earn '
+    el.floorLede.textContent = 'You own these machines. They earn '
       + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
       + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
       + ' because your best game reached round ' + Math.max(r.bestRound, 0)
@@ -969,19 +1055,19 @@ const HELP = [
     + 'rounds. Run out of balls before you reach the round goal and the game ends.'],
   ['The board and the nails', 'The board is the tall lit panel filling most of the screen: a field of several '
     + 'hundred brass nails with pockets cut into it. A falling ball bounces off nail after nail, so where the '
-    + 'nails stand decides where the balls end up. Nothing is rigged and nothing is hidden.'],
+    + 'nails stand decides where the balls end up.'],
   ['The handle and the power', 'The power slider sets how hard a ball is thrown around the outer rail before '
     + 'it drops onto the nails. It\'s the only thing you control while a round is running, and it\'s worth '
     + 'a lot: the gap between the best power setting and the worst is most of what a machine pays. The arrow '
     + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself.'],
-  ['The pockets', 'A pocket is a pocket in the board that catches a ball and pays for it. There are three '
+  ['The pockets', 'A pocket is a cut in the board that catches a ball and pays for it. There are three '
     + 'kinds always on the board. SIDE POCKETS, out at the edges, pay 1 ball. MID POCKETS, the wider ones '
-    + 'lower down, pay 2 or 3. The BIG POCKET is the single green one, pays 5, and is the hardest of them to '
+    + 'lower down, pay 2 or 3. The BIG POCKET is the one mouth in a different color from the rest, pays 5, and is the hardest of them to '
     + 'reach. Balls that find no pocket run out through the OUT LANES at the bottom and are gone, which is '
     + 'most of them, and is why straight play slowly loses ground.'],
   ['The slot and the reels', 'The slot is the narrow pocket in the middle of the board, under a funnel of '
     + 'nails. It pays nothing by itself. What it does is spin the three reels, and that makes it the pocket '
-    + 'worth aiming everything at. The plaque on the left prints the real odds, the way an arcade cabinet '
+    + 'worth aiming everything at. The panel on the left prints the real odds, the way an arcade cabinet '
     + 'prints them on the glass.'],
   ['The bonus and the jackpot pocket', 'The JACKPOT POCKET is the wide pocket across the bottom of the '
     + 'board, and it\'s shut almost all of the time. When all three reels stop on the same digit a BONUS '
@@ -989,35 +1075,15 @@ const HELP = [
     + 'and it pays hard for the next hundred balls or so. A bonus can roll straight into another one, which '
     + 'the banner counts as a streak. This is the whole point of the game. Played straight the board pays '
     + 'back less than it takes, so a bonus is the only way a round finishes ahead.'],
-  ['A round and its goal', 'A round rents the machine for a set number of PULLS and asks you to win a set '
-    + 'number of balls back, which is the GOAL. Meet the goal and the counter pays a bonus of balls and the '
-    + 'next round starts, harder. Miss it and the game is over. Later on a machine sends several balls per '
-    + 'pull, so the same number of pulls puts far more on the board and a round stays about as long as it '
-    + 'ever was while raining much harder.'],
+  ['A round and its goal', 'A round rents the machine for a set number of PULLS and asks you to win a set number of balls back, which is the GOAL. Meet the goal and the counter pays a bonus of balls and the next round starts, harder. Miss it and the game is over. Later rounds send several balls per pull, so the same number of pulls puts far more on the board.'],
   ['The workbench', 'Between rounds the machine opens up. Parts are for sale, paid for with the balls you '
     + 'haven\'t launched, and a part changes how this machine behaves for the rest of the game. Up to five '
     + 'can be in the machine at once, and clicking one already in takes it back out. Some parts work '
     + 'together, and the card says so when they do.'],
-  ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending '
-    + 'steers where balls fall, and there are only a few bends per round, so the good ones are the nails '
-    + 'that feed balls into the slot. The chart at the workbench shows where the last round actually ended '
-    + 'up, which is how you tell which nails are worth bending. This is the craft of the game, and nobody '
-    + 'else lets you do it.'],
-  ['Picking a machine', 'There are six machines and they\'re genuinely different boards, not one board with '
-    + 'the colors changed: the pockets, the slot and the funnel all sit somewhere else. Change machine at '
-    + 'the top of the screen to see three of them measured for you. The number that matters most is how many '
-    + 'balls come back for each ball spent. Picking a machine starts a new game, so what you win on a '
-    + 'machine is worth checking before you sit down for hours.'],
-  ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines '
-    + 'for your arcade. Those are a separate set of machines that you never play and never see on the '
-    + 'board: they simply earn coins every second, including while the page is closed. What they earn is '
-    + 'multiplied by how far you have gotten at the handle, so playing well is the best thing you can do '
-    + 'for the arcade.'],
-  ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again '
-    + 'from nothing. Doing that pays STARS. Stars buy permanent upgrades, and permanent means permanent: '
-    + 'they survive every restart forever after. Because the arcade rebuilds far faster the second time, '
-    + 'selling it\'s a step forward rather than a punishment. Starting over never takes stars away and can '
-    + 'never leave you with fewer than you had.'],
+  ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending steers where balls fall, and there are only a few bends per round, so the good ones are the nails that feed balls into the slot. The chart at the workbench shows where the last round actually ended up, which is how you tell which nails are worth bending.'],
+  ['Picking a machine', 'There are six machines, and the pockets, the slot and the funnel sit somewhere else on each. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
+  ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines for your arcade. Those machines earn coins every second on their own, including while the page is closed. What they earn is multiplied by how far you\'ve gotten at the handle, so playing well is the best thing you can do for the arcade.'],
+  ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again from nothing. Doing that pays STARS. Stars buy permanent upgrades that survive every restart. The arcade rebuilds far faster the second time, and starting over never takes stars away.'],
 ];
 
 function index(doc) {
