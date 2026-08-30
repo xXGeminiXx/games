@@ -663,11 +663,11 @@ export const CONFIG = {
         name: 'Three doors',
         kind: 'doors',
         trigger: { kind: 'pace', share: 0.5 },
-        line: 'Halfway to what the round asks for. {doors} doors light up, and one of them pays when they close in {n} balls. Click a door to call it: right pays {doors} times over, wrong pays nothing. Leave it and the paying door opens on its own.',
+        line: 'Halfway to what the round asks for. {doors} doors light up at the foot of the board, and one of them pays when they close in {n} balls. Click a door to call it: right pays {doors} times over, wrong pays nothing. Leave it and the paying door opens on its own.',
         balls: 18,
         restBalls: 30,
         tellBalls: 2,
-        tellLine: 'A row of doors is lighting up.',
+        tellLine: 'A row of doors is lighting up at the foot of the board.',
         doors: 3,
         // What is behind each door. One is drawn when the row lights and
         // hidden until it closes, so the average is what this is worth.

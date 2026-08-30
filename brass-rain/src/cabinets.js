@@ -18,10 +18,10 @@
 // that proves it. Reading a board is the game.
 // ---------------------------------------------------------------------------
 
-import { createBoard, nailPos, layoutFor } from './board.js?v=47';
-import { createBalls, launch, stepPhysics } from './physics.js?v=47';
-import { rng as makeRng } from './rng.js?v=47';
-import { skinForCabinet } from './render/themes.js?v=47';
+import { createBoard, nailPos, layoutFor } from './board.js?v=48';
+import { createBalls, launch, stepPhysics } from './physics.js?v=48';
+import { rng as makeRng } from './rng.js?v=48';
+import { skinForCabinet } from './render/themes.js?v=48';
 
 /** How hard each candidate is tried, and at how many handle settings. */
 // Enough balls that a good board is not reported by luck. At forty a single
