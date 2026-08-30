@@ -13,14 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=33';
-import { createBoard, pocket } from './board.js?v=33';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=33';
-import { fire, hasHook } from './hooks.js?v=33';
+import { rng as makeRng } from './rng.js?v=34';
+import { createBoard, pocket } from './board.js?v=34';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=34';
+import { fire, hasHook } from './hooks.js?v=34';
 import {
   createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
   eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
-} from './events.js?v=33';
+} from './events.js?v=34';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -820,7 +820,7 @@ export function endFever(state) {
   if (trailing > 0) {
     f.ballsLeft = trailing;
     f.mult = 1;
-    logLine(state, 'fever', 'The attacker is still open for ' + trailing + '.');
+    logLine(state, 'fever', 'The jackpot pocket is still open for ' + trailing + ' balls.');
     return;
   }
   if (state.rng.next() < continueChance(state)) {
