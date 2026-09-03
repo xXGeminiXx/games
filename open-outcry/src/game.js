@@ -19,14 +19,14 @@
 // upward for the rest of the run.
 // ---------------------------------------------------------------------------
 
-import { Pit } from './pit.js?v=2';
-import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=2';
-import { quote } from './purchase.js?v=2';
-import { catchUp, summary } from './offline.js?v=2';
-import { createEngine } from './rules.js?v=2';
-import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=2';
-import { rng } from './rng.js?v=2';
-import { fill, pick } from '../content.js?v=2';
+import { Pit } from './pit.js?v=3';
+import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=3';
+import { quote } from './purchase.js?v=3';
+import { catchUp, summary } from './offline.js?v=3';
+import { createEngine } from './rules.js?v=3';
+import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=3';
+import { rng } from './rng.js?v=3';
+import { fill, pick } from '../content.js?v=3';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -173,7 +173,8 @@ export class Game {
     if (!this.active) this.active = key;
     this.engines.set(key, createEngine({ registry: this.registry, maxFiresPerTick: Math.max(1, this.bought.clerk) }));
     this.scheduleRumour(key);
-    if (!opts.quiet) this.note(fill(this.content.events.pitOpened, { pit: p.name }));
+    if (!opts.quiet) this.note(fill(this.content.events.marketOpened, { pit: p.name }));
+    this.staffBoards();
     return p;
   }
 
@@ -202,8 +203,8 @@ export class Game {
     if (id === 'size') for (const p of this.openPits()) p.setSize(this.quoteSize());
     if (id === 'seat') for (const p of this.openPits()) { p.seatBps = this.seatBps(); p.m.setFeeBps(p.seatBps); }
     if (id === 'clerk') this.onClerkHired(q.count);
-    if (id === 'runner') this.note(fill(this.content.events.runnerHired, { lead: this.runnerLead() }));
-    if (id === 'seat') this.note(fill(this.content.events.seatUp, { bps: this.seatBps() }));
+    if (id === 'runner' && this.bought.runner === q.count) this.note(fill(this.content.events.runnerHired, { lead: Math.round((this.runnerLead() / this.tickHz()) * 10) / 10 }));
+    if (id === 'seat') this.note(this.content.events.seatUp);
     return { ok: true, quote: q };
   }
 
@@ -241,15 +242,47 @@ export class Game {
   onClerkHired(n) {
     this.rebuildRegistry();
     for (const e of this.engines.values()) e.setMaxFires(Math.max(1, this.bought.clerk));
-    const p = this.activePit();
-    if (p) {
-      const engine = this.engines.get(p.key);
-      // The first clerk arrives already doing the job by hand, so the relief
-      // is immediate rather than a composer to learn first.
-      if (engine && engine.getRules().length === 0) engine.setRules([firstCard(this.content, p.spread)]);
-      this.note(fill(this.content.events.clerkHired, { pit: p.name }));
-    }
+    this.staffBoards();
     return n;
+  }
+
+  // A HIRED CLERK IS ALREADY DOING THE JOB. They arrive knowing the one click
+  // the player has been making by hand, and they take the first board that
+  // has nobody on it, so hiring one and opening a market is two clicks and no
+  // configuration. The composer is there for a player who wants to change what
+  // they do, never to make them work in the first place.
+  staffBoards() {
+    let hired = false;
+    for (const p of this.openPits()) {
+      if (this.clerksFree() <= 0) break;
+      const engine = this.engines.get(p.key);
+      if (!engine || engine.getRules().length > 0) continue;
+      engine.setRules([firstCard(this.content, p.spread)]);
+      this.note(fill(this.content.events.clerkHired, { name: this.clerkName(this.cardCount() - 1), pit: p.name }));
+      hired = true;
+    }
+    return hired;
+  }
+
+  // Clerks are people, so they have names. The name is the order they were
+  // hired in, which is stable across a reload because the count is saved.
+  clerkName(i) {
+    const list = this.content.clerkNames;
+    return list[i % list.length] + (i >= list.length ? ' ' + (1 + Math.floor(i / list.length)) : '');
+  }
+
+  // Who is working which board, for the panel. One card is one clerk.
+  clerkRoster() {
+    const out = [];
+    for (const key of this.order) {
+      const engine = this.engines.get(key);
+      if (!engine) continue;
+      for (const card of engine.getRules()) {
+        out.push({ name: this.clerkName(out.length), pit: this.pits.get(key).name, job: card.name, on: card.enabled !== false });
+      }
+    }
+    for (let i = out.length; i < this.clerkSlots(); i++) out.push({ name: this.clerkName(i), pit: null, job: null, on: false });
+    return out;
   }
 
   setCards(key, cards) {
@@ -486,7 +519,7 @@ export class Game {
     this.engines.delete(key);
     this.rumours.delete(key);
     if (this.active === key) this.active = this.order[0] || null;
-    this.note(fill(this.content.events.pitCornered, { pit: p.name, funds: q.funds, rep: q.rep }));
+    this.note(fill(this.content.events.marketCornered, { pit: p.name, funds: q.funds, rep: q.rep }));
     this.checkReveals();
     return q;
   }

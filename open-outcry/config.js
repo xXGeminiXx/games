@@ -10,17 +10,17 @@
 // each other's tuning. Type is taken from the value already in place, so a
 // number stays a number and a typo in a path is reported rather than created.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/oklch.js?v=2';
+import { oklch } from './src/oklch.js?v=3';
 
 export const CONFIG = {
   identity: {
     name: 'Open Outcry',
-    tagline: 'You make the market. The pit trades against you.',
+    tagline: 'You have the only board. Everybody deals with you.',
     storageKey: 'open-outcry',
   },
 
   dev: {
-    build: 2,              // the ?v= tag every import carries; bump on every src change
+    build: 3,              // the ?v= tag every import carries; bump on every src change
     allowOverrides: true,  // ?set= and the namespaced localStorage patch
   },
 
@@ -41,6 +41,11 @@ export const CONFIG = {
     startFunds: 900,       // what the till holds at the first tick of a run
     wireShare: 0.85,       // most of the till one quote may stand on
     reserveOfQuote: 1.0,   // cash held back per unit of quote the boards carry
+    // How long a trade keeps somebody on the floor. Each tick the count of
+    // units taken on a side decays by this and the tick's own trades are added,
+    // so the crowd is the last couple of seconds of trading rather than one
+    // tick's worth flickering.
+    flowDecay: 0.88,
     minSpread: 2,          // ticks; a quote narrower than this is not a quote
     startSpread: 6,
     startSize: 5,
@@ -197,26 +202,56 @@ export const CONFIG = {
   // The picture. Fractions are of the canvas height.
   view: {
     boardTop: 0.0,
-    railTop: 0.62,
-    railBottom: 0.665,
-    floorBottom: 0.93,
-    portraitRailTop: 0.52,     // used when the canvas is taller than it is wide
-    portraitRailBottom: 0.575,
-    portraitFloorBottom: 0.90,
+    // FOUR BANDS, and the controls get one of their own. The old layout hung
+    // the quote boxes over the bottom of the slate, where they sat on top of
+    // the price line the player is meant to be reading. Here the wall ends at
+    // the rail, the crowd stands under it, and everything a hand touches is on
+    // a desk across the front with nothing behind it.
+    railTop: 0.52,
+    railBottom: 0.556,
+    floorBottom: 0.79,         // the crowd ends here and the desk begins
+    portraitRailTop: 0.44,     // used when the canvas is taller than it is wide
+    portraitRailBottom: 0.48,
+    portraitFloorBottom: 1.0,  // on a phone the controls are under the picture
     maxDpr: 2,
-    marksMax: 2600,        // chalk marks drawn; the crowd count can run past it
-    // The floor is rasterised into a buffer this many times the window and
-    // stretched back over it. Every stroke on the floor costs, and there are
-    // thousands of them; a crowd seen from a gallery does not need to be sharp.
-    // 1 draws it at full size. ?set=view.crowdScale=1 for the crisp version.
-    crowdScale: 1,
-    headFrom: 0.3,         // marks nearer than this get a head drawn on them
-    markLen: 15,           // body stroke length in CSS pixels at the near edge
-    markLenFar: 7,         // and at the rail, where the floor is furthest
-    surge: 26,             // pixels a mark leans toward the rail at full volume
-    surgeEase: 0.16,       // how fast a mark moves toward where it wants to be
+
+    // THE FLOOR IS A READOUT, NOT A TEXTURE. The crowd stands in two halves:
+    // the people who want to buy from you on the left, the people who want to
+    // sell to you on the right, each half as many bodies as that side of the
+    // market is actually resting. Which half is bigger is where the price is
+    // about to go, so a player who never reads a number can still see it
+    // coming. A raised arm is somebody trading this tick.
+    //
+    // A few hundred figures read as a crowd and a few thousand read as noise,
+    // which is what the old floor was; they also cost about a sixth as much.
+    crowdMax: 320,         // figures drawn per side when that side is packed
+    crowdMin: 5,           // a side with nothing resting still has somebody on it
+    crowdGap: 0.085,       // share of the width left clear down the middle
+    // What one side of a busy floor is worth in bodies. Measured over 860 ticks
+    // of the grain market: the smoothed count of units taken runs about one per
+    // trader per side, so a side at this level is a full half-room and a side
+    // at nothing has walked out.
+    flowPerSide: 1.8,
+    tradePerTrader: 0.30,  // and units traded in a tick, for how many arms go up
+    figureNear: 33,        // figure height in CSS pixels at the front of the room
+    figureFar: 14,         // and at the rail, where the floor is furthest
+    crowdRedrawMs: 55,     // how often the floor is redrawn; between times it is stamped
+    legsFrom: 0.45,        // figures nearer than this get legs; further back
+                           // they are two pixels and cost a stroke for nothing
+    armSeconds: 0.55,      // how long a raised arm stays up after a trade
+    armShare: 0.30,        // most arms a side can have up at once
+    surgeEase: 0.16,       // how fast a figure moves toward where it wants to be
     settle: 0.06,          // and how fast it drifts back
-    dustGrains: 2600,
+    lean: 0.16,            // how far toward the rail a busy side presses
+
+    // A fill throws the money it made up the wall for a moment. It is the only
+    // thing on the slate that moves on its own, and it is what makes a trade
+    // feel like it happened rather than like a line in a list.
+    popSeconds: 1.1,
+    popRise: 54,           // pixels a pop travels up before it is gone
+    popMax: 14,            // pops alive at once; the oldest is dropped
+
+    dustGrains: 2200,
     beamAngle: 0.42,       // radians the clerestory beam leans from vertical
     ghostSeconds: 1.5,     // how long a wiped figure stays legible
     priceLine: 0.9,        // width of the chalked price line as a share of the slate
@@ -224,11 +259,16 @@ export const CONFIG = {
 
   // The chalk hand: how a written figure is drawn.
   chalk: {
-    passes: 3,             // strokes laid over each other to build a chalk line
-    jitter: 0.055,         // how far a point wanders, as a share of the size
-    widthOfSize: 0.075,    // stroke width as a share of the glyph height
-    tracking: 0.09,        // space between glyphs, as a share of the size
-    grain: 0.35,           // alpha of the roughest pass
+    passes: 2,             // strokes laid over each other to build a chalk line
+    jitter: 0.028,         // how far a point wanders, as a share of the size
+    jitterMax: 1.5,        // and never further than this many pixels, at any size
+    widthOfSize: 0.068,    // stroke width as a share of the glyph height
+    tracking: 0.10,        // space between glyphs, as a share of the size
+    grain: 0.30,           // alpha of the roughest pass
+    // Below this many pixels a written letter is mud. Anything smaller is a
+    // sentence, and sentences are set in the page's own type where they can
+    // be read; the slate keeps the figures.
+    minSize: 15,
   },
 
   // OKLCH: a lightness, a chroma and a hue. Slate is green-grey and never

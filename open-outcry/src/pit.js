@@ -27,8 +27,8 @@
 // first thing the tests check.
 // ---------------------------------------------------------------------------
 
-import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=2';
-import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=2';
+import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=3';
+import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=3';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -340,7 +340,16 @@ export class Pit {
     }
     if (bought + sold > 0) {
       this.fillsSeen++;
-      this.lastFill = { bought, sold, price: Math.round((spent + got) / (bought + sold)) };
+      this.lastFill = {
+        bought, sold,
+        price: Math.round((spent + got) / (bought + sold)),
+        // The two sides are kept apart as well as together. Where both filled
+        // in the same tick, the difference between them is the gap the player
+        // actually kept, and that is the only number the board throws up the
+        // wall - a one-sided fill has not made or lost anything yet.
+        buyPrice: bought > 0 ? spent / bought : 0,
+        sellPrice: sold > 0 ? got / sold : 0,
+      };
     } else this.lastFill = null;
     return this.lastFill;
   }
@@ -533,9 +542,44 @@ export class Pit {
   tape(n) { return this.m.books[0].recentTrades(n); }
   conservation() { return this.m.conservation(); }
 
+  // WHO IS CROSSING THE SPREAD TO GET FILLED, smoothed over the last few
+  // ticks. This is what the floor is drawn from.
+  //
+  // It is deliberately the takers and not the resting book. A crowd that wants
+  // to buy does not leave bids sitting there; it reaches over and lifts the
+  // offers, so a rising market shows a HEAVY sell book and a light buy book,
+  // and a floor drawn from depth would put a packed crowd of sellers under the
+  // words "everybody wants to buy". Takers are also what actually moves the
+  // price, which is the thing the player has to see coming.
+  readFlow() {
+    const book = this.m.books[0];
+    const seen = book.tradeCount - (this.tradesAt || 0);
+    this.tradesAt = book.tradeCount;
+    let b = 0, s = 0;
+    if (seen > 0) {
+      for (const t of book.recentTrades(Math.min(seen, 64))) {
+        if (t.aggressor === BUY) b += t.qty; else s += t.qty;
+      }
+    }
+    const k = this.cfg.pit.flowDecay;
+    this.flowBuy = (this.flowBuy || 0) * k + b;
+    this.flowSell = (this.flowSell || 0) * k + s;
+  }
+
+  taking() { return { buy: this.flowBuy || 0, sell: this.flowSell || 0 }; }
+
+  // How stale the board is, from 0 when the price is sitting on it to 1 when
+  // the price has walked a whole spread away and one side is being run over.
+  staleness() {
+    if (!this.bidOn && !this.askOn) return 1;
+    const half = Math.max(1, this.spread / 2);
+    return clamp(Math.abs(this.drift()) / (half * 2), 0, 1);
+  }
+
   record() {
     this.history.push(this.mid);
     if (this.history.length > this.cfg.sim.historyLen) this.history.shift();
+    this.readFlow();
   }
 
   // --- save ----------------------------------------------------------------

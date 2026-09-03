@@ -1,34 +1,53 @@
 // ---------------------------------------------------------------------------
-// The interface: the boxes on the slate, the panel at the side, and the loop
-// that drives both.
+// The interface: the sentences over the slate, the two dials above the rail,
+// the panel at the side, and the loop that drives all of it.
 //
-// Everything the player can touch is a real focusable element, because the
-// board itself is a picture and a picture cannot be tabbed to. The canvas
-// draws; this file reads the same state and writes it into the DOM.
+// THE BOARD DRAWS FIGURES. THIS FILE WRITES SENTENCES. A stroke alphabet at
+// fourteen pixels is mud, and every line the game uses to teach itself is a
+// sentence, so the canvas gets the purse, the going rate and the two prices on
+// the wall, and the page gets the words. Both read the same state.
 //
-// One requestAnimationFrame loop owns the whole frame: it advances the pits by
-// a fixed number of ticks, renders the board, and writes the panel at a slower
-// cadence than it draws, because text that changes sixty times a second cannot
-// be read and costs more than the picture does.
+// THE PLAYER NEVER TYPES A PRICE. Two prices go on the wall - what you pay for
+// a sack and what you charge for one - and both are worked out from the going
+// rate and one dial: how much of a cut you want. The other dial is how many
+// sacks you will handle at a time. Everything else is one button: the market
+// walks away from what you wrote, and you wipe it and write it again.
+//
+// One requestAnimationFrame loop owns the whole frame: it advances the markets
+// by a fixed number of ticks, renders the board, and writes the panel at a
+// slower cadence than it draws, because text that changes sixty times a second
+// cannot be read and costs more than the picture does.
 //
 // PROGRESSIVE REVEAL is done by hiding sections, not by building them late, so
-// the layout never jumps as the game opens up: a section that appears takes
-// the space it was always going to take.
+// the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=2';
-import { CONTENT, fill } from '../content.js?v=2';
-import { Game } from './game.js?v=2';
-import { Board } from './board.js?v=2';
-import { format, duration, counter } from './format.js?v=2';
-import { toNumber, cmp, big } from './bignum.js?v=2';
-import { createSave } from './save.js?v=2';
-import { affordability } from './purchase.js?v=2';
-import { createComposer } from './rules-ui.js?v=2';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=3';
+import { CONTENT, fill } from '../content.js?v=3';
+import { Game } from './game.js?v=3';
+import { Board } from './board.js?v=3';
+import { format, counter } from './format.js?v=3';
+import { toNumber, cmp } from './bignum.js?v=3';
+import { createSave } from './save.js?v=3';
+import { affordability } from './purchase.js?v=3';
+import { createComposer } from './rules-ui.js?v=3';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 const fmt = (v) => format(v, { decimals: 2 });
+// A price is a whole number of coins. Nothing in this game is sold by the
+// penny, and a shelf that quotes 777.68 reads as a spreadsheet.
+const coins = (v) => format(typeof v === 'number' ? Math.round(v) : v, { decimals: 0 });
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+// What is on the shelf, in one place, so the panel is a list and not four
+// hand-written blocks that drift apart.
+const SHOP = [
+  { id: 'size', reveal: 'ladder', name: 'sizeName' },
+  { id: 'clerk', reveal: 'clerks', name: 'clerkName' },
+  { id: 'seat', reveal: 'seat', name: 'seatName' },
+  { id: 'runner', reveal: 'runners', name: 'runnerName' },
+];
 
 export function boot() {
   const cfg = withOverrides(CONFIG, location.search, typeof localStorage !== 'undefined' ? localStorage : null);
@@ -52,10 +71,10 @@ export function boot() {
   if (!game) game = new Game(cfg, content);
 
   const board = new Board($('c'), cfg, content);
-  const fundsCounter = counter({ rate: 9 });
-  fundsCounter.snap(toNumber(game.funds));
+  const purse = counter({ rate: 9 });
+  purse.snap(toNumber(game.funds));
 
-  const ui = new UI(cfg, content, game, board, save, fundsCounter);
+  const ui = new UI(cfg, content, game, board, save, purse);
   window.game = game;
   window.ui = ui;
   ui.start(fresh);
@@ -70,45 +89,52 @@ function fillStatic(content) {
     const s = at(node.getAttribute('data-t'));
     if (typeof s === 'string') node.textContent = s;
   }
-  // A longer sentence about what a control does. It is a title, not the only
-  // place the information lives: nothing here is hover-only.
   for (const node of document.querySelectorAll('[data-title]')) {
     const s = at(node.getAttribute('data-title'));
     if (typeof s === 'string') node.title = s;
   }
 }
 
+// The opening sheet, filled from the board it is standing in front of.
+function fillIntro(content, pit) {
+  const steps = $('intro-steps');
+  if (!steps || steps.childElementCount) return;
+  const v = pit ? { bid: pit.bid, ask: pit.ask, cut: pit.ask - pit.bid } : {};
+  for (const line of content.intro.steps) steps.appendChild(el('li', null, fill(line, v)));
+}
+
 class UI {
-  constructor(cfg, content, game, board, save, fundsCounter) {
+  constructor(cfg, content, game, board, save, purse) {
     this.cfg = cfg;
     this.content = content;
     this.game = game;
     this.board = board;
     this.save = save;
-    this.fundsCounter = fundsCounter;
+    this.purse = purse;
     this.acc = 0;
     this.last = 0;
     this.panelAt = 0;
     this.tickVolume = 0;
-    this.rows = new Map();
+    this.shop = new Map();
     this.spendRows = new Map();
-    this.pitRows = new Map();
+    this.marketRows = new Map();
     this.composer = null;
     this.composerFor = null;
     this.composerTier = 0;
+    this.composerOpen = false;
     this.afford = affordability();
     this.folded = false;
-    this.editing = null;
-    this.frames = 0;
+    this.said = new Map();       // last text written into each node, so a
+    this.frames = 0;             // frame that changed nothing touches no DOM
   }
 
   start(fresh) {
-    this.buildLadder();
+    this.buildShop();
     this.buildCity();
     this.bind();
     this.resize();
     addEventListener('resize', () => this.resize());
-    if (fresh) this.sheet('intro', true);
+    if (fresh) { fillIntro(this.content, this.game.activePit()); this.sheet('intro', true); }
     else this.showAway();
     this.save.start();
     this.last = performance.now();
@@ -117,21 +143,21 @@ class UI {
 
   // --- layout --------------------------------------------------------------
 
+  // The sentences and the controls are laid out against the picture, so where
+  // the rail lands has to reach the stylesheet. Two custom properties carry it.
   resize() {
     const c = $('c');
     const r = c.getBoundingClientRect();
     const narrow = innerWidth <= 820;
+    this.board.setNarrow(narrow);
     this.board.setInset(narrow ? 0 : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--panelW')) || 0);
     this.board.resize(Math.round(r.width), Math.round(r.height), devicePixelRatio || 1);
-    // On a wide window the quote is written on the slate and the tickets hang
-    // from the rail, both placed against what the canvas drew. On a narrow one
-    // the stylesheet takes them out of the picture entirely, so the inline
-    // placement has to come off with them.
-    const q = $('quote'), rail = $('rail');
-    q.style.bottom = narrow ? '' : Math.round(r.height - this.board.railTop + 14) + 'px';
-    rail.style.top = narrow ? '' : Math.round(this.board.railTop - 10) + 'px';
+    const root = document.documentElement.style;
+    const h = Math.max(1, r.height);
+    root.setProperty('--railTop', (this.board.railTop / h) * 100 + '%');
+    root.setProperty('--railBottom', (this.board.railBottom / h) * 100 + '%');
+    root.setProperty('--floorBottom', (this.board.floorBottom / h) * 100 + '%');
     $('hint').textContent = this.content.labels.hint;
-    $('hint').style.bottom = Math.round(r.height - this.board.floorBottom + 6) + 'px';
   }
 
   // --- the frame -----------------------------------------------------------
@@ -147,6 +173,7 @@ class UI {
     this.acc += dt * hz;
     let ran = 0;
     const cap = this.cfg.sim.maxCatchUpTicks;
+    const was = g.activePit();
     while (this.acc >= 1 && ran < cap) { g.tick(); this.acc -= 1; ran++; }
     if (this.acc > cap) this.acc = 0;
 
@@ -155,45 +182,56 @@ class UI {
       let vol = 0;
       for (const f of p.m.fills) vol += f.qty;
       this.tickVolume = ran > 0 ? vol : this.tickVolume * 0.9;
+      if (ran > 0 && p === was) this.throwMoney(p);
     }
 
-    this.fundsCounter.set(toNumber(g.funds));
-    this.fundsCounter.update(dt);
+    this.purse.set(toNumber(g.funds));
+    this.purse.update(dt);
     this.board.render(this.view(), dt);
 
     if (now - this.panelAt > 130) { this.panelAt = now; this.refresh(); }
     requestAnimationFrame((t) => this.frame(t));
   }
 
+  // THE GAP, THROWN UP THE WALL. When both sides of the board fill in the same
+  // breath you have bought a sack and sold a sack and kept the difference, and
+  // that difference is the whole game, so it is the one number that gets an
+  // animation. Nothing pops for a one-sided fill: buying a sack has not made
+  // any money yet, and saying it did would be a lie the purse contradicts a
+  // minute later.
+  throwMoney(p) {
+    const f = p.lastFill;
+    if (!f) return;
+    const matched = Math.min(f.bought, f.sold);
+    if (matched <= 0) return;
+    const kept = Math.round(matched * (f.sellPrice - f.buyPrice));
+    if (kept === 0) return;
+    this.board.pop((kept > 0 ? '+' : '') + fmt(kept), kept > 0 ? 'buy' : 'sell');
+  }
+
   view() {
-    const g = this.game, p = g.activePit(), c = this.content;
-    if (!p) return { funds: fmt(this.fundsCounter.value), take: '0', pitName: '', price: '0', why: '', position: '0', crowdText: '', crowd: 0, volume: 0, expected: 1, history: [], depth: null, spreadText: '', tape: [] };
-    const drawn = Math.min(p.crowd, this.cfg.view.marksMax);
+    const g = this.game, p = g.activePit();
+    const purse = fmt(Math.round(this.purse.value));
+    if (!p) return { purse, pitName: '', rate: '0', history: [], showQuote: false, bid: 0, ask: 0, buyPressure: 0, sellPressure: 0, crowd: 1, volume: 0 };
+    const press = p.taking();
     return {
-      // The figure on the wall is whole coins. A till that reads 810.07 is a
+      // The figure on the wall is whole coins. A purse that reads 810.07 is a
       // spreadsheet, not a board somebody wrote on.
-      funds: fmt(Math.round(this.fundsCounter.value)),
-      // What this pit has paid the till, counting the cash still standing
-      // behind its quote as the money it is - otherwise a pit that has just
-      // written a bid reads as having cost you what it escrowed.
-      take: fmt(Math.round(p.swept + p.m.player.escrow)),
+      purse,
       pitName: p.name,
-      price: String(Math.round(p.mid)),
-      why: this.whyLine(p),
-      shock: p.shockText || '',
-      position: String(p.position),
-      crowdText: drawn < p.crowd ? `${p.crowd} on the floor, ${drawn} drawn` : `${p.crowd} on the floor`,
+      rate: String(Math.round(p.mid)),
+      history: p.history,
+      showQuote: p.bidOn || p.askOn,
+      bid: p.bid,
+      ask: p.ask,
+      buyPressure: press.buy,
+      sellPressure: press.sell,
       crowd: p.crowd,
       volume: this.tickVolume,
-      expected: Math.max(2, p.crowd * 0.22),
-      history: p.history,
-      depth: p.depth(6),
-      spreadText: `${p.bid} / ${p.ask}`,
-      tape: p.tape(26),
     };
   }
 
-  // The sentence under the price. The CATEGORY comes from what the tick did;
+  // The line under the going rate. The CATEGORY comes from what the tick did;
   // the words are chosen once when the category changes, so the note is stable
   // while the state is and genuinely rewritten when it turns over.
   whyLine(p) {
@@ -209,32 +247,33 @@ class UI {
     return p._whyText || '';
   }
 
+  // Write a string into a node only when it actually changed. The panel runs
+  // eight times a second and most of what it writes is what it wrote last time.
+  say(id, text) {
+    if (this.said.get(id) === text) return;
+    this.said.set(id, text);
+    const node = $(id);
+    if (node) node.textContent = text;
+  }
+
   // --- the panel -----------------------------------------------------------
 
   refresh() {
-    const g = this.game, c = this.content, p = g.activePit();
+    const g = this.game, p = g.activePit();
     this.pitTabs();
-    if (p && this.editing !== 'bid') $('bid').value = p.bid;
-    if (p && this.editing !== 'ask') $('ask').value = p.ask;
-    if (p && this.editing !== 'size') $('size').value = p.size;
-    if (p && this.editing !== 'spread') $('spread').value = p.spread;
-    $('spreadbox').hidden = !g.shown('spread');
-    $('flatten').disabled = !p || p.position <= 0;
-    $('pullq').textContent = p && !p.bidOn && !p.askOn ? c.labels.push : c.labels.pull;
+    this.slate(p);
+    this.controls(p);
+    this.nextLine();
 
-    this.section('ladder', g.shown('ladder'));
-    this.section('clerks', g.shown('clerks'));
-    this.section('seat', g.shown('seat'));
-    this.section('runners', g.shown('runners'));
-    this.section('pits', g.shown('pits'));
+    this.section('buy', SHOP.some((s) => g.shown(s.reveal)));
+    this.section('clerks', g.bought.clerk > 0);
+    this.section('markets', g.shown('pits'));
     this.section('corner', g.shown('corner'));
     this.section('city', g.shown('city'));
 
-    for (const row of this.rows.values()) row.update();
-    this.pitOffers();
+    for (const row of this.shop.values()) row.update();
+    this.markets();
     this.clerks();
-    this.seat();
-    this.runners();
     this.corner();
     this.city();
     this.tickets();
@@ -244,13 +283,100 @@ class UI {
 
   section(id, on) { const s = $('sec-' + id); if (s) s.hidden = !on; }
 
+  // The sentences laid over the picture.
+  slate(p) {
+    const c = this.content.labels;
+    if (!p) return;
+    // A NUMBER ONLY MEANS SOMETHING NEXT TO WHAT IS NORMAL. Holding a couple of
+    // sacks is the job; holding forty is a bet on the price, and the line says
+    // so and turns red. Turning red for any stock at all made red mean nothing,
+    // because you are almost always carrying something.
+    const held = p.position;
+    const lots = Math.abs(held) > p.size * this.cfg.pit.carryOfSize;
+    this.say('holding', held === 0 ? c.holdingNone
+      : held > 0 ? fill(c[lots ? 'holdingLots' : 'holding'], { n: held })
+        : fill(c[lots ? 'owingLots' : 'owing'], { n: -held }));
+    $('holding').classList.toggle('carrying', lots);
+    this.say('crowd', fill(c.crowd, { n: format(p.crowd, { decimals: 0 }) }));
+    this.say('why', this.whyLine(p));
+    this.say('news', p.shockText || '');
+  }
+
+  // The two dials, the one button, and the line that says how far the price
+  // has walked off the board. That bar is the whole tension of the game made
+  // visible: it fills, you wipe, it starts filling again.
+  controls(p) {
+    const c = this.content.labels;
+    if (!p) return;
+    this.say('cut-val', String(p.spread));
+    this.say('size-val', String(p.size));
+    // WHICH WAY IT WENT AND WHAT THAT COSTS. "The price has left your board" is
+    // true and useless; a player wants to know that everything they have is
+    // about to be bought off them, or that they are about to be sold to all
+    // afternoon. The line only says that once the price is genuinely past one
+    // of the two written on the wall.
+    const down = !p.bidOn && !p.askOn;
+    const s = p.staleness();
+    const state = down ? 'down' : s > 0.62 ? 'stale' : s > 0.3 ? 'warn' : 'on';
+    const mid = p.mid;
+    const stale = mid > p.ask ? c.freshHigh : mid < p.bid ? c.freshLow : c.freshStale;
+    this.say('fresh-text', down ? c.freshDown
+      : state === 'stale' ? stale
+        : state === 'warn' ? c.freshDrift : c.freshOn);
+    $('fresh-bar').style.width = Math.round(s * 100) + '%';
+    const fresh = $('fresh');
+    fresh.classList.toggle('warn', state === 'warn');
+    fresh.classList.toggle('stale', state === 'stale' || state === 'down');
+    $('wipe').classList.toggle('stale', state === 'stale' || state === 'down');
+    $('dump').disabled = p.position <= 0;
+    this.say('stopq', down ? c.start : c.stop);
+    $('cut-minus').disabled = p.spread <= this.cfg.pit.minSpread;
+    $('size-plus').disabled = p.size >= this.game.quoteSize();
+    $('size-minus').disabled = p.size <= 1;
+  }
+
+  // ONE LINE THAT SAYS WHAT TO DO NEXT, and only ever one. A player who has
+  // put the game down for a week reads this and carries on.
+  nextLine() {
+    const g = this.game, c = this.content.labels, p = g.activePit();
+    // A line that says SAVE UP for something already in the purse reads as a
+    // game that has not noticed. Each goal has the sentence for both states.
+    const goal = (id, key) => {
+      const q = g.quoteFor(id, 1);
+      const now = q.count > 0;
+      return fill(c[key + (now ? 'Now' : '')], { n: coins(now ? q.total : q.price) });
+    };
+    let text = '';
+    if (!g.fills) text = c.nextFirstFill;
+    else if (!g.shown('clerks')) text = c.nextWipe;
+    else if (g.bought.clerk === 0) text = goal('clerk', 'nextBuyClerk');
+    if (!text && g.shown('city') && !g.canLeave()) text = fill(c.nextCity, { n: g.cornersToLeave() - g.corners });
+    if (!text && g.shown('corner') && p) text = fill(c.nextCorner, { pit: p.name, have: Math.round(p.share * 100) + '%' });
+    if (!text && g.shown('pits')) {
+      const next = this.cfg.pitOrder.find((k) => !g.pits.has(k) && !g.cornered.has(k));
+      if (next && g.order.length < g.slots()) {
+        text = fill(c[g.canOpen(next) ? 'nextOpenPitNow' : 'nextOpenPit'], { n: coins(g.pitCost(next)), pit: this.cfg.pits[next].name });
+      }
+    }
+    if (!text && g.shown('ladder')) text = goal('size', 'nextBuySize');
+    this.say('next', text || c.nextNone);
+  }
+
+  // What the next one costs, whether or not the purse can reach it. A quote
+  // that buys nothing has a total of nothing, and "save up 0" is what that
+  // reads as on the page.
+  priceOfNext(id) {
+    const q = this.game.quoteFor(id, 1);
+    return q.count > 0 ? q.total : q.price;
+  }
+
   // Becoming affordable is an event, so a button brightens once rather than
   // every frame for as long as the player is rich.
   lit() {
     const prices = {};
-    for (const [id, row] of this.rows) prices[id] = row.priceOfOne();
+    for (const [id, row] of this.shop) prices[id] = row.priceOfOne();
     for (const ch of this.afford.update(this.game.funds, prices)) {
-      const row = this.rows.get(ch.id);
+      const row = this.shop.get(ch.id);
       if (row) row.flash(ch.affordable);
     }
   }
@@ -261,7 +387,7 @@ class UI {
     if (mount.dataset.keys !== keys.join(',')) {
       mount.textContent = '';
       keys.forEach((k, i) => {
-        const b = el('button', 'tab', `${i + 1} ${g.pit(k).name}`);
+        const b = el('button', 'tab', g.pit(k).name);
         b.type = 'button';
         b.addEventListener('click', () => { g.active = k; this.rebuildComposer(); this.refresh(); });
         mount.appendChild(b);
@@ -271,104 +397,135 @@ class UI {
     [...mount.children].forEach((b, i) => b.classList.toggle('on', keys[i] === g.active));
   }
 
-  // --- purchase rows -------------------------------------------------------
+  // --- the shelf -----------------------------------------------------------
 
-  buildLadder() {
-    for (const id of ['size', 'clerk', 'seat', 'runner']) {
-      this.rows.set(id, this.buyRow($('ladder-' + id), id));
-    }
+  buildShop() {
+    const mount = $('buy-list');
+    for (const spec of SHOP) this.shop.set(spec.id, this.shopItem(mount, spec));
   }
 
-  buyRow(mount, id) {
-    const g = this.game, spec = this.cfg.ladder[id];
-    const what = el('div', 'row');
-    const label = el('span', 'what grow');
-    what.appendChild(label);
-    const owned = el('span', 'note');
-    what.appendChild(owned);
-    const buttons = el('div', 'row');
-    const btns = this.cfg.bulk.map((k) => {
-      const b = el('button', 'buy');
-      b.type = 'button';
-      b.addEventListener('click', () => {
-        const r = g.buy(id, k);
-        if (r.ok) { this.rebuildComposer(); this.save.write('buy'); }
-        this.refresh();
-      });
-      buttons.appendChild(b);
-      return { k, b };
-    });
-    mount.appendChild(what);
-    mount.appendChild(buttons);
-
-    const priceOfOne = () => {
-      const q = g.quoteFor(id, 1);
-      return q.asked === 0 ? Infinity : q.total;
+  // One thing you can buy: what it is called, what it will do for you with the
+  // number in it, and at most two buttons.
+  //
+  // The old row put out four - one, ten, a hundred, and as many as the purse
+  // allows - and whenever a cap or the money bit, three of them said the same
+  // thing. Two identical buttons side by side is worse than one button.
+  shopItem(mount, spec) {
+    const g = this.game, c = this.content.labels;
+    const box = el('div', 'item');
+    const head = el('div', 'head');
+    const title = el('span', 'title', c[spec.name]);
+    const have = el('span', 'have');
+    head.appendChild(title); head.appendChild(have);
+    const what = el('div', 'what');
+    const acts = el('div', 'acts');
+    const one = el('button', 'buy');
+    const many = el('button', 'buy');
+    one.type = 'button'; many.type = 'button';
+    const click = (k) => () => {
+      const r = g.buy(spec.id, k);
+      if (r.ok) { this.rebuildComposer(); this.save.write('buy'); }
+      this.refresh();
     };
+    one.addEventListener('click', click(1));
+    many.addEventListener('click', click('max'));
+    acts.appendChild(one); acts.appendChild(many);
+    box.appendChild(head); box.appendChild(what); box.appendChild(acts);
+    mount.appendChild(box);
+
+    // What the next one buys you, said with its number in it.
+    const wording = () => {
+      const p = g.activePit();
+      if (spec.id === 'size') return fill(c.sizeWhat, { n: g.quoteSize() + this.cfg.ladder.size.step, was: g.quoteSize() });
+      if (spec.id === 'clerk') return c.clerkWhat;
+      if (spec.id === 'seat') {
+        const paid = p && p.seatPaid > 0 ? ' ' + fill(c.seatPaid, { n: coins(p.seatPaid) }) : '';
+        return c.seatWhat + paid;
+      }
+      const secs = Math.round(((g.runnerLead() + this.cfg.ladder.runner.lead) / g.tickHz()) * 10) / 10;
+      const lead = fill(c.runnerWhat, { n: secs });
+      return g.bought.runner > 0 ? lead : c.runnerNone + ' ' + lead;
+    };
+
     return {
-      priceOfOne,
-      flash(on) { for (const { b } of btns) b.classList.toggle('lit', on); },
-      update() {
-        const l = spec;
-        label.textContent = l.label;
-        owned.textContent = fill(CONTENT.labels.owned, { n: g.bought[id] });
-        for (const { k, b } of btns) {
-          const q = g.quoteFor(id, k);
-          // The button says what the click will ACTUALLY do. A bulk button
-          // that quietly does nothing because only some are affordable is the
-          // oldest silent failure in this genre: it offers what it can buy,
-          // and when it can buy none it says how far off the money is.
-          b.disabled = q.count <= 0;
-          if (q.count > 0) b.textContent = `x${q.count} for ${fmt(q.total)}`;
-          else {
-            // Buy max with nothing affordable asks for nothing, so it has no
-            // shortfall of its own to report. What the player wants to know is
-            // how far off the next one is.
-            const one = k === 'max' ? g.quoteFor(id, 1) : q;
-            b.textContent = `x${k === 'max' ? 1 : k} needs ${fmt(one.shortfall || one.price)}`;
-          }
-        }
+      priceOfOne() { const q = g.quoteFor(spec.id, 1); return q.asked === 0 ? Infinity : q.total; },
+      flash(on) { one.classList.toggle('lit', on); },
+      update: () => {
+        box.hidden = !g.shown(spec.reveal);
+        if (box.hidden) return;
+        have.textContent = fill(c.owned, { n: g.bought[spec.id] });
+        what.textContent = wording();
+        const q1 = g.quoteFor(spec.id, 1);
+        one.disabled = q1.count <= 0;
+        one.textContent = q1.count > 0
+          ? fill(c.buyFor, { n: 1, cost: coins(q1.total) })
+          : `${fill(c.buyFor, { n: 1, cost: coins(q1.price) })}, ${fill(c.needs, { n: coins(q1.shortfall || q1.price) })}`;
+        // A second button only when it would buy something the first does not.
+        const qm = g.quoteFor(spec.id, 'max');
+        const worth = qm.count > 1;
+        many.hidden = !worth;
+        if (worth) many.textContent = fill(c.buyFor, { n: qm.count, cost: coins(qm.total) });
       },
     };
   }
 
-  pitOffers() {
-    const g = this.game, mount = $('pit-offers');
-    const locked = this.cfg.pitOrder.filter((k) => !g.pits.has(k));
-    if (mount.dataset.keys !== locked.join(',')) {
+  markets() {
+    const g = this.game, mount = $('market-list');
+    const shut = this.cfg.pitOrder.filter((k) => !g.pits.has(k));
+    if (mount.dataset.keys !== shut.join(',')) {
       mount.textContent = '';
-      this.pitRows.clear();
-      for (const k of locked) {
-        const row = el('div', 'row');
-        const b = el('button', 'buy grow');
+      this.marketRows.clear();
+      for (const k of shut) {
+        const box = el('div', 'item');
+        const b = el('button', 'buy wide');
         b.type = 'button';
-        b.title = this.content.pits[k] || '';
-        const note = el('span', 'note');
+        const what = el('div', 'what', this.content.pits[k] || '');
         b.addEventListener('click', () => { if (g.openPit(k)) { this.rebuildComposer(); this.save.write('pit'); } this.refresh(); });
-        row.appendChild(b);
-        mount.appendChild(row);
-        mount.appendChild(note);
-        this.pitRows.set(k, { b, note });
+        box.appendChild(b);
+        box.appendChild(what);
+        mount.appendChild(box);
+        this.marketRows.set(k, { b, box });
       }
-      mount.dataset.keys = locked.join(',');
+      mount.dataset.keys = shut.join(',');
     }
-    for (const [k, r] of this.pitRows) {
-      const cost = g.pitCost(k);
-      r.b.textContent = fill(CONTENT.labels.openPit, { pit: this.cfg.pits[k].name }) + '  ' + fmt(cost);
+    const full = g.order.length >= g.slots();
+    for (const [k, r] of this.marketRows) {
+      const name = this.cfg.pits[k].name;
+      const text = `${fill(this.content.labels.openMarket, { pit: name })}  ${coins(g.pitCost(k))}`;
+      if (r.b.textContent !== text) r.b.textContent = text;
       r.b.disabled = !g.canOpen(k);
-      r.note.textContent = this.content.pits[k] || '';
+      r.box.hidden = full && !g.canOpen(k);
     }
   }
 
+  // Clerks are people with names, and a hired one is already doing the job.
+  // The composer that lets you rewrite what they do is behind a toggle,
+  // because nobody should have to open a rules editor to hire somebody.
   clerks() {
-    const g = this.game;
-    $('clerk-count').textContent = fill(this.content.labels.clerkSlots, { used: g.cardCount(), n: g.clerkSlots() });
-    if (g.bought.clerk > 0) this.rebuildComposer();
+    const g = this.game, c = this.content.labels, mount = $('clerk-list');
+    const roster = g.clerkRoster();
+    while (mount.childElementCount < roster.length) {
+      const box = el('div', 'clerk');
+      box.appendChild(el('div', 'who'));
+      box.appendChild(el('div', 'job'));
+      mount.appendChild(box);
+    }
+    while (mount.childElementCount > roster.length) mount.removeChild(mount.lastChild);
+    roster.forEach((r, i) => {
+      const box = mount.children[i];
+      const who = r.pit ? `${r.name}, on the ${r.pit} board` : r.name;
+      const job = r.pit ? r.job : c.clerkIdle;
+      if (box.children[0].textContent !== who) box.children[0].textContent = who;
+      if (box.children[1].textContent !== job) box.children[1].textContent = job;
+      box.classList.toggle('idle', !r.pit);
+    });
+    this.say('clerk-count', fill(c.clerkSlots, { used: g.cardCount(), n: g.clerkSlots() }));
+    if (this.composerOpen && g.bought.clerk > 0) this.rebuildComposer();
   }
 
   rebuildComposer() {
     const g = this.game;
-    if (g.bought.clerk <= 0) return;
+    if (!this.composerOpen || g.bought.clerk <= 0) return;
     const key = g.active;
     const engine = g.engines.get(key);
     if (!engine) return;
@@ -389,61 +546,49 @@ class UI {
     this.composerTier = g.registryTier;
   }
 
-  seat() {
-    const g = this.game, p = g.activePit();
-    $('seat-now').textContent = fill(this.content.labels.seatNow, { bps: g.seatBps() });
-    $('seat-paid').textContent = p ? fill(this.content.labels.seatTaken, { n: fmt(p.seatPaid) }) : '';
-  }
-
-  runners() {
-    const g = this.game;
-    $('runner-now').textContent = g.bought.runner > 0
-      ? fill(this.content.labels.runnerLead, { n: g.runnerLead() })
-      : this.content.labels.runnerNone;
-  }
-
   corner() {
-    const g = this.game, p = g.activePit();
+    const g = this.game, p = g.activePit(), c = this.content.labels;
     if (!p) return;
     const q = g.cornerQuote(p.key);
     $('corner-bar').style.width = Math.round(Math.min(1, q.share / q.need) * 100) + '%';
-    $('corner-need').textContent = fill(this.content.labels.cornerNeed, {
-      pct: Math.round(q.need * 100) + '%', have: Math.round(q.share * 100) + '%',
-    });
-    $('corner-pays').textContent = fill(this.content.labels.cornerPays, { funds: fmt(q.funds), rep: q.rep });
+    this.say('corner-need', q.last ? c.cornerLast
+      : q.share >= q.need && q.held < q.holdTicks ? c.cornerHold
+        : fill(c.cornerNeed, { pit: p.name, have: Math.round(q.share * 100) + '%' }));
+    this.say('corner-pays', fill(c.cornerPays, { funds: coins(q.funds), rep: q.rep }));
     $('corner-call').disabled = !q.ready;
   }
 
   buildCity() {
     const mount = $('city-spend');
     for (const [id, spec] of Object.entries(this.cfg.city.spend)) {
-      const row = el('div', 'row');
-      const b = el('button', 'buy grow');
+      const b = el('button', 'buy wide');
       b.type = 'button';
+      b.style.marginBottom = '6px';
       b.addEventListener('click', () => { this.game.spendReputation(id, 1); this.refresh(); });
-      row.appendChild(b);
-      mount.appendChild(row);
+      mount.appendChild(b);
       this.spendRows.set(id, { b, spec });
     }
   }
 
   city() {
-    const g = this.game;
-    $('city-rep').textContent = fill(this.content.labels.cityRep, { n: g.reputation });
+    const g = this.game, c = this.content.labels;
+    this.say('city-rep', fill(c.cityRep, { n: g.reputation }));
     for (const [id, r] of this.spendRows) {
       const q = g.spendQuote(id, 1);
-      r.b.textContent = `${r.spec.label}  ${q.price} ${this.content.labels.reputation}  (${fill(this.content.labels.cityHave, { n: g.spent[id] })})`;
+      const text = `${r.spec.label}, ${q.price} ${c.reputation}  (${fill(c.cityHave, { n: g.spent[id] })})`;
+      if (r.b.textContent !== text) r.b.textContent = text;
       r.b.disabled = q.count <= 0;
     }
     const go = $('city-go');
-    go.textContent = g.canLeave()
-      ? fill(this.content.labels.cityGo, { city: g.nextCityName() })
-      : this.content.labels.cityNeed;
+    const text = g.canLeave()
+      ? fill(c.cityGo, { city: g.nextCityName() })
+      : fill(c.cityNeed, { n: g.cornersToLeave() - g.corners });
+    if (go.textContent !== text) go.textContent = text;
     go.disabled = !g.canLeave();
   }
 
-  // Clerk tickets hang from the rail. A ticket that fired this tick is marked
-  // in red, which is the visual twin of the thing having happened.
+  // A clerk's ticket hangs from the rail on the board they are working. One
+  // that fired this tick is marked, which is the visual twin of it happening.
   tickets() {
     const g = this.game, mount = $('rail'), p = g.activePit();
     if (!p || g.bought.clerk <= 0) { if (mount.childElementCount) mount.textContent = ''; return; }
@@ -459,8 +604,9 @@ class UI {
     }
     rows.forEach((row, i) => {
       const t = mount.children[i];
-      t.children[0].textContent = row.name;
-      t.children[1].textContent = row.reason;
+      const name = g.clerkName(i) + ': ';
+      if (t.children[0].textContent !== name) t.children[0].textContent = name;
+      if (t.children[1].textContent !== row.name) t.children[1].textContent = row.name;
       t.classList.toggle('fired', !!row.wouldFire);
       t.classList.toggle('off', !row.enabled || row.quarantined);
     });
@@ -468,7 +614,7 @@ class UI {
 
   logList() {
     const g = this.game, list = $('log');
-    const lines = g.log.slice(-16).reverse();
+    const lines = g.log.slice(-14).reverse();
     if (list.childElementCount !== lines.length) {
       list.textContent = '';
       for (let i = 0; i < lines.length; i++) list.appendChild(el('li'));
@@ -480,24 +626,13 @@ class UI {
 
   bind() {
     const g = this.game;
-    const num = (id, apply) => {
-      const input = $(id);
-      input.addEventListener('focus', () => { this.editing = id; });
-      input.addEventListener('blur', () => { this.editing = null; });
-      input.addEventListener('input', () => { const v = Number(input.value); if (Number.isFinite(v)) apply(v); });
-    };
-    num('bid', (v) => { const p = g.activePit(); if (p) p.setBid(v); });
-    num('ask', (v) => { const p = g.activePit(); if (p) p.setAsk(v); });
-    num('size', (v) => { const p = g.activePit(); if (p) p.setSize(Math.min(v, g.quoteSize())); });
-    num('spread', (v) => { const p = g.activePit(); if (p) p.setSpread(v); });
-
     for (const b of document.querySelectorAll('[data-step]')) {
       const [what, delta] = b.getAttribute('data-step').split(':');
       b.addEventListener('click', () => this.step(what, Number(delta)));
     }
-    $('requote').addEventListener('click', () => this.requote());
-    $('flatten').addEventListener('click', () => this.flatten());
-    $('pullq').addEventListener('click', () => this.toggleQuote());
+    $('wipe').addEventListener('click', () => this.wipe());
+    $('dump').addEventListener('click', () => this.dump());
+    $('stopq').addEventListener('click', () => this.toggleBoard());
     $('corner-call').addEventListener('click', () => { const p = g.activePit(); if (p) { g.callCorner(p.key); this.save.write('corner'); this.rebuildComposer(); this.refresh(); } });
     $('city-go').addEventListener('click', () => { if (g.leaveCity()) { this.save.write('city'); this.rebuildComposer(); this.refresh(); } });
 
@@ -506,6 +641,12 @@ class UI {
     $('keys-close').addEventListener('click', () => this.sheet('keys', false));
     $('do-keys').addEventListener('click', () => this.showKeys());
     $('foldbtn').addEventListener('click', () => this.fold());
+    $('composer-toggle').addEventListener('click', () => {
+      this.composerOpen = !this.composerOpen;
+      $('composer').hidden = !this.composerOpen;
+      if (this.composerOpen) this.rebuildComposer();
+      this.refresh();
+    });
 
     $('do-export').addEventListener('click', () => {
       $('savebox').value = this.save.exportString();
@@ -530,37 +671,36 @@ class UI {
   step(what, delta) {
     const p = this.game.activePit();
     if (!p) return;
-    if (what === 'bid') p.setBid(p.bid + delta);
-    else if (what === 'ask') p.setAsk(p.ask + delta);
-    else if (what === 'size') p.setSize(Math.min(p.size + delta, this.game.quoteSize()));
-    else if (what === 'spread') { p.setSpread(p.spread + delta); p.recentre(); }
+    if (what === 'size') p.setSize(clamp(p.size + delta, 1, this.game.quoteSize()));
+    else if (what === 'cut') { p.setSpread(p.spread + delta); p.recentre(); p.place(); }
     this.refresh();
   }
 
-  requote() {
+  wipe() {
     const p = this.game.activePit();
     if (!p) return;
+    if (!p.bidOn && !p.askOn) p.push();
     p.recentre();
     p.place();
-    this.game.note(fill(this.content.events.requote, { bid: p.bid, ask: p.ask }));
+    this.game.note(fill(this.content.events.wiped, { bid: p.bid, ask: p.ask }));
     this.refresh();
   }
 
-  flatten() {
+  dump() {
     const p = this.game.activePit();
     if (!p) return;
     const r = p.flatten();
     this.game.note(r.qty
-      ? fill(this.content.events.flattened, { qty: r.qty, price: r.price })
-      : this.content.events.flattenNothing);
+      ? fill(this.content.events.dumped, { qty: r.qty, price: r.price })
+      : this.content.events.dumpedNothing);
     this.refresh();
   }
 
-  toggleQuote() {
+  toggleBoard() {
     const p = this.game.activePit();
     if (!p) return;
-    if (p.bidOn || p.askOn) { p.pull(); this.game.note(this.content.events.pulled); }
-    else { p.push(); p.recentre(); p.place(); }
+    if (p.bidOn || p.askOn) { p.pull(); this.game.note(this.content.events.stopped); }
+    else { p.push(); p.recentre(); p.place(); this.game.note(this.content.events.started); }
     this.refresh();
   }
 
@@ -568,12 +708,12 @@ class UI {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const g = this.game, k = e.key;
-    if (k === 'r' || k === 'R') this.requote();
-    else if (k === 'f' || k === 'F') this.flatten();
-    else if (k === 'q' || k === 'Q') this.toggleQuote();
+    if (k === ' ' || k === 'r' || k === 'R') this.wipe();
+    else if (k === 's' || k === 'S' || k === 'f' || k === 'F') this.dump();
+    else if (k === 'x' || k === 'X' || k === 'q' || k === 'Q') this.toggleBoard();
     else if (k >= '1' && k <= '6') { const key = g.order[Number(k) - 1]; if (key) { g.active = key; this.rebuildComposer(); this.refresh(); } }
-    else if (k === '[') this.step('spread', -1);
-    else if (k === ']') this.step('spread', 1);
+    else if (k === '[') this.step('cut', -1);
+    else if (k === ']') this.step('cut', 1);
     else if (k === '-') this.step('size', -1);
     else if (k === '=' || k === '+') this.step('size', 1);
     else if (k === 'p' || k === 'P') this.fold();
@@ -587,7 +727,7 @@ class UI {
     this.folded = !this.folded;
     $('panel').classList.toggle('folded', this.folded);
     $('foldbtn').textContent = this.folded ? this.content.labels.unfold : this.content.labels.fold;
-    document.documentElement.style.setProperty('--panelW', this.folded ? '0px' : '334px');
+    document.documentElement.style.setProperty('--panelW', this.folded ? '0px' : '340px');
     this.resize();
   }
 
@@ -612,7 +752,7 @@ class UI {
     const c = this.content.labels;
     $('away-title').textContent = fill(c.away, { away: r.away, counted: r.counted });
     $('away-body').textContent = cmp(r.gained, 0) > 0
-      ? fill(c.awayRan, { ticks: r.ticksRun, funds: fmt(r.gained) })
+      ? fill(c.awayRan, { funds: coins(r.gained) })
       : c.awayNothing;
     this.sheet('away', true);
     this.save.write('resume');

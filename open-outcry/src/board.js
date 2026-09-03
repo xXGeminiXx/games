@@ -1,34 +1,35 @@
 // ---------------------------------------------------------------------------
-// The picture: a pit hall seen from the gallery.
+// The picture: a market hall seen from the gallery.
 //
-// Four bands down the window. The slate fills the top and carries every figure
-// in the game, written in chalk strokes by src/chalk.js. A worn timber rail
-// crosses under it. Below that is the floor, where every trader in the crowd
-// is one short stroke with a round cap and a dot for a head; they lean toward
-// the rail in proportion to how much the book moved this tick, so the press of
-// bodies IS the volume rather than a decoration beside it. The tape runs along
-// the bottom edge.
+// Three bands down the window. The slate fills the top and carries the figures
+// - the purse, the going rate, the price line and the two prices written on
+// it - all drawn in chalk strokes by src/chalk.js. A worn timber rail crosses
+// under it. Everything below the rail is the crowd.
+//
+// THE FLOOR IS A READOUT. The people who want to buy stand on the left of the
+// room and the people who want to sell stand on the right, and each side holds
+// as many bodies as that side of the market is actually resting. A player who
+// reads no numbers at all can see the room tip before the price moves. Arms go
+// up on the side that is trading, which is what the game is named after.
 //
 // WHAT IS DRAWN ONCE AND WHAT IS DRAWN EVERY FRAME. The room itself - the
 // slate wash, the chalk dust, the old score lines, the clerestory beam, the
 // timber of the rail, the floor's fall-off - never changes between resizes, so
-// it is rendered to its own canvas and stamped. That was worth about three
-// times the frame rate on a comparable page in the lab, and it is most of why
-// a few thousand marks fit in a frame here.
+// it is rendered to its own canvas and stamped.
 //
-// Every mark is drawn in one of a handful of depth bands, and each band is a
-// single batched stroke: two calls per band, one for the bodies and one for
-// the heads, instead of one call per trader.
+// Every figure is drawn in one of a handful of depth bands, and each band is
+// three batched strokes - bodies, heads, arms - instead of three calls per
+// person.
 //
 // GHOSTS. A figure that changes is not cross-faded and does not slide. The old
 // strokes stay where they were, greyed, and fade over a couple of seconds
-// while the new ones are written over them. That wipe is the one animation the
-// game has, and everything else on the slate is still.
+// while the new ones are written over them. That wipe and the money thrown up
+// the wall after a trade are the only two animations on the slate.
 // ---------------------------------------------------------------------------
 
-import { createHand } from './chalk.js?v=2';
-import { alpha as withAlpha } from './oklch.js?v=2';
-import { hash2f } from './rng.js?v=2';
+import { createHand } from './chalk.js?v=3';
+import { alpha as withAlpha } from './oklch.js?v=3';
+import { hash2f } from './rng.js?v=3';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -40,16 +41,17 @@ export class Board {
     this.cfg = cfg;
     this.content = content;
     this.hand = createHand(cfg.chalk);
-    this.marks = null;
-    this.markCount = 0;
-    this.surge = 0;
+    this.crowd = null;
+    this.shown = { buy: 0, sell: 0 };   // figures actually on the floor, eased
+    this.heat = { buy: 0, sell: 0 };    // how many arms are up on each side
+    this.pops = [];
     this.furniture = null;
     this.W = 0; this.H = 0; this.dpr = 1;
-    this.inset = { right: 0, bottom: 0 };
+    this.inset = { right: 0 };
     this.slots = new Map();      // id -> { text, ghost, ghostAt }
-    this.tapeOffset = 0;
     this.reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.frame = 0;
+    this.now = 0;
   }
 
   // --- layout --------------------------------------------------------------
@@ -58,7 +60,6 @@ export class Board {
     const d = Math.min(this.cfg.view.maxDpr, dpr || 1);
     if (w === this.W && h === this.H && d === this.dpr) return false;
     this.W = w; this.H = h; this.dpr = d;
-    this.floorCanvas = null;
     this.canvas.width = Math.max(1, Math.round(w * d));
     this.canvas.height = Math.max(1, Math.round(h * d));
     this.canvas.style.width = w + 'px';
@@ -66,12 +67,17 @@ export class Board {
     this.layout();
     this.furniture = null;
     this.hand.clear();
-    this.marks = null;
+    this.crowd = null;
     return true;
   }
 
+  // WHICH LAYOUT, and why it is not measured off the canvas. On a phone the
+  // board is a band across the top of a page that scrolls, so the canvas comes
+  // out 390 by 371 - wider than it is tall - and a check on its own shape puts
+  // the wide layout on a phone, with a desk band at the bottom that nothing
+  // ever draws in. The page decides, and it tells the board.
   layout() {
-    const v = this.cfg.view, portrait = this.H > this.W;
+    const v = this.cfg.view, portrait = this.narrow === undefined ? this.H > this.W : this.narrow;
     this.railTop = Math.round(this.H * (portrait ? v.portraitRailTop : v.railTop));
     this.railBottom = Math.round(this.H * (portrait ? v.portraitRailBottom : v.railBottom));
     this.floorBottom = Math.round(this.H * (portrait ? v.portraitFloorBottom : v.floorBottom));
@@ -84,6 +90,14 @@ export class Board {
     this.inset.right = right;
     this.layout();
     this.furniture = null;
+  }
+
+  setNarrow(on) {
+    if (this.narrow === on) return;
+    this.narrow = on;
+    this.layout();
+    this.furniture = null;
+    this.crowd = null;
   }
 
   // --- the room, rendered once --------------------------------------------
@@ -108,7 +122,7 @@ export class Board {
     g.fillRect(0, 0, W, this.railTop);
 
     // Old column rules, scored into the slate and never quite cleaned off.
-    g.strokeStyle = withAlpha(p.ghost, 0.13);
+    g.strokeStyle = withAlpha(p.ghost, 0.11);
     g.lineWidth = 1;
     for (let i = 1; i < 9; i++) {
       const x = Math.round((W * i) / 9) + 0.5;
@@ -165,6 +179,17 @@ export class Board {
     g.fillStyle = floor;
     g.fillRect(0, this.railBottom, W, this.floorBottom - this.railBottom);
 
+    // The aisle down the middle of the room, between the two halves of the
+    // crowd. It is the only thing that says the split is a split and not a
+    // gap in a scatter.
+    const gap = this.cfg.view.crowdGap;
+    const aisle = g.createLinearGradient(W * (0.5 - gap * 0.9), 0, W * (0.5 + gap * 0.9), 0);
+    aisle.addColorStop(0, withAlpha(p.slateDeep, 0));
+    aisle.addColorStop(0.5, withAlpha(p.slateDeep, 0.42));
+    aisle.addColorStop(1, withAlpha(p.slateDeep, 0));
+    g.fillStyle = aisle;
+    g.fillRect(0, this.railBottom, W, this.floorBottom - this.railBottom);
+
     // The rail: worn timber, lighter along the top edge where hands rest.
     const rail = g.createLinearGradient(0, this.railTop, 0, this.railBottom);
     rail.addColorStop(0, p.timberLit);
@@ -187,6 +212,17 @@ export class Board {
       g.stroke();
     }
     g.globalAlpha = 1;
+
+    // TWO WORDS THAT MAKE THE ROOM A READOUT. Without them the split is a
+    // pattern; with them it is the one thing on screen that says which way the
+    // price is about to go. They are burnt into the timber, because a word
+    // written on the back wall of the room has people standing in front of it.
+    const size = clamp(Math.round(this.railTop * 0.045), 15, 22);
+    const ty = this.railTop - size * 0.55;
+    const lab = this.content.labels;
+    this.hand.write(g, lab.buyers, this.slateW * 0.25, ty, size, { colour: p.dust, align: 'centre', width: 0.95, alpha: 0.85 });
+    this.hand.write(g, lab.sellers, this.slateW * 0.75, ty, size, { colour: p.dust, align: 'centre', width: 0.95, alpha: 0.85 });
+
     // A shadow the rail casts down onto the floor.
     const cast = g.createLinearGradient(0, this.railBottom, 0, this.railBottom + 34);
     cast.addColorStop(0, withAlpha(p.slateDeep, 0.7));
@@ -194,149 +230,269 @@ export class Board {
     g.fillStyle = cast;
     g.fillRect(0, this.railBottom, W, 34);
 
-    // The strip the tape runs along.
-    g.fillStyle = p.slateDeep;
-    g.fillRect(0, this.floorBottom, W, H - this.floorBottom);
-    g.strokeStyle = withAlpha(p.rule, 0.5);
-    g.beginPath();
-    g.moveTo(0, this.floorBottom + 0.5);
-    g.lineTo(W, this.floorBottom + 0.5);
-    g.stroke();
+    // The desk across the front, where your own hands are. Everything the
+    // player touches sits on this and nothing is drawn behind it.
+    if (this.floorBottom < H) {
+      const deep = g.createLinearGradient(0, this.floorBottom - 26, 0, this.floorBottom + 6);
+      deep.addColorStop(0, withAlpha(p.slateDeep, 0));
+      deep.addColorStop(1, withAlpha(p.slateDeep, 0.92));
+      g.fillStyle = deep;
+      g.fillRect(0, this.floorBottom - 26, W, 32);
+      g.fillStyle = p.slateDeep;
+      g.fillRect(0, this.floorBottom, W, H - this.floorBottom);
+      g.strokeStyle = withAlpha(p.timber, 0.55);
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(0, this.floorBottom + 1);
+      g.lineTo(W, this.floorBottom + 1);
+      g.stroke();
+    }
 
     this.furniture = c;
   }
 
   // --- the crowd -----------------------------------------------------------
 
-  buildMarks(n) {
-    const count = Math.min(n, this.cfg.view.marksMax);
-    const m = {
-      n: count,
-      x: new Float32Array(count),
-      base: new Float32Array(count),
-      d: new Float32Array(count),
-      eager: new Float32Array(count),
+  // One pool of standing places per side, built once at the biggest the floor
+  // ever gets. A side with fewer people shows the first N of its pool, so a
+  // crowd that grows fills in around the people already standing there rather
+  // than shuffling everybody to a new spot.
+  buildCrowd() {
+    const n = this.cfg.view.crowdMax;
+    const side = (salt) => {
+      const s = { x: new Float32Array(n), base: new Float32Array(n), d: new Float32Array(n), phase: new Float32Array(n) };
+      for (let i = 0; i < n; i++) {
+        // People stand in knots, not on a grid. Each place belongs to one of a
+        // couple of dozen knots and sits near its middle.
+        const knot = i % 26;
+        const kx = hash2f(knot, salt + 7, 3);
+        const kd = hash2f(knot, salt + 11, 5);
+        const u = kx + (hash2f(i, salt + 101, 7) - 0.5) * 0.22;
+        const v = kd * 0.78 + hash2f(i, salt + 211, 13) * 0.30;
+        s.x[i] = clamp(u, 0.02, 0.98);
+        s.base[i] = clamp(v / 1.08, 0.03, 1);
+        s.d[i] = s.base[i];
+        s.phase[i] = hash2f(i, salt + 401, 19);
+      }
+      return s;
     };
-    for (let i = 0; i < count; i++) {
-      // Spread across the floor with a little clumping, deeper near the rail
-      // than at the front so the crowd reads as a crowd rather than a grid.
-      // People stand in knots, not on a grid: each mark belongs to one of a
-      // few dozen knots and sits near its middle. An even scatter reads as a
-      // tally of marks; a clumped one reads as a room with people in it.
-      const knot = i % 34;
-      const kx = hash2f(knot, 907, 3);
-      const kd = hash2f(knot, 911, 5);
-      const u = kx + (hash2f(i, 101, 7) - 0.5) * 0.16;
-      const v = kd * 0.75 + hash2f(i, 211, 13) * 0.35;
-      m.x[i] = clamp(u * 0.94 + 0.03, 0.015, 0.985);
-      m.base[i] = clamp(Math.pow(v, 0.82), 0.02, 1);
-      m.d[i] = m.base[i];
-      m.eager[i] = 0.35 + hash2f(i, 401, 19) * 0.65;
-    }
-    this.marks = m;
-    this.markCount = count;
-    return m;
+    this.crowd = { buy: side(0), sell: side(900) };
   }
 
-  // volume is this tick's traded units, expected is what a settled pit does,
-  // so the surge is a ratio and not a raw count.
-  setSurge(volume, expected) {
-    const want = clamp(volume / Math.max(1, expected), 0, 1.6);
-    this.surge = this.surge + (want - this.surge) * (want > this.surge ? 0.45 : 0.08);
-  }
-
-  stepMarks(dt) {
-    const m = this.marks;
-    if (!m) return;
+  // How many bodies each side should be showing, and how many arms are up.
+  // buy and sell are units the crowd has resting; expected is what a settled
+  // market of this size rests, so a busy room is a full one.
+  setFloor(buy, sell, crowd, volume) {
     const v = this.cfg.view;
-    const up = this.reduced ? v.surgeEase * 0.4 : v.surgeEase;
-    const back = this.reduced ? v.settle * 0.6 : v.settle;
+    // How many bodies a side shows is that side's own share of the buying and
+    // selling, against what a busy half-room is worth, so the floor fills the
+    // same way in a market of two hundred and one of two thousand. Each side is
+    // counted on its own: when one of them stops trading, half the room walks
+    // out, and that is the reading the whole picture exists to give.
+    //
+    // The square root is what makes it worth looking at. Trading swings from
+    // nothing to several hundred inside a minute, and counting bodies straight
+    // off it leaves the floor either empty or jammed with nothing in between.
+    const norm = Math.max(1, crowd * v.flowPerSide);
+    const span = v.crowdMax - v.crowdMin;
+    const want = {
+      buy: v.crowdMin + span * clamp(Math.sqrt(buy / norm), 0, 1),
+      sell: v.crowdMin + span * clamp(Math.sqrt(sell / norm), 0, 1),
+    };
+    for (const k of ['buy', 'sell']) this.shown[k] += (want[k] - this.shown[k]) * 0.06;
+
+    const total = buy + sell;
+    const share = total > 0 ? buy / total : 0.5;
+    const hot = clamp(volume / Math.max(1, crowd * v.tradePerTrader), 0, 1);
+    for (const k of ['buy', 'sell']) {
+      const target = hot * clamp((k === 'buy' ? share : 1 - share) * 1.6, 0, 1);
+      this.heat[k] += (target - this.heat[k]) * (target > this.heat[k] ? 0.35 : 0.05);
+    }
+  }
+
+  stepCrowd(dt) {
+    if (!this.crowd) return;
+    const v = this.cfg.view;
     const k = Math.min(1, dt * 60);
-    for (let i = 0; i < m.n; i++) {
-      const target = clamp(m.base[i] * (1 - Math.min(0.8, this.surge * m.eager[i] * 0.75)), 0.02, 1);
-      const rate = target < m.d[i] ? up : back;
-      m.d[i] += (target - m.d[i]) * rate * k;
+    for (const name of ['buy', 'sell']) {
+      const s = this.crowd[name];
+      const press = this.heat[name] * v.lean;
+      const up = this.reduced ? v.surgeEase * 0.4 : v.surgeEase;
+      const back = this.reduced ? v.settle * 0.6 : v.settle;
+      for (let i = 0; i < s.d.length; i++) {
+        const target = clamp(s.base[i] * (1 - press), 0.02, 1);
+        const rate = target < s.d[i] ? up : back;
+        s.d[i] += (target - s.d[i]) * rate * k;
+      }
     }
   }
 
-  // The floor, drawn to its own canvas when the crowd is being rendered at a
-  // reduced scale. Thousands of little round-capped strokes are the whole cost
-  // of a frame - measured, an empty floor held 60 and 2,600 marks took it to
-  // 20 - and rasterising them into a smaller buffer and stretching it costs a
-  // quarter of that. A crowd seen from a gallery is not sharp anyway.
-  crowdTarget() {
-    const scale = clamp(this.cfg.view.crowdScale, 0.25, 1);
-    if (scale >= 1) return null;
-    const w = Math.max(1, Math.round(this.W * scale));
-    const h = Math.max(1, Math.round((this.floorBottom - this.railBottom) * scale));
-    if (!this.floorCanvas || this.floorCanvas.width !== w || this.floorCanvas.height !== h) {
-      this.floorCanvas = document.createElement('canvas');
-      this.floorCanvas.width = w;
-      this.floorCanvas.height = h;
-      this.floorCtx = this.floorCanvas.getContext('2d');
-    }
-    this.floorCtx.clearRect(0, 0, w, h);
-    return { ctx: this.floorCtx, scale };
-  }
-
-  drawCrowd(g) {
-    const m = this.marks;
-    if (!m) return;
+  // One half of the room. from and to are the fractions of the window this
+  // side stands between; arms are raised toward the aisle.
+  drawSide(g, s, count, from, to, heat, armDir) {
     const v = this.cfg.view, p = this.cfg.palette;
-    const target = this.crowdTarget();
-    let offsetY = 0;
-    if (target) {
-      g = target.ctx;
-      g.save();
-      g.scale(target.scale, target.scale);
-      offsetY = this.railBottom;
-      g.translate(0, -offsetY);
-    }
-    const top = this.railBottom + 6, bot = this.floorBottom - 4;
-    const cx = this.W * 0.5;
-    const BANDS = 5;
+    const top = this.railBottom + 8, bot = this.floorBottom - 6;
+    const x0 = this.slateW * from, x1 = this.slateW * to;
+    const BANDS = 4;
+    const t = this.now / 1000;
     for (let b = 0; b < BANDS; b++) {
-      const lo = b / BANDS, hi = (b + 1) / BANDS;
-      const mid = (lo + hi) / 2;
-      const a = lerp(0.46, 1.0, mid);
-      const sc = lerp(v.markLenFar, v.markLen, mid);
-      g.globalAlpha = a;
+      const lo = b / BANDS, hi = (b + 1) / BANDS, mid = (lo + hi) / 2;
+      const h = lerp(v.figureFar, v.figureNear, mid);
+      g.globalAlpha = lerp(0.42, 1.0, mid);
       g.strokeStyle = p.chalk;
       g.lineCap = 'round';
-      g.lineWidth = lerp(1.2, 2.4, mid);
+
+      // Bodies: hip to shoulder.
+      g.lineWidth = Math.max(1.1, h * 0.11);
       g.beginPath();
-      for (let i = 0; i < m.n; i++) {
-        const d = m.d[i];
+      for (let i = 0; i < count; i++) {
+        const d = s.d[i];
         if (d < lo || d >= hi) continue;
         const y = lerp(top, bot, d);
-        const sx = cx + (m.x[i] - 0.5) * this.W * lerp(0.62, 1.0, d);
-        g.moveTo(sx, y);
-        g.lineTo(sx, y - sc);
+        const x = lerp(x0, x1, s.x[i]);
+        g.moveTo(x, y - h * 0.30);
+        g.lineTo(x, y - h * 0.66);
       }
       g.stroke();
-      // A head is a round cap on a zero length segment, and a round cap is the
-      // most expensive thing on the floor. At the back of the room it is one
-      // pixel wide and nobody can see it, so it is not drawn there.
-      if (mid < v.headFrom) continue;
-      g.lineWidth = lerp(2.2, 4.0, mid);
+
+      // Legs, splayed off the hip. This is the whole difference between a
+      // person and a pin, and it only costs anything at the front of the room.
+      if (mid >= v.legsFrom) {
+        g.lineWidth = Math.max(1, h * 0.085);
+        g.beginPath();
+        for (let i = 0; i < count; i++) {
+          const d = s.d[i];
+          if (d < lo || d >= hi) continue;
+          const y = lerp(top, bot, d);
+          const x = lerp(x0, x1, s.x[i]);
+          const w = h * (0.09 + (s.phase[i] - 0.5) * 0.05);
+          g.moveTo(x, y - h * 0.31);
+          g.lineTo(x - w, y);
+          g.moveTo(x, y - h * 0.31);
+          g.lineTo(x + w, y);
+        }
+        g.stroke();
+      }
+
+      // Heads: a round cap on a zero length stroke, sitting on the shoulders.
+      g.lineWidth = h * 0.23;
       g.beginPath();
-      for (let i = 0; i < m.n; i++) {
-        const d = m.d[i];
+      for (let i = 0; i < count; i++) {
+        const d = s.d[i];
         if (d < lo || d >= hi) continue;
-        const y = lerp(top, bot, d) - sc - sc * 0.24;
-        const sx = cx + (m.x[i] - 0.5) * this.W * lerp(0.62, 1.0, d);
-        g.moveTo(sx, y);
-        g.lineTo(sx + 0.01, y);
+        const y = lerp(top, bot, d) - h * 0.76;
+        const x = lerp(x0, x1, s.x[i]);
+        g.moveTo(x, y);
+        g.lineTo(x + 0.01, y);
       }
       g.stroke();
+
+      // Arms. A figure has its arm up while its own slot in the cycle is
+      // inside the share of the crowd that is trading, so the hands go up in
+      // ones and twos across the room instead of all together.
+      if (heat > 0.02) {
+        g.lineWidth = Math.max(1, h * 0.085);
+        g.beginPath();
+        let any = false;
+        for (let i = 0; i < count; i++) {
+          const d = s.d[i];
+          if (d < lo || d >= hi) continue;
+          const slot = (t * 0.9 + s.phase[i]) % 1;
+          if (slot > heat * v.armShare) continue;
+          any = true;
+          const y = lerp(top, bot, d);
+          const x = lerp(x0, x1, s.x[i]);
+          g.moveTo(x, y - h * 0.60);
+          g.lineTo(x + armDir * h * 0.30, y - h * 1.02);
+        }
+        if (any) g.stroke();
+      }
     }
     g.globalAlpha = 1;
-    if (target) {
-      g.restore();
-      const out = this.ctx;
-      out.imageSmoothingEnabled = true;
-      out.drawImage(this.floorCanvas, 0, this.railBottom, this.W, this.floorBottom - this.railBottom);
+  }
+
+  // THE FLOOR IS DRAWN ON ITS OWN CANVAS AND STAMPED. Six hundred figures is
+  // sixteen batched strokes and a few thousand round caps, and it was most of
+  // what a frame cost. Nothing down there moves fast: the counts ease at six
+  // hundredths a frame and an arm is up for half a second, so the room is
+  // redrawn a few times a second and the frames in between stamp the last one.
+  drawCrowd(g) {
+    const every = this.cfg.view.crowdRedrawMs;
+    const band = this.floorBottom - this.railBottom;
+    if (band <= 0) return;
+    const w = Math.max(1, Math.round(this.W * this.dpr));
+    const h = Math.max(1, Math.round(band * this.dpr));
+    if (!this.floorBuf || this.floorBuf.width !== w || this.floorBuf.height !== h) {
+      this.floorBuf = document.createElement('canvas');
+      this.floorBuf.width = w;
+      this.floorBuf.height = h;
+      this.floorCtx = this.floorBuf.getContext('2d');
+      this.crowdAt = -1e9;
     }
+    if (this.now - this.crowdAt >= every) {
+      this.crowdAt = this.now;
+      const fg = this.floorCtx;
+      fg.setTransform(1, 0, 0, 1, 0, 0);
+      fg.clearRect(0, 0, w, h);
+      fg.setTransform(this.dpr, 0, 0, this.dpr, 0, -this.railBottom * this.dpr);
+      this.paintCrowd(fg);
+    }
+    g.drawImage(this.floorBuf, 0, this.railBottom, this.W, band);
+  }
+
+  paintCrowd(g) {
+    if (!this.crowd) this.buildCrowd();
+    const v = this.cfg.view, p = this.cfg.palette;
+    const half = v.crowdGap / 2;
+    // How many bodies a half-room can hold is how wide it is. The same count
+    // that reads as a packed floor at twelve hundred pixels is a solid block
+    // of chalk at four hundred.
+    const room = clamp(this.slateW / 1000, 0.34, 1);
+    const cap = Math.max(v.crowdMin, Math.round(v.crowdMax * room));
+    const nBuy = Math.round(clamp(this.shown.buy, 0, cap));
+    const nSell = Math.round(clamp(this.shown.sell, 0, cap));
+    // TWO WORDS THAT MAKE THE ROOM A READOUT. Without them the split is a
+    // pattern; with them it is the one thing on screen that says which way the
+    // price is about to go. They go on before the crowd does, so they read as
+    // painted on the back wall with people standing in front of them.
+    this.drawSide(g, this.crowd.buy, nBuy, 0.015, 0.5 - half, this.heat.buy, 1);
+    this.drawSide(g, this.crowd.sell, nSell, 0.5 + half, 0.985, this.heat.sell, -1);
+    void half;
+  }
+
+  // --- money thrown up the wall -------------------------------------------
+
+  // What a trade paid, written over the rail where it happened and gone in a
+  // second. Nothing else on the slate moves by itself.
+  pop(text, side) {
+    const v = this.cfg.view;
+    const lane = side === 'buy' ? 0.44 : 0.56;
+    // Two pops in a row must not land on the same spot, and the scatter comes
+    // off the counter rather than a live generator so nothing in the game
+    // reaches for randomness the run does not own.
+    this.popN = (this.popN || 0) + 1;
+    const jog = (hash2f(this.popN, side === 'buy' ? 5 : 9, 313) - 0.5) * 0.17;
+    this.pops.push({ text, x: this.slateW * (lane + jog), at: this.now });
+    while (this.pops.length > v.popMax) this.pops.shift();
+  }
+
+  drawPops(g) {
+    if (!this.pops.length) return;
+    const v = this.cfg.view, p = this.cfg.palette;
+    const life = v.popSeconds * 1000;
+    const size = clamp(Math.round(this.railTop * 0.052), 16, 30);
+    const base = this.railBottom + 34;
+    let kept = 0;
+    for (const q of this.pops) {
+      const age = (this.now - q.at) / life;
+      if (age >= 1) continue;
+      this.pops[kept++] = q;
+      const y = base - v.popRise * age;
+      if (y < 0) continue;
+      const a = age < 0.15 ? age / 0.15 : 1 - (age - 0.15) / 0.85;
+      this.hand.write(g, q.text, q.x, y, size, { colour: p.red, align: 'centre', alpha: clamp(a, 0, 1) });
+    }
+    this.pops.length = kept;
   }
 
   // --- written figures, with a ghost behind a change -----------------------
@@ -348,8 +504,6 @@ export class Board {
     let s = this.slots.get(id);
     if (!s) { s = { text, ghost: null, ghostAt: 0, size, x, y }; this.slots.set(id, s); }
     else if (s.text !== text) {
-      // A sentence is not wiped and rewritten: two lines of prose laid over
-      // each other are unreadable, and the ghost is for a FIGURE changing.
       s.ghost = o.ghost === false ? null : s.text;
       s.ghostAt = this.now; s.text = text; s.size = size; s.x = x; s.y = y;
     }
@@ -372,133 +526,127 @@ export class Board {
     this.now = view.now === undefined ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : view.now;
     this.frame++;
     if (!this.furniture) this.buildFurniture();
-    if (!this.marks || this.markCount !== Math.min(view.crowd, this.cfg.view.marksMax)) this.buildMarks(view.crowd);
-    this.setSurge(view.volume, view.expected);
-    this.stepMarks(dt);
+    if (!this.crowd) this.buildCrowd();
+    this.setFloor(view.buyPressure, view.sellPressure, view.crowd, view.volume);
+    this.stepCrowd(dt);
 
     g.save();
     g.scale(this.dpr, this.dpr);
     g.drawImage(this.furniture, 0, 0, this.W, this.H);
     this.drawCrowd(g);
     this.drawSlate(g, view);
-    this.drawTape(g, view, dt);
+    this.drawPops(g);
     g.restore();
   }
 
+  // WHERE EVERYTHING ON THE WALL SITS, as a share of the height down to the
+  // rail. The page positions its sentences off the same fractions, so a line
+  // of type and a written figure never land on each other.
   drawSlate(g, view) {
     const p = this.cfg.palette;
     const W = this.slateW, top = this.railTop;
-    const pad = Math.max(16, Math.round(W * 0.022));
-    const small = clamp(Math.round(top * 0.032), 11, 17);
+    const pad = Math.max(16, Math.round(W * 0.024));
 
-    // Funds, top left, the largest thing on the wall after the price, with
-    // what the pit has paid and what you are carrying under it.
-    const fundsSize = clamp(Math.round(top * 0.105), 20, 52);
-    let y = pad + small;
-    this.slot(g, 'funds-label', this.content.labels.funds, pad, y, small, { colour: p.chalkDim, width: 0.9, ghost: false });
-    y += fundsSize * 1.02;
-    this.slot(g, 'funds', view.funds, pad, y, fundsSize, { colour: p.chalk });
-    y += small * 1.6;
-    this.slot(g, 'take', this.content.labels.take + ' ' + view.take, pad, y, small, { colour: p.chalkDim, width: 0.9 });
-    y += small * 1.5;
-    this.slot(g, 'pos', this.content.labels.position + ' ' + view.position, pad, y, small, { colour: p.red, width: 0.95 });
-    this.slot(g, 'crowd', view.crowdText, W - pad, pad + small, small, { colour: p.chalkDim, align: 'right', width: 0.9, ghost: false });
+    // The purse, top left, the biggest figure on the wall after the rate.
+    const label = clamp(Math.round(top * 0.042), 15, 20);
+    const purseSize = clamp(Math.round(top * 0.125), 26, 60);
+    this.slot(g, 'purse-label', this.content.labels.purse, pad, top * 0.075, label, { colour: p.chalkDim, width: 0.9, ghost: false });
+    this.slot(g, 'purse', view.purse, pad, top * 0.075 + purseSize * 1.02, purseSize, { colour: p.chalk });
 
-    // The price, centred high, with the reason under it.
-    const cx = this.portrait ? W * 0.42 : W * 0.47;
-    const priceSize = clamp(Math.round(top * 0.19), 32, 100);
-    const py = top * 0.36;
-    this.slot(g, 'pit', view.pitName, cx, py - priceSize * 0.92, clamp(priceSize * 0.20, 12, 22), { colour: p.chalkDim, align: 'centre', width: 0.9, ghost: false });
-    this.slot(g, 'price', view.price, cx, py, priceSize, { colour: p.chalk, align: 'centre' });
-    const note = this.portrait ? small * 0.82 : small;
-    this.slot(g, 'why', view.why, cx, py + small * 2.0, note, { colour: p.chalkDim, align: 'centre', width: 0.85, ghost: false });
-    if (view.shock) this.slot(g, 'shock', view.shock, cx, py + small * 3.4, note, { colour: p.red, align: 'centre', width: 0.9, ghost: false });
-    else this.slots.delete('shock');
+    // The going rate, centred, with the name of the market small above it.
+    const cx = W * 0.5;
+    const rateSize = clamp(Math.round(top * 0.20), 34, 100);
+    const nameSize = clamp(Math.round(top * 0.048), 15, 24);
+    this.slot(g, 'pit', view.pitName, cx, top * 0.085, nameSize, { colour: p.chalkDim, align: 'centre', width: 0.95, ghost: false });
+    this.slot(g, 'rate', view.rate, cx, top * 0.085 + rateSize * 1.02, rateSize, { colour: p.chalk, align: 'centre' });
 
     this.drawPriceLine(g, view, pad, top);
-    this.drawLadder(g, view, W, top, small);
   }
 
-  // The price, chalked as a line across the wall. Stable wobble by index, so
-  // it is a drawn line rather than a jittering one.
+  // THE PICTURE THAT IS THE GAME. The going rate is chalked as a line walking
+  // left to right across the wall, and the two prices on your board are two
+  // straight lines laid over it in your own red chalk. While the walk stays
+  // between them you are being traded with on both sides and keeping the gap.
+  // When it climbs over the top line or falls under the bottom one, one side
+  // of your board is being taken and the other is dead, and you can see that
+  // without reading a number.
   drawPriceLine(g, view, pad, top) {
     const h = view.history;
     if (!h || h.length < 3) return;
     const p = this.cfg.palette;
-    const x0 = pad, x1 = this.slateW * 0.66;
-    const y0 = top * 0.52, y1 = top * 0.70;
+    const c = this.content.labels;
+    const s = clamp(Math.round(top * 0.036), 14, 19);
+    const tight = this.slateW < 620;
+    const pay = tight ? c.payShort : c.pay;
+    const charge = tight ? c.chargeShort : c.charge;
+    const labelRoom = this.hand.measure(charge + ' 0000', s) + s;
+    const x0 = pad, x1 = Math.max(pad + 60, this.slateW - pad - labelRoom);
+    // The two words naming the halves of the room go on the wall just above the
+    // rail on a wide board. A narrow one has no wall left there - the price
+    // labels are already sitting in it - so the chart stops higher.
+    const y0 = top * 0.47, y1 = top * (this.portrait ? 0.84 : 0.93);
+
+    // The window has to hold your own prices as well as the walk, or the lines
+    // that matter most are the ones that fall off the wall.
     let lo = Infinity, hi = -Infinity;
     for (const v of h) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    if (!(hi > lo)) { hi = lo + 1; }
+    if (view.showQuote) { lo = Math.min(lo, view.bid); hi = Math.max(hi, view.ask); }
+    const pad10 = Math.max(1, (hi - lo) * 0.12);
+    lo -= pad10; hi += pad10;
+    if (!(hi > lo)) hi = lo + 1;
+    const yOf = (v) => lerp(y1, y0, (v - lo) / (hi - lo));
+
+    // Your two prices, ruled across the whole wall in red.
+    if (view.showQuote) {
+      // On a short wall the two prices are a few pixels apart and their names
+      // land on top of each other. The lines stay where the prices are; the
+      // words are pushed apart far enough to be read.
+      const ya = yOf(view.ask), yb = yOf(view.bid);
+      const need = s * 1.25;
+      const mid = (ya + yb) / 2;
+      const spread = Math.max(need, Math.abs(yb - ya)) / 2;
+      const labelY = { ask: mid - spread, bid: mid + spread };
+      for (const [key, price, text] of [['ask', view.ask, charge], ['bid', view.bid, pay]]) {
+        const y = yOf(price);
+        g.strokeStyle = p.red;
+        g.globalAlpha = 0.5;
+        g.lineWidth = 1.4;
+        g.setLineDash([7, 6]);
+        g.beginPath();
+        g.moveTo(x0, y);
+        g.lineTo(x1 + s * 0.5, y);
+        g.stroke();
+        g.setLineDash([]);
+        g.globalAlpha = 1;
+        this.slot(g, 'q-' + key, `${text} ${price}`, x1 + s, labelY[key] + s * 0.36, s, { colour: p.red, width: 0.95 });
+      }
+    }
+
+    // The walk itself, laid down twice: a line and a softer one under it.
     const n = h.length;
     for (let pass = 0; pass < 2; pass++) {
       g.strokeStyle = p.chalk;
-      g.globalAlpha = pass === 0 ? 0.85 : 0.3;
-      g.lineWidth = pass === 0 ? 1.7 : 3.2;
+      g.globalAlpha = pass === 0 ? 0.92 : 0.28;
+      g.lineWidth = pass === 0 ? 1.8 : 3.4;
       g.lineCap = 'round';
       g.lineJoin = 'round';
       g.beginPath();
       for (let i = 0; i < n; i++) {
         const t = i / (n - 1);
-        const x = lerp(x0, x1, t) + (hash2f(i, pass, 61) - 0.5) * 1.6;
-        const y = lerp(y1, y0, (h[i] - lo) / (hi - lo)) + (hash2f(i, pass, 71) - 0.5) * 1.8;
+        const x = lerp(x0, x1, t) + (hash2f(i, pass, 61) - 0.5) * 1.4;
+        const y = yOf(h[i]) + (hash2f(i, pass, 71) - 0.5) * 1.6;
         if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
       }
       g.stroke();
     }
     g.globalAlpha = 1;
-    const s = clamp(Math.round(top * 0.028), 10, 15);
-    this.slot(g, 'hi', String(Math.round(hi)), x1 + 8, y0 + s * 0.4, s, { colour: p.ghost, width: 0.85 });
-    this.slot(g, 'lo', String(Math.round(lo)), x1 + 8, y1 + s * 0.4, s, { colour: p.ghost, width: 0.85 });
-  }
 
-  // The depth ladder, chalked at the right of the slate: offers reaching right
-  // above the spread, bids reaching left below it.
-  drawLadder(g, view, W, top, small) {
-    const p = this.cfg.palette;
-    const d = view.depth;
-    if (!d) return;
-    const rows = this.portrait ? 4 : 6;
-    const x = W * (this.portrait ? 0.84 : 0.80);
-    const y0 = top * 0.14;
-    const step = Math.max(13, small * 1.35);
-    let maxQ = 1;
-    for (const l of d.asks) maxQ = Math.max(maxQ, l.qty);
-    for (const l of d.bids) maxQ = Math.max(maxQ, l.qty);
-    const barW = W * 0.13;
-
-    const row = (level, i, up) => {
-      const y = up ? y0 + (rows - 1 - i) * step : y0 + (rows + 1 + i) * step;
-      if (!level) { if (i === 0) this.slot(g, `lad-${up ? 'a' : 'b'}-none`, '-', x, y, small * 0.9, { colour: p.ghost, width: 0.8 }); return; }
-      const w = (level.qty / maxQ) * barW;
-      g.fillStyle = withAlpha(up ? p.chalkDim : p.chalkDim, 0.16);
-      if (up) g.fillRect(x + small * 2.6, y - small * 0.8, w, small * 0.95);
-      else g.fillRect(x + small * 2.6, y - small * 0.8, w, small * 0.95);
-      this.slot(g, `lad-${up ? 'a' : 'b'}-${i}`, String(level.price), x + small * 2.3, y, small * 0.95, { colour: p.chalk, align: 'right', width: 0.85 });
-      this.slot(g, `ladq-${up ? 'a' : 'b'}-${i}`, String(level.qty), x + small * 2.9, y, small * 0.85, { colour: p.chalkDim, width: 0.8 });
-    };
-    for (let i = 0; i < rows; i++) row(d.asks[i], i, true);
-    for (let i = 0; i < rows; i++) row(d.bids[i], i, false);
-    // The spread sits in the gap between the two halves.
-    this.slot(g, 'lad-mid', view.spreadText, x + small * 2.3, y0 + rows * step, small * 0.95, { colour: p.red, align: 'right', width: 0.95 });
-  }
-
-  // The tape: small chalk prints running right to left along the bottom edge.
-  drawTape(g, view, dt) {
-    const p = this.cfg.palette;
-    const y = this.floorBottom + (this.H - this.floorBottom) * 0.66;
-    const size = clamp((this.H - this.floorBottom) * 0.30, 8, 12);
-    if (!this.reduced) this.tapeOffset = (this.tapeOffset + dt * 26) % 1e7;
-    let x = this.W - 10 - (this.reduced ? 0 : (this.tapeOffset % 40));
-    const prints = view.tape || [];
-    for (let i = 0; i < prints.length && x > -80; i++) {
-      const t = prints[i];
-      const text = `${t.price}x${t.qty}`;
-      const w = this.hand.measure(text, size);
-      const mine = t.buyer === -1 || t.seller === -1;
-      this.hand.write(g, text, x - w, y, size, { colour: mine ? p.red : p.chalkDim, alpha: mine ? 1 : 0.62, width: 0.85 });
-      x -= w + size * 1.7;
-    }
+    // The head of the walk, so the eye knows which end is now.
+    const hy = yOf(h[n - 1]);
+    g.fillStyle = p.chalk;
+    g.beginPath();
+    g.arc(x1, hy, 3.2, 0, Math.PI * 2);
+    g.fill();
   }
 }
 

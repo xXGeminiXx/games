@@ -25,7 +25,7 @@
 // string is the previous cache entry, drawn again at a lower alpha.
 // ---------------------------------------------------------------------------
 
-import { xmur3 } from './rng.js?v=2';
+import { xmur3 } from './rng.js?v=3';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -131,7 +131,11 @@ function drawTo(ctx, text, x, y, size, cfg, colour, widthMul) {
   const s = String(text).toLowerCase();
   const h = xmur3(s + '|' + size.toFixed(1));
   const seed = h();
-  const jitter = cfg.jitter * size;
+  // The wander is a share of the letter height, which at a big size puts it
+  // several pixels off and turns a figure into a blot: an eight became two
+  // overlapping blobs at 44 pixels. A hand writing large is steadier relative
+  // to the letter, so the wander is capped in real pixels as well.
+  const jitter = Math.min(cfg.jitter * size, cfg.jitterMax === undefined ? Infinity : cfg.jitterMax);
   const passes = Math.max(1, cfg.passes | 0);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
