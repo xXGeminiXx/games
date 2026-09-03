@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=56';
-import { createScene } from './render/scene.js?v=56';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=56';
-import { num, count, duration, mult, pct, fill } from './format.js?v=56';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=56';
-import { nailPos } from './board.js?v=56';
-import { DOORS_ROW } from './render/board-geom.js?v=56';
-import { sketchCabinet } from './cabinets.js?v=56';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=56';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=57';
+import { createScene } from './render/scene.js?v=57';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=57';
+import { num, count, duration, mult, pct, fill } from './format.js?v=57';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=57';
+import { nailPos } from './board.js?v=57';
+import { DOORS_ROW } from './render/board-geom.js?v=57';
+import { sketchCabinet } from './cabinets.js?v=57';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=57';
 
 const SPEEDS = [1, 2, 4];
 
@@ -40,7 +40,7 @@ export async function boot(doc) {
   const scene = startScene(doc, el, cfg, game);
   if (scene) game.attach(scene);
 
-  let bulk = 10;
+  let bulk = 1;
   let speedIndex = 0;
   // The night already written to the board, and where it landed.
   let recordedSeed = null;
@@ -1132,6 +1132,43 @@ export async function boot(doc) {
   // their own, including while the page is closed.
   function openFloor() { show(el.floorSheet); paintFloor(); }
 
+  // The arcade table and the star board are built ONCE and thereafter only
+  // their numbers change. They used to be thrown away and rebuilt on every
+  // frame, which replaced each button between the press and the release of a
+  // click - so the browser never saw a click on any of them and not one of
+  // these buttons could be pressed by hand. Anything painted every frame must
+  // update its text in place; only a change in what rows exist may rebuild.
+  const machineRows = new Map();
+  let emptyRow = null;
+  let prestigeUi = null;
+
+  /** What the next single unit of a machine costs at the count now owned. */
+  function nextUnitPrice(m, owned) { return m.cost * Math.pow(m.ratio, owned); }
+
+  function buildMachineRows(body) {
+    body.textContent = '';
+    for (const m of cfg.floor.machines) {
+      const tr = doc.createElement('tr');
+      tr.innerHTML = '<td></td><td class="n"></td><td class="n"></td><td class="n"></td><td></td><td></td>';
+      const cells = tr.children;
+      cells[0].textContent = m.name;
+      const buy = doc.createElement('button');
+      buy.type = 'button';
+      buy.title = 'Costs coins. Adds to what your arcade earns every second.';
+      buy.addEventListener('click', () => { game.buyMachine(m.id, bulk); paintFloor(); });
+      cells[4].appendChild(buy);
+      const note = doc.createElement('span');
+      note.style.fontSize = '11px';
+      note.style.color = '#8c7f76';
+      cells[5].appendChild(note);
+      body.appendChild(tr);
+      machineRows.set(m.id, { tr, cells, buy, note });
+    }
+    emptyRow = doc.createElement('tr');
+    emptyRow.innerHTML = '<td colspan="6">Trade some balls for coins at the machine, and the cheapest arcade machine here comes within reach.</td>';
+    body.appendChild(emptyRow);
+  }
+
   function paintFloor() {
     const r = game.reading();
     const started = game.meta && game.meta.lifetime ? Math.floor(game.meta.lifetime.runs || 0) : 0;
@@ -1157,109 +1194,113 @@ export async function boot(doc) {
     });
 
     const body = el.machines.tBodies[0];
-    body.textContent = '';
+    if (!machineRows.size) buildMachineRows(body);
+
+    let anyShown = false;
     for (const m of cfg.floor.machines) {
+      const row = machineRows.get(m.id);
+      if (!row) continue;
       const q = game.quoteMachine(m.id, bulk);
       const mile = game.milestone(m.id);
       const affordable = q.k > 0;
+      // A machine is shown once it is within a quarter of reach, so the next
+      // rung is visible before it is buyable.
       const seen = mile.owned > 0 || game.floor.scrip >= m.cost * 0.25;
+      row.tr.style.display = seen ? '' : 'none';
       if (!seen) continue;
-
-      const tr = doc.createElement('tr');
-      if (!affordable) tr.className = 'poor';
-      tr.innerHTML = '<td></td><td class="n"></td><td class="n"></td><td class="n"></td><td></td><td></td>';
-      const cells = tr.children;
-      cells[0].textContent = m.name;
-      cells[1].textContent = count(mile.owned) + (mile.mult > 1 ? '  ' + mult(mile.mult) : '');
-      cells[2].textContent = num(game.machineIncome(m.id)) + ' /s';
-      cells[3].textContent = q.k > 0 ? num(q.cost) : num(game.quoteMachine(m.id, 1).cost || 0);
-
-      const buy = doc.createElement('button');
-      buy.type = 'button';
-      buy.textContent = q.k > 0 ? 'Buy ' + count(q.k) : 'Buy';
-      buy.title = 'Costs coins. Adds to what your arcade earns every second.';
-      buy.disabled = !affordable;
-      buy.addEventListener('click', () => { game.buyMachine(m.id, bulk); paintFloor(); });
-      cells[4].appendChild(buy);
-
-      if (mile.next) {
-        const note = doc.createElement('span');
-        note.style.fontSize = '11px';
-        note.style.color = '#8c7f76';
-        note.textContent = 'buy ' + (mile.next - mile.owned) + ' more to double what these earn';
-        cells[5].appendChild(note);
-      } else if (mile.owned > 0) {
-        cells[5].textContent = 'every doubling already taken';
-      }
-      body.appendChild(tr);
+      anyShown = true;
+      row.tr.className = affordable ? '' : 'poor';
+      row.cells[1].textContent = count(mile.owned) + (mile.mult > 1 ? '  ' + mult(mile.mult) : '');
+      row.cells[2].textContent = num(game.machineIncome(m.id)) + ' /s';
+      // What one more costs when none are affordable. Quoting a purchase of
+      // zero costs zero, and printing that told the player a machine they
+      // could not buy was free.
+      row.cells[3].textContent = num(affordable ? q.cost : nextUnitPrice(m, mile.owned));
+      row.buy.textContent = affordable ? 'Buy ' + count(q.k) : 'Buy';
+      row.buy.disabled = !affordable;
+      row.note.textContent = mile.next
+        ? 'buy ' + (mile.next - mile.owned) + ' more to double what these earn'
+        : mile.owned > 0 ? 'every doubling already taken' : '';
     }
-    if (!body.children.length) {
-      const tr = doc.createElement('tr');
-      tr.innerHTML = '<td colspan="6">Trade some balls for coins at the machine, and the cheapest arcade machine here comes within reach.</td>';
-      body.appendChild(tr);
-    }
+    if (emptyRow) emptyRow.style.display = anyShown ? 'none' : '';
 
     paintPrestige();
   }
 
-  function paintPrestige() {
+  function buildPrestige() {
     const m = game.metaModule;
-    el.prestigeBox.textContent = '';
-    if (!m || typeof m.pendingMarks !== 'function') return;
-    const pending = game.pendingMarks();
-    const can = typeof m.canReset === 'function' ? m.canReset(cfg, game.meta, game.floor) : { ok: false, why: '' };
+    const box = el.prestigeBox;
+    box.textContent = '';
 
     const h = doc.createElement('h3');
     h.textContent = 'Start over, and keep what you learned';
-    el.prestigeBox.appendChild(h);
+    box.appendChild(h);
 
     const p = doc.createElement('p');
     p.className = 'lede';
-    p.textContent = can.ok
-      ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
-        + num(pending) + ' stars. Stars buy permanent upgrades, listed below, and those never go away no '
-        + 'matter how many times you start over. You have ' + num((game.meta && game.meta.marks) || 0) + ' stars now.'
-      : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.');
-    el.prestigeBox.appendChild(p);
+    box.appendChild(p);
 
-    if (can.ok) {
-      const b = doc.createElement('button');
-      b.type = 'button';
-      b.textContent = 'Sell the arcade for ' + num(pending) + ' stars';
-      b.addEventListener('click', () => {
-        if (confirm('Every machine in your arcade is sold and your coins go with it. You keep '
-            + num(pending) + ' stars and every upgrade you have already bought. Do it?')) {
-          game.prestige(); paintFloor();
-        }
-      });
-      el.prestigeBox.appendChild(b);
-    }
+    const sell = doc.createElement('button');
+    sell.type = 'button';
+    sell.addEventListener('click', () => {
+      const pending = game.pendingMarks();
+      if (confirm('Every machine in your arcade is sold and your coins go with it. You keep '
+          + num(pending) + ' stars and every upgrade you have already bought. Do it?')) {
+        game.prestige(); paintFloor();
+      }
+    });
+    box.appendChild(sell);
 
-    if (Array.isArray(m.NODES) && m.NODES.length) {
+    const nodes = new Map();
+    if (m && Array.isArray(m.NODES) && m.NODES.length) {
       const subhead = doc.createElement('h3');
       subhead.textContent = 'Permanent upgrades, bought with stars';
-      el.prestigeBox.appendChild(subhead);
+      box.appendChild(subhead);
       const wrap = doc.createElement('div');
       wrap.className = 'nodes';
       wrap.style.marginTop = '10px';
       for (const node of m.NODES) {
-        const have = game.meta.nodes && game.meta.nodes[node.id];
         const d = doc.createElement('div');
-        d.className = 'node' + (have ? ' have' : '');
+        d.className = 'node';
         d.innerHTML = '<h4></h4><p></p>';
         d.querySelector('h4').textContent = node.name;
         d.querySelector('p').textContent = node.text;
-        if (!have) {
-          const b = doc.createElement('button');
-          b.type = 'button';
-          b.textContent = 'Buy for ' + num(node.cost) + ' stars';
-          b.disabled = (game.meta.marks || 0) < node.cost;
-          b.addEventListener('click', () => { const r = game.buyNode(node.id); if (!r.ok) say(r.why); paintFloor(); });
-          d.appendChild(b);
-        }
+        const b = doc.createElement('button');
+        b.type = 'button';
+        b.textContent = 'Buy for ' + num(node.cost) + ' stars';
+        b.addEventListener('click', () => { const res = game.buyNode(node.id); if (!res.ok) say(res.why); paintFloor(); });
+        d.appendChild(b);
         wrap.appendChild(d);
+        nodes.set(node.id, { d, b });
       }
-      el.prestigeBox.appendChild(wrap);
+      box.appendChild(wrap);
+    }
+    prestigeUi = { p, sell, nodes };
+  }
+
+  function paintPrestige() {
+    const m = game.metaModule;
+    if (!m || typeof m.pendingMarks !== 'function') { el.prestigeBox.textContent = ''; return; }
+    if (!prestigeUi) buildPrestige();
+    const pending = game.pendingMarks();
+    const can = typeof m.canReset === 'function' ? m.canReset(cfg, game.meta, game.floor) : { ok: false, why: '' };
+
+    prestigeUi.p.textContent = can.ok
+      ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
+        + num(pending) + ' stars. Stars buy permanent upgrades, listed below, and those never go away no '
+        + 'matter how many times you start over. You have ' + num((game.meta && game.meta.marks) || 0) + ' stars now.'
+      : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.');
+
+    prestigeUi.sell.textContent = 'Sell the arcade for ' + num(pending) + ' stars';
+    prestigeUi.sell.style.display = can.ok ? '' : 'none';
+
+    for (const node of (Array.isArray(m.NODES) ? m.NODES : [])) {
+      const ui = prestigeUi.nodes.get(node.id);
+      if (!ui) continue;
+      const have = !!(game.meta.nodes && game.meta.nodes[node.id]);
+      ui.d.className = 'node' + (have ? ' have' : '');
+      ui.b.style.display = have ? 'none' : '';
+      ui.b.disabled = (game.meta.marks || 0) < node.cost;
     }
   }
 
