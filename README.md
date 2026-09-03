@@ -4,20 +4,24 @@ The index of the games, plus the builds of the ones that are served from here.
 
 **https://xxgeminixx.github.io/games/**
 
-The games hosted here are plain ES modules: no build step, no package manager, no
-bundler, no dependencies, and nothing fetched from anywhere else while you play (each page
-reads its own build.json from this site now and then, so a game left open notices a new build). Clone one and it
-runs, as long as it is served over http rather than opened off the filesystem,
-which is the one thing browsers refuse to do with modules.
+The games hosted here are plain ES modules: no build step, no package manager,
+no bundler and no dependencies. Clone one and it runs, as long as it is served
+over http rather than opened off the filesystem, which is the one thing browsers
+refuse to do with modules. What a page does fetch is listed under Constraints,
+and it is two things.
 
 ## What is here
 
 | | |
 |---|---|
+| [open-outcry](open-outcry/) | A trading pit under a slate board. Quote a bid and an offer, and the crowd trades against you. |
+| [brass-rain](brass-rain/) | Balls fall through a few hundred brass nails, and between rounds you bend the nails. |
 | [swarm-breaker](swarm-breaker/) | One decision a turn: the angle. A growing swarm does the rest. |
 | [accretion](accretion/) | A blank field, a click, and whatever gravity makes of it. |
 | [barrow](barrow/) | The dead dig; you keep the books. An idle horde, endless strata, and a market that moves when you sell into it. |
 | [foxfire](foxfire/) | One spore on a dead log; then the forest. A honey fungus whose tips forage on their own, a market of trees, and a floor that folds into a bigger one. |
+| [fall-line](fall-line/) | A tower defense where you shape the hill. The Melt takes the fastest way down and grows a counter to whatever killed it. |
+| [aerie](aerie/) | A carrier over cold water. Thousands of drones work the island and bring back what sells. |
 
 And one that is listed but not hosted here:
 
@@ -42,8 +46,15 @@ To make a change stick in one browser, put a patch in storage from the console:
 ## Constraints
 
 Everything listed here draws its graphics from primitives and math rather than
-from image files, sends nothing anywhere, and measures nothing. A save lives in
-the browser that made it.
+from image files. A save lives in the browser that made it.
+
+A page fetches two things, and no more. It reads its own `build.json` from this
+site now and then, so a game left open in a tab notices that it has been
+replaced. And each game adds one to a counter the first time a browser plays it,
+so the index can list the ones people play first: a number going up, with no
+account, no cookie, no identifier and nothing about how it was played. The
+counter is added when a build is published rather than living in any game's
+source. Add `?nocount` to the address to sit it out.
 
 The games hosted here hold to two more that Iron Spine does not:
 
