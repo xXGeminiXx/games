@@ -362,7 +362,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="b2290bb887a3">
+<meta name="build" content="90216277f12b">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -515,24 +515,24 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=19';
-import { createJuice } from './src/juice.js?v=19';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=19';
-import { createBlockKinds } from './src/blocks.js?v=19';
-import { safeRows } from './src/arrival.js?v=19';
-import { createAwards } from './src/awards.js?v=19';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=19';
-import { createLeaderboard } from './src/leaderboard.js?v=19';
-import * as Tiers from './src/tiers.js?v=19';
-import { createOnboarding } from './src/onboarding.js?v=19';
-import { createVisual } from './src/visual.js?v=19';
-import * as Economy from './src/economy.js?v=19';
-import * as Powers from './src/powers.js?v=19';
-import * as Meta from './src/meta.js?v=19';
-import { createUI } from './src/ui.js?v=19';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=19';
-import { seedForSync, today as utcToday } from './src/daily.js?v=19';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=19';
+         storageKey, applyIdentity } from './config.js?v=20';
+import { createJuice } from './src/juice.js?v=20';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=20';
+import { createBlockKinds } from './src/blocks.js?v=20';
+import { safeRows } from './src/arrival.js?v=20';
+import { createAwards } from './src/awards.js?v=20';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=20';
+import { createLeaderboard } from './src/leaderboard.js?v=20';
+import * as Tiers from './src/tiers.js?v=20';
+import { createOnboarding } from './src/onboarding.js?v=20';
+import { createVisual } from './src/visual.js?v=20';
+import * as Economy from './src/economy.js?v=20';
+import * as Powers from './src/powers.js?v=20';
+import * as Meta from './src/meta.js?v=20';
+import { createUI } from './src/ui.js?v=20';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=20';
+import { seedForSync, today as utcToday } from './src/daily.js?v=20';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=20';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -750,7 +750,7 @@ function fresh(){
   S.dealt = 0;
   // The market is told how tough a block is at a given depth so it can price
   // what one is worth without knowing anything about the field.
-  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, blockHealth(d)) });
   // The hand is dealt off the run's own seed, so the same run offers the same
   // options and a redeal is a decision rather than a spin.
   S.pow = Powers.createState({ seed: S.seed, swarm: S.balls, essence: 0 });
@@ -1037,6 +1037,9 @@ function fireDir(dx, dy){
   S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
   S.turnKills = 0;
   S.turnDamage = 0;
+  // The market is read ONCE, here. A turn never re-reads it, so nothing about
+  // trading asks the player to act while the swarm is already working.
+  marketMult = readMarketNow();
   S.lead = true;
   S.queue += extraBodies();
   // Counters a block carries for the length of one shot - how many times it
@@ -1178,6 +1181,9 @@ function sim(){
   // of a turn, then rising until nothing can stay up.
   const over = (S.fireT || 0) - SETTLE_AFTER;
   settleNow = over <= 0 ? 0 : SETTLE_FORCE * Math.min(1, over / SETTLE_RAMP);
+  // The lines between paired bodies sweep the field. Every fourth frame is
+  // enough to cut what they cross and costs a quarter of every frame.
+  if (pd && pd.tether > 0 && ((S.fireT || 0) & 3) === 0) tetherCut();
 
   if (S.firing){
     S.fireT++;
@@ -1301,12 +1307,15 @@ function skimOff(b){
 function takeMarker(j){
   const p = S.drops[j];
   if (!p) return;
+  // SCAVENGE. A pickup is worth a multiple of what it would have been.
+  const sc = 1 + ((S.pow && S.pow.derived && S.pow.derived.scavenge) || 0);
   if (p.kind === 'ball'){
-    const n = markerBalls();
+    const n = Math.max(1, Math.round(markerBalls() * sc));
     S.balls += n;
     juice.pickup(cx(p.c), cyOf(p.r), 'ball', n);
   } else {
     const w = Economy.windfall(S.econ, S.depth);
+    if (sc > 1) payCash(Economy.toNum(w.essence) * (sc - 1));
     juice.pickup(cx(p.c), cyOf(p.r), 'gold', w.text);
   }
   S.drops.splice(j, 1);
@@ -1597,6 +1606,47 @@ function orbitStep(b){
   const hit = hitPower(b) * d.orbitFrac;
   S.turnDamage = (S.turnDamage || 0) + hit;
   hurt(o.bl, hit, true);
+}
+
+/** TETHER. Bodies are strung together in pairs and the line between each pair
+ *  cuts whatever it crosses. Pairs are taken in flight order so the same two
+ *  bodies stay linked while both are up, and only so many pairs are evaluated
+ *  in a frame however large the swarm gets. */
+function tetherCut(){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.tether > 0) || !S.rows.length) return;
+  const live = S.live;
+  const pairs = Math.min(Powers.TUNING.tetherPairs, live.length >> 1);
+  if (pairs < 1) return;
+  const cut = hitPower() * d.tether;
+  if (!(cut > 0)) return;
+  const step = Math.max(1, CELL * 0.5);
+  for (let i = 0; i < pairs; i++){
+    const a = live[i * 2], b = live[i * 2 + 1];
+    if (!a || !b) break;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 0)) continue;
+    const n = Math.min(24, Math.ceil(len / step));
+    for (let k = 1; k < n; k++){
+      const x = a.x + dx * (k / n), y = a.y + dy * (k / n);
+      const bl = blockAt(x, y);
+      if (bl) hurt(bl, cut, true);
+    }
+    juice.trail(a.x + dx / 2, a.y + dy / 2, dx / len, dy / len);
+  }
+}
+
+/** The block standing at a point, or null. */
+function blockAt(x, y){
+  const c = Math.floor((x - ORIGIN) / CELL), r = Math.floor((y - TOP) / CELL);
+  for (const bl of S.rows){
+    if (bl.dead) continue;
+    if (bl.box){
+      if (bl.box.c0 <= c && bl.box.c1 > c && bl.box.R0 <= r && bl.box.R1 > r) return bl;
+    } else if (bl.c === c && bl.r === r) return bl;
+  }
+  return null;
 }
 
 /** Bend one body toward a block, keeping its speed. */
@@ -2146,6 +2196,18 @@ function drawMoments(X){
   }
 }
 
+/** What a block at a depth is worth being told about.
+ *
+ *  PAST THE FINISH THE FIELD COMPOUNDS. The market was told the plain number,
+ *  which leaves out the endless ramp entirely, so from the finish depth onward
+ *  it priced blocks as though they had stopped getting harder while they went
+ *  on getting harder without limit. That is what made a power cost two
+ *  thousand blocks at depth 200 and twenty-four at depth 100. */
+function blockHealth(d){
+  const past = S.endless || (S.depth > Tiers.tierOf(S.tier).finish);
+  return Tiers.healthNumber(S.tier, d, past ? 'endless' : undefined);
+}
+
 // --- the market, the hand, and the record -----------------------------------
 //
 // Blocks pay MATERIAL, not cash. Cash comes off the markers the field drops
@@ -2206,31 +2268,50 @@ function payCash(n){
   S.econ.stats.essenceEarned = Economy.add(S.econ.stats.essenceEarned, Economy.L(n));
 }
 
-/** A block broke. It pays material decided by the depth it arrived at and the
- *  column it stood in, so what the field hands you changes as you descend and
- *  never matches what the upgrade list wants. */
+/** A block broke, and this is everything it pays.
+ *
+ *  A trading run is handed ORE and the market decides which; a run that is not
+ *  trading is handed the ESSENCE that ore was worth. Both go through the same
+ *  adjustments below, and each one has to be applied to whichever of the two
+ *  the block actually paid - applying an ore adjustment to a run with no ore
+ *  drives its inventory negative.
+ *
+ *  In order: a kill something else made pays a fraction until GLEANING closes
+ *  the gap, HARVEST pays more of whatever it was, and the yield powers pay
+ *  more ore on top of that. */
 function harvestBlock(bl, secondary){
   if (!S.econ) return null;
   const got = Economy.harvest(S.econ, { depth: bl.d || S.depth, col: bl.c, maxHp: bl.max });
-  // A block something else broke pays a fraction of one the swarm hit, until
-  // GLEANING closes the gap. Without this a chain build prints material.
+  if (!got) return null;
   const d = S.pow && S.pow.derived;
-  if (got && secondary && !(d && d.gleaning)){
-    const cut = Economy.scale(got.qty, 0.6);
-    S.econ.held[got.id] = Economy.sub(S.econ.held[got.id], cut);
-    got.qty = Economy.sub(got.qty, cut);
+  const cash = !!got.essence;
+
+  /** Move the payout by `k` (0.5 pays half again, -0.6 takes three fifths). */
+  const adjust = (k) => {
+    if (!k) return;
+    if (cash){
+      const by = Economy.scale(got.essence, Math.abs(k));
+      S.econ.essence = k > 0 ? Economy.add(S.econ.essence, by) : Economy.sub(S.econ.essence, by);
+      if (k > 0) S.econ.stats.essenceEarned = Economy.add(S.econ.stats.essenceEarned, by);
+      got.essence = k > 0 ? Economy.add(got.essence, by) : Economy.sub(got.essence, by);
+      got.essenceText = Economy.fmt(got.essence);
+      return;
+    }
+    const by = Economy.scale(got.qty, Math.abs(k));
+    S.econ.held[got.id] = k > 0 ? Economy.add(S.econ.held[got.id], by) : Economy.sub(S.econ.held[got.id], by);
+    got.qty = k > 0 ? Economy.add(got.qty, by) : Economy.sub(got.qty, by);
     got.text = Economy.fmt(got.qty);
+  };
+
+  if (secondary && !(d && d.gleaning)) adjust(-0.6);
+  if (d && d.harvest > 0) adjust(d.harvest);
+  // The yield powers are about ORE specifically - CORNER works the seams - so
+  // they pay nothing in a run that never mines any.
+  if (!cash){
+    const mult = S.pow ? Powers.yieldMult(S.pow) : 1;
+    if (mult > 1) adjust(mult - 1);
   }
-  // Powers that raise material yield are a multiplier on top of whatever the
-  // market already paid, so the market keeps owning the base number.
-  const mult = S.pow ? Powers.yieldMult(S.pow) : 1;
-  if (got && mult > 1){
-    const extra = Economy.scale(got.qty, mult - 1);
-    S.econ.held[got.id] = Economy.add(S.econ.held[got.id], extra);
-    got.qty = Economy.add(got.qty, extra);
-    got.text = Economy.fmt(got.qty);
-  }
-  if (got) turnHarvest.push(got);
+  turnHarvest.push(got);
   return got;
 }
 let turnHarvest = [];
@@ -2285,6 +2366,22 @@ const DELIVERS = new Set([
   'lensing',     // the floor throws a body back up
   'overrun',     // the floor sends it round to the top
   'gleaning',    // a chain kill pays what a direct one does
+  'tether',      // the line between two bodies cuts what it crosses
+  'melt',        // material can be dumped for a flat price at the desk
+  'harvest',     // a block pays more, in ore or in essence
+  'scavenge',    // a pickup is worth more
+  'interest',    // unspent essence grows between turns
+  'augury',      // the hand carries into the next depth
+  // read at the desk through tradeMods(), which src/economy.js applies
+  'fill',        // a sale fills closer to its quote
+  'book',        // the book is deeper, so size costs less price
+  'revealShift', // every market tool arrives earlier
+  'forward',     // consignments pay more and take more
+  'refineFee',   // the refining fee is cut
+  'refineYield', // and the run makes more
+  'monopoly',    // a sale stops moving the price
+  // read once when a turn opens, through readMarket() and marketMultiplier()
+  'speculate', 'hedge', 'liquidity', 'solvency',
   'yieldBonus',  // more material per block
   'corner',      // more material the larger the swarm
   'slots',       // a wider hand
@@ -2373,6 +2470,8 @@ function hitPower(b){
     p *= 1 + d.sympathy * 0.5 * Math.min(S.turnKills || 0, Powers.TUNING.sympathyCap);
   }
   if (b && d.momentum > 0) p *= Math.pow(1 + d.momentum, b.bounces || 0);
+  // What the market was worth when this turn opened. Fixed for the whole turn.
+  if (marketMult > 1) p *= marketMult;
   // A stack of multipliers reaches the top of a double eventually. Past that
   // every arithmetic step downstream is NaN and the body silently stops
   // dealing damage, so the figure is held at a number instead.
@@ -2408,6 +2507,9 @@ function spoilsFor(){
 function endOfTurnPowers(){
   const d = S.pow && S.pow.derived;
   if (!d) return;
+  // INTEREST. Essence left unspent grows, which is the one reason in the game
+  // to sit on it rather than press the first thing you can afford.
+  if (d.interest > 0) payCash(cash() * d.interest);
   if (d.spawntide > 0 && S.turnKills > 0){
     S.balls += Math.floor(S.balls * d.spawntide * S.turnKills);
   }
@@ -2415,6 +2517,24 @@ function endOfTurnPowers(){
     const each = (S.turnDamage * d.collapse) / S.rows.length;
     if (each > 0) for (const bl of S.rows.slice()) hurt(bl, each);
   }
+}
+
+// What the market powers are worth for the length of one turn. One for a run
+// that is not trading, and one for a run whose hand has none of them.
+let marketMult = 1;
+function readMarketNow(){
+  if (!S.pow || !S.econ || S.econ.cashOnly) return 1;
+  const r = Economy.report(S.econ);
+  const held = Object.keys(S.econ.held).reduce((a, k) => a + Economy.toNum(S.econ.held[k]), 0);
+  const snap = Powers.readMarket({ market: {
+    // Above one is a market paying up for what you hold; below one is not.
+    favour: Math.max(-1, Math.min(1, ((r.prices || []).reduce((a, p) => a + (p.index || 1), 0)
+      / Math.max(1, (r.prices || []).length)) - 1)),
+    inventory: held,
+    cash: cash(),
+    regime: r.regime ? r.regime.id : null,
+  } });
+  return Powers.marketMultiplier(S.pow, snap);
 }
 
 /** TEMPER. Damage the run keeps, banked one block at a time. */
@@ -2445,6 +2565,9 @@ function syncPowers(){
   S.pow.depth = S.depth;
   S.pow.swarm = Powers.B.of(S.balls);
   S.pow.essence = Powers.B.of(cash());
+  // What the trade powers are worth at the desk, as plain numbers. The market
+  // reads this and never reads the hand, so neither module imports the other.
+  S.econ.pow = Powers.tradeMods(S.pow);
 }
 
 /** The hand as plain data. What is left out is rebuilt on load: the flattened
@@ -2580,6 +2703,7 @@ function makeDeck(){
       },
       on: {
         sell:    ({ id, qty })       => act('s_' + id, units(qty)),
+        melt:    ({ id, qty })       => act('x_' + id, units(qty)),
         buy:     ({ id, qty })       => act('b_' + id, units(qty)),
         craft:   ({ id, times })     => act('c_' + id, Math.max(1, times | 0)),
         consign: ({ id, qty, term }) => act('f_' + id + '_' + (term | 0), units(qty)),
@@ -2647,6 +2771,16 @@ function press(id, n){
   if (verb === 'b'){
     const r = Economy.buy(S.econ, rest, times);
     return r && r.ok ? times : 0;
+  }
+  // MELT. Material out, a flat price in, no book touched and no timing to read.
+  if (verb === 'x'){
+    if (!S.pow || !(S.pow.derived.melt > 0)) return 0;
+    const have = Economy.toNum(S.econ.held[rest]);
+    const take = Math.min(have, times);
+    if (!(take > 0)) return 0;
+    S.econ.held[rest] = Economy.sub(S.econ.held[rest], Economy.L(take));
+    payCash(Powers.B.toNumber(Powers.meltYield(S.pow, take, S.depth)));
+    return take;
   }
   if (verb === 'c'){
     const r = Economy.craft(S.econ, rest, times);
@@ -2743,7 +2877,11 @@ function paintShop(){
       damage: hitPower(),
     },
     market: Economy.report(S.econ),
-    powers: S.pow ? { offer: handNow(), codex: Powers.codex(S.pow) } : null,
+    powers: S.pow ? {
+      offer: handNow(), codex: Powers.codex(S.pow),
+      // What the desk needs to know the hand can do, rather than the hand.
+      melt: S.pow.derived.melt > 0,
+    } : null,
     feats: featRows(),
     boards: boardPanels(),
   });
@@ -2948,8 +3086,8 @@ const store = createSave({
     S.endless = !!v.endless; S.won = !!v.won;
     S.depth = v.depth | 0; S.balls = v.balls | 0; S.broken = v.broken | 0;
     S.econ = v.econ
-      ? Economy.load(v.econ, { hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) })
-      : Economy.create({ depth: S.depth, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+      ? Economy.load(v.econ, { hpAt: (d) => Math.max(1, blockHealth(d)) })
+      : Economy.create({ depth: S.depth, hpAt: (d) => Math.max(1, blockHealth(d)) });
     S.pow = powLoad(v.pow);
     S.owed = { ball: (v.owed && v.owed.ball) | 0, gold: (v.owed && v.owed.gold) | 0 };
     S.power = v.power || CONFIG.swarm.startingPower;
@@ -3424,7 +3562,7 @@ function rebuildFrom(seed){
   S.kinds = createBlockKinds(seed, { lattice: S.field.lattice !== false });
   S.rows = []; S.drops = []; S.live = []; S.dealt = 0; S.depth = 1;
   S.balls = Tiers.tierOf(S.tier).supply.start; S.broken = 0;
-  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, blockHealth(d)) });
   S.pow = Powers.createState({ seed, swarm: S.balls, essence: 0 });
   S.pow.hostPool = HAND_POOL;
   Powers.setTier(S.pow, Tiers.dialsFor(S.tier));

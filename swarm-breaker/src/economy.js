@@ -321,9 +321,35 @@ const MAT_GATE = {
   alloy: 'refinery', lens: 'optics', core: 'apex',
 };
 
+// ---------------------------------------------------------------------------
+// WHAT THE PLAYER'S HAND IS WORTH AT THE DESK
+//
+// A trade power does nothing on its own. The hand works out what each one is
+// worth and hands this module a bag of plain numbers - no import either way,
+// so neither file knows the other exists. Everything below reads it through
+// mods() and a run with no such powers reads the defaults and behaves exactly
+// as it did.
+//
+// The host refreshes it whenever the hand changes. It is derived, so it is not
+// written down with the run.
+// ---------------------------------------------------------------------------
+
+const NO_MODS = {
+  slippageMult: 1,        // 0 closes the whole gap between quote and fill
+  bookDepthMult: 1,       // above 1 and size moves the price less
+  revealShift: 0,         // depths earlier every tool arrives
+  forwardPayoutMult: 1,
+  forwardCapacityMult: 1,
+  refineFeeMult: 1,
+  refineYieldMult: 1,
+  noBookImpact: false,    // a sale stops moving the book at all
+};
+
+function mods(state) { return (state && state.pow) || NO_MODS; }
+
 /** True when a reveal is available at the state's current progress. */
 export function has(state, id) {
-  return state.reach >= (REVEAL_DEPTH[id] ?? Infinity);
+  return state.reach + (mods(state).revealShift || 0) >= (REVEAL_DEPTH[id] ?? Infinity);
 }
 
 /** Everything unlocked so far plus the next thing and how far off it is. */
@@ -387,6 +413,7 @@ export function create(config = {}) {
     trades: [],        // last forty fills, newest first
     stats: { sold: {}, bought_units: {}, mined: {}, essenceEarned: ZERO(), essenceSpent: ZERO(), defaults: 0, delivered: 0 },
   };
+  state.bookScale = depthScale(state, depth);
   for (const m of MATERIALS) {
     state.stock[m.id] = anchorOf(state, m, depth);
     state.held[m.id] = ZERO();
@@ -411,6 +438,27 @@ export function tick(state, depth) {
   state.reach = Math.max(state.reach, state.depth);
 
   const settled = settleDue(state);
+
+  // A BOOK THAT NOBODY TRADED IN HAS NOT MOVED.
+  //
+  // Normal depth for a book scales with what a block at this depth is worth,
+  // and past the finish depth that compounds. The refill only ever closes a
+  // fixed share of the gap, so a book could never catch up: it fell further
+  // behind normal every turn, read as emptier and emptier, and its price rose
+  // on its own with nobody trading. Material bought early and held through it
+  // was free money - measured, 1,000 essence became 1,284,560,996 over two
+  // hundred turns without a block being broken, while the same strategy with
+  // the depth held still lost.
+  //
+  // The stock is carried up with normal depth first, so how full a book is
+  // only ever changes because somebody bought or sold.
+  const wasScale = state.bookScale || depthScale(state, state.depth);
+  const nowScale = depthScale(state, state.depth);
+  if (nowScale !== wasScale && wasScale > 0) {
+    const carry = nowScale / wasScale;
+    for (const m of MATERIALS) state.stock[m.id] = scale(state.stock[m.id], carry);
+  }
+  state.bookScale = nowScale;
 
   // books refill toward normal depth at a fixed fraction of the remaining gap
   const reg = regimeOf(state.depth);
@@ -470,8 +518,21 @@ function anchorOf(state, m, depth) {
   return scale(L(m.anchor), depthScale(state, depth));
 }
 
+// A UNIT IS A UNIT AT EVERY DEPTH.
+//
+// This used to scale the price of one unit by the depth as well, and a deeper
+// block already yields proportionally MORE units - so depth was counted twice
+// and a block at depth 100 paid ninety-five times what the same block paid a
+// run that was not trading. It also made holding material a riskless way to
+// make money: material bought at depth 20 and sold at depth 60 gained the
+// whole difference for nothing. Measured, that turned 1,000 essence into
+// 22,766,967 over two hundred turns without a block being broken, and the same
+// strategy with the depth held still LOST money, which is what says the depth
+// was the mechanism rather than the demand cycle.
+//
+// A deeper block still pays more. It pays more because it hands over more.
 function baseOf(state, m, depth) {
-  return scale(L(m.base), depthScale(state, depth));
+  return L(m.base);
 }
 
 function clampStock(s, anchor) {
@@ -576,19 +637,30 @@ export function sellPreview(state, id, qty) {
   const u0 = bookOf(state, m, depth);
   const k = mul(baseOf(state, m, depth), L(demandAt(id, depth) * regimeMul(m, depth)));
   const sp = spreadOf(m, depth);
+  const md = mods(state);
+  // FLOAT deepens the book the sale walks down, so size costs less price. The
+  // real anchor still decides where the book ends up.
+  const Ac = scale(A, md.bookDepthMult);
 
   // units that still fit on the curve before the book stops absorbing
-  const roomQty = scale(A, Math.max(0, U_MAX - u0));
+  const roomQty = scale(Ac, Math.max(0, U_MAX - u0));
   const onCurve = minL(q, roomQty);
   const flat = sub(q, onCurve);
 
-  const du = toNum(div(onCurve, A));
+  const du = toNum(div(onCurve, Ac));
   const acc = integ(u0, Math.min(U_MAX, u0 + (isFinite(du) ? du : U_MAX)), m.elast);
 
-  let gross = scale(mul(k, A), acc);
+  let gross = scale(mul(k, Ac), acc);
   if (isPos(flat)) gross = add(gross, mul(mul(k, L(Math.pow(U_MAX, -m.elast))), flat));
 
-  const net = scale(gross, 1 - sp);
+  let net = scale(gross, 1 - sp);
+  // STANDING closes the gap between the price quoted and the price filled;
+  // MONOPOLY closes it entirely. The quote is what the whole lot would fetch
+  // if the sale moved nothing.
+  if (md.slippageMult < 1) {
+    const atQuote = scale(mul(scale(k, Math.pow(u0, -m.elast)), q), 1 - sp);
+    net = sub(atQuote, scale(sub(atQuote, net), md.slippageMult));
+  }
   const endStock = clampStock(add(state.stock[id], q), A);
   const endBook = Math.min(U_MAX, Math.max(U_MIN, toNum(div(endStock, A))));
 
@@ -617,15 +689,16 @@ export function buyPreview(state, id, qty) {
   const k = mul(baseOf(state, m, depth), L(demandAt(id, depth) * regimeMul(m, depth)));
   const sp = spreadOf(m, depth);
 
-  const available = scale(A, Math.max(0, u0 - U_MIN));
+  const Ac = scale(A, mods(state).bookDepthMult);
+  const available = scale(Ac, Math.max(0, u0 - U_MIN));
   const filled = minL(want, available);
   if (!isPos(filled)) return { ok: false, reason: 'empty', filled: ZERO() };
 
-  const du = toNum(div(filled, A));
+  const du = toNum(div(filled, Ac));
   const u1 = Math.max(U_MIN, u0 - (isFinite(du) ? du : u0));
   const acc = integ(u1, u0, m.elast);
 
-  const gross = scale(mul(k, A), acc);
+  const gross = scale(mul(k, Ac), acc);
   const cost = scale(gross, 1 + sp);
   const endStock = clampStock(sub(state.stock[id], filled), A);
   const endBook = Math.min(U_MAX, Math.max(U_MIN, toNum(div(endStock, A))));
@@ -651,7 +724,10 @@ export function sell(state, id, qty) {
   if (!pv.ok) return pv;
 
   state.held[id] = sub(state.held[id], q);
-  state.stock[id] = clampStock(add(state.stock[id], q), anchorOf(state, matDef(id), state.depth));
+  // MONOPOLY: the book does not take the sale on, so the price does not move.
+  if (!mods(state).noBookImpact) {
+    state.stock[id] = clampStock(add(state.stock[id], q), anchorOf(state, matDef(id), state.depth));
+  }
   state.essence = add(state.essence, pv.net);
   state.stats.sold[id] = add(state.stats.sold[id], q);
   state.stats.essenceEarned = add(state.stats.essenceEarned, pv.net);
@@ -733,7 +809,9 @@ export function harvest(state, block) {
 
 /** A field pickup that pays cash rather than material. Roughly six slag. */
 export function windfall(state, depth = state.depth) {
-  const gain = scale(baseOf(state, matDef('slag'), depth), 6);
+  // A pickup off the FIELD, not a price at the desk, so it scales with the
+  // depth it was found at the way a block's yield does.
+  const gain = scale(L(matDef('slag').base * 6), depthScale(state, depth));
   state.essence = add(state.essence, gain);
   state.stats.essenceEarned = add(state.stats.essenceEarned, gain);
   return { essence: gain, text: fmt(gain) };
@@ -832,13 +910,14 @@ export function craft(state, recipeId, times = 1) {
   const n = minL(floorL(maxL(L(times), ZERO())), craftable(state, recipeId));
   if (!isPos(n)) return { ok: false, reason: 'inputs' };
 
-  const fee = mul(scale(quote(state, r.out).mid, r.fee * r.qty), n);
+  const md = mods(state);
+  const fee = mul(scale(quote(state, r.out).mid, r.fee * r.qty * md.refineFeeMult), n);
   if (cmp(fee, state.essence) > 0) return { ok: false, reason: 'fee', fee };
 
   for (const [id, need] of Object.entries(r.inputs)) {
     state.held[id] = sub(state.held[id], mul(L(need), n));
   }
-  const made = mul(L(r.qty), n);
+  const made = scale(mul(L(r.qty), n), md.refineYieldMult);
   state.held[r.out] = add(state.held[r.out], made);
   state.essence = sub(state.essence, fee);
   logTrade(state, { kind: 'craft', id: r.out, qty: made, value: fee, index: quote(state, r.out).index });
@@ -874,7 +953,7 @@ function premiumOf(term, standing) {
 export function forwardCapacity(state, id) {
   const turns = 2 + state.standing / 12;
   const floorCap = scale(L(matDef(id).drop * 4), depthScale(state, state.depth));
-  const cap = maxL(scale(state.flow[id], turns), floorCap);
+  const cap = scale(maxL(scale(state.flow[id], turns), floorCap), mods(state).forwardCapacityMult);
   const open = state.forwards.filter(f => f.id === id).reduce((a, f) => add(a, f.qty), ZERO());
   return { cap, open, free: maxL(sub(cap, open), ZERO()) };
 }
@@ -895,7 +974,7 @@ export function consignPreview(state, id, qty, term) {
   const fair = fairAt(state, id, due);
   const prem = premiumOf(t, state.standing);
   const sp = spreadOf(m, state.depth);
-  const unit = scale(fair, (1 - sp) * prem);
+  const unit = scale(fair, (1 - sp) * prem * mods(state).forwardPayoutMult);
   const payout = mul(unit, q);
   const spotUnit = quote(state, id).bid;
   return {
@@ -1353,7 +1432,10 @@ export function netWorth(state) {
 // from the same config object on load.
 
 export function save(state) {
-  const { cfg, ...rest } = state;
+  // `pow` is what the player's hand is worth right now. The hand is written
+  // down on its own and this is worked out again from it, so saving it would
+  // only be a second copy that could disagree with the first.
+  const { cfg, pow, ...rest } = state;
   return JSON.parse(JSON.stringify(rest));
 }
 

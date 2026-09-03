@@ -30,7 +30,7 @@
 // answers and gets the rest of the game for free.
 // ===========================================================================
 
-import { CONFIG } from '../config.js?v=19';
+import { CONFIG } from '../config.js?v=20';
 
 /**
  * What an arrival is shown of the board. Rows are measured in cells rather

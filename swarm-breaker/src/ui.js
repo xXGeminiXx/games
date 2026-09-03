@@ -1466,18 +1466,24 @@ function makeMarket(U) {
     sellBtn.type = 'button';
     const buyBtn = h('button', 'btn', 'buy');
     buyBtn.type = 'button';
-    act.appendChild(sellBtn); act.appendChild(buyBtn);
+    // Dumping. Only appears for a player who bought the way to do it, because
+    // without that there is nothing to dump material for.
+    const meltBtn = h('button', 'btn', 'dump');
+    meltBtn.type = 'button';
+    show(meltBtn, false);
+    act.appendChild(sellBtn); act.appendChild(buyBtn); act.appendChild(meltBtn);
 
     row.appendChild(main); row.appendChild(inst); row.appendChild(act);
     wrap.appendChild(row);
 
     on(nmBtn, 'click', () => U.selectGood(id));
     on(sellBtn, 'click', () => U.emit('sell', { id, qty: wrap.__qty }));
+    on(meltBtn, 'click', () => U.emit('melt', { id, qty: wrap.__qty }));
     on(buyBtn, 'click', () => { U.orderState(id).mode = 'buy'; U.selectGood(id, true); });
 
     wrap.n = {
       row, nmBtn, price, hold, ixWrap, ixVal, ixMark, spWrap, spark,
-      bkWrap, meter, bkVal, cyWrap, dial, cyVal, alWrap, act, sellBtn, buyBtn,
+      bkWrap, meter, bkVal, cyWrap, dial, cyVal, alWrap, act, sellBtn, buyBtn, meltBtn,
       order: null,
     };
     return wrap;
@@ -1549,6 +1555,13 @@ function makeMarket(U) {
     n.sellBtn.disabled = U.busy || !hasStock || !U.can('sell');
     show(n.buyBtn, U.has(m, 'bids') && U.can('buy'));
     n.buyBtn.disabled = U.busy;
+    const canMelt = !!(m.powers && m.powers.melt) && U.can('melt');
+    show(n.meltBtn, canMelt);
+    if (canMelt) {
+      setText(n.meltBtn, hasStock ? 'dump ' + U.fmt(qty) : 'dump');
+      n.meltBtn.disabled = U.busy || !hasStock;
+      n.meltBtn.title = 'a flat price with no book and no timing, worse than selling it well';
+    }
 
     // the order panel is built the first time it is needed and never rebuilt
     if (sel && expandable) {
@@ -2915,7 +2928,7 @@ const SECTIONS = [
   },
 ];
 
-const ACTIONS = ['sell', 'buy', 'craft', 'consign', 'upgrade', 'power', 'reroll', 'wager', 'restart', 'select', 'section'];
+const ACTIONS = ['sell', 'buy', 'melt', 'craft', 'consign', 'upgrade', 'power', 'reroll', 'wager', 'restart', 'select', 'section'];
 
 
 // ===========================================================================
