@@ -13,14 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=60';
-import { createBoard, pocket } from './board.js?v=60';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=60';
-import { fire, hasHook } from './hooks.js?v=60';
+import { rng as makeRng } from './rng.js?v=61';
+import { createBoard, pocket } from './board.js?v=61';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=61';
+import { fire, hasHook } from './hooks.js?v=61';
 import {
   createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
   eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
-} from './events.js?v=60';
+} from './events.js?v=61';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -48,6 +48,7 @@ export function baseMods() {
     ballWorth: 1,        // what one ball is worth when it lands somewhere paying
     refund: 0,           // share of a lost ball handed back
     spinsPerGate: 1,     // reel spins bought by one ball through the gate
+    gateBase: 0,         // balls a ball through the slot pays on its own
   };
 }
 
@@ -404,10 +405,16 @@ export function pullHandle(state) {
     // under it, and the player can watch it happen.
     const target = ball.forceGate ? 'gate' : ball.forcePocket;
     if (target) steerTo(state, idx, target);
-    if (!ball.free) state.tray -= cfg.launch.cost;
+    // A free ball costs neither a ball out of the tray nor one of the launches
+    // the round is rented for. Taking only the tray meant it cost nothing a
+    // round can run out of, so the part that sends them saved the player
+    // exactly nothing.
+    if (!ball.free) {
+      state.tray -= cfg.launch.cost;
+      state.launched++;
+    }
     state.counters.launchesThisRound++;
     state.counters.ballsThisRun++;
-    state.launched++;
     state.stats.launched++;
     sent++;
     // Balls sent is the only clock anything the machine is doing back runs on,
@@ -496,9 +503,12 @@ function resolveEvent(state, e, out) {
   }
   if (e.kind === 'gate') {
     state.stats.gates++;
-    const gateCtx = moment(state, 'onGate', { ball: ballOf(e), payout: 0, value: 0, fever: state.fever.active });
-    if (gateCtx) {
-      const given = Number.isFinite(gateCtx.value) ? gateCtx.value : gateCtx.payout;
+    // What the slot pays before any part speaks, which is nothing on a bare
+    // machine and whatever the parts have added to it otherwise.
+    const gateOwn = Math.max(0, state.mods.gateBase || 0);
+    const gateCtx = moment(state, 'onGate', { ball: ballOf(e), payout: gateOwn, value: gateOwn, fever: state.fever.active });
+    {
+      const given = gateCtx && Number.isFinite(gateCtx.value) ? gateCtx.value : gateOwn;
       const gatePay = Math.max(0, Math.round((Number.isFinite(given) ? given : 0) * state.mods.payMult));
       if (gatePay > 0) {
         state.tray += gatePay;

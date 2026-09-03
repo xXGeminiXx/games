@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=60';
+import { loadConfig } from '../config.js?v=61';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=60';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=61';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=60';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=60';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=60';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=60';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=60';
-import { rng as makeRng } from './rng.js?v=60';
-import { offerCabinets, freshSeed } from './cabinets.js?v=60';
-import * as Save from './save.js?v=60';
-import { showState } from './render/reach.js?v=60';
-import { skinForCabinet } from './render/themes.js?v=60';
-import { chooseDoor as callDoor } from './events.js?v=60';
+         handMult, restoreFloor } from './floor.js?v=61';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=61';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=61';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=61';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=61';
+import { rng as makeRng } from './rng.js?v=61';
+import { offerCabinets, freshSeed } from './cabinets.js?v=61';
+import * as Save from './save.js?v=61';
+import { showState } from './render/reach.js?v=61';
+import { skinForCabinet } from './render/themes.js?v=61';
+import { chooseDoor as callDoor } from './events.js?v=61';
 
 // A gap between frames longer than this is time the player was away, not a
 // slow frame. The same number decides whether a reopened page was away at all.
@@ -53,8 +53,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=60');
-  const metaModule = await optional('./meta.js?v=60');
+  const catalogue = await optional('./fittings.js?v=61');
+  const metaModule = await optional('./meta.js?v=61');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -323,6 +323,14 @@ function rerollPrice(game) {
   const baseCost = Number.isFinite(terms.rerollCost) && terms.rerollCost > 0 ? terms.rerollCost : s.rerollCost;
   const step = Number.isFinite(terms.rerollStep) && terms.rerollStep > 0 ? terms.rerollStep : s.rerollGrowth;
   const fallback = Math.max(0, Math.round(baseCost * Math.pow(step, Math.max(0, game.rerolls - freeLeft))));
+  // A part that has changed the shop's own terms is honoured before the
+  // catalogue's standing price. Without this the terms a part writes were read
+  // into a variable nothing reached, and the one part that changes them did
+  // nothing for its price.
+  if (Number.isFinite(terms.rerollCost) && terms.rerollCost > 0
+      || Number.isFinite(terms.rerollStep) && terms.rerollStep > 0) {
+    return cut(fallback);
+  }
   const cat = game.catalogue;
   if (cat && typeof cat.rerollCost === 'function') {
     try {

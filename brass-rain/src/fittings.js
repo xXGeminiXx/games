@@ -761,11 +761,11 @@ export const FITTINGS = [
   }),
 
   fit({
-    id: 'gate_widener', name: 'Bonus Slot Widener',
-    text: 'During a BONUS the slot takes {feverGateProb%} of balls, and a slot hit inside a BONUS extends it.',
+    id: 'gate_widener', name: 'Filed Slot Mouth',
+    text: 'The slot takes 3 more balls in every 100, now {gateProb%}. Its mouth is filed wider.',
     rarity: 'uncommon', price: 60, hook: 'static', tags: ['fever', 'gate'],
-    mods: { feverGateProb: ['+', 0.08] },
-    bound: 'It stops at 45 percent, which is what keeps a BONUS from running forever. Outside a BONUS it does nothing.'
+    mods: { gateProb: ['+', 0.03] },
+    bound: 'A mouth wider than the funnel feeding it is only a wider way to miss, so filing past twice its width buys held spins instead.'
   }),
 
   fit({

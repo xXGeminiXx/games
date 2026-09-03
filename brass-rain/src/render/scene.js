@@ -22,21 +22,21 @@
 // description of what to draw, and it touches nothing else on the page.
 // ---------------------------------------------------------------------------
 
-import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=60';
-import { createColours } from './colours.js?v=60';
-import { fitBoard, clipTransform, lampPosition, reelRect, screenRect, drumStrip } from './layout.js?v=60';
-import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=60';
+import { createGL, program, buffer, vao, target, fittedTarget, bindScreen, FULLSCREEN_VS } from './gl.js?v=61';
+import { createColours } from './colours.js?v=61';
+import { fitBoard, clipTransform, lampPosition, reelRect, screenRect, drumStrip } from './layout.js?v=61';
+import { normaliseQuality, bufferSize, sceneSize, drawnBalls } from './quality.js?v=61';
 import {
   packPins, packPockets, packRails, packFlashes, packReels, packArc, packScreen,
   packEvents, tellHeat, showIntensity, medianPinRadius,
   POCKET_KINDS, POCKET_TONES, FLASH_KINDS, REEL_WINDOWS, EVENT_CAP,
-} from './board-geom.js?v=60';
+} from './board-geom.js?v=61';
 import {
   INSTANCE_VS, RAIL_VS, BALL_VS, GROUND_FS, PIN_FS, BALL_FS, BALL_SHADOW_FS,
   RAIL_FS, POCKET_FS, FLASH_FS, REEL_FS, ARC_FS, SCREEN_FS, EVENT_FS, COMPOSITE_FS,
-} from './shaders.js?v=60';
-import { themeForCabinet, themeIndex, DEFAULT_THEME } from './themes.js?v=60';
-import { encode as encodeName, MAX_LETTERS } from './marquee.js?v=60';
+} from './shaders.js?v=61';
+import { themeForCabinet, themeIndex, DEFAULT_THEME } from './themes.js?v=61';
+import { encode as encodeName, MAX_LETTERS } from './marquee.js?v=61';
 
 // The unit quad every instance is stamped from, as a triangle strip so no
 // index buffer is needed.

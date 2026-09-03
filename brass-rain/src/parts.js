@@ -28,9 +28,9 @@
 // and it keeps every promise honest.
 // ---------------------------------------------------------------------------
 
-import { createBoard, addPin, removePinsNear, rebuild, nailPos, POCKET_PAY, POCKET_GATE } from './board.js?v=60';
-import { baseMods } from './run.js?v=60';
-import { rng as makeRng } from './rng.js?v=60';
+import { createBoard, addPin, removePinsNear, rebuild, nailPos, POCKET_PAY, POCKET_GATE } from './board.js?v=61';
+import { baseMods } from './run.js?v=61';
+import { rng as makeRng } from './rng.js?v=61';
 
 // Board units of mouth width per point of probability, measured.
 const GATE_UNITS_PER_POINT = 1 / 0.0042;
@@ -153,6 +153,23 @@ export function fitMachine(cfg, catalogue, ids, extra) {
       out.reels.matchChance = clamp(cfg.reels.matchChance * (nowChance / wasChance), 0.01, 0.9);
     }
   }
+
+  // The chance three reels agree. The catalogue keeps it as two numbers - how
+  // often the outer two land together, and how often the middle one joins them
+  // - and the run carries the whole thing as one bonus, so what the parts make
+  // of the pair over what the bare machine makes of it is that bonus. Without
+  // this, four parts in the catalogue described the reels in a language nothing
+  // read and changed nothing at all.
+  const matchNow = Number(model.reachProb) * Number(model.middleWeight);
+  const matchWas = Number(base.reachProb) * Number(base.middleWeight);
+  if (Number.isFinite(matchNow) && Number.isFinite(matchWas) && matchNow !== matchWas) {
+    mods.matchBonus += matchNow - matchWas;
+  }
+  // What a ball through the slot pays on its own. Held as the DIFFERENCE from
+  // the bare machine, so a machine with nothing bolted in still pays what it
+  // always paid and a part that says the slot pays two more really pays two
+  // more.
+  mods.gateBase += d('gatePay');
 
   // ---- the round ------------------------------------------------------
   mods.payMult *= safeRatio(ratio('payMul'));
