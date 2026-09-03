@@ -624,6 +624,14 @@ export const CONFIG = {
       glow: 0.55,           // the tint of glow the front carries in daylight
       head: 0.13,           // the bright point at the front, in cells
       headAlpha: 1,
+      // A tip with nowhere to go stops dead in the simulation, and a front of
+      // two thousand frozen heads reads as a game that has crashed. It has not
+      // stopped working - it is still carrying what the ground gives up to the
+      // trees - so it is drawn casting about on the spot: a slow circle of
+      // this radius, a turn taking this long, each tip out of step with the
+      // next. Nothing here touches the simulation.
+      idleRadius: 0.16,     // in cells
+      idleSeconds: 2.6,     // one turn
     },
 
     // WHOSE GROUND IT IS. Everything the threads have not got to is somebody
@@ -887,7 +895,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 12,
+    build: 13,
   },
 };
 

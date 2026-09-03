@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=12';
-import { noise } from './world.js?v=12';
-import { hash, unit } from './rng.js?v=12';
-import { angleGap, burntSet } from './events.js?v=12';
+import { seasonOf } from './season.js?v=13';
+import { noise } from './world.js?v=13';
+import { hash, unit } from './rng.js?v=13';
+import { angleGap, burntSet } from './events.js?v=13';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -1334,26 +1334,48 @@ export function createView(canvas, cfg, doc) {
       const stride = tips.length > V.tipsDrawn ? tips.length / V.tipsDrawn : 1;
       const len = Math.max(1.5, V.tip.dash * s);
       const origin = nodes[world.origin] || { x: 0, y: 0 };
+      // A tip with nowhere to go is parked in the simulation, and a front of
+      // two thousand frozen heads reads as a game that has stopped. It has
+      // not: it is still carrying. So it is drawn casting about on the spot,
+      // each one out of step with the next, and the tail points the way the
+      // circle is going.
+      const drift = Math.max(0, num(V.tip.idleRadius, 0.16)) * s;
+      const turn = Math.max(0.2, num(V.tip.idleSeconds, 2.6));
+      const spin = (state.t / turn) * TAU;
+      // Where a tip is drawn, and which way its tail lies. Written into these
+      // two so the head pass and the tail pass agree without doing it twice.
+      let px2 = 0, py2 = 0, ux2 = 0, uy2 = 0;
+      const place2 = (t, k) => {
+        px2 = cx + t.x * s; py2 = cy + t.y * s;
+        const to = t.to >= 0 ? nodes[t.to] : null;
+        if (to) {
+          ux2 = to.x - t.x; uy2 = to.y - t.y;
+          const d = Math.hypot(ux2, uy2);
+          if (d > 1e-6) { ux2 /= d; uy2 /= d; return; }
+        } else if (drift > 0.4) {
+          const a = spin + unit(t.from >= 0 ? t.from : 0, 'cast:' + k) * TAU;
+          px2 += Math.cos(a) * drift;
+          py2 += Math.sin(a) * drift;
+          // Along the circle, which is the way it is actually moving.
+          ux2 = -Math.sin(a); uy2 = Math.cos(a);
+          return;
+        }
+        // Nothing to go by: out from the middle, which is where it came from.
+        ux2 = t.x - origin.x; uy2 = t.y - origin.y;
+        const d = Math.hypot(ux2, uy2);
+        if (d > 1e-6) { ux2 /= d; uy2 /= d; return; }
+        const a = unit(t.from >= 0 ? t.from : 0, 'idle:' + k) * TAU;
+        ux2 = Math.cos(a); uy2 = Math.sin(a);
+      };
       const front = () => {
         ctx.beginPath();
         for (let k = 0; k < tips.length; k += stride) {
           const t = tips[Math.floor(k)];
           if (!t || !ok(t.x) || !ok(t.y)) continue;
-          const x = cx + t.x * s, y = cy + t.y * s;
-          if (!inFrame(x, y)) continue;
-          // Pointing where it is going; a tip with nowhere to go yet faces out
-          // from the middle of the organism, which is where it came from.
-          let ux = t.x - origin.x, uy = t.y - origin.y;
-          const to = t.to >= 0 ? nodes[t.to] : null;
-          if (to) { ux = to.x - t.x; uy = to.y - t.y; }
-          const d = Math.hypot(ux, uy);
-          if (d > 1e-6) { ux /= d; uy /= d; }
-          else {
-            const a = unit(t.from >= 0 ? t.from : 0, 'idle:' + Math.floor(k)) * TAU;
-            ux = Math.cos(a); uy = Math.sin(a);
-          }
-          ctx.moveTo(x - ux * len, y - uy * len);
-          ctx.lineTo(x, y);
+          place2(t, Math.floor(k));
+          if (!inFrame(px2, py2)) continue;
+          ctx.moveTo(px2 - ux2 * len, py2 - uy2 * len);
+          ctx.lineTo(px2, py2);
         }
       };
       ctx.lineWidth = Math.max(0.7, V.tip.width * s);
@@ -1379,10 +1401,10 @@ export function createView(canvas, cfg, doc) {
         for (let k = 0; k < tips.length; k += stride) {
           const t = tips[Math.floor(k)];
           if (!t || !ok(t.x) || !ok(t.y)) continue;
-          const x = cx + t.x * s, y = cy + t.y * s;
-          if (!inFrame(x, y)) continue;
-          ctx.moveTo(x, y);
-          ctx.lineTo(x + 0.01, y);
+          place2(t, Math.floor(k));
+          if (!inFrame(px2, py2)) continue;
+          ctx.moveTo(px2, py2);
+          ctx.lineTo(px2 + 0.01, py2);
         }
         ctx.strokeStyle = look.glow;
         ctx.lineWidth = head * 2;
