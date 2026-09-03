@@ -4,85 +4,155 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Games</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308090c'/%3E%3Ccircle cx='11' cy='12' r='4' fill='%235ad1ff'/%3E%3Ccircle cx='21' cy='21' r='6' fill='%23e6e9ef'/%3E%3C/svg%3E">
+<meta name="description" content="Browser games. Nothing to install, no account, no ads. Every one runs and saves in the browser.">
+<meta name="theme-color" content="#0b0b0c">
+
+<!-- A link pasted into a message shows a card rather than a bare address. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Games that run in the browser">
+<meta property="og:description" content="Nothing to install, no account, no ads. Every one runs and saves in the browser.">
+<meta property="og:url" content="https://xxgeminixx.github.io/games/">
+<meta property="og:image" content="https://xxgeminixx.github.io/games/preview/social.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Nine squares, one lit: an index with something picked out of it. Drawn
+     here so the page asks for no file to put a mark on a tab. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b0b0c'/%3E%3Cg fill='%23515259'%3E%3Crect x='5' y='5' width='6' height='6'/%3E%3Crect x='13' y='5' width='6' height='6'/%3E%3Crect x='21' y='5' width='6' height='6'/%3E%3Crect x='5' y='13' width='6' height='6'/%3E%3Crect x='21' y='13' width='6' height='6'/%3E%3Crect x='5' y='21' width='6' height='6'/%3E%3Crect x='13' y='21' width='6' height='6'/%3E%3Crect x='21' y='21' width='6' height='6'/%3E%3C/g%3E%3Crect x='13' y='13' width='6' height='6' fill='%23f2f2f4'/%3E%3C/svg%3E">
 <style>
+  /* This page is a shelf, not a tenth game. Every game here owns a look, so
+     the shelf keeps none of them: the chrome carries no colour at all and the
+     nine screenshots are the only colour on the page. Type does the same job -
+     the reading voice is the plain sans a browser already has, and monospace
+     is kept for the small labels, which is the opposite way round from every
+     game on the list. */
   :root{
-    --void:#08090c; --panel:#0e1016; --rule:#1c2029;
-    --ink:#e6e9ef; --dim:#7a828f; --accent:#5ad1ff;
+    --bg:#0b0b0c;
+    --tile:#111113;
+    --line:#232326;
+    --line-lit:#55565d;
+    --ink:#f2f2f4;
+    --dim:#8b8c93;
+    --faint:#5c5d64;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
   }
   *{box-sizing:border-box}
   html,body{min-height:100%;margin:0}
   body{
-    background:var(--void); color:var(--ink);
-    font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    display:flex; justify-content:center; padding:40px 20px;
+    background:var(--bg); color:var(--ink);
+    font:15px/1.55 var(--sans);
+    -webkit-font-smoothing:antialiased;
+    display:flex; justify-content:center; padding:44px 20px 64px;
   }
-  main{width:100%; max-width:1040px}
+  main{width:100%; max-width:1120px}
+
+  header{
+    display:grid; align-items:baseline; gap:4px 18px;
+    grid-template-columns:auto 1fr auto;
+    padding-bottom:20px; margin-bottom:24px;
+    border-bottom:1px solid var(--line);
+  }
   h1{
-    font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:.22em;
-    color:var(--dim); margin:0;
+    grid-column:1; margin:0;
+    font-size:27px; font-weight:650; letter-spacing:-.025em;
   }
-  /* The filter earns its place once the list outgrows a glance; it is hidden
-     below that count rather than sitting there asking to be used. */
-  #head{display:flex; align-items:center; gap:16px; margin:0 0 26px}
+  #count{
+    grid-column:2; justify-self:start; align-self:center;
+    font:11px/1 var(--mono); color:var(--dim); letter-spacing:.08em;
+    border:1px solid var(--line); border-radius:2px; padding:4px 7px;
+  }
+  #sub{
+    grid-column:1 / 3; grid-row:2; margin:0;
+    font:12.5px/1.5 var(--mono); color:var(--dim);
+  }
   #find{
-    margin-left:auto; width:150px; padding:5px 9px;
+    grid-column:3; grid-row:1 / 3; align-self:center;
+    width:170px; padding:7px 10px;
     background:transparent; color:var(--ink);
-    border:1px solid var(--rule); border-radius:0;
-    font:inherit; font-size:12px;
+    border:1px solid var(--line); border-radius:2px;
+    font:12px/1 var(--mono);
   }
-  #find:focus{outline:none; border-color:var(--accent)}
-  #find::placeholder{color:var(--dim)}
+  #find:focus{outline:none; border-color:var(--line-lit)}
+  #find::placeholder{color:var(--faint)}
   #find[hidden]{display:none}
-  #none{color:var(--dim); font-size:13px}
-
-  /* A game added since the reader was last here is worth pointing at, and the
-     page knows because the browser remembers what it had already shown. */
-  .new{
-    display:inline-block; margin-left:8px; vertical-align:middle;
-    font-size:10px; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--void); background:var(--accent); padding:2px 6px;
+  /* On a phone the three columns squeeze the sentence into a stack beside the
+     box, so the header becomes one column and the box takes the full width. */
+  @media (max-width:659px){
+    header{grid-template-columns:auto 1fr}
+    #sub{grid-column:1 / -1}
+    #find{grid-column:1 / -1; grid-row:auto; width:100%; margin-top:6px}
   }
+  #none{color:var(--dim); font:13px/1.5 var(--mono)}
 
-  /* One column on a phone, two from a tablet up, three on a wide screen. */
-  #grid{
-    display:grid; gap:16px;
-    grid-template-columns:1fr;
-  }
-  @media (min-width:620px){ #grid{grid-template-columns:repeat(2,1fr)} }
-  @media (min-width:1000px){ #grid{grid-template-columns:repeat(3,1fr)} }
+  /* One column on a phone, two from a tablet, three on a wide screen. */
+  #grid{display:grid; gap:18px; grid-template-columns:1fr}
+  @media (min-width:660px){ #grid{grid-template-columns:repeat(2,1fr)} }
+  @media (min-width:1020px){ #grid{grid-template-columns:repeat(3,1fr)} }
 
   a.tile{
     display:flex; flex-direction:column; text-decoration:none; color:inherit;
-    border:1px solid var(--rule); background:var(--panel);
-    transition:border-color .14s linear, transform .14s ease-out;
+    border:1px solid var(--line); background:var(--tile); border-radius:3px;
+    overflow:hidden;
+    transition:border-color .15s linear, background-color .15s linear;
   }
   /* display:flex above beats the hidden attribute's own display:none, so a
      filtered-out tile has to be told again. */
   a.tile[hidden]{display:none}
-  a.tile:hover, a.tile:focus-visible{border-color:var(--accent); transform:translateY(-2px)}
-  a.tile:focus-visible{outline:1px solid var(--accent); outline-offset:2px}
+  a.tile:hover,a.tile:focus-visible{border-color:var(--line-lit); background:#151517}
+  a.tile:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
 
-  /* The shot keeps its shape whatever the column width is, so a row of tiles
-     lines up even though the games are different shapes underneath. */
+  /* The shot keeps its shape whatever the column width is, so a row lines up
+     even though the games are different shapes underneath. */
+  .frame{position:relative; background:#000; border-bottom:1px solid var(--line)}
   .shot{
     display:block; width:100%; height:auto; aspect-ratio:16/10; object-fit:cover;
-    background:var(--void); border-bottom:1px solid var(--rule);
+    transition:transform .3s ease-out, opacity .15s linear;
   }
-  .body{padding:14px 16px 16px}
-  .tile b{display:block; font-size:19px; font-weight:600; letter-spacing:-.02em}
-  a.tile:hover b, a.tile:focus-visible b{color:var(--accent)}
-  .tile p{margin:6px 0 0; color:var(--dim); font-size:13px; line-height:1.5}
-  .away{
-    display:inline-block; margin-top:10px; font-size:11px; letter-spacing:.12em;
-    text-transform:uppercase; color:var(--dim);
+  a.tile:hover .shot,a.tile:focus-visible .shot{transform:scale(1.02)}
+  .shot.gone{visibility:hidden}
+
+  .body{display:flex; flex-direction:column; flex:1; padding:13px 15px 15px}
+  .meta{
+    display:flex; align-items:baseline; gap:10px; margin-bottom:5px;
+    font:10.5px/1.4 var(--mono); color:var(--faint); letter-spacing:.02em;
+  }
+  .meta .played{margin-left:auto; color:#4a4b51}
+  .name{
+    display:block; font-size:18.5px; font-weight:600; letter-spacing:-.015em;
+    line-height:1.25;
+  }
+  .blurb{margin:7px 0 0; color:var(--dim); font-size:13px; line-height:1.6}
+  .foot{
+    margin-top:auto; padding-top:11px;
+    font:10.5px/1 var(--mono); color:var(--faint); letter-spacing:.02em;
   }
 
-  footer{margin-top:30px; color:var(--dim); font-size:11px; line-height:1.7}
-  footer code{color:var(--ink)}
+  /* A game added since this browser was last here is worth pointing at, and
+     the page knows because the browser remembers what it had already shown. */
+  .new{
+    display:inline-block; margin-left:8px; vertical-align:2px;
+    font:9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--bg); background:var(--ink); padding:3px 5px; border-radius:2px;
+  }
+
+  footer{
+    margin-top:34px; padding-top:20px; border-top:1px solid var(--line);
+    max-width:74ch;
+    font:11.5px/1.8 var(--mono); color:var(--faint);
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important}
+    a.tile:hover .shot,a.tile:focus-visible .shot{transform:none}
+  }
 </style>
+<!-- plays:start -->
+<meta name="plays" content="https://games-plays.xxgeminixx.workers.dev">
+<!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="bcb17103b419">
+<meta name="build" content="aee6616d8dcc">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -126,24 +196,22 @@
 })();
 </script>
 <!-- build-watch:end -->
-<!-- plays:start -->
-<meta name="plays" content="https://games-plays.xxgeminixx.workers.dev">
-<!-- plays:end -->
 </head>
 <body>
 <main>
-  <div id="head">
+  <header>
     <h1>Games</h1>
+    <span id="count"></span>
+    <p id="sub">Free, in the browser, nothing to install. Pick one and it starts.</p>
     <input id="find" type="search" placeholder="filter" aria-label="Filter the games" autocomplete="off" spellcheck="false">
-  </div>
+  </header>
   <div id="grid"></div>
   <p id="none" hidden>Nothing matches that.</p>
   <footer>
-    Each game adds one to a counter the first time you play it, so the ones people actually play
-    can be listed first. That is a number going up and nothing else: no account, no cookie, no
-    identifier, nothing about how you played, and nothing that can be traced back to you. Beyond
-    that no game here sends anything anywhere, and none of them load an image while you play -
-    every one of them draws itself. Saves live in the browser that made them.
+    Each game adds one to a counter the first time you play it, so the ones people play can be
+    listed first. No account, no cookie, nothing about how you played. Nothing else leaves your
+    browser, and saves stay in the one that made them. The games load no images - every one draws
+    itself, and the pictures here are screenshots.
   </footer>
 </main>
 
@@ -154,90 +222,123 @@
 //   'played'  the ones people actually play first, over the last 30 days
 //
 // The counter has to be deployed and switched on for 'played' to have anything
-// to say; until then it falls back to the order below on its own, so setting
-// this early costs nothing.
+// to say; until then it falls back to the order below on its own.
 const ORDER = 'played';
+
+// Below this many players on the busiest game, the counts are one or two
+// afternoons and putting a game last says nothing about the game. The written
+// order stands until there are enough of them to mean something. Five is a
+// guess, written when the busiest game here had two players; revisit it when
+// there are real numbers to look at.
+const ENOUGH = 5;
 
 // Everything the page shows. Add a game by adding a line, and drop a 16:10
 // screenshot of it in preview/ under the same name.
+//
+//   id     what the play counter calls it, and the name of its directory
+//   kick   the one thing the game asks the player to decide
+//   find   words the filter should match that the tile does not say out loud,
+//          so typing 'idle' or 'defense' finds the games that are one
 const GAMES = [
   {
+    id:   'open-outcry',
+    find: 'market trading economy exchange idle numbers',
     dir:  'open-outcry',
     name: 'Open Outcry',
+    kick: 'you set the price',
     shot: 'preview/open-outcry.webp',
-    line: 'A trading pit under a slate board. You quote a bid and an offer; a ' +
-          'crowd of traders does the rest. Earn the spread, hire clerks, take ' +
-          'the seat, corner a pit, and move on to a bigger city.',
+    line: 'A trading pit under a slate board. Quote a bid and an offer, and the crowd ' +
+          'trades against you. Keep the spread, hire clerks, buy the seat.',
   },
   {
+    id:   'brass-rain',
+    find: 'pachinko machine arcade idle numbers physics',
     dir:  'brass-rain',
     name: 'Brass Rain',
+    kick: 'you bend the nails',
     shot: 'preview/brass-rain.webp',
-    line: 'A pachinko machine you are allowed to work on. Balls fall through a ' +
-          'few hundred brass nails, and between rounds you bend the nails. One ' +
-          'in the right place is worth several times what the machine pays.',
+    line: 'Balls fall through a few hundred brass nails. Between rounds you bend them, ' +
+          'and one nail in the right place pays several times over.',
   },
   {
+    id:   'swarm-breaker',
+    find: 'swarm blocks turns breakout puzzle numbers',
     dir:  'swarm-breaker',
     name: 'Swarm Breaker',
+    kick: 'you pick the angle',
     shot: 'preview/swarm-breaker.webp',
-    line: 'One decision a turn: the angle. A growing swarm of bodies does the rest ' +
-          'while blocks descend toward the line you are defending.',
+    line: 'One decision a turn. The swarm grows every round and breaks the blocks ' +
+          'before they reach the line you are holding.',
   },
   {
+    id:   'accretion',
+    find: 'gravity space physics simulation sandbox',
     dir:  'accretion',
     name: 'Accretion',
+    kick: 'you drop one body',
     shot: 'preview/accretion.webp',
-    line: 'A blank field. A click puts something in it. Nothing after that is ' +
-          'scripted - what forms, forms because gravity says so.',
+    line: 'An empty field and one click. Nothing after that is scripted. What forms, ' +
+          'forms because gravity says so.',
   },
   {
+    id:   'barrow',
+    find: 'idle horde market digging dead numbers',
     dir:  'barrow',
     name: 'Barrow',
+    kick: 'you keep the books',
     shot: 'preview/barrow.webp',
-    line: 'The dead dig. You keep the books. An idle game: raise a horde that ' +
-          'digs down forever, play the market for what it brings up, and seal ' +
-          'the barrow when the ground finally beats you.',
+    line: 'The dead dig. Raise a horde that goes down forever, sell what it brings up, ' +
+          'and seal the barrow when the ground beats you.',
   },
   {
+    id:   'foxfire',
+    find: 'idle market forest fungus growth nature',
     dir:  'foxfire',
     name: 'Foxfire',
+    kick: 'you spread the tips',
     shot: 'preview/foxfire.webp',
-    line: 'One spore on a dead log. Then the forest. An idle game: you are a ' +
-          'honey fungus, your tips forage on their own, the trees are the ' +
-          'market, and when the floor is threaded end to end you go beyond it.',
+    line: 'One spore on a dead log, then the whole forest floor. Your tips forage on ' +
+          'their own and the trees are the market.',
   },
   {
+    id:   'fall-line',
+    find: 'tower defense strategy terrain waves',
     dir:  'fall-line',
     name: 'Fall Line',
+    kick: 'you shape the ground',
     shot: 'preview/fall-line.webp',
-    line: 'A tower defense where the enemy is a river and the land is your weapon. ' +
-          'Raise and cut the ground, the Melt takes the fastest way down, and after ' +
-          'every surge it grows a counter to whatever killed it.',
+    line: 'A tower defense where you shape the hill. Lengthen the road by raising ground, ' +
+          'and the Melt grows a counter to whatever killed it last.',
   },
   {
+    id:   'aerie',
+    find: 'idle market drones flying island',
     dir:  'aerie',
     name: 'Aerie',
+    kick: 'you aim the fleet',
     shot: 'preview/aerie.webp',
-    line: 'A carrier over cold water. Your drones work the land: they stream out to ' +
-          'the island in their thousands and bring back what sells, the ground fades ' +
-          'where they work, and a market you flood falls until you spread the fleet.',
+    line: 'A carrier over cold water. Thousands of drones work the island and bring back ' +
+          'what sells, until the price falls and you spread out.',
   },
   {
     // Hosted at its own address since 2025 and left there: a save lives with
     // the address it was made at, so moving the game would throw away every
     // one of them.
+    id:   'iron-spine',
+    find: 'action waves merge train arcade',
     href: 'https://xxgeminixx.github.io/TheIronSpine/',
     name: 'Iron Spine',
+    kick: 'you merge the cars',
     shot: 'preview/iron-spine.webp',
-    line: 'Command a modular weapon train. Collect cars, merge matching pairs ' +
-          'into heavier ones, and hold out for twenty waves.',
+    line: 'A weapon train you build while it rolls. Collect cars, merge matching pairs ' +
+          'into heavier ones, hold out twenty waves.',
   },
 ];
 
 const grid = document.getElementById('grid');
 const find = document.getElementById('find');
 const none = document.getElementById('none');
+document.getElementById('count').textContent = GAMES.length;
 
 // A game is "new" to whoever is reading until they have seen it once. The list
 // of what they have seen lives in their own browser, so the marker fades by
@@ -245,49 +346,80 @@ const none = document.getElementById('none');
 let seen = [];
 try { seen = JSON.parse(localStorage.getItem('seen') || '[]'); } catch (e) { seen = []; }
 const first = seen.length === 0;              // never been here: nothing is new, it is all new
-const isNew = (g) => !first && seen.indexOf(g.dir || g.href) < 0;
 
-const tiles = GAMES.map((g) => {
+// Which games this browser has already opened. The counter writes this on its
+// way past and it never leaves the machine, so the shelf can say which ones
+// have been tried without anyone being asked or told.
+let plays = {};
+try { plays = JSON.parse(localStorage.getItem('__plays') || '{}') || {}; } catch (e) { plays = {}; }
+
+const tiles = GAMES.map((g, i) => {
   const a = document.createElement('a');
   a.className = 'tile';
   a.href = g.href || (g.dir + '/');
   if (g.href) a.rel = 'noopener';
 
+  const frame = document.createElement('div');
+  frame.className = 'frame';
   const img = document.createElement('img');
   img.className = 'shot';
   img.src = g.shot;
   img.width = 800; img.height = 500;
-  img.loading = 'lazy';
+  // The first row is on screen before anything is scrolled, so it is fetched
+  // straight away; everything below waits until it is needed.
+  img.loading = i < 3 ? 'eager' : 'lazy';
   img.decoding = 'async';
+  if (i === 0) img.fetchPriority = 'high';
   img.alt = g.name + ' running';
+  // A shot that will not load leaves a black frame the right shape rather than
+  // a broken-image mark in the middle of the tile.
+  img.addEventListener('error', () => { img.classList.add('gone'); });
+  frame.appendChild(img);
 
   const body = document.createElement('div');
   body.className = 'body';
-  const b = document.createElement('b');
-  b.textContent = g.name;
-  if (isNew(g)) {
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const kick = document.createElement('span');
+  kick.textContent = g.kick;
+  meta.appendChild(kick);
+  if (plays[g.id] && plays[g.id].day) {
+    const p = document.createElement('span');
+    p.className = 'played';
+    p.textContent = 'played';
+    meta.appendChild(p);
+  }
+
+  const name = document.createElement('b');
+  name.className = 'name';
+  name.textContent = g.name;
+  if (!first && seen.indexOf(g.id) < 0) {
     const tag = document.createElement('span');
     tag.className = 'new';
     tag.textContent = 'new';
-    b.appendChild(tag);
+    name.appendChild(tag);
   }
+
   const p = document.createElement('p');
+  p.className = 'blurb';
   p.textContent = g.line;
-  body.append(b, p);
+
+  body.append(meta, name, p);
   if (g.href) {
     const away = document.createElement('span');
-    away.className = 'away';
+    away.className = 'foot';
     away.textContent = 'its own address';
     body.appendChild(away);
   }
 
-  a.append(img, body);
+  a.append(frame, body);
   grid.appendChild(a);
-  return { el: a, name: g.dir || g.href, hay: (g.name + ' ' + g.line).toLowerCase() };
+  return { el: a, id: g.id, hay: (g.name + ' ' + g.kick + ' ' + g.line + ' ' + (g.find || '')).toLowerCase() };
 });
 
 // Remember what was on the page, so the next visit can mark what was added.
-try { localStorage.setItem('seen', JSON.stringify(GAMES.map((g) => g.dir || g.href))); } catch (e) { /* no store, no markers */ }
+try { localStorage.setItem('seen', JSON.stringify(GAMES.map((g) => g.id))); } catch (e) { /* no store, no markers */ }
 
 // Put the most played first, when that is what has been asked for.
 //
@@ -296,21 +428,24 @@ try { localStorage.setItem('seen', JSON.stringify(GAMES.map((g) => g.dir || g.hr
 // is a slower page for a detail nobody asked to wait for. The last order that
 // arrived is remembered, so a second visit is already in it and nothing moves
 // while it is being read.
-function reorder(names) {
-  const at = {};
-  tiles.forEach((t) => { at[t.name] = t.el; });
-  for (const name of names) {
-    if (at[name]) grid.appendChild(at[name]);
-  }
-  // A game the counter has never heard of keeps its place at the end rather
-  // than disappearing: one published an hour ago has no plays yet.
-  for (const t of tiles) if (names.indexOf(t.name) < 0) grid.appendChild(t.el);
+function arrange(order) {
+  const rank = {};
+  order.forEach((id, i) => { rank[id] = i; });
+  const ranked = tiles.filter((t) => t.id in rank).sort((a, b) => rank[a.id] - rank[b.id]);
+  // A game the counter has never heard of holds the slot it was written in
+  // rather than being pushed to the end: one published an hour ago has no
+  // plays yet, and the end of the list is where it would be least seen.
+  const out = new Array(tiles.length);
+  tiles.forEach((t, i) => { if (!(t.id in rank)) out[i] = t; });
+  let k = 0;
+  for (let i = 0; i < out.length; i++) if (!out[i]) out[i] = ranked[k++];
+  for (const t of out) if (t) grid.appendChild(t.el);
 }
 
 if (ORDER === 'played') {
   let last = [];
   try { last = JSON.parse(localStorage.getItem('played') || '[]'); } catch (e) { last = []; }
-  if (last.length) reorder(last);
+  if (last.length) arrange(last);
 
   const where = document.querySelector('meta[name="plays"]');
   const endpoint = where && where.getAttribute('content');
@@ -319,15 +454,18 @@ if (ORDER === 'played') {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d || !d.order || !d.order.length) return;
-        reorder(d.order);
-        try { localStorage.setItem('played', JSON.stringify(d.order)); } catch (e) { /* not remembered, asked again next time */ }
+        let most = 0;
+        for (const id in (d.games || {})) most = Math.max(most, Number(d.games[id].players) || 0);
+        if (most < ENOUGH) return;
+        arrange(d.order);
+        try { localStorage.setItem('played', JSON.stringify(d.order)); } catch (e) { /* asked again next time */ }
       })
       .catch(() => { /* the written order is a perfectly good order */ });
   }
 }
 
-// The filter appears only once there are enough games that reading them all
-// is a chore. Below that it would be furniture.
+// The filter appears only once there are enough games that reading them all is
+// a chore. Below that it would be furniture.
 if (GAMES.length < 8) find.hidden = true;
 find.addEventListener('input', () => {
   const q = find.value.trim().toLowerCase();
@@ -338,6 +476,12 @@ find.addEventListener('input', () => {
     if (hit) shown++;
   }
   none.hidden = shown > 0;
+});
+// Slash reaches the filter from anywhere on the page, escape empties it.
+addEventListener('keydown', (e) => {
+  const typing = /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
+  if (e.key === '/' && !typing && !find.hidden) { e.preventDefault(); find.focus(); }
+  if (e.key === 'Escape' && typing) { find.value = ''; find.dispatchEvent(new Event('input')); find.blur(); }
 });
 </script>
 </body>
