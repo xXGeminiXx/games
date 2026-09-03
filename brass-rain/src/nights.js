@@ -12,6 +12,18 @@
 
 const KEY = 'brassrain:nights';
 const SALT_KEY = 'brassrain:nights:salt';
+// The board was kept under this name until the game's storage names were made
+// to match each other. A board sitting under it was played for and is real, so
+// it is taken over once - signed as this browser's own on the way, because it
+// was written before there were signatures - and the old name is then cleared,
+// which shuts the door behind it rather than leaving a second way onto the
+// board that carries no signature at all.
+const OLD_KEY = 'brass-rain:nights';
+// Set once the old name has been asked for. Clearing the old name alone is not
+// enough: a name that no longer exists can be written to again, and a night
+// typed into it would then be adopted and signed, which is the hand edit the
+// signature exists to stop.
+const ADOPTED_KEY = 'brassrain:nights:adopted';
 
 // ---- keeping the board honest ------------------------------------------
 //
@@ -85,10 +97,50 @@ function storeOf(store) {
   try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (e) { return null; }
 }
 
+/**
+ * Takes over a board left under the old name, once.
+ *
+ * The old name is cleared FIRST, so a store that will not take the new board
+ * still never hands the old one over twice. A store with no removal is given
+ * an empty board under the old name instead, which comes to the same thing.
+ */
+function adoptOldBoard(s) {
+  if (!s) return;
+  let raw = null;
+  try {
+    if (s.getItem(ADOPTED_KEY)) return;
+    raw = s.getItem(OLD_KEY);
+  } catch (e) { return; }
+  // Marked as asked whether or not there was anything under it, so this runs
+  // once per browser. A store that will not take the mark is asked again next
+  // read, which costs one lookup and never loses a board.
+  try {
+    s.setItem(ADOPTED_KEY, '1');
+    if (typeof s.removeItem === 'function') s.removeItem(OLD_KEY);
+    else s.setItem(OLD_KEY, '[]');
+  } catch (e) { /* nothing to do */ }
+  if (!raw) return;
+  let old;
+  try { old = JSON.parse(raw); } catch (e) { return; }
+  if (!Array.isArray(old) || !old.length) return;
+  let kept;
+  try { kept = JSON.parse(s.getItem(KEY) || '[]'); } catch (e) { kept = []; }
+  const out = Array.isArray(kept) ? kept.slice() : [];
+  for (const n of old) {
+    if (!sound(n)) continue;
+    const night = Object.assign({}, n);
+    night.sig = signature(night, s);
+    out.push(night);
+  }
+  out.sort(compare);
+  try { s.setItem(KEY, JSON.stringify(out.slice(0, KEEP))); } catch (e) { /* nothing to do */ }
+}
+
 /** The board as kept, best first. */
 export function loadNights(store) {
   try {
     const s = storeOf(store);
+    adoptOldBoard(s);
     const raw = s ? s.getItem(KEY) : null;
     const list = raw ? JSON.parse(raw) : [];
     return Array.isArray(list) ? list.filter(n => honest(n, store)).sort(compare) : [];

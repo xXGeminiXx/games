@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=57';
-import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=57';
+import { POCKET_PAY } from './board.js?v=58';
+import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=58';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -646,8 +646,8 @@ function buildDoors(state, e, def) {
 /**
  * How a row of doors pays when it closes. Left alone, the paying door opens
  * and pays its prize. Called - the player clicked a door while the row was
- * lit - the right door pays three times over and a wrong one pays nothing:
- * the same average, with the choice in the player's hands.
+ * lit - the right door pays as many times over as there are doors and a wrong
+ * one pays nothing: the same average, with the choice in the player's hands.
  */
 export function settleDoors(e) {
   const prize = Math.max(0, num(e.prize, 0));

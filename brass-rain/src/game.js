@@ -11,24 +11,28 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=57';
+import { loadConfig } from '../config.js?v=58';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=57';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=58';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=57';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=57';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=57';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=57';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=57';
-import { rng as makeRng } from './rng.js?v=57';
-import { offerCabinets, freshSeed } from './cabinets.js?v=57';
-import * as Save from './save.js?v=57';
-import { showState } from './render/reach.js?v=57';
-import { skinForCabinet } from './render/themes.js?v=57';
-import { chooseDoor as callDoor } from './events.js?v=57';
+         handMult, restoreFloor } from './floor.js?v=58';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=58';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=58';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=58';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=58';
+import { rng as makeRng } from './rng.js?v=58';
+import { offerCabinets, freshSeed } from './cabinets.js?v=58';
+import * as Save from './save.js?v=58';
+import { showState } from './render/reach.js?v=58';
+import { skinForCabinet } from './render/themes.js?v=58';
+import { chooseDoor as callDoor } from './events.js?v=58';
+
+// A gap between frames longer than this is time the player was away, not a
+// slow frame. The same number decides whether a reopened page was away at all.
+const AWAY_SECONDS = 20;
 
 export const VIEW_MACHINE = 'machine';
 export const VIEW_BENCH = 'bench';
@@ -49,8 +53,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=57');
-  const metaModule = await optional('./meta.js?v=57');
+  const catalogue = await optional('./fittings.js?v=58');
+  const metaModule = await optional('./meta.js?v=58');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -382,7 +386,7 @@ function loadSave(game, saved) {
   const at = Number(saved.at);
   if (Number.isFinite(at) && at > 0) {
     const seconds = Math.max(0, (Date.now() - at) / 1000);
-    if (seconds > 20) game.away = tickFloor(game.cfg, game.floor, seconds, metaEffects(game));
+    if (seconds > AWAY_SECONDS) game.away = tickFloor(game.cfg, game.floor, seconds, metaEffects(game));
   }
 }
 
@@ -426,8 +430,19 @@ function api(game) {
       if (r.ok) changed(game);
       return r;
     },
-    straightenAll() { straighten(game.run.board); changed(game); },
+    /**
+     * Every nail back where it was driven, and the round's bends back with
+     * them. Straightening is the undo, and an undo that kept the cost would
+     * leave a player who tried a lean with no way to try another.
+     */
+    straightenAll() {
+      straighten(game.run.board);
+      game.run.bendsLeft = bendsPerRound(game);
+      changed(game);
+    },
     bendsLeft() { return game.run.bendsLeft; },
+    /** How many nails this round may be leaned, the permanent upgrades counted. */
+    bendsPerRound() { return bendsPerRound(game); },
 
     // ---- the bench -----------------------------------------------------
     offers() { return game.offer || []; },
@@ -488,6 +503,11 @@ function api(game) {
       game.run.model = catalogueModel(game);
       const bends = serializeBendState(game.run.board);
       game.run.board = buildFittedBoard(fitted.cfg, game.run.seed, fitted.shape);
+      // The refit starts from the game's own configuration, which carries the
+      // fallback return rather than this cabinet's. Without this the machine
+      // is asked for the quota of an average board for the rest of the game,
+      // which on a thin one is nearly double what it should be.
+      useCabinet(fitted.cfg, game.run.board);
       restoreBendState(game.run.board, bends);
       changed(game);
       return true;
@@ -502,16 +522,35 @@ function api(game) {
 
     // ---- the counter and the floor -------------------------------------
     cashOutValue() { return game.run.tray * game.cfg.floor.cashRate * (metaEffects(game).cashMult || 1); },
-    cashOut() {
+    /**
+     * Hands the tray to the counter, which ends the game, so another machine
+     * has to be sat at. `nextSeed` names it; a fresh one is drawn when nothing
+     * does. A caller that has already decided where the player is going has to
+     * say so HERE rather than seat them afterwards: this replaces the run, and
+     * a seed read out of the run after the call is the machine this drew, not
+     * the machine that was chosen.
+     */
+    cashOut(nextSeed) {
       const balls = game.run.tray;
       if (balls <= 0) return 0;
       const got = cashOut(game.cfg, game.floor, balls, metaEffects(game));
       if (game.run.round - 1 > game.floor.bestRound) game.floor.bestRound = game.run.round - 1;
       game.run.tray = 0;
-      newRun(game, freshSeed(game.cfg));
+      newRun(game, Number.isFinite(nextSeed) ? nextSeed >>> 0 : freshSeed(game.cfg));
       save(game);
       changed(game);
       return got;
+    },
+    /**
+     * Ends this game and starts another on the machine already in front of the
+     * player. One call, so the seed is read before anything can replace the
+     * run it is read from.
+     */
+    stayHere() {
+      const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed >>> 0 : freshSeed(game.cfg);
+      if (game.run.tray > 0) this.cashOut(seed);
+      else this.sitAt(seed);
+      return seed;
     },
     quoteMachine(id, want) { return quote(game.cfg, game.floor, id, want); },
     buyMachine(id, want) { const n = buyMachine(game.cfg, game.floor, id, want); if (n) changed(game); return n; },
@@ -741,6 +780,25 @@ export function frame(game, now) {
   const frameMs = Math.max(0, now - last);
   game.lastFrame = now;
   const dt = Math.min(0.25, frameMs / 1000);
+  // A page that is not on screen stops being handed frames, and the time it
+  // was away comes back as one enormous gap. The clamp above is what keeps a
+  // stalled frame from taking a whole second of physics in one step, and it
+  // used to throw that gap away - so an hour in a background tab paid a
+  // quarter of a second of arcade income, and leaving the page open earned
+  // less than closing it. What the clamp drops is handed to the floor here,
+  // the same way a reopened page's is, and written down at once so the same
+  // time is never paid for twice.
+  // Kept rather than paid per frame, so an ordinary stutter costs nothing and
+  // a page that was away is paid for whether the time comes back as one gap or
+  // as several. Written down the moment it is paid, so the same seconds are
+  // never paid again by the away sum a reopened page works out.
+  game.dropped = (game.dropped || 0) + (frameMs / 1000 - dt);
+  if (game.dropped > AWAY_SECONDS) {
+    const caught = tickFloor(game.cfg, game.floor, game.dropped, metaEffects(game));
+    if (caught.gained > 0) game.away = caught;
+    game.dropped = 0;
+    save(game);
+  }
 
   if (observe(game.quality, frameMs, now) && game.scene) {
     game.scene.setQuality(renderQuality(game.quality));

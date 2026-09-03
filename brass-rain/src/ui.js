@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=57';
-import { createScene } from './render/scene.js?v=57';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=57';
-import { num, count, duration, mult, pct, fill } from './format.js?v=57';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=57';
-import { nailPos } from './board.js?v=57';
-import { DOORS_ROW } from './render/board-geom.js?v=57';
-import { sketchCabinet } from './cabinets.js?v=57';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=57';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=58';
+import { createScene } from './render/scene.js?v=58';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=58';
+import { num, count, duration, mult, pct, fill } from './format.js?v=58';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=58';
+import { nailPos } from './board.js?v=58';
+import { DOORS_ROW } from './render/board-geom.js?v=58';
+import { sketchCabinet } from './cabinets.js?v=58';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=58';
 
 const SPEEDS = [1, 2, 4];
 
@@ -42,8 +42,11 @@ export async function boot(doc) {
 
   let bulk = 1;
   let speedIndex = 0;
-  // The night already written to the board, and where it landed.
-  let recordedSeed = null;
+  // The games already written to the board, held weakly so a finished run is
+  // still collectable. Keyed on the run itself rather than on its seed: two
+  // games in a row on the same machine share a seed, and keying on that meant
+  // the second of them was never recorded and never counted.
+  const banked = new WeakSet();
   let lastRank = 0;
   let lastNightAt = 0;
   // The board as last painted, and the live rank last spoken, so the plaque
@@ -107,8 +110,7 @@ export async function boot(doc) {
       const r = game.reading();
       if (r.over) {
         bankNight();
-        if (r.tray > 0) game.cashOut();
-        game.sitAt(game.run && Number.isFinite(game.run.seed) ? game.run.seed : (Math.random() * 1e9) | 0);
+        game.stayHere();
       }
       hide(el.rowSheet);
     });
@@ -173,6 +175,9 @@ export async function boot(doc) {
 
     on(doc, 'keydown', (e) => {
       if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+      // A chord belongs to the browser. Without this, select-all pressed Auto
+      // and find opened the arcade, on top of doing what the browser does.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === ' ') { e.preventDefault(); game.pull(); }
       else if (e.key === 'a' || e.key === 'A') game.setAuto(!game.run.auto);
       else if (e.key === 'ArrowLeft') game.setStrength(game.run.strength - 0.01);
@@ -260,7 +265,7 @@ export async function boot(doc) {
       const k = doorAt(p.x, p.y);
       if (k >= 0) {
         const r = game.chooseDoor(k);
-        if (r.ok) say('Door ' + (k + 1) + ' called. Right pays three times over, wrong pays nothing.');
+        if (r.ok) say('Door ' + (k + 1) + ' called. Right pays as many times over as there are doors, wrong pays nothing.');
       }
       return;
     }
@@ -366,8 +371,8 @@ export async function boot(doc) {
       if (stars > 0) el.hint.textContent += ' Or start over from Your arcade: it pays ' + num(stars) + (stars === 1 ? ' star' : ' stars') + ' right now.';
       // The night goes on the board the moment it ends, once.
       const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
-      if (seed !== recordedSeed) {
-        recordedSeed = seed;
+      if (game.run && !banked.has(game.run)) {
+        banked.add(game.run);
         const night = {
           round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
           machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), trusted: r.trusted !== false,
@@ -431,6 +436,12 @@ export async function boot(doc) {
     if (r.fever && !r.over) {
       el.banner.hidden = false;
       // The banner wears the machine's accent, with lettering that reads on it.
+      // Written every time rather than only when there is one, or a machine
+      // with no accent of its own keeps wearing the last machine's.
+      if (!(r.skin && r.skin.glow)) {
+        el.banner.style.background = cfg.palette.jade;
+        el.banner.style.color = cfg.palette.oxblood;
+      }
       if (r.skin && r.skin.glow) {
         const g = r.skin.glow.replace('#', '');
         const lum = (parseInt(g.slice(0, 2), 16) * 0.2126 + parseInt(g.slice(2, 4), 16) * 0.7152 + parseInt(g.slice(4, 6), 16) * 0.0722) / 255;
@@ -552,7 +563,7 @@ export async function boot(doc) {
     paintLanding();
     el.bendLede.textContent = 'Drag any nail on the board to the right to bend it. Bending steers where the balls '
       + 'fall, so bend the ones that feed balls into the slot. '
-      + game.bendsLeft() + ' of ' + (cfg.board.bendsPerRound) + ' bends left this round, '
+      + game.bendsLeft() + ' of ' + game.bendsPerRound() + ' bends left this round, '
       + r.bends + ' nails bent so far. A nail won\'t go into another nail, into a pocket, '
       + 'or farther than its head reaches. Straighten every nail undoes them all and gives the bends back.';
 
@@ -816,6 +827,10 @@ export async function boot(doc) {
         + 'several handle settings. Picking one starts a new game.';
 
     el.rowLater.textContent = r.over ? 'Play this machine again' : 'Keep playing the one I\'m on';
+    // The tooltip says what the button does, which is two different things.
+    el.rowLater.title = r.over
+      ? 'Start a new game on the machine you are already at.'
+      : 'Back to the machine you are on. The game you are playing carries on.';
     el.cabinets.textContent = '';
     for (const cab of game.cabinets()) {
       const label = cab.title || cab.layout || cab.name;
@@ -878,8 +893,10 @@ export async function boot(doc) {
         // a run, and restarting it without a word is how one gets thrown away.
         if (!r.over && !confirm(cost + ' Go ahead?')) return;
         bankNight();
-        if (r.tray > 0) game.cashOut();
-        game.sitAt(cab.seed);
+        // The chosen machine is named to whichever call starts the run, so it
+        // is started once. Cashing out and then sitting down started two, and
+        // the games count moved by two for one game.
+        if (r.tray > 0) game.cashOut(cab.seed); else game.sitAt(cab.seed);
         hide(el.rowSheet);
       });
       d.appendChild(b);
@@ -989,8 +1006,8 @@ export async function boot(doc) {
   function bankNight() {
     const r = game.reading();
     const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
-    if (seed === recordedSeed || !r.stats || !(r.stats.launched > 0)) return;
-    recordedSeed = seed;
+    if (!game.run || banked.has(game.run) || !r.stats || !(r.stats.launched > 0)) return;
+    banked.add(game.run);
     const night = {
       round: r.round, cleared: Math.max(0, r.round - 1), won: r.stats.won || 0, fevers: r.stats.fevers || 0, launched: r.stats.launched || 0,
       machine: r.skin ? r.skin.title : '', layout: r.cabinet ? r.cabinet.name : '', seed, at: Date.now(), cashed: !r.over, trusted: r.trusted !== false,
@@ -1309,8 +1326,11 @@ export async function boot(doc) {
 
   function paintSettings() {
     const q = game.quality;
-    const idx = Math.max(0, cfg.quality.targetChoices.indexOf(q.target));
-    el.fpsTarget.value = String(idx < 0 ? 2 : idx);
+    const found = cfg.quality.targetChoices.indexOf(q.target);
+    // A target that is not one of the choices lands on the middle choice, not
+    // on the first: Math.max wrote the fallback out of reach.
+    const idx = found >= 0 ? found : Math.min(2, cfg.quality.targetChoices.length - 1);
+    el.fpsTarget.value = String(idx);
     el.fpsOut.textContent = q.target;
     el.scaleSlider.value = String(q.userScale > 0 ? q.userScale : q.scale);
     el.scaleOut.textContent = q.userScale > 0 ? q.userScale.toFixed(2) : 'auto ' + q.scale.toFixed(2);
@@ -1340,12 +1360,39 @@ export async function boot(doc) {
     try { if (game.storage) game.storage.setItem(primerKey, '1'); } catch (e) { /* nothing to do */ }
   }
 
+  // Built every time it is opened rather than once. Some of what it says is
+  // about the machine being played, and every machine cuts its pockets
+  // somewhere else and holds a different number of parts, so a card built once
+  // is a card that is true of one machine and wrong on the next.
   function openHelp() {
     show(el.helpSheet);
-    if (el.helpBody._built) return;
-    el.helpBody._built = true;
-    el.helpBody.innerHTML = HELP.map(([h, body]) => '<h3>' + h + '</h3><p class="lede">' + body + '</p>').join('');
+    el.helpBody.textContent = '';
+    for (const [head, body] of HELP) {
+      const h = doc.createElement('h3');
+      h.textContent = head;
+      const p = doc.createElement('p');
+      p.className = 'lede';
+      p.textContent = typeof body === 'function' ? body(helpFacts()) : body;
+      el.helpBody.appendChild(h);
+      el.helpBody.appendChild(p);
+    }
   }
+
+  /** What the help has to read off the machine rather than assume. */
+  function helpFacts() {
+    const r = game.reading();
+    const pays = ((game.run.board && game.run.board.pockets) || [])
+      .filter(p => p.kind === 'pay')
+      .map(p => p.pay)
+      .sort((a, b) => a - b);
+    return {
+      pays,
+      best: pays.length ? pays[pays.length - 1] : 0,
+      slots: r.slots,
+      machines: (cfg.board.layouts || []).length || 1,
+    };
+  }
+
 
   function confirmCash() {
     const worth = game.cashOutValue();
@@ -1391,6 +1438,16 @@ export async function boot(doc) {
 // defined in the order they run into it. This is the reference behind the Help
 // button, and it is the only place any of these words is explained in full, so
 // a term used anywhere on screen has to appear here.
+/** '1, 2 or 6 balls', the way a person says a short list of numbers out loud. */
+function listOfPays(numbers) {
+  const seen = Array.from(new Set(numbers));
+  if (!seen.length) return 'nothing';
+  const most = seen[seen.length - 1];
+  const balls = most === 1 ? ' ball' : ' balls';
+  if (seen.length === 1) return seen[0] + balls;
+  return seen.slice(0, -1).join(', ') + ' or ' + most + balls;
+}
+
 const HELP = [
   ['Balls', 'Everything is counted in balls. Pulling the handle spends a ball and sends it arcing over the '
     + 'top of the board. Balls that land in a pocket pay balls back into your count, and the count is on '
@@ -1403,11 +1460,12 @@ const HELP = [
     + 'it drops onto the nails. It\'s the only thing you control while a round is running, and it\'s worth '
     + 'a lot: the gap between the best power setting and the worst is most of what a machine pays. The arrow '
     + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself, and the number keys call a door when a row is lit.'],
-  ['The pockets', 'A pocket is a cut in the board that catches a ball and pays for it. There are three '
-    + 'kinds always on the board. SIDE POCKETS, out at the edges, pay 1 ball. MID POCKETS, the wider ones '
-    + 'lower down, pay 2 or 3. The BIG POCKET is the one mouth in a different color from the rest, pays 5, and is the hardest of them to '
-    + 'reach. Balls that find no pocket run out through the OUT LANES at the bottom and are gone, which is '
-    + 'most of them, and is why straight play slowly loses ground.'],
+  ['The pockets', (f) => 'A pocket is a cut in the board that catches a ball and pays for it. The machine '
+    + 'you are at has ' + f.pays.length + ' of them and they pay ' + listOfPays(f.pays) + '. The '
+    + f.best + '-ball pocket is the hardest of them to reach and the one worth steering toward. Every '
+    + 'machine cuts its pockets somewhere else and pays different amounts for them, so this changes when '
+    + 'you change machine. Balls that find no pocket run out through the OUT LANES at the bottom and are '
+    + 'gone, which is most of them, and is why straight play slowly loses ground.'],
   ['The slot and the reels', 'The slot is the narrow pocket in the middle of the board, under a funnel of '
     + 'nails. It pays nothing by itself. What it does is spin the three reels, and that makes it the pocket '
     + 'worth aiming everything at. The panel on the left prints the real odds, the way an arcade cabinet '
@@ -1425,12 +1483,12 @@ const HELP = [
     + 'show on the machine too: nail parts warm the nails, slot parts brighten the slot, rail parts run a second '
     + 'rail, and glass parts thicken the sheet.'],
   ['A round and its goal', 'A round rents the machine for a set number of PULLS and asks you to win a set number of balls back, which is the GOAL. Meet the goal and the counter pays a bonus of balls and the next round starts, harder. Miss it and the game is over. Later rounds send several balls per pull, so the same number of pulls puts far more on the board.'],
-  ['The workbench', 'Between rounds the machine opens up. Parts are for sale, paid for with the balls you '
-    + 'haven\'t launched, and a part changes how this machine behaves for the rest of the game. Up to five '
-    + 'can be in the machine at once, and clicking one already in takes it back out. Some parts work '
+  ['The workbench', (f) => 'Between rounds the machine opens up. Parts are for sale, paid for with the balls you '
+    + 'haven\'t launched, and a part changes how this machine behaves for the rest of the game. Up to '
+    + f.slots + ' can be in the machine at once, and clicking one already in takes it back out. Some parts work '
     + 'together, and the card says so when they do.'],
   ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending steers where balls fall, and there are only a few bends per round, so the good ones are the nails that feed balls into the slot. The chart at the workbench shows where the last round actually ended up, which is how you tell which nails are worth bending.'],
-  ['Picking a machine', 'There are six machines, and the pockets, the slot and the funnel sit somewhere else on each. Each lights its own number of doors and sends its own creature across the board. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
+  ['Picking a machine', (f) => 'There are ' + f.machines + ' machines, and the pockets, the slot and the funnel sit somewhere else on each. Each lights its own number of doors and sends its own creature across the board. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
   ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines for your arcade. Those machines earn coins every second on their own, including while the page is closed. What they earn is multiplied by how far you\'ve gotten at the handle, so playing well is the best thing you can do for the arcade.'],
   ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again from nothing. Doing that pays STARS. Stars buy permanent upgrades that survive every restart. The arcade rebuilds far faster the second time, and starting over never takes stars away.'],
 ];
