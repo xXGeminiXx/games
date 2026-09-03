@@ -11,14 +11,14 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=14';
-import * as Mk from './market.js?v=14';
-import * as H from './horde.js?v=14';
-import * as R from './rites.js?v=14';
-import * as Rb from './rebirth.js?v=14';
-import * as Lore from './lore.js?v=14';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=14';
-import { fill } from '../config.js?v=14';
+import * as Mat from './materials.js?v=15';
+import * as Mk from './market.js?v=15';
+import * as H from './horde.js?v=15';
+import * as R from './rites.js?v=15';
+import * as Rb from './rebirth.js?v=15';
+import * as Lore from './lore.js?v=15';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=15';
+import { fill } from '../config.js?v=15';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -50,11 +50,13 @@ export function createUI(doc, sim, cfg, actions) {
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
     marketPanel: byId('market-panel'), market: byId('market'),
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
+    tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
+    tabOathsCount: byId('tab-oaths-n'), oathsNote: byId('oaths-note'),
     visitorPanel: byId('visitor-panel'), visitorText: byId('visitor-text'), visitorActs: byId('visitor-acts'),
     chamberPanel: byId('chamber-panel'), chamberTitle: byId('chamber-title'),
     chamberText: byId('chamber-text'), chamberOffers: byId('chamber-offers'),
     sealPanel: byId('seal-panel'), sealNote: byId('seal-note'), sealActs: byId('seal-acts'),
-    oaths: byId('oaths'), oathsTitle: byId('p-oaths'),
+    oaths: byId('oaths'),
     stats: {
       coin: byId('coin'), income: byId('income'), bones: byId('bones'), horde: byId('horde'),
       depth: byId('depth'), rem: byId('rem'),
@@ -174,10 +176,22 @@ export function createUI(doc, sim, cfg, actions) {
       const layer = isFace ? null : sim.ground.at(key);
       const name = isFace ? T.face : Lore.label(layer.name);
       const hue = isFace ? cfg.palette.face : layer.hue;
+      // Five notches, each its own button. Pressing the third notch puts the
+      // layer straight on three; pressing the notch a row is already on
+      // clears it. Stepping a row from five to nothing was five presses, and
+      // with ten rows on the panel nobody did it.
+      const notches = [];
       const bar = el('span', { class: 'bar', title: T.weightBarTip });
+      for (let i = 1; i <= cfg.horde.maxWeight; i++) {
+        const n = el('button', { class: 'notch', title: T.weightBarTip,
+          onclick: () => actions.setWeightAt(key, currentWeight(key) === i ? 0 : i) });
+        notches.push(n);
+        bar.appendChild(n);
+      }
       const meta = el('i');
+      const rate = el('small', { class: 'rate', title: T.rowRateTip });
       const tag = el('span', { class: 'seam', text: isFace ? '' : seamTag(key) });
-      const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') },
+      const head = el('div', { class: 'wtop' },
         el('span', { class: 'swatch', style: 'background:' + hue }),
         el('span', { class: 'name', text: name, title: isFace ? T.faceLine : seamLine(key) }),
         tag,
@@ -185,11 +199,15 @@ export function createUI(doc, sim, cfg, actions) {
         bar,
         el('button', { class: 'w', text: T.weightMore, title: T.weightMoreTip, onclick: () => actions.setWeight(key, 1) }),
         meta);
-      row.firstChild.style.background = hue;
+      head.firstChild.style.background = hue;
+      const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') }, head, rate);
       nodes.weights.appendChild(row);
-      weightRows.set(key, { node: row, bar, meta, tag });
+      weightRows.set(key, { node: row, bar, notches, meta, tag, rate });
     }
   };
+
+  const currentWeight = (key) =>
+    (key === 'face' ? sim.state.faceWeight : sim.state.weights[key]) | 0;
 
   // -- the market ----------------------------------------------------------
 
@@ -467,6 +485,22 @@ export function createUI(doc, sim, cfg, actions) {
   let sealArmed = false;
   let sealButton = null;
 
+  // Which of the two lists the right-hand panel is showing. Relics buy things
+  // nobody buys unless they can see them, and the list used to sit at the
+  // bottom of a column three screens tall.
+  let panelTab = 'rites';
+  const paintTabs = () => {
+    const on = (node, yes) => { if (node) node.setAttribute('aria-pressed', String(yes)); };
+    on(nodes.tabRites, panelTab === 'rites');
+    on(nodes.tabOaths, panelTab === 'oaths');
+    show(nodes.riteBulk, panelTab === 'rites');
+    show(nodes.rites, panelTab === 'rites');
+    show(nodes.oaths, panelTab === 'oaths');
+    show(nodes.oathsNote, panelTab === 'oaths');
+  };
+  if (nodes.tabRites) nodes.tabRites.addEventListener('click', () => { panelTab = 'rites'; paintTabs(); });
+  if (nodes.tabOaths) nodes.tabOaths.addEventListener('click', () => { panelTab = 'oaths'; paintTabs(); });
+
   const buildSeal = () => {
     if (sealButton || !nodes.sealActs) return;
     const words = Lore.seal();
@@ -502,18 +536,27 @@ export function createUI(doc, sim, cfg, actions) {
       sealButton.disabled = !ready;
       if (!ready && sealArmed) { sealArmed = false; sealButton.textContent = words.button; }
     }
+    let affordable = 0;
     for (const r of oathRows.values()) {
       const lv = Rb.oathLevel(legacy, r.def.id);
       const done = Rb.oathMaxed(legacy, r.def);
+      const can = Rb.canBuyOath(legacy, r.def);
+      if (can) affordable++;
       r.cost.textContent = done ? T.bought : fmt(Rb.oathCost(r.def, lv));
-      r.button.disabled = done || !Rb.canBuyOath(legacy, r.def);
+      r.button.disabled = done || !can;
       r.level.textContent = lv > 0 ? 'lv ' + lv : '';
     }
-    // Nothing is remembered until a barrow has been closed, so the heading
-    // goes with the list rather than standing over an empty space.
-    const remembered = legacy.seals > 0 || legacy.remembrance > 0;
-    show(nodes.oaths, remembered);
-    show(nodes.oathsTitle, remembered);
+    // Nothing carries over until a barrow has been closed, so the list and
+    // its tab arrive together with the first one.
+    const carried = legacy.seals > 0 || legacy.remembrance > 0;
+    show(nodes.tabOaths, carried);
+    if (!carried && panelTab === 'oaths') { panelTab = 'rites'; paintTabs(); }
+    if (nodes.oathsNote) nodes.oathsNote.textContent = words.oathsNote;
+    // The count on the tab is the whole reason a player opens it. Without a
+    // figure on the furniture, relics are banked and never spent.
+    if (nodes.tabOathsCount) {
+      nodes.tabOathsCount.textContent = affordable > 0 ? fmt(legacy.remembrance) : '';
+    }
   };
 
   // -- everything ----------------------------------------------------------
@@ -533,7 +576,13 @@ export function createUI(doc, sim, cfg, actions) {
       const layer = sim.ground.at(s.depth);
       st.depth.textContent = String(s.depth + 1) + ' ' + Lore.label(layer.name);
     }
-    if (st.rem) st.rem.textContent = fmt(sim.legacy.remembrance);
+    // Relics banked, and what this barrow would pay for being filled in right
+    // now. Both belong in the strip: the second one is the reason to keep
+    // digging and it used to be three screens down a scrolling column.
+    if (st.rem) {
+      const pending = sim.canSeal() ? sim.sealYield() : 0;
+      st.rem.textContent = fmt(sim.legacy.remembrance) + (pending > 0 ? ' +' + fmt(pending) : '');
+    }
     show(st.coinBox, s.totals.earned > 0 || s.coin > 0);
     show(st.incomeBox, s.totals.earned > 0 && s.horde > 0);
     show(st.bonesBox, f.raise);
@@ -568,11 +617,25 @@ export function createUI(doc, sim, cfg, actions) {
       buildWeights();
       const from = sim.activeFrom();
       const split = H.distribute(s.weights, s.faceWeight, from);
+      const rates = sim.layerRates();
       for (const [key, r] of weightRows) {
         const w = key === 'face' ? s.faceWeight : (s.weights[key] || 0);
-        let bar = '';
-        for (let i = 0; i < cfg.horde.maxWeight; i++) bar += i < w ? '▌' : '·';
-        r.bar.textContent = bar;
+        for (let i = 0; i < r.notches.length; i++) {
+          const on = i < w;
+          r.notches[i].textContent = on ? '▌' : '·';
+          r.notches[i].className = on ? 'notch on' : 'notch';
+        }
+        // What this layer is actually paying, which is the whole reason to
+        // move a weight. A row on ground its buyers filled hours ago reads
+        // near nothing next to a row a thousand times richer.
+        const rate = rates.get(key === 'face' ? 'face' : Number(key));
+        if (rate) {
+          const bits = [];
+          if (rate.coin > 0.005) bits.push(fill(T.rowRate, { coin: fmtCoin(rate.coin) }));
+          if (rate.bones > 0.005) bits.push(fill(T.rowBones, { bones: fmt(rate.bones) }));
+          r.rate.textContent = bits.length ? bits.join('   ') : (w > 0 ? T.rowNothing : '');
+          r.rate.className = 'rate' + (w > 0 && !bits.length ? ' hot' : '');
+        }
         const share = key === 'face' ? split.face : (split.strata[key] || 0);
         let meta = fmtPct(share);
         let hot = false;
@@ -602,9 +665,9 @@ export function createUI(doc, sim, cfg, actions) {
     show(nodes.marketPanel, f.market);
     if (f.market) { buildMarket(); renderMarket(); }
 
-    // Rites.
+    // Rites, and beside them what relics buy.
     show(nodes.ritesPanel, f.rites);
-    if (f.rites) { buildRiteBulk(); buildRites(); renderRites(); }
+    if (f.rites) { buildRiteBulk(); buildRites(); renderRites(); paintTabs(); }
 
     // The seal.
     show(nodes.sealPanel, f.seal);

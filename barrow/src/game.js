@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=14';
-import { createSim, restoreSim, openedState } from './sim.js?v=14';
-import * as Save from './save.js?v=14';
-import * as Rb from './rebirth.js?v=14';
-import * as Lore from './lore.js?v=14';
-import { hash } from './rng.js?v=14';
-import { createUI } from './ui.js?v=14';
-import { createView } from './view.js?v=14';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=14';
-import * as Mat from './materials.js?v=14';
+import { storageKey, fill } from '../config.js?v=15';
+import { createSim, restoreSim, openedState } from './sim.js?v=15';
+import * as Save from './save.js?v=15';
+import * as Rb from './rebirth.js?v=15';
+import * as Lore from './lore.js?v=15';
+import { hash } from './rng.js?v=15';
+import { createUI } from './ui.js?v=15';
+import { createView } from './view.js?v=15';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=15';
+import * as Mat from './materials.js?v=15';
 
 /**
  * @param {object} o
@@ -75,6 +75,7 @@ export function createGame(o) {
   actions.buy = wrap((id) => sim.buy(id));
   actions.raise = wrap((count) => { const r = sim.raise(count); save(); return r; });
   actions.setWeight = wrap((key, delta) => { sim.setWeight(key, delta); return []; });
+  actions.setWeightAt = wrap((key, value) => { sim.setWeightAt(key, value); return []; });
   actions.buyRite = wrap((id, count) => { const r = sim.buyRite(id, count); save(); return r; });
   actions.takeOffer = wrap((i) => { const r = sim.takeOffer(i); save(); return r; });
   actions.acceptVisitor = wrap(() => { const r = sim.acceptVisitor(); save(); return r; });
@@ -113,7 +114,7 @@ export function createGame(o) {
       if (parts.length) line += ' ' + parts.join(', ') + '.';
       // These are whole sentences after a full stop, so they take capitals
       // like every other sentence the game writes.
-      if (r.gained.visits > 0) line += ' ' + (r.gained.visits === 1 ? 'Somebody called at the gate.' : r.gained.visits + ' called at the gate.');
+      if (r.gained.waiting) line += ' ' + Lore.line(sim.state.seed, 'waiting', null, String(sim.state.visitCount));
       if (r.capped) line += ' They stopped after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }

@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=14';
-import { pick } from './rng.js?v=14';
-import { fill } from '../config.js?v=14';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=14';
+import * as Lore from './lore.js?v=15';
+import { pick } from './rng.js?v=15';
+import { fill } from '../config.js?v=15';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=15';
 
 export const LEGACY_VERSION = 1;
 
@@ -64,7 +64,10 @@ export function yieldOf(state, cfg) {
   const earned = Math.max(0, state.totals.earned);
   const decades = earned > s.earnFloor ? Math.log10(earned / s.earnFloor) * s.perDecade : 0;
   const bonus = Number.isFinite(state.remBonus) ? state.remBonus : 0;
-  const total = layers + decades + bonus;
+  // Coin spent on the books late in a barrow comes back out of it as relics,
+  // which is the only thing coin can buy that the next barrow keeps.
+  const books = (cfg.rites.recordsRelics || 0) * ((state.rites && state.rites.records) || 0);
+  const total = layers + decades + bonus + books;
   return Number.isFinite(total) ? Math.floor(total) : 0;
 }
 

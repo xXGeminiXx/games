@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=14';
-import * as Mk from './market.js?v=14';
-import * as Lore from './lore.js?v=14';
-import { fill } from '../config.js?v=14';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=14';
+import { hash, unit, range, pick } from './rng.js?v=15';
+import * as Mk from './market.js?v=15';
+import * as Lore from './lore.js?v=15';
+import { fill } from '../config.js?v=15';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=15';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -219,14 +219,21 @@ export function build(api, i) {
 /**
  * Bring the gate up to date for a step. Sets or clears state.visitor and
  * pushes a line when somebody arrives or gives up waiting.
+ *
+ * `waiting` is set while the game is catching up on hours the tab was shut.
+ * Nobody gives up during those hours and nobody else walks up behind them:
+ * the first caller to arrive sits down at the gate and is still there when
+ * the player comes back. Running the gate on the same clock during a
+ * catch-up expires almost every caller a player is away for, which turns an
+ * offer into a penalty for closing the tab.
  */
-export function tick(api, events) {
+export function tick(api, events, waiting) {
   const { state, cfg } = api;
   const md = api.mods();
   if (state.visitNext === undefined || state.visitNext === null) begin(state, cfg, md);
 
   if (state.visitor) {
-    if (state.t >= state.visitor.expires) {
+    if (!waiting && state.t >= state.visitor.expires) {
       state.visitorsMissed = (state.visitorsMissed || 0) + 1;
       state.visitor = null;
       state.visitNext = state.t + gapFor(state, cfg, md, state.visitCount);
@@ -243,6 +250,17 @@ export function tick(api, events) {
   state.visitor = rec;
   state.visitorsSeen = (state.visitorsSeen || 0) + 1;
   if (events) events.push({ type: 'visitor', text: rec.text });
+}
+
+/**
+ * Give whoever is at the gate their full wait, counted from now. Called when
+ * the game comes back from hours it was closed, so a caller who arrived in
+ * the night is not standing there with a minute left on them.
+ */
+export function refresh(state, cfg) {
+  if (!state.visitor) return false;
+  state.visitor.expires = state.t + cfg.visitors.stay;
+  return true;
 }
 
 // ---------------------------------------------------------------------------

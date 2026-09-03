@@ -7,7 +7,7 @@
 // reach it. Nothing here is stored, so a save is just k.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=14';
+import { CONFIG } from '../config.js?v=15';
 
 const ROMAN = ['', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 

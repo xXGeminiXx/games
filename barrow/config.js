@@ -68,7 +68,15 @@ export const CONFIG = {
     weightLess: '-',
     weightMoreTip: 'Put more of the horde on this layer',
     weightLessTip: 'Take some of the horde off this layer',
-    weightBarTip:  'How hard this layer is worked, and how much of the horde is on it',
+    weightBarTip:  'Press a notch to set how hard this layer is worked. Nothing set by hand moves on its own again',
+    // Under each row: what that layer is actually paying and how many of the
+    // dead it is turning up, both per second. Deep ground is worth thousands
+    // of times what shallow ground is and its buyers are nowhere near full,
+    // so two rows that look alike on the panel can be a billion apart here.
+    rowRate:     '{coin} coin/s',
+    rowBones:    '{bones} bones/s',
+    rowNothing:  'Nothing yet',
+    rowRateTip:  'What this layer pays and how many of the dead it turns up, every second, at the weights as they stand',
     face:       'Digging down',
     faceLine:   'Put some of them here and they break through to the layer below.',
     export:     'Export',
@@ -149,11 +157,16 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   // THE HORDE - how the dead are raised and how fast they dig
   //
-  // Raising costs BONES only. A digger turns up bones at a rate that depends
-  // on the ground it is standing in and on nothing else: not on how fast it
-  // digs, so buying speed never buys growth, and not on the market, so coin
-  // never buys growth either. Deeper ground holds more of the dead, which is
-  // the whole reason to send them down rather than sideways.
+  // Raising costs BONES only, and how FAST a digger works never changes how
+  // many bones it turns up, so buying speed never buys growth. Deeper ground
+  // holds more of the dead, in a straight line, which is the whole reason to
+  // send them down rather than sideways.
+  //
+  // Coin does reach the horde, through two rites and two oaths: what a bone
+  // raises, and how much the ground gives up. Both scale how fast the horde
+  // grows and neither scales how fast THAT rate grows, so the horde stays
+  // linear in time. That is the line: a multiplier on the slope is fine, a
+  // multiplier on the multiplier runs the game away inside a day.
   // -------------------------------------------------------------------------
   horde: {
     digRate: 1,          // units per second per digger, at hardness 1
@@ -169,9 +182,15 @@ export const CONFIG = {
     maxWeight: 5,        // weight notches per row
     activeStrata: 5,     // layers kept open behind the face; the wider workings
                          // rite adds to this
-    weightNew: 5,        // weight a newly opened layer starts on: the newest
-                         // layer is always the richest, so a player who never
-                         // touches the panel still leans the right way
+    weightNew: 5,        // weight a newly opened layer starts on
+    // Every time a layer opens, the layers above it step back by this much,
+    // down to nothing, so the horde follows the work down without being told
+    // to. A layer whose weight the player has set by hand is never moved
+    // again. Deep ground is worth more per digger and its market is nowhere
+    // near full, while a shallow one is a thousand times over what its buyers
+    // will take, so an untouched panel spread evenly earns about half what the
+    // same horde earns leaning down.
+    weightDecay: 1,
     weightFace: 2,       // weight the way down starts on
   },
 
@@ -385,11 +404,19 @@ export const CONFIG = {
   // breaking new ground compounds with the depth it unlocks.
   //
   // The effects: hands multiplies dig speed; grave multiplies how far bones
-  // go; picks multiplies how fast the face gives way; routes multiplies what
-  // every market takes; haste multiplies how fast every market forgets;
-  // workings keeps another layer open; crier brings visitors sooner and
-  // richer; vigil adds hours to the time the dead work alone; ledger, assay
-  // and foresight buy information; the factor sells for you.
+  // go; pits multiplies how many of the dead the ground gives up; picks
+  // multiplies how fast the face gives way; routes multiplies what every
+  // market takes; haste multiplies how fast every market forgets; workings
+  // keeps another layer open; crier brings visitors sooner and richer; vigil
+  // adds hours to the time the dead work alone; records pay relics when the
+  // barrow is filled in; ledger, assay, foresight and survey buy information;
+  // the factor sells for you.
+  //
+  // The depths the last seven are held back to are the schedule the list
+  // arrives on. Set at four to eight they were all in hand inside a quarter
+  // of an hour and everything after that was the same five rows getting
+  // dearer. Spread to twenty one they keep opening through a first evening,
+  // and a new barrow walks the ladder again.
   // -------------------------------------------------------------------------
   rites: {
     handsFactor:  1.5,
@@ -397,9 +424,18 @@ export const CONFIG = {
     picksFactor:  1.25,
     routesFactor: 1.5,
     hasteFactor:  1.25,
+    // The ground gives up this much more of the dead per level, and it stops
+    // after twelve of them. Anything bought with coin that multiplies the
+    // bones multiplies the horde, which multiplies the depth, which multiplies
+    // the coin; left uncapped at 1.45 it moved a week of play from layer 34 to
+    // layer 44 and ran the numbers past every suffix the game has. Twelve
+    // levels is a fifty-six times boost that arrives deep and then ends.
+    pitsFactor:   1.4,
     crierGap:     0.85,   // visitor gap per level
     crierPay:     1.25,   // visitor generosity per level
     vigilHours:   4,      // offline hours added per level
+    surveyReads:  5,      // layers below the cut named ahead of time
+    recordsRelics: 3,     // relics per level, paid when the barrow is filled in
     list: [
       { id: 'hands',     cost: 40,      growth: 8,    max: 200 },
       { id: 'grave',     cost: 60,      growth: 8,    max: 200 },
@@ -410,9 +446,12 @@ export const CONFIG = {
       { id: 'haste',     cost: 1800,    growth: 7,    max: 100 },
       { id: 'foresight', cost: 4000,    growth: 1,    max: 1 },
       { id: 'crier',     cost: 12000,   growth: 9,    max: 6,   atDepth: 4 },
-      { id: 'assay',     cost: 30000,   growth: 1,    max: 1,   atDepth: 5 },
-      { id: 'vigil',     cost: 120000,  growth: 14,   max: 5,   atDepth: 6 },
-      { id: 'workings',  cost: 600000,  growth: 70,   max: 5,   atDepth: 8 },
+      { id: 'assay',     cost: 30000,   growth: 1,    max: 1,   atDepth: 6 },
+      { id: 'vigil',     cost: 120000,  growth: 14,   max: 5,   atDepth: 9 },
+      { id: 'workings',  cost: 600000,  growth: 70,   max: 5,   atDepth: 11 },
+      { id: 'survey',    cost: 2e12,    growth: 1,    max: 1,   atDepth: 13 },
+      { id: 'records',   cost: 5e13,    growth: 6,    max: 10,  atDepth: 17 },
+      { id: 'pits',      cost: 1e16,    growth: 8,    max: 12,  atDepth: 21 },
     ],
     // The factor by level: the share of each market's best flow it sells into
     // every second, its cut, and how choosy it is about the swell. It never
@@ -505,10 +544,20 @@ export const CONFIG = {
   // THE FIELD - the one drawing: a cross-section of the hill
   // -------------------------------------------------------------------------
   view: {
-    bandHeight: 90,        // px per stratum until the field runs out of room
-    minBandHeight: 12,
-    surfaceHeight: 34,     // the sky and the mound
+    bandHeight: 150,       // px per stratum until the field runs out of room; a
+                           // shallow dig fills the frame rather than sitting in
+                           // a strip at the top of an empty page
+    // The absolute floor a band shrinks to. Fitting the whole dig into the
+    // frame wins over readability: held at twelve, a phone at seventeen
+    // layers pushed the deepest six and the face off the bottom of a two
+    // hundred pixel field, which is the part worth looking at.
+    minBandHeight: 2,
+    labelBandHeight: 17,   // below this a band is too thin to write its name in
+    seamBandHeight: 24,    // and below this there is no room for its seam too
+    surfaceHeight: 46,     // the sky, the mound and the spoil heap
     particleCap: 2200,     // dots drawn; past this the mass is conveyed by density
+    pixelsPerDot: 380,     // and never more than one dot per this many pixels of
+                           // field, so a phone's strip does not fill with bone
     particleSize: 1.6,
     tunnelSegments: 260,   // carve segments per stratum, revealed as it is dug
     carveScale: 60,        // units dug for the first ~63% of a stratum's carve
@@ -546,7 +595,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 14,
+    build: 15,
   },
 };
 

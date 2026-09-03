@@ -59,6 +59,19 @@
   #rite-bulk button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
   #rites-panel{border-top:1px solid var(--rule);padding:10px 18px 8px;flex:0 0 auto;max-height:48%;overflow-y:auto}
   #rites{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:1px 22px}
+  /* What coin buys and what relics buy, side by side, because relics are only
+     ever spent by somebody who can see they have them. The list they used to
+     sit in was the last thing on a column three screens tall. */
+  #panel-tabs{display:flex;gap:18px;align-items:baseline;margin:0 0 8px}
+  #panel-tabs button{
+    border:0;padding:0;background:transparent;font-size:10px;font-weight:500;
+    text-transform:uppercase;letter-spacing:.2em;color:var(--quiet);border-bottom:1px solid transparent;
+    border-radius:0;
+  }
+  #panel-tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--rule)}
+  #panel-tabs button:hover:not(:disabled){color:var(--dim);border-color:transparent}
+  #panel-tabs button[aria-pressed="true"]:hover{color:var(--ink);border-bottom-color:var(--rule)}
+  #panel-tabs button em{font-style:normal;color:var(--deepink);margin-left:7px;letter-spacing:.05em}
 
   /* The log: newest on top, fading down, five lines on screen. */
   #log{margin:0 0 12px;min-height:44px}
@@ -73,14 +86,26 @@
   #hand #handline{color:var(--dim);margin-left:12px}
   #raise{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
   .raise i{margin-left:6px}
-  .wrow{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px}
-  .wrow .name{width:78px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wrow{margin:5px 0;font-size:12px}
+  .wtop{display:flex;align-items:center;gap:6px}
+  .wrow .name{width:100px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wrow .seam{width:64px;color:var(--quiet);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wrow.face .name{color:var(--dim)}
-  .wrow .bar{letter-spacing:1px;color:var(--bone);width:52px;text-align:center}
+  /* Five notches, each a button: pressing one sets the weight outright. */
+  .wrow .bar{display:inline-flex;justify-content:center;width:54px}
+  .wrow .bar .notch{
+    border:0;background:transparent;padding:0 1px;min-width:0;line-height:18px;
+    color:var(--quiet);border-radius:0;letter-spacing:0;
+  }
+  .wrow .bar .notch.on{color:var(--bone)}
+  .wrow .bar .notch:hover:not(:disabled){color:var(--ink);border-color:transparent}
   .wrow button.w{padding:0 7px;line-height:17px}
   .wrow i{font-style:normal;color:var(--dim);font-size:11px;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wrow i.hot,.ledger.hot{color:var(--hot)}
+  /* What the layer pays, under the row that sets it: the one figure that
+     says whether the weight above it is worth anything. */
+  .wrow .rate{display:block;margin:1px 0 0 14px;color:var(--quiet);font-size:10.5px;white-space:nowrap}
+  .wrow .rate.hot{color:var(--hot)}
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
   /* Somebody at the gate. */
@@ -138,12 +163,12 @@
 
   /* Closing one barrow and opening the next. */
   #seal-note{margin:0 0 8px;color:var(--dim)}
-  #seal-acts{margin-bottom:10px}
+  #seal-acts{margin-bottom:2px}
   #seal-acts button.seal{border-color:var(--deepink);color:var(--deepink);padding:4px 12px}
-  #oaths{display:grid;gap:2px}
-  #p-oaths{margin-top:10px}
+  #oaths{display:grid;gap:1px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));column-gap:22px}
   #oaths .rrow button.rite{border-color:var(--rule)}
   #oaths .rrow i{color:var(--deepink)}
+  #oaths-note{color:var(--dim);font-size:11px;margin:0 0 8px}
 
   footer{
     display:flex;gap:10px;align-items:center;padding:6px 22px;border-top:1px solid var(--rule);
@@ -190,8 +215,34 @@
     .rrow button.rite{grid-area:name}
     .rrow .lv{grid-area:lv}
     .rrow .line{grid-area:line;white-space:normal;overflow:visible}
-    .wrow{flex-wrap:wrap}
+    .wtop{flex-wrap:wrap}
     .wrow i{white-space:normal;overflow:visible}
+    .wrow .rate{white-space:normal}
+    #oaths{grid-template-columns:1fr}
+    #panel-tabs{gap:14px;flex-wrap:wrap}
+    /* The market's columns are pinned wide enough for a chart and a base
+       price beside it. On a phone that pushed the sell buttons a good sixty
+       pixels off the right edge of the page, where nothing could reach them.
+       The chart keeps its shape at two thirds the width and the rest give. */
+    #market{table-layout:auto}
+    #market th:nth-child(1){width:auto}
+    #market th:nth-child(2){width:48px}
+    #market th:nth-child(3){width:auto}
+    #market th:nth-child(4){width:66px}
+    #market td.chart{width:66px}
+    .spark{width:62px}
+    .demand{width:62px}
+    #market td.acts button{padding:1px 4px;margin-left:1px}
+    #market small{white-space:normal}
+  }
+  /* A 360 pixel phone is the narrowest thing anybody plays this on, and three
+     sell buttons on one line do not fit beside a chart there. They wrap. */
+  @media (max-width:440px){
+    #market td.acts{white-space:normal}
+    #market th:nth-child(4){width:58px}
+    #market td.chart{width:58px}
+    .spark{width:54px}
+    .demand{width:54px}
   }
 
 /* A thumb, not a pointer: on touch devices every control gets a real target
@@ -200,6 +251,11 @@
 @media (pointer: coarse) {
   button, select, input[type="button"], [role="button"] { min-height: 36px; min-width: 36px; }
   input[type="range"] { min-height: 28px; }
+  /* A notch is one fifth of a bar, so it cannot be 36 px wide and stay a bar.
+     It gets a thumb-sized height and the bar gets wide enough that five of
+     them are still separately hittable. */
+  .wrow .bar { width: 130px; }
+  .wrow .bar .notch { min-width: 26px; min-height: 32px; }
 }
 </style>
 <!-- plays:start -->
@@ -334,7 +390,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="1593ddcad039">
+<meta name="build" content="a2dd6ae402f0">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -411,13 +467,20 @@
       <h2 id="p-seal">Fill it in</h2>
       <p id="seal-note"></p>
       <div id="seal-acts"></div>
-      <h2 id="p-oaths">Kept forever</h2>
-      <div id="oaths"></div>
     </div>
   </section>
   <section id="field">
     <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
-    <div id="rites-panel" hidden><h2 id="p-rites">What coin buys</h2><div id="rite-bulk"></div><div id="rites"></div></div>
+    <div id="rites-panel" hidden>
+      <div id="panel-tabs">
+        <button id="tab-rites" aria-pressed="true"><span id="p-rites">What coin buys</span></button>
+        <button id="tab-oaths" hidden><span id="p-oaths">Kept forever</span><em id="tab-oaths-n"></em></button>
+      </div>
+      <div id="rite-bulk"></div>
+      <div id="rites"></div>
+      <p id="oaths-note" hidden></p>
+      <div id="oaths" hidden></div>
+    </div>
   </section>
 </main>
 <footer>
@@ -435,8 +498,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=14';
-import { createGame } from './src/game.js?v=14';
+import { CONFIG, applyIdentity } from './config.js?v=15';
+import { createGame } from './src/game.js?v=15';
 
 applyIdentity(document);
 

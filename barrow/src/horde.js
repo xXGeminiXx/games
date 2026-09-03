@@ -47,6 +47,26 @@ export function maxRaisable(bones, n, cfg, softMult) {
   return lo;
 }
 
+/**
+ * Put the horde on a newly opened layer and step the older ones back.
+ *
+ * The new floor takes the full weight and every layer above it drops by one,
+ * so over five layers a worked-out one falls quietly to nothing and the horde
+ * follows the shaft down on its own. A row the player has set by hand is left
+ * exactly where they put it, for good: keeping an old bonefield working is a
+ * decision, and a decision is not undone by the next breakthrough.
+ */
+export function settle(s, cfg) {
+  const step = cfg.weightDecay || 0;
+  if (step > 0) {
+    for (let k = 0; k < s.depth; k++) {
+      if (s.tuned && s.tuned[k]) continue;
+      if (s.weights[k] > 0) s.weights[k] = Math.max(0, s.weights[k] - step);
+    }
+  }
+  if (!(s.tuned && s.tuned[s.depth])) s.weights[s.depth] = cfg.weightNew;
+}
+
 /** The shallowest layer the horde will still work. */
 export function activeFrom(depth, cfg, active) {
   const keep = active || cfg.activeStrata;
@@ -117,7 +137,7 @@ export function dig(s, dt, cfg, mods, ground) {
       progress *= target.hardness / next.hardness;
       target = next;
       while (s.weights.length <= s.depth) s.weights.push(0);
-      s.weights[s.depth] = cfg.horde.weightNew;
+      settle(s, cfg.horde);
       if (opened.length > 64) break; // a step cannot open the whole earth
     }
     s.capProgress = progress;

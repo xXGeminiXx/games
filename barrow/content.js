@@ -94,10 +94,20 @@ export const CONTENT = {
       'Your hands are done. You keep the books now.',
       'You haven\'t touched a spade in a week and the hole is deeper than ever.',
     ],
+    sealShown: [
+      'This hole is deep enough to fill in now. It pays relics, and relics are all a barrow ever leaves you.',
+      'You could close this barrow and keep the relics. There are other hills.',
+      'Filling it in ends the barrow and pays relics. Everything else goes back in the hole.',
+    ],
     away: [
       'You were gone {t}. They didn\'t stop.',
       'You come back after {t}. The spoil heap has moved twice.',
       '{T} away. The hole went on without you.',
+    ],
+    waiting: [
+      'Somebody\'s been waiting at the gate a while.',
+      'There\'s a cart at the gate and somebody sitting on it.',
+      'Somebody walked up the track while you were out and stayed.',
     ],
     seamFound: [
       'The {name} runs {seam} here.',
@@ -479,6 +489,12 @@ export const CONTENT = {
                  long: 'Word gets around. People come up the track 15% sooner per level and pay 25% better when they get there.' },
     vigil:     { name: 'Night shift',    line: 'They dig 4 hours longer alone.',
                  long: 'The dead work 12 hours while you\'re away, and 4 hours longer for every level of this.' },
+    survey:    { name: 'Sound the shaft', line: 'Name the next 5 layers now.',
+                 long: 'The next five layers down show their names and their ground on the panel and on the hill before anybody stands in them.' },
+    records:   { name: 'Keep the books',  line: '3 more relics for filling in.',
+                 long: 'Every level is 3 more relics when you fill this barrow in.' },
+    pits:      { name: 'Open the old pits', line: 'The ground holds 45% more of them.',
+                 long: 'They stop cutting clean and start working the burials. Every level turns up 45% more of the dead out of the same ground.' },
   },
 
   // -------------------------------------------------------------------------
@@ -493,6 +509,7 @@ export const CONTENT = {
     ready: 'Filling it in ends this barrow. The dead, the coin, the goods, the layers and everything coin bought go back in the hole. You keep the relics, and relics buy things that carry into every barrow after this one.',
     yieldNow: 'Filling it in now pays {n} relics.',
     yieldPaid: 'The barrow paid {n} relics.',
+    oathsNote: 'Relics come out of a barrow you filled in. Everything here holds in every barrow you open after it.',
     doneLines: [
       'You fill it in from the bottom up. It takes a season and it takes all of them.',
       'The field is a field again by spring. You can still find the ditch if you know where.',

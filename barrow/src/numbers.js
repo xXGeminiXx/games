@@ -8,9 +8,16 @@
 // rather than as text a player has to decode.
 // ---------------------------------------------------------------------------
 
-export const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+// Thousand to decillion, then on through the undecillions. A week of play
+// already reaches the far end of this list, and a figure that falls off it
+// comes back as 6.14e36, which is not a number anybody reads.
+export const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc',
+  'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg'];
 
-/** A number with a suffix, sensible decimals, and no exponent below 1e36. */
+/** The figure past which there is no suffix left and the exponent takes over. */
+export const SUFFIX_CEILING = Math.pow(10, SUFFIXES.length * 3);
+
+/** A number with a suffix, sensible decimals, and an exponent only past the end of the list. */
 export function fmt(n, decimals) {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '?';
   const neg = n < 0;
@@ -20,7 +27,7 @@ export function fmt(n, decimals) {
     out = small(a, decimals);
   } else {
     const tier = Math.min(SUFFIXES.length - 1, Math.floor(Math.log10(a) / 3));
-    if (tier < SUFFIXES.length - 1 || a < 1e36) {
+    if (tier < SUFFIXES.length - 1 || a < SUFFIX_CEILING) {
       const scaled = a / Math.pow(10, tier * 3);
       // 999.995K would round up to 1000.00K; hand it to the next tier instead.
       if (scaled >= 999.995 && tier < SUFFIXES.length - 1) {

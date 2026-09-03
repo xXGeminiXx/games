@@ -17,18 +17,18 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=14';
-import * as Mat from './materials.js?v=14';
-import * as Mk from './market.js?v=14';
-import * as H from './horde.js?v=14';
-import * as R from './rites.js?v=14';
-import * as Rv from './reveal.js?v=14';
-import * as Ch from './chambers.js?v=14';
-import * as Vi from './visitors.js?v=14';
-import * as Rb from './rebirth.js?v=14';
-import * as Lore from './lore.js?v=14';
-import { createGround } from './ground.js?v=14';
-import { fill } from '../config.js?v=14';
+import { CONFIG as DEFAULT } from '../config.js?v=15';
+import * as Mat from './materials.js?v=15';
+import * as Mk from './market.js?v=15';
+import * as H from './horde.js?v=15';
+import * as R from './rites.js?v=15';
+import * as Rv from './reveal.js?v=15';
+import * as Ch from './chambers.js?v=15';
+import * as Vi from './visitors.js?v=15';
+import * as Rb from './rebirth.js?v=15';
+import * as Lore from './lore.js?v=15';
+import { createGround } from './ground.js?v=15';
+import { fill } from '../config.js?v=15';
 
 export const SAVE_VERSION = 2;
 
@@ -42,6 +42,7 @@ export function freshState(cfg, seed) {
     horde: 0,
     depth: 0,             // deepest open layer
     weights: [cfg.horde.weightNew],
+    tuned: {},            // layer -> true once the player has set its weight
     faceWeight: 0,        // set when the face is first shown
     capProgress: 0,
     stock: {},            // good id -> units held
@@ -187,6 +188,19 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     }
   };
 
+  /**
+   * Mark the ground below the cut as known, as far ahead as anything bought
+   * reads. The panel and the hill both show a layer's name and its seam once
+   * it is in here, so this is where reading ahead turns into something on
+   * screen.
+   */
+  const readAhead = () => {
+    const n = mods().readAhead;
+    if (!(n > 0)) return;
+    if (!state.read) state.read = {};
+    for (let i = 1; i <= n; i++) state.read[state.depth + i] = true;
+  };
+
   /** The line a newly opened layer says about the ground it turned out to be. */
   const seamLine = (events, k) => {
     const layer = ground.at(k);
@@ -307,6 +321,63 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return q * state.horde * cfg.horde.digRate * md.boneMult;
   };
 
+  /**
+   * What every open layer and the way down are making right now, at the
+   * weights as they stand: coin per second at the price its own flow holds
+   * the market down to, and bones per second.
+   *
+   * A layer's goods land in three markets - its own, the one above and a
+   * trace of the one below - and a market's price is set by everything
+   * arriving in it, so the flows are added up first and each layer is then
+   * credited with what its own share of them fetches. That is why a row can
+   * read near zero while its neighbour reads in the billions: they are
+   * selling into the same buyers and the shallow one filled them hours ago.
+   */
+  const layerRates = () => {
+    const md = mods();
+    const from = activeFrom();
+    const split = H.distribute(state.weights, state.faceWeight, from);
+    const perSec = state.horde * cfg.horde.digRate * md.digMult;
+    const diggerSeconds = state.horde * cfg.horde.digRate;
+    const flow = {};                       // good id -> units per second, all layers
+    const rows = new Map();
+    for (let k = from; k <= state.depth; k++) {
+      const share = split.strata[k] || 0;
+      const layer = ground.at(k);
+      const parts = [];
+      if (share > 0) {
+        const units = perSec * share / layer.hardness;
+        for (const part of ground.mixAt(k)) {
+          const id = 's' + part.k;
+          const q = units * part.share;
+          flow[id] = (flow[id] || 0) + q;
+          parts.push({ id, q });
+        }
+      }
+      rows.set(k, { share, parts, coin: 0, bones: diggerSeconds * share * layer.bones * md.boneMult });
+    }
+    // The price each good settles at once the whole flow is arriving. The
+    // multipliers are read once for the whole panel rather than once per
+    // market: this runs ten times a second.
+    const settled = {};
+    for (const id of Object.keys(flow)) {
+      const k = Mat.strataOf(id);
+      if (k < 0) continue;
+      const m = marketFor(id);
+      settled[id] = m.base * md.valueMult * Math.exp(-Mk.saturation(m, flow[id], md));
+    }
+    for (const row of rows.values()) {
+      for (const part of row.parts) row.coin += part.q * (settled[part.id] || 0);
+    }
+    // The dead on the way down bring up no goods, only the bones of the layer
+    // they are breaking into.
+    rows.set('face', {
+      share: split.face, parts: [], coin: 0,
+      bones: diggerSeconds * split.face * ground.at(state.depth + 1).bones * md.boneMult,
+    });
+    return rows;
+  };
+
   const takeOffer = (index) => {
     const events = [];
     const room = state.chamber;
@@ -368,7 +439,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   // -- the step -------------------------------------------------------------
 
-  const step = (dt) => {
+  const step = (dt, unwatched) => {
     const events = [];
     if (!(dt > 0)) return events;
     const md = mods();
@@ -381,13 +452,14 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       seamLine(events, k);
       openChamber(events, k);
     }
+    if (opened.length) readAhead();
 
     for (const m of markets.values()) Mk.relax(m, dt, md);
     brokerStep(dt, md);
 
     state.t += dt;
     trimIncome();
-    Vi.tick(visitorApi, events);
+    Vi.tick(visitorApi, unwatched ? null : events, unwatched);
 
     const after = Math.floor(state.t / cfg.market.sampleSeconds);
     if (after !== before) {
@@ -425,15 +497,19 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     let guard = 0;
     while (left > 1e-9 && guard++ < 2e6) {
       const dt = Math.min(chunk, left);
-      for (const e of step(dt)) events.push(e);
+      for (const e of step(dt, away)) events.push(e);
       left -= dt;
     }
+    // Whoever walked up while the tab was shut gets their full wait from the
+    // moment the player looks at the page again.
+    const waiting = away ? Vi.refresh(state, cfg) : false;
     const gained = {
       coin: state.coin - startCoin,
       bones: state.bones - startBones,
       strata: state.depth - startDepth,
       horde: state.horde - startHorde,
       visits: (state.visitorsSeen || 0) - startVisits,
+      waiting,
       stock: {},
     };
     for (const id of Object.keys(state.stock)) {
@@ -525,16 +601,29 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   const setWeight = (target, delta) => {
+    if (target === 'face') return setWeightAt(target, (state.faceWeight | 0) + delta);
+    const k = target | 0;
+    if (k < activeFrom() || k > state.depth) return 0;
+    return setWeightAt(k, (state.weights[k] | 0) + delta);
+  };
+
+  /**
+   * Put a layer straight on a weight. The bar on the panel is five notches
+   * and pressing one sets it, so moving a row from five to nothing is one
+   * press rather than five. A row set this way is the player's from then on
+   * and no breakthrough moves it again.
+   */
+  const setWeightAt = (target, value) => {
     const max = cfg.horde.maxWeight;
-    if (target === 'face') {
-      state.faceWeight = Math.max(0, Math.min(max, (state.faceWeight | 0) + delta));
-      return state.faceWeight;
-    }
+    const w = Math.max(0, Math.min(max, Math.round(value) || 0));
+    if (target === 'face') { state.faceWeight = w; return w; }
     const k = target | 0;
     if (k < activeFrom() || k > state.depth) return 0;
     while (state.weights.length <= k) state.weights.push(0);
-    state.weights[k] = Math.max(0, Math.min(max, (state.weights[k] | 0) + delta));
-    return state.weights[k];
+    state.weights[k] = w;
+    if (!state.tuned) state.tuned = {};
+    state.tuned[k] = true;
+    return w;
   };
 
   const buyRite = (id, count) => {
@@ -542,6 +631,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const level = R.buy(state, id, cfg, count);
     if (level > 0) {
       events.push({ type: 'rite', id, level });
+      readAhead();
       announce(events, Rv.update(state, cfg, legacy));
     }
     return { events, level };
@@ -557,7 +647,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
-    step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, buyRite,
+    step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -565,6 +655,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     canSeal: () => Rb.canSeal(state, cfg),
     price: (id) => Mk.priceAt(marketFor(id), state.t) * (id === Mat.BONES ? 1 : mods().valueMult),
     quote: (id, q) => Mk.quote(marketFor(id), q, state.t, mods()) * (id === Mat.BONES ? 1 : mods().valueMult),
+    layerRates,
     /** Steady flow of a good in units per second from the horde as it is set. */
     flowOf: (id) => {
       const md = mods();
@@ -615,7 +706,7 @@ export function restoreSim(cfg, snap) {
   if (!Array.isArray(state.effort)) state.effort = [];
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.chamberQueue)) state.chamberQueue = [];
-  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought']) {
+  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned']) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }
   if (state.visitor && typeof state.visitor !== 'object') state.visitor = null;
@@ -641,7 +732,9 @@ export function openedState(cfg, legacy, seed, lines) {
   for (let k = 0; k <= depth; k++) {
     if (k > state.depth) state.depth = k;
     while (state.weights.length <= k) state.weights.push(0);
-    state.weights[k] = cfg.horde.weightNew;
+    // The same step back a breakthrough applies, so ground that comes free
+    // with a new barrow is already leaning down rather than spread flat.
+    H.settle(state, cfg.horde);
     // Enough of each good to put its market on the table, and enough effort
     // spent for the drawing to show the tunnels that were supposedly cut.
     state.stock['s' + k] = ground.at(k).absorb * 0.05;

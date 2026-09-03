@@ -9,9 +9,9 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=14';
-import * as Rb from './rebirth.js?v=14';
-import * as Lore from './lore.js?v=14';
+import * as Ch from './chambers.js?v=15';
+import * as Rb from './rebirth.js?v=15';
+import * as Lore from './lore.js?v=15';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -98,7 +98,7 @@ export function modsOf(s, cfg, legacy) {
   return {
     // Production.
     digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1),
-    boneMult: b.bones,
+    boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones,
     softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1),
     faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1),
     valueMult: b.value,
@@ -111,6 +111,11 @@ export function modsOf(s, cfg, legacy) {
     ledger: lv('ledger') > 0,
     foresight: lv('foresight') > 0,
     assay: lv('assay') > 0,
+    // Layers below the cut whose ground is known before the dead reach it.
+    readAhead: lv('survey') > 0 ? r.surveyReads : 0,
+    // Relics this barrow will pay for being filled in, over what its depth
+    // and its earnings are worth on their own.
+    records: r.recordsRelics * lv('records'),
     // The world outside the field.
     visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1),
     visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1),

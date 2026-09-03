@@ -8,7 +8,7 @@
 // announced by one line in the log.
 // ---------------------------------------------------------------------------
 
-import { BONES } from './materials.js?v=14';
+import { BONES } from './materials.js?v=15';
 
 /** Flag -> the pool in the writing that announces it. */
 export const ANNOUNCE = {
@@ -18,6 +18,10 @@ export const ANNOUNCE = {
   market: 'marketShown',
   rites: 'ritesShown',
   handHidden: 'handsDone',
+  // Said once, in the first barrow that gets deep enough. Every barrow after
+  // it opens with the flag already set (openedState brings the flags up to
+  // date before the run starts), so this never repeats.
+  seal: 'sealShown',
 };
 
 /** Goods held a whole unit of, bones not counted: what a market is for. */
