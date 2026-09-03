@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=14';
-import { createSim, restoreSim, openedState } from './sim.js?v=14';
-import * as Save from './save.js?v=14';
-import * as Sp from './spores.js?v=14';
-import * as Lore from './lore.js?v=14';
-import { hash } from './rng.js?v=14';
-import { createUI } from './ui.js?v=14';
-import { createView } from './view.js?v=14';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=14';
+import { storageKey } from '../config.js?v=15';
+import { createSim, restoreSim, openedState } from './sim.js?v=15';
+import * as Save from './save.js?v=15';
+import * as Sp from './spores.js?v=15';
+import * as Lore from './lore.js?v=15';
+import { hash } from './rng.js?v=15';
+import { createUI } from './ui.js?v=15';
+import { createView } from './view.js?v=15';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=15';
 
 /**
  * @param {object} o
@@ -117,7 +117,9 @@ export function createGame(o) {
       if (parts.length) line += ' ' + parts.join(', ') + '.';
       ui.log(line);
       // And at the top of the page, where somebody coming back is looking.
-      ui.awayNote(line);
+      // After the events, so a week away reports the week rather than the last
+      // thing that happened during it.
+      ui.notice(line);
     }
     return r;
   };

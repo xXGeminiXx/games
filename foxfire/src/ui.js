@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=14';
-import * as Advice from './advice.js?v=14';
-import * as Tr from './traits.js?v=14';
-import * as Sp from './spores.js?v=14';
-import { fill } from '../config.js?v=14';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=14';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=14';
+import * as Lore from './lore.js?v=15';
+import * as Advice from './advice.js?v=15';
+import * as Tr from './traits.js?v=15';
+import * as Sp from './spores.js?v=15';
+import { fill } from '../config.js?v=15';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=15';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=15';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -107,24 +107,29 @@ export function createUI(doc, sim, cfg, actions) {
 
   const say = (event) => {
     if (!event || !event.key) return;
-    log(Lore.line(state.seed, event.key, event.values, event.salt));
+    const line = Lore.line(state.seed, event.key, event.values, event.salt);
+    log(line);
+    // What the world does to the plot is the one kind of entry a player has to
+    // see the moment it happens. The entries sit at the foot of the page, so
+    // it goes to the notice at the top as well.
+    if (/^events\./.test(event.key)) notice(line);
   };
 
-  // -- what happened while nobody was here --------------------------------------
+  // -- the notice ---------------------------------------------------------------
   //
-  // An idle game's first job on being opened is to say what it did while it was
-  // alone. That used to be one entry among the others; with the entries at the
-  // foot of the page it would have been off the bottom of the screen, which is
-  // no way to report the thing a player came back for. It stands above
-  // everything until anything is pressed.
+  // One line above everything for the two things a player has to see the moment
+  // the page is looked at: what the fungus did while nobody was here, and what
+  // the world has just done to the plot. Both used to be entries among the
+  // others; with the entries at the foot of the page they would have been off
+  // the bottom of the screen. It stands there until anything is pressed.
 
-  const awayNote = (line) => {
+  const notice = (line) => {
     const e = el('away');
     if (!e) return;
     e.textContent = line || '';
     e.hidden = !line;
   };
-  const clearAway = () => awayNote('');
+  const clearAway = () => notice('');
 
   // -- the specimen label ------------------------------------------------------
 
@@ -715,5 +720,5 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
-  return { render, say, log, restore, savedNote, renderLog, awayNote, clearAway };
+  return { render, say, log, restore, savedNote, renderLog, notice, clearAway };
 }
