@@ -16,8 +16,8 @@
 // One engine per pit, so a card written for grain cannot fire on oil.
 // ---------------------------------------------------------------------------
 
-import { createRegistry } from './rules.js?v=3';
-import { PLAYER_ID, SELL } from './market.js?v=3';
+import { createRegistry } from './rules.js?v=4';
+import { PLAYER_ID, SELL } from './market.js?v=4';
 
 // Which reading and which action arrive with which clerk. A tier is a count of
 // clerks hired across the whole run.

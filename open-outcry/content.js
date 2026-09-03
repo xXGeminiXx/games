@@ -71,6 +71,7 @@ export const CONTENT = {
     needs: 'needs {n} more',
     openMarket: 'Open the {pit} market',
     marketCost: 'costs {n}',
+    marketsFull: 'You have room for {n} markets in this town. Buy one of them up to make room.',
 
     sizeName: 'Bigger loads',
     sizeWhat: 'Handle {n} sacks at a time instead of {was}.',
@@ -123,7 +124,7 @@ export const CONTENT = {
     nextOpenPit: 'Save up {n} to open the {pit} market.',
     nextOpenPitNow: 'Open the {pit} market for {n}.',
     nextCorner: 'You hold {have} of the {pit} here. Get to half and you can buy the lot.',
-    nextCity: 'Buy up {n} more markets here and the next town will seat you.',
+    nextCity: 'Buy up {n} more markets here and you can move on.',
     nextNone: 'Keep the board fresh and the purse fills.',
   },
 

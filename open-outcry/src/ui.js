@@ -22,15 +22,15 @@
 // the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=3';
-import { CONTENT, fill } from '../content.js?v=3';
-import { Game } from './game.js?v=3';
-import { Board } from './board.js?v=3';
-import { format, counter } from './format.js?v=3';
-import { toNumber, cmp } from './bignum.js?v=3';
-import { createSave } from './save.js?v=3';
-import { affordability } from './purchase.js?v=3';
-import { createComposer } from './rules-ui.js?v=3';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=4';
+import { CONTENT, fill } from '../content.js?v=4';
+import { Game } from './game.js?v=4';
+import { Board } from './board.js?v=4';
+import { format, counter } from './format.js?v=4';
+import { toNumber, cmp } from './bignum.js?v=4';
+import { createSave } from './save.js?v=4';
+import { affordability } from './purchase.js?v=4';
+import { createComposer } from './rules-ui.js?v=4';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -443,8 +443,7 @@ class UI {
         return c.seatWhat + paid;
       }
       const secs = Math.round(((g.runnerLead() + this.cfg.ladder.runner.lead) / g.tickHz()) * 10) / 10;
-      const lead = fill(c.runnerWhat, { n: secs });
-      return g.bought.runner > 0 ? lead : c.runnerNone + ' ' + lead;
+      return fill(c.runnerWhat, { n: secs });
     };
 
     return {
@@ -488,7 +487,11 @@ class UI {
       }
       mount.dataset.keys = shut.join(',');
     }
+    // A HEADING OVER NOTHING IS A BUG. When every town slot is taken, every row
+    // here is hidden and the section used to sit there empty; say why instead.
     const full = g.order.length >= g.slots();
+    this.say('markets-full', full ? fill(this.content.labels.marketsFull, { n: g.slots() }) : '');
+    $('markets-full').hidden = !full;
     for (const [k, r] of this.marketRows) {
       const name = this.cfg.pits[k].name;
       const text = `${fill(this.content.labels.openMarket, { pit: name })}  ${coins(g.pitCost(k))}`;

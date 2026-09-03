@@ -10,7 +10,7 @@
 // each other's tuning. Type is taken from the value already in place, so a
 // number stays a number and a typo in a path is reported rather than created.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/oklch.js?v=3';
+import { oklch } from './src/oklch.js?v=4';
 
 export const CONFIG = {
   identity: {
@@ -20,7 +20,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 3,              // the ?v= tag every import carries; bump on every src change
+    build: 4,              // the ?v= tag every import carries; bump on every src change
     allowOverrides: true,  // ?set= and the namespaced localStorage patch
   },
 
@@ -167,10 +167,10 @@ export const CONFIG = {
     // schedule: a bought floor is bigger from the moment you arrive and never
     // grows on its own, which is what keeps the curve from accelerating.
     spend: {
-      floor:  { base: 3, r: 1.6, label: 'a bigger floor' },
-      seat:   { base: 4, r: 1.7, label: 'a cheaper seat' },
-      slot:   { base: 6, r: 2.4, label: 'another pit' },
-      clock:  { base: 5, r: 2.0, label: 'a faster clock' },
+      floor:  { base: 3, r: 1.6, label: 'a bigger crowd' },
+      seat:   { base: 4, r: 1.7, label: 'a cheaper slice of the trade' },
+      slot:   { base: 6, r: 2.4, label: 'room for one more market' },
+      clock:  { base: 5, r: 2.0, label: 'a faster market' },
     },
     seatDiscount: 0.16,    // per point spent on the seat
     clockBonus: 0.07,      // ticks per second, per point spent on the clock
