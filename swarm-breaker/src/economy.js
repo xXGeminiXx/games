@@ -368,6 +368,12 @@ export function create(config = {}) {
     depth,
     reach: Math.max(depth, Math.trunc(config.reach ?? depth)),
     cfg,
+    // CASH ONLY. A run that is not trading never sees the four ores, the price
+    // table, the refinery or the consignment desk. A block pays essence at what
+    // the ore it held was worth, and the upgrade list is priced the same way,
+    // so every number below stays the number it was tuned to be. Nothing here
+    // is removed - it is not reached.
+    cashOnly: !!config.cash,
     essence: L(config.essence ?? 0),
     stock: {},         // market book, in units
     held: {},          // player inventory, in units
@@ -712,6 +718,12 @@ export function harvest(state, block) {
   const m = matDef(id);
   const maxHp = block.maxHp ?? state.cfg.hpAt(depth);
   const units = scale(L(m.drop * bulkOf(maxHp)), (1 + state.mods.gain) * state.boost.mult);
+  if (state.cashOnly) {
+    const worth = scale(units, m.base);
+    state.essence = add(state.essence, worth);
+    state.stats.essenceEarned = add(state.stats.essenceEarned, worth);
+    return { id, name: m.name, qty: units, text: fmt(units), essence: worth, essenceText: fmt(worth) };
+  }
   state.held[id] = add(state.held[id], units);
   state.stats.mined[id] = add(state.stats.mined[id], units);
   // running estimate of production per turn, which is what forward capacity is based on
@@ -1007,8 +1019,22 @@ export function costOf(state, offerId) {
   return out;
 }
 
+/** The same upgrade, priced in essence: what the ore it asks for is worth. */
+export function cashCostOf(state, offerId) {
+  const o = OFFER_BY_ID[offerId];
+  if (!o) return null;
+  const n = state.bought[offerId] ?? 0;
+  const f = depthScale(state, state.depth) * Math.pow(o.growth, n);
+  let total = ZERO();
+  for (const [id, units] of Object.entries(o.cost)) {
+    total = add(total, scale(L(units * matDef(id).base), f));
+  }
+  return ceilL(total);
+}
+
 /** Every unlocked upgrade, with cost, affordability, and the shortfall if any. */
 export function offers(state) {
+  if (state.cashOnly) return cashOffers(state);
   return OFFERS.filter(o => has(state, o.gate)).map(o => {
     const cost = costOf(state, o.id);
     const lines = Object.entries(cost).map(([id, need]) => ({
@@ -1035,6 +1061,35 @@ export function offers(state) {
 }
 
 /**
+ * The upgrade list for a run that is not trading.
+ *
+ * Only what the hand of powers does not already do. A run with no market has
+ * one place to build from and one place to buy a way out of trouble, and
+ * neither of them offers the other's goods.
+ */
+// Their own depths, because a run with no market has never heard of cinder or
+// the refinery and cannot be gated behind either.
+const CASH_OFFERS = { purge: 8, brake: 14 };
+const CASH_OFFER_IDS = Object.keys(CASH_OFFERS);
+
+function cashOffers(state) {
+  return OFFERS.filter(o => state.reach >= (CASH_OFFERS[o.id] ?? Infinity)).map(o => {
+    const need = cashCostOf(state, o.id);
+    const afford = cmp(state.essence, need) >= 0;
+    return {
+      id: o.id, name: o.name, desc: o.desc, effect: o.effect,
+      bought: state.bought[o.id] ?? 0,
+      cost: { essence: need },
+      lines: [{ id: 'essence', need, have: state.essence,
+                short: maxL(sub(need, state.essence), ZERO()),
+                needText: fmt(need), haveText: fmt(state.essence) }],
+      afford,
+      coverCost: ZERO(), coverText: '', coverable: false,
+    };
+  });
+}
+
+/**
  * Buy an upgrade with material from inventory.
  * Returns the effect record for the host to apply to its own game state.
  * Yield-affecting effects are also applied here, since pricing needs them.
@@ -1043,6 +1098,17 @@ export function purchase(state, offerId) {
   const o = OFFER_BY_ID[offerId];
   if (!o) return { ok: false, reason: 'unknown' };
   if (!has(state, o.gate)) return { ok: false, reason: 'locked' };
+  if (state.cashOnly) {
+    if (!CASH_OFFER_IDS.includes(offerId)) return { ok: false, reason: 'unknown' };
+    const price = cashCostOf(state, offerId);
+    if (cmp(state.essence, price) < 0) return { ok: false, reason: 'essence', need: price, have: state.essence };
+    state.essence = sub(state.essence, price);
+    state.stats.essenceSpent = add(state.stats.essenceSpent, price);
+    state.bought[offerId] = (state.bought[offerId] ?? 0) + 1;
+    if (o.effect.gain) state.mods.gain += o.effect.gain;
+    if (o.effect.yieldBoost) state.boost = { turns: o.effect.yieldBoost.turns, mult: o.effect.yieldBoost.mult };
+    return { ok: true, id: o.id, effect: o.effect, cost: { essence: price }, bought: state.bought[offerId] };
+  }
   const cost = costOf(state, offerId);
   for (const [id, need] of Object.entries(cost)) {
     if (cmp(state.held[id], need) < 0) return { ok: false, reason: 'material', id, need, have: state.held[id] };
@@ -1224,6 +1290,18 @@ function simulateSplit(state, m, total, weights) {
 /** Everything the player is allowed to see, in one call. Safe to poll. */
 export function report(state) {
   const r = reveal(state);
+  if (state.cashOnly) {
+    return {
+      depth: state.depth, reach: state.reach,
+      essence: state.essence, essenceText: fmt(state.essence),
+      scale: depthScale(state, state.depth),
+      boost: state.boost.turns > 0 ? { ...state.boost } : null,
+      offers: offers(state),
+      prices: [], indicators: [], margins: [], recipes: [], forwards: [], trades: [],
+      regime: null, reveal: null, standing: state.standing,
+      worth: { value: state.essence, text: fmt(state.essence) },
+    };
+  }
   return {
     depth: state.depth,
     reach: state.reach,

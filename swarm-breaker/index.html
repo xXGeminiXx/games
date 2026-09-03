@@ -362,7 +362,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="14d52a480451">
+<meta name="build" content="b2290bb887a3">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -450,6 +450,11 @@
       <select id="tier" title="difficulty"></select>
     </label>
 
+    <label class="setting">
+      <span id="lbl-trade">trading</span>
+      <select id="trade" title="trading"></select>
+    </label>
+
     <span class="lbl" id="lbl-mode">mode</span>
     <div id="modelist"></div>
 
@@ -510,24 +515,24 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=18';
-import { createJuice } from './src/juice.js?v=18';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=18';
-import { createBlockKinds } from './src/blocks.js?v=18';
-import { safeRows } from './src/arrival.js?v=18';
-import { createAwards } from './src/awards.js?v=18';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=18';
-import { createLeaderboard } from './src/leaderboard.js?v=18';
-import * as Tiers from './src/tiers.js?v=18';
-import { createOnboarding } from './src/onboarding.js?v=18';
-import { createVisual } from './src/visual.js?v=18';
-import * as Economy from './src/economy.js?v=18';
-import * as Powers from './src/powers.js?v=18';
-import * as Meta from './src/meta.js?v=18';
-import { createUI } from './src/ui.js?v=18';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=18';
-import { seedForSync, today as utcToday } from './src/daily.js?v=18';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=18';
+         storageKey, applyIdentity } from './config.js?v=19';
+import { createJuice } from './src/juice.js?v=19';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=19';
+import { createBlockKinds } from './src/blocks.js?v=19';
+import { safeRows } from './src/arrival.js?v=19';
+import { createAwards } from './src/awards.js?v=19';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=19';
+import { createLeaderboard } from './src/leaderboard.js?v=19';
+import * as Tiers from './src/tiers.js?v=19';
+import { createOnboarding } from './src/onboarding.js?v=19';
+import { createVisual } from './src/visual.js?v=19';
+import * as Economy from './src/economy.js?v=19';
+import * as Powers from './src/powers.js?v=19';
+import * as Meta from './src/meta.js?v=19';
+import { createUI } from './src/ui.js?v=19';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=19';
+import { seedForSync, today as utcToday } from './src/daily.js?v=19';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=19';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -623,6 +628,10 @@ const FONT = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
 // Steps a body may live for, whatever it is doing. This is the whole reason a
 // turn is guaranteed to end - see config.swarm.maxSteps.
 const MAX_STEPS = Math.max(60, CONFIG.swarm.maxSteps | 0);
+// When the floor starts taking the turn back. See config.swarm.settleAfter.
+const SETTLE_AFTER = Math.max(0, CONFIG.swarm.settleAfter | 0);
+const SETTLE_RAMP = Math.max(1, CONFIG.swarm.settleRamp | 0);
+const SETTLE_FORCE = Math.max(0, Number(CONFIG.swarm.settleForce) || 0);
 const SKIM = Math.max(0, Math.min(1, Number(CONFIG.swarm.skim)));
 const SKIM_FLOOR = Math.max(0.01, Math.min(0.9, Number(CONFIG.swarm.skimFloor)));
 // The flattest a sprayed body may be thrown. See spray().
@@ -680,6 +689,22 @@ let TIER = (() => {
   return CONFIG.difficulty.defaultTier;
 })();
 
+// TRADING. Off, a block pays essence and there is one list to spend it on.
+// On, a block pays ore and the whole desk opens: four books, a refinery,
+// consignments, an assay and the powers that only matter to a trader.
+//
+// It is a way to play, not a stage of the game, and a run is one or the other
+// from its first turn. Off is the default because the game is a swarm against
+// a field first and a market never.
+let TRADE = (() => {
+  try {
+    const v = localStorage.getItem(storageKey('trade'));
+    if (v === 'on') return true;
+    if (v === 'off') return false;
+  } catch (e) {}
+  return CONFIG.trade.on === true;
+})();
+
 // Which field a run descends through. A mode changes what descends and nothing
 // else - see src/modes.js. The words belong to config.js.
 let MODE = (() => {
@@ -692,6 +717,7 @@ function fresh(){
   S = {
     depth: 1, balls: Tiers.tierOf(TIER).supply.start, tier: TIER,
     endless: false, won: false, broken: 0,
+    temper: 0, turnDamage: 0, shot: 0,
     clears: 0, streak: 0, turnKills: 0, kindsSeen: [],
     // Where the history stood when this run began, so a mid-run check adds
     // this run's totals to it rather than to itself.
@@ -724,11 +750,15 @@ function fresh(){
   S.dealt = 0;
   // The market is told how tough a block is at a given depth so it can price
   // what one is worth without knowing anything about the field.
-  S.econ = Economy.create({ depth: 1, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
   // The hand is dealt off the run's own seed, so the same run offers the same
   // options and a redeal is a decision rather than a spin.
   S.pow = Powers.createState({ seed: S.seed, swarm: S.balls, essence: 0 });
   S.pow.hostPool = HAND_POOL;
+  // The hand prices itself off block health, so it has to be on the same
+  // difficulty the field is. Without this it quoted one curve while the blocks
+  // arrived on another.
+  Powers.setTier(S.pow, Tiers.dialsFor(S.tier));
   spoilsPool = 0;
   turnHarvest = [];
   saidReveals = null;
@@ -1006,6 +1036,13 @@ function fireDir(dx, dy){
   S.dir = { x: dx, y: dy };
   S.firing = true; S.queue = S.balls; S.fireT = 0; S.nextOrigin = null;
   S.turnKills = 0;
+  S.turnDamage = 0;
+  S.lead = true;
+  S.queue += extraBodies();
+  // Counters a block carries for the length of one shot - how many times it
+  // has been struck, for one - are stamped with this and reset by themselves
+  // when it changes. Nothing has to walk the field to clear them.
+  S.shot = (S.shot | 0) + 1;
   if (rec) rec.fire(dx, dy, CELL, ORIGIN);
   if (ui && !QUIET) ui.setPhase('firing');
   mark();
@@ -1015,6 +1052,7 @@ function fireDir(dx, dy){
 
 function endTurn(){
   S.firing = false;
+  endOfTurnPowers();
   // A BOARD CLEARED TO NOTHING, before the next one arrives.
   //
   // The field refills every turn, so an empty board is never a state the game
@@ -1132,11 +1170,20 @@ function die(){
 // --- simulation -------------------------------------------------------------
 
 function sim(){
+  // Read once for the whole frame rather than per body per substep.
+  const pd = S.pow && S.pow.derived;
+  steerPull = pd ? pd.pull : 0;
+  anchorAt = (pd && pd.anchor) ? deepestBlock() : null;
+  // How hard the floor is pulling this frame. Zero for the first few seconds
+  // of a turn, then rising until nothing can stay up.
+  const over = (S.fireT || 0) - SETTLE_AFTER;
+  settleNow = over <= 0 ? 0 : SETTLE_FORCE * Math.min(1, over / SETTLE_RAMP);
+
   if (S.firing){
     S.fireT++;
     const gap = Math.max(1, Math.round(CONFIG.swarm.launchGap - S.balls / CONFIG.swarm.launchCrowd));
     if (S.queue > 0 && S.fireT % gap === 0){
-      S.live.push({ x: S.origin, y: FLOOR - R, vx: S.dir.x * SPEED, vy: S.dir.y * SPEED, clean: true });
+      S.live.push(newBody(S.origin, FLOOR - R, S.dir.x * SPEED, S.dir.y * SPEED));
       S.queue--;
     }
   }
@@ -1160,13 +1207,24 @@ function sim(){
       S.live.splice(i, 1);
       continue;
     }
+    // A captured body is on rails until its hold runs out - and the moment the
+    // floor starts taking the turn back, it is let go.
+    if (b.orb){
+      if (settleNow > 0) b.orb.t = 0;
+      orbitStep(b);
+      continue;
+    }
+    if (settleNow > 0) b.vy += settleNow;
     juice.trail(b.x, b.y, b.vx, b.vy);
+    // PULL bends the flight toward a block. Every fourth frame is enough to
+    // curve a path and costs a quarter of what every frame would.
+    if (steerPull > 0 && (b.age & 3) === 0) steer(b);
     // substep so fast balls cannot tunnel through a block
     for (let s = 0; s < SUBSTEPS; s++){
       b.x += b.vx / SUBSTEPS; b.y += b.vy / SUBSTEPS;
-      if (b.x < R){ b.x = R; b.vx = Math.abs(b.vx); }
-      if (b.x > W - R){ b.x = W - R; b.vx = -Math.abs(b.vx); }
-      if (b.y < CEIL + R){ b.y = CEIL + R; b.vy = Math.abs(b.vy); skimOff(b); }
+      if (b.x < R){ b.x = R; b.vx = Math.abs(b.vx); b.bounces = (b.bounces || 0) + 1; }
+      if (b.x > W - R){ b.x = W - R; b.vx = -Math.abs(b.vx); b.bounces = (b.bounces || 0) + 1; }
+      if (b.y < CEIL + R){ b.y = CEIL + R; b.vy = Math.abs(b.vy); b.bounces = (b.bounces || 0) + 1; skimOff(b); }
       // A body low in the field has a fresh run at the ceiling ahead of it, so
       // whatever it touched on the way down stops counting against it.
       if (b.y > CLEAN_LINE) b.clean = true;
@@ -1178,6 +1236,20 @@ function sim(){
       if (Math.hypot(b.x - cx(p.c), b.y - cyOf(p.r)) < CELL * 0.32) takeMarker(j);
     }
     if (b.y > FLOOR - R){
+      // LENSING kicks it back up off the floor; OVERRUN sends it round to the
+      // top instead. Both are spent one crossing at a time.
+      if (b.lens > 0){
+        b.lens--;
+        b.y = FLOOR - R - 1; b.vy = -Math.abs(b.vy);
+        look.splash(b.x, 0.35);
+        continue;
+      }
+      if (b.wraps > 0){
+        b.wraps--;
+        b.y = CEIL + R + 1; b.vy = Math.abs(b.vy);
+        look.splash(b.x, 0.35);
+        continue;
+      }
       // Where the next shot starts is decided by the swarm, never by a spray.
       // A burst throws bodies at every angle, so letting one of them claim the
       // launcher would move it somewhere the player did not choose.
@@ -1366,11 +1438,13 @@ function damage(b, bl, i, x, y){
   // 0.2 would read 0 while it was still standing. The fraction is carried on
   // the body instead and lands on its next contact, so nothing is lost and
   // nothing on screen is a lie. With no powers owned this is S.power exactly.
-  b.carry = (b.carry || 0) + hitPower() * sunderMult(bl);
+  b.carry = (b.carry || 0) + hitPower(b) * sunderMult(bl) * erosionMult(bl);
   const dmg = Math.max(1, Math.floor(b.carry));
   b.carry -= dmg;
   bl.hp -= dmg;
+  S.turnDamage = (S.turnDamage || 0) + dmg;
   juice.hit(b.x, b.y, dmg, nx, ny);
+  arcFrom(bl, dmg);
   if (bl.hp <= 0){
     juice.destroy(x, y, shade, nx, ny);
     const at = i >= 0 ? i : S.rows.indexOf(bl);
@@ -1380,12 +1454,248 @@ function damage(b, bl, i, x, y){
     spoilsFor();
     S.turnKills = (S.turnKills || 0) + 1;
     S.broken = (S.broken || 0) + 1;
+    temperGain();
+    splitBody(b, x, y);
+    detonateFrom(bl, dmg);
     if (bl.k){
       // Breaking one is how a player finds out what it does, so breaking one
       // is what the record is of.
       if (!S.kindsSeen.includes(bl.k)) S.kindsSeen.push(bl.k);
       applyBlockEffect(S.kinds.effectOf(bl.k), x, y, bl);
     }
+  }
+}
+
+/** EROSION. Every strike a block has already taken this shot makes the next
+ *  one land harder. The count is stamped with the shot, so it clears itself. */
+function erosionMult(bl){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.erosion > 0)) return 1;
+  if (bl.stT !== S.shot){ bl.stT = S.shot; bl.st = 0; }
+  const n = Math.min(bl.st, Powers.TUNING.strainCap);
+  bl.st++;
+  return 1 + d.erosion * n;
+}
+
+/** FISSION. A body that destroys a block cleaves in two. Each child carries
+ *  half the parent's charges, and CASCADE is what lets a child keep any. */
+function splitBody(b, x, y){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.splits > 0)) return;
+  if (b.temp) return;
+  if (!(b.charges > 0)) return;
+  if (S.live.length >= MAX_BODIES) return;
+  b.charges--;
+  const gen = (b.gen || 0) + 1;
+  const keep = d.splitKeepsStack ? b.charges : (gen < d.splitGens ? b.charges : 0);
+  const sp = Powers.TUNING.splitAngle;
+  const a = Math.atan2(b.vy, b.vx);
+  const v = Math.hypot(b.vx, b.vy) || SPEED;
+  b.vx = Math.cos(a - sp) * v; b.vy = Math.sin(a - sp) * v;
+  b.gen = gen;
+  S.live.push({
+    x, y, vx: Math.cos(a + sp) * v, vy: Math.sin(a + sp) * v,
+    clean: false, gen, charges: keep, bounces: b.bounces || 0,
+  });
+}
+
+// A ceiling on how many circles one turn can have in the air at once. The
+// simulation is per body per frame, so without this a split build turns a
+// turn into a wait.
+const MAX_BODIES = 900;
+
+// --- what one impact sets off ----------------------------------------------
+//
+// Three powers throw damage away from the body that dealt it. ARC hits the
+// nearest blocks the body never touched. DETONATE hands a share of a killing
+// blow to everything against the block that died, and those deaths hand on a
+// share of their own. RESONANCE turns the falloff around so each link lands
+// harder than the one before it.
+//
+// They all draw on ONE budget. A reaction that sets off a reaction is how a
+// turn stops ending, and a turn ending is the only promise this game makes.
+
+const blockX = bl => (bl.id !== undefined ? pieceX(bl) : cx(bl.c));
+const blockY = bl => (bl.id !== undefined ? pieceY(bl) : cyOf(bl.r));
+
+// --- a body, and where it goes ----------------------------------------------
+
+// Read once a frame in sim() so steering does not re-read the hand for every
+// body on every substep.
+let steerPull = 0;
+let anchorAt = null;
+let settleNow = 0;
+let bodyUid = 0;
+
+/** A circle in flight, carrying the charges the hand paid for. */
+function newBody(x, y, vx, vy){
+  const d = S.pow && S.pow.derived;
+  const lead = S.lead === true;
+  S.lead = false;
+  return {
+    x, y, vx, vy, clean: true,
+    uid: ++bodyUid,
+    bounces: 0,
+    lead,
+    charges: d ? d.splits : 0,
+    pierce: d ? d.pierce : 0,
+    lens: d ? d.lensing : 0,
+    wraps: d ? d.overrun : 0,
+  };
+}
+
+/** Bodies a shot puts in the air on top of the swarm itself. BROODLINE and
+ *  FISSION add a fixed number; SPALL adds them for how hard one ball hits. */
+function extraBodies(){
+  const d = S.pow && S.pow.derived;
+  if (!d) return 0;
+  let n = Math.max(0, (d.bodyCap | 0) - Powers.TUNING.baseBodyCap);
+  if (d.spall > 0) n += Math.floor(d.spall * Math.max(0, Math.log10(Math.max(1, hitPower()))));
+  return Math.min(n, MAX_BODIES);
+}
+
+/** A number between 0 and 1 fixed by the run, the shot and what is being asked
+ *  about, so a replay of the same log lands on the same answers. */
+function roll(a, b, c){
+  let h = (S.seed ^ (S.shot * 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (a | 0), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (b | 0), 0xc2b2ae35) >>> 0;
+  h = Math.imul(h ^ (c | 0), 0x27d4eb2f) >>> 0;
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+/** The block furthest down the field. What ANCHOR drags the swarm toward. */
+function deepestBlock(){
+  let low = null;
+  for (const bl of S.rows) if (!low || bl.r > low.r) low = bl;
+  return low;
+}
+
+/** One frame of a captured body's ring. It strikes on a fixed beat and leaves
+ *  along the tangent when its hold runs out or the block under it dies. */
+function orbitStep(b){
+  const d = S.pow && S.pow.derived;
+  const o = b.orb;
+  if (!d || o.bl.dead || o.t <= 0){
+    b.orb = null;
+    b.vx = Math.cos(o.a + Math.PI / 2) * o.v;
+    b.vy = Math.sin(o.a + Math.PI / 2) * o.v;
+    return;
+  }
+  o.t--;
+  o.a += o.v / Math.max(1, o.rad) * 0.5;
+  const cxb = blockX(o.bl), cyb = blockY(o.bl);
+  b.x = cxb + Math.cos(o.a) * o.rad;
+  b.y = cyb + Math.sin(o.a) * o.rad;
+  juice.trail(b.x, b.y, -Math.sin(o.a) * o.v, Math.cos(o.a) * o.v);
+  if (++o.next < (d.orbitPeriod || 7)) return;
+  o.next = 0;
+  // EVENT HORIZON makes a lap count the way a bounce does, so a long capture
+  // keeps compounding rather than holding steady.
+  if (d.eventHorizon) b.bounces = (b.bounces || 0) + 1;
+  const hit = hitPower(b) * d.orbitFrac;
+  S.turnDamage = (S.turnDamage || 0) + hit;
+  hurt(o.bl, hit, true);
+}
+
+/** Bend one body toward a block, keeping its speed. */
+function steer(b){
+  let tgt = anchorAt;
+  if (!tgt){
+    let best = Infinity;
+    for (const bl of S.rows){
+      const dx = blockX(bl) - b.x, dy = blockY(bl) - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < best){ best = d2; tgt = bl; }
+    }
+  }
+  if (!tgt) return;
+  const dx = blockX(tgt) - b.x, dy = blockY(tgt) - b.y;
+  const L = Math.hypot(dx, dy);
+  if (!(L > 0)) return;
+  const v = Math.hypot(b.vx, b.vy) || SPEED;
+  const k = Math.min(0.5, steerPull);
+  const nx = b.vx / v + (dx / L) * k;
+  const ny = b.vy / v + (dy / L) * k;
+  const n = Math.hypot(nx, ny);
+  if (!(n > 0)) return;
+  b.vx = nx / n * v; b.vy = ny / n * v;
+}
+
+/** Damage a block that nothing touched. True if it died.
+ *
+ *  `spread` is for a kill the player made by another route - a body grinding
+ *  it from orbit, an arc reaching it - which sets off its detonation the same
+ *  as a direct hit. The links inside a detonation pass it up, because the wave
+ *  already walks its own generations and would otherwise run twice. */
+function hurt(bl, dmg, spread){
+  if (!bl || bl.dead || !(dmg > 0)) return false;
+  const x = blockX(bl), y = blockY(bl);
+  const take = Math.max(1, Math.floor(dmg));
+  bl.hp -= take;
+  if (bl.hp > 0){ juice.hit(x, y, take, 0, -1); return false; }
+  juice.destroy(x, y, shadeOf(bl), 0, -1);
+  const at = S.rows.indexOf(bl);
+  if (at >= 0) S.rows.splice(at, 1);
+  retire(bl);
+  harvestBlock(bl, true);
+  spoilsFor();
+  S.turnKills = (S.turnKills || 0) + 1;
+  S.broken = (S.broken || 0) + 1;
+  temperGain();
+  if (spread) detonateFrom(bl, dmg);
+  return true;
+}
+
+/** The n blocks closest to this one. Picked by a single walk rather than a
+ *  sort, because this runs on every impact of every body. */
+function nearestBlocks(src, n){
+  if (!(n > 0) || !S.rows.length) return [];
+  const sx = blockX(src), sy = blockY(src);
+  const best = [];
+  for (const bl of S.rows){
+    if (bl === src || bl.dead) continue;
+    const dx = blockX(bl) - sx, dy = blockY(bl) - sy;
+    const d2 = dx * dx + dy * dy;
+    if (best.length < n){ best.push({ bl, d2 }); continue; }
+    let worst = 0;
+    for (let i = 1; i < best.length; i++) if (best[i].d2 > best[worst].d2) worst = i;
+    if (d2 < best[worst].d2) best[worst] = { bl, d2 };
+  }
+  return best.map(o => o.bl);
+}
+
+/** ARC. A share of the blow lands on the nearest blocks the body missed. */
+function arcFrom(bl, blow){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.arcTargets > 0) || !(blow > 0)) return;
+  const share = blow * d.arcFalloff;
+  for (const other of nearestBlocks(bl, d.arcTargets | 0)) hurt(other, share, true);
+}
+
+/** DETONATE. A block died; everything touching it takes a share, and those
+ *  deaths pass a share on, for as many links as the hand paid for. */
+function detonateFrom(bl, blow){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.detonate > 0) || !(blow > 0)) return;
+  const links = Math.max(1, d.detonateChains | 0);
+  const step = d.resonance ? d.detonate * d.resonanceAmp : d.detonate;
+  let budget = Powers.TUNING.cascadeBudget;
+  let front = [{ bl, blow }];
+  for (let gen = 0; gen < links && front.length && budget > 0; gen++){
+    const next = [];
+    for (const item of front){
+      const hit = item.blow * step;
+      if (!(hit > 0)) continue;
+      for (const nb of S.rows.slice()){
+        if (budget <= 0) break;
+        if (nb.dead || nb === item.bl || !adjacent(nb, item.bl)) continue;
+        budget--;
+        if (hurt(nb, hit)) next.push({ bl: nb, blow: hit });
+      }
+    }
+    front = next;
   }
 }
 
@@ -1428,8 +1738,38 @@ function strike(b, bl, i){
   const ty = (!awayY && sy > 1e-6) ? oy / sy : Infinity;
   if (tx === Infinity && ty === Infinity) return false;
 
+  // ORBIT. Instead of leaving, the body is caught and starts circling, grinding
+  // the block it hit. Whether it catches is fixed by the run, the shot and the
+  // pair involved, so a replay of the same log catches the same bodies.
+  const od = S.pow && S.pow.derived;
+  if (od && od.orbitChance > 0 && !b.orb && !b.temp
+      && roll(b.uid, bl.c * 131 + bl.r, 17) < od.orbitChance){
+    b.orb = {
+      bl,
+      t: od.orbitTicks,
+      a: Math.atan2(b.y - (by + bh / 2), b.x - (bx + bw / 2)),
+      rad: CELL * 0.62,
+      v: Math.hypot(b.vx, b.vy) || SPEED,
+      next: 0,
+    };
+    damage(b, bl, i, bx + bw / 2, by + bh / 2);
+    return true;
+  }
+
+  // PIERCE. The body carries on through instead of turning around. The block
+  // it went through is marked with the body's own number so the next substep
+  // does not read the same contact again and spend a second charge on it.
+  if (b.pierce > 0 && b.uid !== undefined && bl.thru !== b.uid){
+    b.pierce--;
+    bl.thru = b.uid;
+    damage(b, bl, i, bx + bw / 2, by + bh / 2);
+    return true;
+  }
+  if (b.uid !== undefined && bl.thru === b.uid) return false;
+
   if (tx <= ty){ b.vx = -b.vx; b.x += b.vx > 0 ? ox : -ox; }
   else         { b.vy = -b.vy; b.y += b.vy > 0 ? oy : -oy; }
+  b.bounces = (b.bounces || 0) + 1;
 
   damage(b, bl, i, bx + bw / 2, by + bh / 2);
   return true;
@@ -1869,9 +2209,18 @@ function payCash(n){
 /** A block broke. It pays material decided by the depth it arrived at and the
  *  column it stood in, so what the field hands you changes as you descend and
  *  never matches what the upgrade list wants. */
-function harvestBlock(bl){
+function harvestBlock(bl, secondary){
   if (!S.econ) return null;
   const got = Economy.harvest(S.econ, { depth: bl.d || S.depth, col: bl.c, maxHp: bl.max });
+  // A block something else broke pays a fraction of one the swarm hit, until
+  // GLEANING closes the gap. Without this a chain build prints material.
+  const d = S.pow && S.pow.derived;
+  if (got && secondary && !(d && d.gleaning)){
+    const cut = Economy.scale(got.qty, 0.6);
+    S.econ.held[got.id] = Economy.sub(S.econ.held[got.id], cut);
+    got.qty = Economy.sub(got.qty, cut);
+    got.text = Economy.fmt(got.qty);
+  }
   // Powers that raise material yield are a multiplier on top of whatever the
   // market already paid, so the market keeps owning the base number.
   const mult = S.pow ? Powers.yieldMult(S.pow) : 1;
@@ -1900,12 +2249,42 @@ let turnHarvest = [];
 const DELIVERS = new Set([
   'flat',        // damage added to every hit
   'mult',        // damage multiplied
+  'momentum',    // damage per bounce already made
   'pressure',    // damage from the size of the swarm
   'sunder',      // damage against blocks still near full health
   'requisition', // damage from what the run has spent
+  'conduction',  // damage per block still standing
+  'sympathy',    // damage per block already broken this shot
+  'erosion',     // damage per strike the same block has taken
   'growth',      // the swarm grows a share of itself every turn
   'spoils',      // swarm per block broken
   'nesting',     // a swarm marker is worth a share of the swarm
+  'splits',      // a body cleaves in two on a kill
+  'splitGens',   // generations of children that keep the charges
+  'splitKeepsStack',
+  'arcTargets',  // an impact also strikes nearby blocks
+  'arcFalloff',
+  'detonate',    // a dead block damages what it touched
+  'detonateChains',
+  'resonance',   // a chain gains strength instead of losing it
+  'resonanceAmp',
+  'pierce',      // pass through a block instead of bouncing
+  'bodyCap',     // more circles in the air on every shot
+  'spall',       // and more of them the harder one ball hits
+  'temper',      // damage the run keeps, banked per block broken
+  'singular',    // the first body of a shot carries a share of the swarm
+  'spawntide',   // the swarm grows by what a shot destroyed
+  'collapse',    // the shot's damage is spent once more as it settles
+  'orbitChance', // an impact catches the body into a ring
+  'orbitTicks',
+  'orbitFrac',
+  'orbitPeriod',
+  'eventHorizon',// a lap counts as a bounce
+  'pull',        // flight bends toward a block
+  'anchor',      // toward the deepest one
+  'lensing',     // the floor throws a body back up
+  'overrun',     // the floor sends it round to the top
+  'gleaning',    // a chain kill pays what a direct one does
   'yieldBonus',  // more material per block
   'corner',      // more material the larger the swarm
   'slots',       // a wider hand
@@ -1956,23 +2335,53 @@ for (const def of Powers.POWER_LIST){
  *  from the whole table of effects rather than the narrowed one. */
 function handNow(){
   if (!S.pow) return null;
+  // The hand prices itself against the run's cash, and the run's cash lives on
+  // the market side. Syncing here rather than only in the repaint means the
+  // hand a caller reads is priced against the money that is actually there -
+  // a headless driver never repaints, and was told nothing was affordable
+  // while the run sat on a thousand essence.
+  syncPowers();
   const hand = Powers.offer(S.pow, S.depth);
   hand.slots = hand.slots.filter(s => HAND_POOL.has(s.id));
   return hand;
 }
 
 /** Damage one body deals on a clean impact, with everything the hand has
- *  added to it. Without a single power this is exactly S.power. */
-function hitPower(){
+ *  added to it. Without a single power this is exactly S.power.
+ *
+ *  Pass the body to include what that body alone has earned this flight. The
+ *  readout calls it with nothing and gets the swarm-wide figure. */
+function hitPower(b){
   if (!S.pow || !S.pow.derived) return S.power;
   const d = S.pow.derived;
   const flat = Powers.B.toNumber(d.flat) - Powers.TUNING.baseDamage;
   const mult = Powers.B.toNumber(d.mult);
-  let p = (S.power + (flat > 0 ? flat : 0)) * (mult > 0 ? mult : 1);
+  // TEMPER is damage the run keeps: every block broken adds to it and nothing
+  // takes it away, so it is worth most to a build that never sells anything.
+  let p = (S.power + (flat > 0 ? flat : 0) + (S.temper || 0)) * (mult > 0 ? mult : 1);
+  // SINGULAR pours a share of the whole swarm into the first body of a shot.
+  if (b && b.lead && d.singular > 0) p *= Math.max(1, d.singular * S.balls);
   if (d.pressure > 0) p *= 1 + d.pressure * Math.max(0, Math.log10(S.balls + 10));
   if (d.requisition > 0) p *= 1 + d.requisition * Math.max(0, Math.log10(Powers.B.toNumber(S.pow.meta.spent) + 10));
-  return p;
+  // Every block still standing feeds the next hit, so a full board is worth
+  // more than an empty one. Capped so a huge field cannot run the figure away.
+  if (d.conduction > 0){
+    p *= Math.pow(1 + d.conduction, Math.min(S.rows.length, Powers.TUNING.conductionCap));
+  }
+  // Kills already made this turn feed it too, at half rate on a direct hit.
+  if (d.sympathy > 0){
+    p *= 1 + d.sympathy * 0.5 * Math.min(S.turnKills || 0, Powers.TUNING.sympathyCap);
+  }
+  if (b && d.momentum > 0) p *= Math.pow(1 + d.momentum, b.bounces || 0);
+  // A stack of multipliers reaches the top of a double eventually. Past that
+  // every arithmetic step downstream is NaN and the body silently stops
+  // dealing damage, so the figure is held at a number instead.
+  return p > MAX_HIT ? MAX_HIT : p;
 }
+
+// Large enough that nothing on the field survives it, small enough that it can
+// still be added to and multiplied without leaving the number line.
+const MAX_HIT = 1e250;
 
 /** The extra damage a block takes for being close to full health. */
 function sunderMult(bl){
@@ -1990,6 +2399,29 @@ function spoilsFor(){
   spoilsPool += d.spoils;
   const whole = Math.floor(spoilsPool);
   if (whole >= 1){ spoilsPool -= whole; S.balls += whole; }
+}
+
+/** What the hand does once the last body is down.
+ *
+ *  SPAWNTIDE grows the swarm by what the shot destroyed. COLLAPSE spends the
+ *  shot's own damage one more time, spread over the field. */
+function endOfTurnPowers(){
+  const d = S.pow && S.pow.derived;
+  if (!d) return;
+  if (d.spawntide > 0 && S.turnKills > 0){
+    S.balls += Math.floor(S.balls * d.spawntide * S.turnKills);
+  }
+  if (d.collapse > 0 && S.turnDamage > 0 && S.rows.length){
+    const each = (S.turnDamage * d.collapse) / S.rows.length;
+    if (each > 0) for (const bl of S.rows.slice()) hurt(bl, each);
+  }
+}
+
+/** TEMPER. Damage the run keeps, banked one block at a time. */
+function temperGain(){
+  const d = S.pow && S.pow.derived;
+  if (!d || !(d.temper > 0)) return;
+  S.temper = (S.temper || 0) + d.temper;
 }
 
 /** What a swarm marker is worth. One ball, or a share of the swarm. */
@@ -2029,6 +2461,7 @@ function powLoad(saved){
   });
   if (saved) Object.assign(st, saved);
   st.hostPool = HAND_POOL;
+  Powers.setTier(st, Tiers.dialsFor(S.tier));
   Powers.recompute(st);
   return st;
 }
@@ -2125,6 +2558,11 @@ function makeDeck(){
       mount: document.getElementById('shop'),
       headerMount: false,
       maxWidth: 520,
+      rails: TRADE,
+      // Each power already says what it does in one line. The second line said
+      // what that would look like on screen, which is the same sentence twice
+      // and doubled the height of every card in the hand.
+      showTells: false,
       material: {
         slag: CONFIG.palette.tithe, ferrite: CONFIG.palette.dim,
         quartz: CONFIG.palette.swarm, cinder: CONFIG.palette.hot,
@@ -2288,10 +2726,15 @@ function boardPanels(){
   }];
 }
 
+let railsShown = null;
 function paintShop(){
   if (QUIET || !ui || !S || !S.econ) return;
   S.econ.depth = S.depth;
   syncPowers();
+  // A run keeps the way it was started even if the menu has been changed
+  // since, so the second price on a power card follows the run.
+  const wantRails = !S.econ.cashOnly;
+  if (wantRails !== railsShown){ railsShown = wantRails; ui.setOptions({ rails: wantRails }); }
   const reach = metaReach();
   ui.update({
     run: {
@@ -2310,6 +2753,17 @@ function paintShop(){
 /** What the market said about the turn that just finished. */
 function digestTurn(){
   if (!ui || QUIET) return;
+  if (S.econ && S.econ.cashOnly){
+    let paid = Economy.L(0);
+    for (const g of turnHarvest) if (g.essence) paid = Economy.add(paid, g.essence);
+    const any = Economy.toNum(paid) > 0;
+    ui.digest(any
+      ? { depth: S.depth, blocks: S.turnKills || 0,
+          materials: [{ id: 'essence', qty: paid, text: Economy.fmt(paid) }] }
+      : null);
+    turnHarvest = [];
+    return;
+  }
   const rolled = {};
   for (const g of turnHarvest){
     rolled[g.id] = rolled[g.id] ? Economy.add(rolled[g.id], g.qty) : g.qty;
@@ -2327,7 +2781,7 @@ const revealQueue = [];
 const REVEAL_LIFE = 14000;
 
 function announceReveals(){
-  if (!ui || QUIET || !S.econ) return;
+  if (!ui || QUIET || !S.econ || S.econ.cashOnly) return;
   const now = Economy.reveal(S.econ).unlocked;
   if (!saidReveals){ saidReveals = new Set(now); return; }
   for (const id of now){
@@ -2444,6 +2898,9 @@ const store = createSave({
     econ: S.econ ? Economy.save(S.econ) : null,
     pow: S.pow ? powSave() : null,
     power: S.power, origin: S.origin, dead: S.dead,
+    // Damage the run has banked off broken blocks. It is not on the hand and
+    // it is not on the market, so it is only here.
+    temper: S.temper || 0,
     clears: S.clears | 0, streak: S.streak | 0, kindsSeen: (S.kindsSeen || []).slice(),
     // A picture block keeps the row it was cut from and the id of its piece,
     // or it comes back faceless.
@@ -2496,6 +2953,7 @@ const store = createSave({
     S.pow = powLoad(v.pow);
     S.owed = { ball: (v.owed && v.owed.ball) | 0, gold: (v.owed && v.owed.gold) | 0 };
     S.power = v.power || CONFIG.swarm.startingPower;
+    S.temper = Number(v.temper) || 0;
     S.origin = typeof v.origin === 'number' ? v.origin : W / 2;
     S.rows = Array.isArray(v.rows) ? v.rows.slice() : [];
     // A piece is handed back to the field it was cut from; one the replayed
@@ -2557,6 +3015,22 @@ tierSel.onchange = () => {
   paintMenu();
   startRun(MODE);
 };
+
+const tradeSel = document.getElementById('trade');
+if (tradeSel){
+  [['off', CONFIG.trade.offLabel], ['on', CONFIG.trade.onLabel]].forEach(([v, label]) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    if ((v === 'on') === TRADE) o.selected = true;
+    tradeSel.appendChild(o);
+  });
+  tradeSel.onchange = () => {
+    TRADE = tradeSel.value === 'on';
+    try { localStorage.setItem(storageKey('trade'), TRADE ? 'on' : 'off'); } catch (e) {}
+    paintMenu();
+    startRun(MODE);
+  };
+}
 
 // Deepest run per field per difficulty. Kept here rather than on the
 // leaderboard because it answers a different question: not who is best, but
@@ -2950,14 +3424,16 @@ function rebuildFrom(seed){
   S.kinds = createBlockKinds(seed, { lattice: S.field.lattice !== false });
   S.rows = []; S.drops = []; S.live = []; S.dealt = 0; S.depth = 1;
   S.balls = Tiers.tierOf(S.tier).supply.start; S.broken = 0;
-  S.econ = Economy.create({ depth: 1, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
+  S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, Tiers.healthNumber(S.tier, d)) });
   S.pow = Powers.createState({ seed, swarm: S.balls, essence: 0 });
   S.pow.hostPool = HAND_POOL;
+  Powers.setTier(S.pow, Tiers.dialsFor(S.tier));
   spoilsPool = 0;
   S.owed = { ball: 0, gold: 0 };
   S.power = CONFIG.swarm.startingPower;
   S.origin = W / 2; S.nextOrigin = null; S.dead = false;
   S.endless = false; S.won = false; S.clears = 0; S.streak = 0; S.turnKills = 0;
+  S.temper = 0; S.turnDamage = 0; S.shot = 0;
   ROWS_TURN = 1;
   turnKills = [];
   bindField();

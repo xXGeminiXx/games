@@ -265,7 +265,7 @@ const TUNING = {
 
   essenceExp: 0.75,       // essence per kill scales as health^this
   essenceBase: 2.2,
-  costDepth: 1.13,        // every power costs this much more per depth
+  costDepth: 1.13,        // retired: prices ride the payout curve, see payScale
   rerollBase: 9,
   rerollGrowth: 1.8,
 
@@ -295,27 +295,27 @@ const DOCTRINES = {
   },
   monolith: {
     id: 'monolith', name: 'MONOLITH', tint: '#ff5c46',
-    creed: 'few, and each one ruinous',
+    creed: 'fewer bodies, each one enormous',
     reads: 'fewer, larger, hotter bodies that leave craters',
   },
   fracture: {
     id: 'fracture', name: 'FRACTURE', tint: '#ffc94a',
-    creed: 'the first hit is not the hit that matters',
+    creed: 'one hit sets off the next',
     reads: 'arcs between blocks and blooms of secondary detonations',
   },
   well: {
     id: 'well', name: 'WELL', tint: '#b98cff',
-    creed: 'do not aim it, bend it',
+    creed: 'the field bends what you fire',
     reads: 'curved trails, orbit rings, and a visible pull at the field floor',
   },
   ledger: {
     id: 'ledger', name: 'LEDGER', tint: '#6ee7a8',
-    creed: 'the field is not an enemy, it is supply',
+    creed: 'the field is where your ore comes from',
     reads: 'price marks and fill quality printed beside every payout',
   },
   tithe: {
     id: 'tithe', name: 'TITHE', tint: '#8f9aa8',
-    creed: 'what the field owes you, taken with interest',
+    creed: 'more out of every block',
     reads: 'brighter essence payouts and a wider hand of choices',
   },
 };
@@ -430,7 +430,7 @@ function baseDerived(state) {
 //   doctrine    which axis it belongs to
 //   tier        reveal wave (see TIER_GATE)
 //   max         rank ceiling, usually Infinity
-//   base/growth cost curve: base * growth^rank * costDepth^depth
+//   base/growth cost curve: base * growth^rank * payScale(depth)
 //   req(s)      extra gate on top of the tier
 //   line(r, s)  what the NEXT rank does, in the player's terms
 //   visual      the on-screen tell, so nothing is invisible
@@ -453,7 +453,7 @@ const POWER_LIST = [
   {
     id: 'conscript', name: 'CONSCRIPT', doctrine: 'legion', tier: 0,
     max: Infinity, base: 14, growth: 1.42,
-    line: (r, s) => `+${fmt(conscriptGain(s, r + 1))} to the swarm now (or 9% of it, whichever is more)`,
+    line: (r, s) => `+${fmt(conscriptGain(s, r + 1))} to the swarm`,
     visual: 'the swarm band under the floor visibly thickens on purchase',
     effect: () => {},
     onTake: (s, r) => {
@@ -466,7 +466,7 @@ const POWER_LIST = [
     id: 'levy', name: 'LEVY', doctrine: 'legion', tier: 1,
     max: Infinity, base: 90, growth: 1.36,
     req: s => doc(s, 'legion') >= 2,
-    line: r => `the swarm grows ${(7 + r).toFixed(0)}% every turn, compounding`,
+    line: r => `the swarm grows ${(7 + r).toFixed(0)}% a turn`,
     visual: 'a growth figure ticks up on the swarm readout at the end of every turn',
     effect: (d, r) => { d.growth += 0.07 + 0.01 * r; },
   },
@@ -474,7 +474,7 @@ const POWER_LIST = [
     id: 'spoils', name: 'SPOILS', doctrine: 'legion', tier: 1,
     max: Infinity, base: 70, growth: 1.33,
     req: s => doc(s, 'legion') >= 2,
-    line: r => `every block destroyed adds ${(0.05 * r).toFixed(2)} to the swarm`,
+    line: r => `+${(0.05 * r).toFixed(2)} to the swarm for every block you break`,
     visual: 'a fractional counter fills beside the swarm readout as blocks die',
     effect: (d, r) => { d.spoils += 0.05 * r; },
   },
@@ -482,7 +482,7 @@ const POWER_LIST = [
     id: 'broodline', name: 'BROODLINE', doctrine: 'legion', tier: 2,
     max: Infinity, base: 150, growth: 1.44,
     req: s => doc(s, 'legion') >= 5,
-    line: r => `+${2 + Math.floor(r / 3)} bodies on the field; the same swarm arrives as more, smaller impacts`,
+    line: r => `+${2 * r + Math.floor(r * r / 6)} more bodies on every shot`,
     visual: 'more distinct circles in flight for the same swarm size',
     effect: (d, r) => { d.bodyCap += 2 * r + Math.floor(r * r / 6); },
   },
@@ -490,7 +490,7 @@ const POWER_LIST = [
     id: 'nesting', name: 'NESTING', doctrine: 'legion', tier: 2,
     max: Infinity, base: 175, growth: 1.40,
     req: s => doc(s, 'legion') >= 5,
-    line: r => `swarm pickups grant ${(2 * r).toFixed(0)}% of the current swarm instead of one ball`,
+    line: r => `a swarm pickup is worth ${(2 * r).toFixed(0)}% of the swarm`,
     visual: 'pickups burst into a spray sized to the swarm rather than a single mote',
     effect: (d, r) => { d.nesting += 0.02 * r; },
   },
@@ -498,7 +498,7 @@ const POWER_LIST = [
     id: 'pressure', name: 'PRESSURE', doctrine: 'legion', tier: 2,
     max: Infinity, base: 220, growth: 1.42,
     req: s => doc(s, 'legion') >= 4,
-    line: r => `every impact hits harder the larger the swarm is (+${(30 * r)}% per order of magnitude)`,
+    line: r => `+${(30 * r)}% damage every time the swarm grows tenfold`,
     visual: 'impact flashes scale with the swarm readout',
     effect: (d, r) => { d.pressure += 0.30 * r; },
   },
@@ -506,7 +506,7 @@ const POWER_LIST = [
     id: 'overrun', name: 'OVERRUN', doctrine: 'legion', tier: 3,
     max: Infinity, base: 500, growth: 1.5,
     req: s => doc(s, 'legion') >= 9,
-    line: r => `${r} time${r === 1 ? '' : 's'} per body, crossing the floor re-enters it from the top instead of ending`,
+    line: r => `each body crosses the floor ${r === 1 ? 'once' : r + ' times'} and comes back in at the top`,
     visual: 'bodies wrap through the top edge with a bright seam where they cross',
     effect: (d, r) => { d.overrun += r; },
   },
@@ -531,7 +531,7 @@ const POWER_LIST = [
     id: 'hone', name: 'HONE', doctrine: 'monolith', tier: 1,
     max: Infinity, base: 120, growth: 1.40,
     req: s => doc(s, 'monolith') >= 2,
-    line: r => `x${(1.25 + 0.02 * r).toFixed(2)} damage, multiplying with everything else`,
+    line: r => `x${(1.25 + 0.02 * r).toFixed(2)} damage on everything`,
     visual: 'bodies burn brighter and their impact flash grows with each rank',
     effect: (d, r) => {
       for (let i = 1; i <= r; i++) d.mult = bmul(d.mult, big(1.25 + 0.02 * i));
@@ -541,7 +541,7 @@ const POWER_LIST = [
     id: 'momentum', name: 'MOMENTUM', doctrine: 'monolith', tier: 1,
     max: Infinity, base: 130, growth: 1.38,
     req: s => doc(s, 'monolith') >= 2,
-    line: r => `+${(5 + r).toFixed(0)}% damage for every bounce a body has already made, compounding`,
+    line: r => `+${(5 + r).toFixed(0)}% damage for every bounce a body has made`,
     visual: 'a body heats from cold to white across a long turn and trails harder',
     effect: (d, r) => { d.momentum += 0.05 + 0.01 * r; },
   },
@@ -575,7 +575,7 @@ const POWER_LIST = [
     id: 'temper', name: 'TEMPER', doctrine: 'monolith', tier: 2,
     max: Infinity, base: 245, growth: 1.42,
     req: s => doc(s, 'monolith') >= 4,
-    line: r => `every block destroyed adds ${(0.08 * r).toFixed(2)} permanent damage - no material, no selling, no price`,
+    line: r => `every block you break adds ${(0.08 * r).toFixed(2)} damage for the rest of the run`,
     visual: 'the launcher core thickens by a visible increment as blocks break',
     effect: (d, r) => { d.temper += 0.08 * r; },
   },
@@ -583,7 +583,7 @@ const POWER_LIST = [
     id: 'singular', name: 'SINGULAR', doctrine: 'monolith', tier: 3,
     max: 5, base: 620, growth: 1.85,
     req: s => doc(s, 'monolith') >= 9,
-    line: r => `the first body of every turn carries ${(15 * r)}% of the entire swarm by itself`,
+    line: r => `the first body of a shot carries ${(15 * r)}% of the swarm`,
     visual: 'one enormous body leads the volley, drawn several times the size of the rest',
     effect: (d, r) => { d.singular += 0.15 * r; },
   },
@@ -598,7 +598,7 @@ const POWER_LIST = [
     id: 'fission', name: 'FISSION', doctrine: 'fracture', tier: 1,
     max: Infinity, base: 105, growth: 1.40,
     req: s => s.meta.taken >= 2,
-    line: r => `destroying a block splits the body in two, ${r} time${r === 1 ? '' : 's'} per body; +${Math.floor(r * 1.5)} bodies at launch`,
+    line: r => `a body splits in two when it breaks a block, ${r === 1 ? 'once' : r + ' times'} per body. +${Math.floor(r * 1.5)} at launch`,
     visual: 'a body visibly cleaves into two smaller ones at the moment a block dies',
     effect: (d, r) => { d.splits += r; d.bodyCap += Math.floor(r * 1.5); },
   },
@@ -606,7 +606,7 @@ const POWER_LIST = [
     id: 'arc', name: 'ARC', doctrine: 'fracture', tier: 1,
     max: Infinity, base: 115, growth: 1.38,
     req: s => s.meta.taken >= 2,
-    line: r => `each impact also strikes the ${r} nearest other block${r === 1 ? '' : 's'} for a share of the damage`,
+    line: r => `every hit also strikes the ${r === 1 ? 'nearest block' : r + ' nearest blocks'} for part of the damage`,
     visual: 'a drawn line jumps from the struck block to each secondary target',
     effect: (d, r) => { d.arcTargets += r; d.arcFalloff = Math.min(0.85, 0.32 + 0.04 * r); },
   },
@@ -614,7 +614,7 @@ const POWER_LIST = [
     id: 'conduction', name: 'CONDUCTION', doctrine: 'fracture', tier: 1,
     max: Infinity, base: 110, growth: 1.40,
     req: s => doc(s, 'fracture') >= 1,
-    line: (r, s) => `+${((0.04 + 0.015 * r) * (1 + doc(s, 'fracture') / 15) * 100).toFixed(0)}% damage for every block standing on the field, compounding - and it sharpens as FRACTURE deepens`,
+    line: (r, s) => `+${((0.04 + 0.015 * r) * (1 + doc(s, 'fracture') / 15) * 100).toFixed(0)}% damage for every block still standing`,
     visual: 'the whole field glows faintly and the glow deepens as it fills up',
     // Multiplied by how deep FRACTURE runs, so this is the doctrine's reward
     // for going all in. A few points splashed into another build barely move
@@ -625,7 +625,7 @@ const POWER_LIST = [
     id: 'detonate', name: 'DETONATE', doctrine: 'fracture', tier: 1,
     max: Infinity, base: 145, growth: 1.40,
     req: s => doc(s, 'fracture') >= 2,
-    line: r => `a destroyed block detonates, dealing ${(45 * r)}% of the killing blow to its neighbors`,
+    line: r => `a block you break deals ${(45 * r)}% of the killing hit to the blocks around it`,
     visual: 'a square shockwave expands from every block as it dies',
     effect: (d, r) => { d.detonate += 0.45 * r; d.detonateChains = 3 + 2 * r; },
   },
@@ -633,7 +633,7 @@ const POWER_LIST = [
     id: 'sympathy', name: 'SYMPATHY', doctrine: 'fracture', tier: 2,
     max: Infinity, base: 250, growth: 1.42,
     req: s => doc(s, 'fracture') >= 4,
-    line: r => `every block already destroyed this turn makes arcs and detonations ${(4 + r)}% harder, and direct impacts half that`,
+    line: r => `every block already broken this shot adds ${(4 + r)}% to arcs and blasts, ${((4 + r) / 2).toFixed(1)}% to direct hits`,
     visual: 'the whole field destabilises as the turn goes on - later impacts flash harder than the first ones did',
     effect: (d, r) => { d.sympathy += 0.04 + 0.01 * r; },
   },
@@ -641,7 +641,7 @@ const POWER_LIST = [
     id: 'pierce', name: 'PIERCE', doctrine: 'fracture', tier: 2,
     max: Infinity, base: 230, growth: 1.44,
     req: s => doc(s, 'fracture') >= 5,
-    line: r => `bodies pass straight through their first ${r} block${r === 1 ? '' : 's'} instead of bouncing`,
+    line: r => `a body punches through its first ${r === 1 ? 'block' : r + ' blocks'} instead of bouncing`,
     visual: 'a body punches through in a straight line and leaves a bored channel behind it',
     effect: (d, r) => { d.pierce += r; },
   },
@@ -649,7 +649,7 @@ const POWER_LIST = [
     id: 'resonance', name: 'RESONANCE', doctrine: 'fracture', tier: 3,
     max: 1, base: 900, growth: 3,
     req: s => doc(s, 'fracture') >= 9,
-    line: (r, s) => `a chain stops losing strength and starts gaining it: every link hits harder than the one before, scaled by how deep FRACTURE runs (currently x${(1 + 0.02 * doc(s, 'fracture')).toFixed(2)} per link)`,
+    line: (r, s) => `each link of a chain hits ${(2 * doc(s, 'fracture')).toFixed(0)}% harder than the one before it`,
     visual: 'chain lines brighten link by link instead of fading, ending brighter than they began',
     effect: (d, r, s) => {
       d.resonance = true;
@@ -660,7 +660,7 @@ const POWER_LIST = [
     id: 'cascade', name: 'CASCADE', doctrine: 'fracture', tier: 4,
     max: 4, base: 1400, growth: 2.1,
     req: s => doc(s, 'fracture') >= 13 && owns(s, 'fission'),
-    line: r => `split children keep their own split charges for ${r} further generation${r === 1 ? '' : 's'}`,
+    line: r => `bodies made by a split can split again, ${r === 1 ? 'once' : r + ' more times'}`,
     visual: 'one cleave becomes a branching front of bodies filling the field',
     effect: (d, r) => { d.splitGens = 1 + r; },
   },
@@ -674,7 +674,7 @@ const POWER_LIST = [
     id: 'pull', name: 'PULL', doctrine: 'well', tier: 1,
     max: Infinity, base: 100, growth: 1.36,
     req: s => s.meta.taken >= 2,
-    line: r => `bodies curve toward the nearest block (steering ${(5 * r)}%)`,
+    line: r => `flight bends ${(5 * r)}% toward the nearest block`,
     visual: 'flight paths bend visibly instead of running straight between bounces',
     effect: (d, r) => { d.pull += 0.05 * r; },
   },
@@ -682,7 +682,7 @@ const POWER_LIST = [
     id: 'anchor', name: 'ANCHOR', doctrine: 'well', tier: 2,
     max: Infinity, base: 210, growth: 1.42,
     req: s => doc(s, 'well') >= 4,
-    line: r => `a well forms on the deepest block and drags the whole swarm into it (+${(6 * r)}% pull)`,
+    line: r => `the whole swarm is dragged toward the deepest block. +${(6 * r)}% bend`,
     visual: 'a drawn well ring sits on the deepest block with the swarm spiralling in',
     effect: (d, r) => { d.anchor = true; d.pull += 0.06 * r; },
   },
@@ -690,7 +690,7 @@ const POWER_LIST = [
     id: 'orbit', name: 'ORBIT', doctrine: 'well', tier: 2,
     max: Infinity, base: 250, growth: 1.44,
     req: s => doc(s, 'well') >= 5,
-    line: r => `${(9 * r)}% of impacts capture the body into orbit, grinding the block instead of bouncing off`,
+    line: r => `${(9 * r)}% of hits catch the body into a ring, grinding the block it circles`,
     visual: 'captured bodies trace a visible ring around their block, striking every few frames',
     effect: (d, r) => {
       d.orbitChance += 0.09 * r;
@@ -702,7 +702,7 @@ const POWER_LIST = [
     id: 'erosion', name: 'EROSION', doctrine: 'well', tier: 2,
     max: Infinity, base: 235, growth: 1.42,
     req: s => doc(s, 'well') >= 4,
-    line: r => `every strike a block has already taken this turn makes the next one ${(5 + r)}% harder`,
+    line: r => `every strike a block has taken this shot makes the next one ${(5 + r)}% harder`,
     visual: 'a block being worked over cracks progressively and its number falls faster each strike',
     effect: (d, r) => { d.erosion += 0.05 + 0.01 * r; },
   },
@@ -710,7 +710,7 @@ const POWER_LIST = [
     id: 'lensing', name: 'LENSING', doctrine: 'well', tier: 2,
     max: Infinity, base: 280, growth: 1.46,
     req: s => doc(s, 'well') >= 5,
-    line: r => `${r} time${r === 1 ? '' : 's'} per body, the floor throws it back up instead of taking it`,
+    line: r => `the floor throws each body back up ${r === 1 ? 'once' : r + ' times'}`,
     visual: 'the floor line flexes and kicks the body upward with a visible bow',
     effect: (d, r) => { d.lensing += r; },
   },
@@ -726,7 +726,7 @@ const POWER_LIST = [
     id: 'collapse', name: 'COLLAPSE', doctrine: 'well', tier: 3,
     max: Infinity, base: 640, growth: 1.5,
     req: s => doc(s, 'well') >= 10,
-    line: r => `when the turn ends the well implodes for ${(3 * r)}% of everything the turn dealt`,
+    line: r => `when a shot ends, ${(3 * r)}% of everything it dealt lands again across the field`,
     visual: 'the field pulls inward once and everything inside the well flashes at once',
     effect: (d, r) => { d.collapse += 0.03 * r; },
   },
@@ -758,7 +758,7 @@ const POWER_LIST = [
     id: 'assayer', name: 'ASSAYER', doctrine: 'ledger', tier: 1,
     max: Infinity, base: 120, growth: 1.36,
     req: s => doc(s, 'ledger') >= 2,
-    line: r => `every block destroyed yields ${(20 * r)}% more material`,
+    line: r => `every block you break yields ${(20 * r)}% more ore`,
     visual: 'material counts tick up harder over each block as it breaks',
     effect: (d, r) => { d.yieldBonus += 0.20 * r; },
   },
@@ -834,7 +834,7 @@ const POWER_LIST = [
     id: 'survey', name: 'SURVEY', doctrine: 'tithe', tier: 1,
     max: 3, base: 190, growth: 2.4,
     req: s => doc(s, 'tithe') >= 2,
-    line: r => `+1 option in every hand and +${r} free reroll each depth`,
+    line: r => `+${r} card in every hand, and ${r === 1 ? 'one free redeal' : r + ' free redeals'} a depth`,
     visual: 'an extra card slot appears in the choice row',
     effect: (d, r) => { d.slots += r; d.freeRerolls += r; },
   },
@@ -866,7 +866,7 @@ const POWER_LIST = [
     id: 'duty', name: 'DUTY', doctrine: 'tithe', tier: 2,
     max: 4, base: 340, growth: 2.0,
     req: s => doc(s, 'tithe') >= 4,
-    line: r => `powers in your most-invested doctrine cost ${(12 * r)}% less`,
+    line: r => `cards on the path you have backed most cost ${(12 * r)}% less`,
     visual: 'discounted options are marked in their doctrine color',
     effect: (d, r) => { d.duty += 0.12 * r; },
   },
@@ -887,7 +887,7 @@ const POWER_LIST = [
     id: 'shardstorm', name: 'SHARDSTORM', doctrine: 'legion', tier: 3, keystone: true,
     max: 1, base: 1500, growth: 3,
     req: s => doc(s, 'legion') >= 9 && doc(s, 'fracture') >= 7,
-    line: () => 'a split no longer divides a body: both halves carry the whole stack',
+    line: () => 'both halves of a split hit as hard as the body that split',
     visual: 'the field fills with full-size bodies where there was one, each hitting as hard as the parent',
     effect: d => { d.splitKeepsStack = true; },
   },
@@ -895,7 +895,7 @@ const POWER_LIST = [
     id: 'spawntide', name: 'SPAWNTIDE', doctrine: 'legion', tier: 3, keystone: true,
     max: Infinity, base: 1300, growth: 1.7,
     req: s => doc(s, 'legion') >= 8 && doc(s, 'well') >= 6,
-    line: r => `at the end of a turn the swarm grows ${(0.5 * r).toFixed(1)}% for every block the turn destroyed`,
+    line: r => `the swarm grows ${(0.5 * r).toFixed(1)}% for every block a shot breaks`,
     visual: 'the swarm band surges once, sized to the turn, as the field settles',
     effect: (d, r) => { d.spawntide += 0.005 * r; },
   },
@@ -903,7 +903,7 @@ const POWER_LIST = [
     id: 'spall', name: 'SPALL', doctrine: 'monolith', tier: 3, keystone: true,
     max: Infinity, base: 1250, growth: 1.7,
     req: s => doc(s, 'monolith') >= 8 && doc(s, 'legion') >= 6,
-    line: r => `+${r} bodies for every order of magnitude of damage a single ball deals`,
+    line: r => `+${r} bod${r === 1 ? 'y' : 'ies'} every time one ball's damage grows tenfold`,
     visual: 'heavier bodies shed splinters that become bodies of their own on launch',
     effect: (d, r) => { d.spall += r; },
   },
@@ -911,7 +911,7 @@ const POWER_LIST = [
     id: 'horizon', name: 'EVENT HORIZON', doctrine: 'well', tier: 3, keystone: true,
     max: 1, base: 1600, growth: 3,
     req: s => doc(s, 'well') >= 8 && doc(s, 'monolith') >= 7,
-    line: () => 'orbit strikes count as bounces, so a captured body keeps compounding for as long as it circles',
+    line: () => 'a lap around a block counts as a bounce',
     visual: 'an orbiting body brightens continuously through its ring instead of holding steady',
     effect: d => { d.eventHorizon = true; },
   },
@@ -919,7 +919,7 @@ const POWER_LIST = [
     id: 'gleaning', name: 'GLEANING', doctrine: 'fracture', tier: 3, keystone: true,
     max: 1, base: 1100, growth: 3,
     req: s => doc(s, 'fracture') >= 7 && doc(s, 'tithe') >= 5,
-    line: () => 'blocks killed by arcs and detonations pay full essence instead of a fraction',
+    line: () => 'blocks broken by arcs and blasts pay in full',
     visual: 'chain kills print their essence in full rather than dimmed',
     effect: d => { d.gleaning = true; },
   },
@@ -935,7 +935,7 @@ const POWER_LIST = [
     id: 'corner', name: 'CORNER', doctrine: 'ledger', tier: 3, keystone: true,
     max: Infinity, base: 1450, growth: 1.7,
     req: s => doc(s, 'ledger') >= 8 && doc(s, 'legion') >= 6,
-    line: r => `material yield rises ${(18 * r)}% per order of magnitude of swarm, so the horde works the seams as well as the field`,
+    line: r => `ore yield rises ${(18 * r)}% every time the swarm grows tenfold`,
     visual: 'material payouts scale with the swarm band rather than with the block that paid them',
     effect: (d, r) => { d.corner += 0.18 * r; },
   },
@@ -943,7 +943,7 @@ const POWER_LIST = [
     id: 'requisition', name: 'REQUISITION', doctrine: 'monolith', tier: 3, keystone: true,
     max: Infinity, base: 1150, growth: 1.7,
     req: s => doc(s, 'monolith') >= 7 && doc(s, 'tithe') >= 5,
-    line: r => `+${(12 * r)}% damage per order of magnitude of essence spent this run`,
+    line: r => `+${(12 * r)}% damage every time your spending this run grows tenfold`,
     visual: 'the launcher core is ringed by a band that thickens as the run total climbs',
     effect: (d, r) => { d.requisition += 0.12 * r; },
   },
@@ -1048,7 +1048,7 @@ function mintEcho(state, rnd, depth) {
     mag,
     tier: 2,
     echo: true,
-    cost: bmul(big(210 * Math.pow(1.34, held)), bpow(big(dial(state, 'costDepth')), depth)),
+    cost: bmul(big(210 * Math.pow(1.34, held)), payScale(state, depth)),
     line: tmpl.line(mag),
     visual: DOCTRINES[pick].reads,
   };
@@ -1268,6 +1268,26 @@ function hpFor(state, depth) {
 }
 
 /**
+ * What one block at this depth is worth against one block at the start, so a
+ * price can be quoted in blocks rather than in essence.
+ *
+ * PRICES RIDE THE PAYOUT CURVE. A power used to cost a fixed percentage more
+ * per depth while the field's payout grew with block health, which is a slower
+ * curve - so the two diverged and the whole hand went out of reach within a
+ * handful of depths and stayed there for the rest of the run. Pricing against
+ * the payout instead means a power costs about the same number of BLOCKS at
+ * depth 200 as it did at depth 2. Getting richer is then something the player
+ * does by breaking more of them per turn, which is what every power in the
+ * list is for.
+ */
+function payScale(state, depth) {
+  const exp = dial(state, 'essenceExp');
+  const here = bpow(hpFor(state, depth), exp);
+  const start = bmax(bpow(hpFor(state, 1), exp), big(1e-9));
+  return bdiv(here, start);
+}
+
+/**
  * Essence a destroyed block pays out.
  * @param {object} state
  * @param {object} block  {c, r, hp, max}
@@ -1407,10 +1427,15 @@ function yieldMult(state) {
  *
  * @param {number|object} units bulk material units
  */
-function meltYield(state, units) {
+function meltYield(state, units, depth) {
   const d = state.derived;
   if (d.melt <= 0) return ZERO;
-  return bmul(big(units), big(d.melt));
+  // A FIXED RATE PER UNIT FELL BEHIND WITHOUT BOUND. What a block pays grows
+  // with depth; a flat number per unit does not, so melting went from a crude
+  // route to a worthless one somewhere in the middle of every run. It is a
+  // fraction of what the same material is worth at this depth instead: still
+  // crude, still no price to read, and still worse than trading it well.
+  return bmul(bmul(big(units), big(d.melt)), payScale(state, depth == null ? state.depth : depth));
 }
 
 // ---------------------------------------------------------------------------
@@ -1442,7 +1467,7 @@ function costOf(state, id, depth) {
   const def = POWERS[id];
   if (!def) return INF;
   const r = rank(state, id);
-  let c = bmul(big(def.base * Math.pow(def.growth, r)), bpow(big(dial(state, 'costDepth')), dep));
+  let c = bmul(big(def.base * Math.pow(def.growth, r)), payScale(state, dep));
   const d = state.derived;
   if (d.duty > 0 && d.dominant === def.doctrine) c = bmul(c, big(Math.max(0.4, 1 - d.duty)));
   return bfloor(c);
@@ -1463,7 +1488,7 @@ function rerollCost(state, depth) {
   const n = state.meta.rerollsThisDepth - state.derived.freeRerolls;
   return bfloor(bmul(
     big(TUNING.rerollBase * Math.pow(TUNING.rerollGrowth, Math.max(0, n))),
-    bpow(big(dial(state, 'costDepth')), dep)
+    payScale(state, dep)
   ));
 }
 

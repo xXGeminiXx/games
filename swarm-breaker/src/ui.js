@@ -2511,22 +2511,22 @@ function makeHand(U) {
         setText(q.vs, s.visual || '');
         show(q.vs, U.opt.showTells !== false && !!s.visual);
 
-        setText(q.cash, 'take  ' + (s.costText != null ? s.costText : U.fmt(s.cost)));
+        setText(q.cash, 'buy  ' + (s.costText != null ? s.costText : U.fmt(s.cost)) + ' essence');
         q.cash.disabled = U.busy || s.maxed || !s.affordable || !U.can('power');
         const wantMat = U.opt.rails !== false && s.costMaterialText != null;
         show(q.matl, wantMat);
         if (wantMat) {
-          setText(q.matl, 'or ' + s.costMaterialText + ' material');
+          setText(q.matl, 'or ' + s.costMaterialText + ' ore');
           q.matl.disabled = U.busy || s.maxed || !U.can('power');
         }
-        setText(q.sp, s.maxed ? 'at its ceiling' : (s.isNew ? '' : ''));
+        setText(q.sp, s.maxed ? 'no more of this one' : '');
       });
 
       const free = o.rerollFree;
       setText(rerollBtn, free ? 'redeal' : 'redeal  ' + U.fmt(o.rerollCost));
       rerollBtn.disabled = U.busy || !o.canReroll || !U.can('reroll');
       show(rerollBtn, U.can('reroll'));
-      setText(footNote, 'a new hand arrives with the next depth; buying one does not redeal the rest');
+      setText(footNote, 'a new hand every depth');
 
       if (sec) {
         const afford = o.slots.filter(s => s.affordable && !s.maxed).length;

@@ -75,6 +75,7 @@ export const CONFIG = {
     aimLimit:    'limit',
 
     difficultyLabel: 'difficulty',
+    tradeLabel: 'trading',
     // It abandons the run in progress and starts another one. It does not
     // touch awards, best depths or the chosen mode, and RESET is the word
     // players expect to mean exactly that - wiping everything they have.
@@ -719,6 +720,22 @@ export const CONFIG = {
     // the worst real turn and should never be reached in play.
     maxSteps: 3000,
 
+    // WHEN A TURN STARTS TO CLOSE ITSELF.
+    //
+    // A body's own step budget bounds one body. It does not bound a TURN, and
+    // the field powers are all ways of keeping bodies up: orbit holds them on
+    // a block, pull steers them off the floor, lensing and overrun buy them
+    // extra crossings of it. Stacked, they took an eight-second turn to fifty
+    // seconds, every turn, which is not a stronger build - it is waiting.
+    //
+    // So the floor comes for everything. After `settleAfter` frames every body
+    // starts being pushed down, harder over the next `settleRamp` frames, and
+    // a body held in orbit is let go. A long turn is still longer than a short
+    // one; it just cannot be indefinite.
+    settleAfter: 420,
+    settleRamp:  300,
+    settleForce: 0.55,
+
     // THE SMALLEST VERTICAL SHARE A SPRAYED BODY MAY BE THROWN AT.
     //
     // A spray goes out evenly around the circle, which means some of it goes
@@ -857,6 +874,24 @@ export const CONFIG = {
   //
   // Only the keys you name are replaced; the rest of the tier is untouched.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // TRADING - a whole way to play, kept out of the way of the one that is not
+  //
+  // Off, a block pays essence and one short list spends it. On, a block pays
+  // one of four ores and the desk opens: books with their own prices, a
+  // refinery, consignments, an assay, and the powers that only matter to
+  // somebody reading a price.
+  //
+  // Trading is not a later stage of a run, it is a different run. Nothing is
+  // half on: a run is one or the other from its first turn and keeps what it
+  // started with even if this is changed underneath it.
+  // -------------------------------------------------------------------------
+  trade: {
+    on: false,
+    offLabel: 'off',
+    onLabel: 'on - four ores and a market',
+  },
+
   difficulty: {
     defaultTier: 'swell',
 
@@ -1183,6 +1218,7 @@ export function applyIdentity(doc) {
   put('menutitle',      CONFIG.identity.name);
   put('menutag',        CONFIG.identity.tagline);
   put('lbl-difficulty', t.difficultyLabel);
+  put('lbl-trade',      t.tradeLabel);
   put('modes',          t.menuButton);
   put('resume',         t.menuResume);
   put('lbl-mode',       t.menuModeLabel);

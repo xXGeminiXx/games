@@ -51,8 +51,8 @@
 // restores the whole future of the run.
 // ===========================================================================
 
-import { CONFIG } from '../config.js?v=18';
-import { safeRows, cellKey } from './arrival.js?v=18';
+import { CONFIG } from '../config.js?v=19';
+import { safeRows, cellKey } from './arrival.js?v=19';
 
 /** 32 bit mix over three inputs. The run, the depth, and the cell. */
 function mix(a, b, c) {

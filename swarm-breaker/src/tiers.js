@@ -164,7 +164,7 @@
 // numbers, so a caller that never goes deep never has to think about this.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=18';
+import { CONFIG } from '../config.js?v=19';
 
 const ZERO = Object.freeze({ m: 0, e: 0 });
 
