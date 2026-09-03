@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=58';
+import { loadConfig } from '../config.js?v=59';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=58';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=59';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=58';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=58';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=58';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=58';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=58';
-import { rng as makeRng } from './rng.js?v=58';
-import { offerCabinets, freshSeed } from './cabinets.js?v=58';
-import * as Save from './save.js?v=58';
-import { showState } from './render/reach.js?v=58';
-import { skinForCabinet } from './render/themes.js?v=58';
-import { chooseDoor as callDoor } from './events.js?v=58';
+         handMult, restoreFloor } from './floor.js?v=59';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=59';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=59';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=59';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=59';
+import { rng as makeRng } from './rng.js?v=59';
+import { offerCabinets, freshSeed } from './cabinets.js?v=59';
+import * as Save from './save.js?v=59';
+import { showState } from './render/reach.js?v=59';
+import { skinForCabinet } from './render/themes.js?v=59';
+import { chooseDoor as callDoor } from './events.js?v=59';
 
 // A gap between frames longer than this is time the player was away, not a
 // slow frame. The same number decides whether a reopened page was away at all.
@@ -53,8 +53,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=58');
-  const metaModule = await optional('./meta.js?v=58');
+  const catalogue = await optional('./fittings.js?v=59');
+  const metaModule = await optional('./meta.js?v=59');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -71,7 +71,6 @@ export async function createGame(opts) {
     runCfg: runConfig(cfg),
     out: createOut(),
     offer: null,
-    offerRng: makeRng('shop:' + Date.now()),
     rerolls: 0,
     notes: [],
     away: null,
@@ -289,9 +288,13 @@ export function rollOffer(game) {
   if (!cat || typeof cat.rollOffer !== 'function') { game.offer = []; return; }
   const eff = metaEffects(game);
   const count = Math.max(1, Math.round(game.runCfg.shop.offers + (eff.shopOffers || 0)));
+  // The hand is a function of the round and of how many rerolls have been paid
+  // for, and of nothing else. Asking twice deals the same cards, so reopening
+  // the page at the bench shows what the player left rather than a new draw.
+  const deal = makeRng('shop:' + (run.shopSeed >>> 0) + ':' + Math.max(0, Math.floor(game.rerolls || 0)));
   let list = [];
   try {
-    list = cat.rollOffer(game.offerRng.next, run.fittings, game.cfg.shop.rarityWeights, count) || [];
+    list = cat.rollOffer(deal.next, run.fittings, game.cfg.shop.rarityWeights, count) || [];
   } catch (e) {
     list = [];
   }
@@ -303,9 +306,7 @@ export function rollOffer(game) {
 }
 
 function priceOfFitting(game, f) {
-  const eff = metaEffects(game);
-  const discount = Number.isFinite(eff.rerollDiscount) ? eff.rerollDiscount : 0;
-  return Math.max(1, Math.round((f.price || 10) * (1 - discount)));
+  return Math.max(1, Math.round(f.price || 10));
 }
 
 function rerollPrice(game) {
@@ -313,6 +314,12 @@ function rerollPrice(game) {
   const terms = game.shopTerms || {};
   const freeLeft = Number.isFinite(terms.freeRerolls) ? terms.freeRerolls : 0;
   if (freeLeft > game.rerolls) return 0;
+  // What the technician has learned about asking again. It comes off THIS
+  // price: it used to come off the price of the parts, which is the one thing
+  // the upgrade does not mention.
+  const eff = metaEffects(game);
+  const off = Number.isFinite(eff.rerollDiscount) ? eff.rerollDiscount : 0;
+  const cut = (p) => Math.max(0, Math.round(p * (1 - off)));
   const baseCost = Number.isFinite(terms.rerollCost) && terms.rerollCost > 0 ? terms.rerollCost : s.rerollCost;
   const step = Number.isFinite(terms.rerollStep) && terms.rerollStep > 0 ? terms.rerollStep : s.rerollGrowth;
   const fallback = Math.max(0, Math.round(baseCost * Math.pow(step, Math.max(0, game.rerolls - freeLeft))));
@@ -322,10 +329,10 @@ function rerollPrice(game) {
       const price = Math.round(cat.rerollCost(catalogueModel(game), game.rerolls));
       // A price that is not a number would be spent anyway and would take the
       // whole tray with it. Anything that is not a real price is not a price.
-      if (Number.isFinite(price) && price >= 0) return price;
+      if (Number.isFinite(price) && price >= 0) return cut(price);
     } catch (e) { /* fall through to the price this game sets itself */ }
   }
-  return fallback;
+  return cut(fallback);
 }
 
 /** The catalogue's own view of the machine, for the text and the prices. */
@@ -374,6 +381,9 @@ function loadSave(game, saved) {
       game.run.mods = fitted.mods;
     }
     Save.restoreRun(game.runCfg, game.run, saved.run);
+    // How many rerolls have been paid for. Without it a reopened bench prices
+    // its next reroll as the first one.
+    game.rerolls = Number.isFinite(saved.run.rerolls) ? Math.max(0, Math.floor(saved.run.rerolls)) : 0;
     game.view = game.run.phase === PHASE_SHOP ? VIEW_BENCH : VIEW_MACHINE;
     if (game.view === VIEW_BENCH) rollOffer(game);
   } else {
@@ -798,9 +808,11 @@ export function frame(game, now) {
     if (caught.gained > 0) game.away = caught;
     game.dropped = 0;
     save(game);
-  }
-
-  if (observe(game.quality, frameMs, now) && game.scene) {
+    // An hour is not a frame the card drew. Measuring it would put an hour in
+    // the sample the picture's resolution is chosen from, which reads as the
+    // worst five percent of frames taking an hour each.
+    resetMeasurement(game.quality, now);
+  } else if (observe(game.quality, frameMs, now) && game.scene) {
     game.scene.setQuality(renderQuality(game.quality));
   }
 

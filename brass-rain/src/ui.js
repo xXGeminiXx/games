@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=58';
-import { createScene } from './render/scene.js?v=58';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=58';
-import { num, count, duration, mult, pct, fill } from './format.js?v=58';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=58';
-import { nailPos } from './board.js?v=58';
-import { DOORS_ROW } from './render/board-geom.js?v=58';
-import { sketchCabinet } from './cabinets.js?v=58';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=58';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=59';
+import { createScene } from './render/scene.js?v=59';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=59';
+import { num, count, duration, mult, pct, fill } from './format.js?v=59';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=59';
+import { nailPos } from './board.js?v=59';
+import { DOORS_ROW } from './render/board-geom.js?v=59';
+import { sketchCabinet } from './cabinets.js?v=59';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=59';
 
 const SPEEDS = [1, 2, 4];
 
@@ -1460,12 +1460,10 @@ const HELP = [
     + 'it drops onto the nails. It\'s the only thing you control while a round is running, and it\'s worth '
     + 'a lot: the gap between the best power setting and the worst is most of what a machine pays. The arrow '
     + 'keys nudge it, the space bar pulls, and A turns on Auto so the handle pulls itself, and the number keys call a door when a row is lit.'],
-  ['The pockets', (f) => 'A pocket is a cut in the board that catches a ball and pays for it. The machine '
-    + 'you are at has ' + f.pays.length + ' of them and they pay ' + listOfPays(f.pays) + '. The '
-    + f.best + '-ball pocket is the hardest of them to reach and the one worth steering toward. Every '
-    + 'machine cuts its pockets somewhere else and pays different amounts for them, so this changes when '
-    + 'you change machine. Balls that find no pocket run out through the OUT LANES at the bottom and are '
-    + 'gone, which is most of them, and is why straight play slowly loses ground.'],
+  ['The pockets', (f) => 'A pocket is a cut in the board that catches a ball and pays for it. This machine has '
+    + f.pays.length + ', paying ' + listOfPays(f.pays) + '. The ' + f.best + '-ball pocket is the hardest '
+    + 'to reach. Balls that find no pocket run out through the OUT LANES at the bottom and are gone, which '
+    + 'is most of them, and is why playing straight slowly loses ground.'],
   ['The slot and the reels', 'The slot is the narrow pocket in the middle of the board, under a funnel of '
     + 'nails. It pays nothing by itself. What it does is spin the three reels, and that makes it the pocket '
     + 'worth aiming everything at. The panel on the left prints the real odds, the way an arcade cabinet '

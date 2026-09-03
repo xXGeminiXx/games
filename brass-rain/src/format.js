@@ -16,6 +16,18 @@ const SUFFIX = [
   'Vg',
 ];
 
+/**
+ * Drops a trailing run of zeros from a fraction, and the point with them.
+ *
+ * Only from a fraction. Stripping them from a whole number as well turned a
+ * hundred thousand into one thousand, which is the same string a player would
+ * read as a hundred times less money than they are holding.
+ */
+function trim(text) {
+  if (text.indexOf('.') < 0) return text;
+  return text.replace(/0+$/, '').replace(/\.$/, '');
+}
+
 /** The house style for any quantity a player reads. */
 export function num(v, places) {
   if (v === null || v === undefined) return '0';
@@ -29,15 +41,23 @@ export function num(v, places) {
     // they stop being counted.
     if (places !== undefined) s = n.toFixed(places);
     else if (n === Math.floor(n)) s = String(n);
-    else if (n < 10) s = n.toFixed(2).replace(/\.?0+$/, '');
+    else if (n < 10) s = trim(n.toFixed(2));
     else if (n < 100) s = n.toFixed(1).replace(/\.0$/, '');
     else s = String(Math.round(n));
   } else {
-    const tier = Math.floor(Math.log10(n) / 3);
+    let tier = Math.floor(Math.log10(n) / 3);
     if (tier < SUFFIX.length) {
-      const scaled = n / Math.pow(1000, tier);
-      const d = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
-      s = scaled.toFixed(d).replace(/\.?0+$/, '') + SUFFIX[tier];
+      let scaled = n / Math.pow(1000, tier);
+      let d = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+      // Rounding can carry the front of the number up to a thousand, and a
+      // thousand belongs to the next suffix: 999,999 rounds to 1000 and is a
+      // million, not a thousand thousand.
+      if (Number(scaled.toFixed(d)) >= 1000 && tier + 1 < SUFFIX.length) {
+        tier += 1;
+        scaled = n / Math.pow(1000, tier);
+        d = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+      }
+      s = trim(scaled.toFixed(d)) + SUFFIX[tier];
     } else {
       const e = Math.floor(Math.log10(n));
       s = (n / Math.pow(10, e)).toFixed(2) + 'e' + e;

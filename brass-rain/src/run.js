@@ -13,14 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=58';
-import { createBoard, pocket } from './board.js?v=58';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=58';
-import { fire, hasHook } from './hooks.js?v=58';
+import { rng as makeRng } from './rng.js?v=59';
+import { createBoard, pocket } from './board.js?v=59';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=59';
+import { fire, hasHook } from './hooks.js?v=59';
 import {
   createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
   eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
-} from './events.js?v=58';
+} from './events.js?v=59';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -77,7 +77,18 @@ export function createRun(cfg, seed, meta, fitted) {
     launchAcc: 0,
     lent: 0,              // balls the counter put in to cover this round
 
-    fever: { active: false, ballsLeft: 0, chain: 0, mult: 1, t: 0, spent: 0 },
+    // Which hand the bench deals this round. Drawn from the run's own stream so
+    // two nights on one machine are not offered the same parts, and kept on the
+    // run so the bench deals the same hand every time it is asked - reopening
+    // the page at the bench used to deal a fresh one, which is a free reroll
+    // beside a reroll that costs a rising price.
+    shopSeed: (r.next() * 1e9) >>> 0,
+
+    // `trailing` is set while the pocket is running on a window the parts left
+    // behind it. The parts are asked for one of those, once: asking again at
+    // the end of it let a part hand out another every time, and the jackpot
+    // pocket never shut again for the rest of the round.
+    fever: { active: false, ballsLeft: 0, chain: 0, mult: 1, t: 0, spent: 0, trailing: false },
     // The centre window, plus whatever is turning beside it. A second spin
     // used to wait for the first, which pushed its payout past the end of the
     // round; it now opens its own window around the centre one.
@@ -244,6 +255,13 @@ export function startRound(state, n) {
   state.phase = PHASE_PLAY;
   state.budget = budgetFor(cfg, n, state.mods);
   state.quota = quotaFor(cfg, n, state.mods);
+  // Pulls carried forward from a round that was cleared early. They are added
+  // after the quota is worked out, so they are launches the round is not asked
+  // to pay for, which is what carrying them forward means.
+  if (state.carryLaunches > 0) {
+    state.budget += state.carryLaunches;
+    state.carryLaunches = 0;
+  }
   state.won = 0;
   state.launched = 0;
   // The counter lends the machine its round. A tray short of what the round
@@ -258,6 +276,7 @@ export function startRound(state, n) {
     state.lent = 0;
   }
   state.fever.active = false;
+  state.fever.trailing = false;
   state.fever.ballsLeft = 0;
   state.fever.chain = 0;
   state.reel.spinning = false;
@@ -280,6 +299,8 @@ export function startRound(state, n) {
   state.counters.launchesThisRound = 0;
   state.counters.pocketsThisRound = 0;
   state.counters.feversThisRound = 0;
+  // A new round is a new hand at the bench.
+  state.shopSeed = (state.rng.next() * 1e9) >>> 0;
   const rs = moment(state, 'onRoundStart', {
     round: { n, budget: state.budget, quota: state.quota, launches: 0, paid: 0 },
     tray: { balls: state.tray },
@@ -785,6 +806,7 @@ export function startFever(state, out, lenOverride, multOverride, symbol) {
   const f = state.fever;
   const chaining = f.active;
   f.active = true;
+  f.trailing = false;
   const face = Number.isFinite(symbol) ? symbol : state.reel.digits[0];
   const fev = { balls: Math.max(1, cfg.fever.balls + state.mods.feverBalls), mult: 1, symbol: face, seven: false, openings: [] };
   const before = f.ballsLeft;
@@ -813,11 +835,14 @@ export function endFever(state) {
   const cfg = state.cfg;
   const f = state.fever;
   if (state.feverWon > state.stats.bestFever) state.stats.bestFever = state.feverWon;
-  const endCtx = moment(state, 'onFeverEnd', { fever: { ballsPaid: state.feverWon || 0, totalPaid: state.stats.won }, after: [] });
+  const endCtx = f.trailing
+    ? null
+    : moment(state, 'onFeverEnd', { fever: { ballsPaid: state.feverWon || 0, totalPaid: state.stats.won }, after: [] });
   // Windows the fever leaves behind it: the flap does not slam the instant the
   // lamp cools, it stays open for a few more balls.
   const trailing = endCtx ? windowBalls(endCtx.after) : 0;
   if (trailing > 0) {
+    f.trailing = true;
     f.ballsLeft = trailing;
     f.mult = 1;
     logLine(state, 'fever', 'The jackpot pocket is still open for ' + trailing + ' balls.');
@@ -828,6 +853,7 @@ export function endFever(state) {
     return;
   }
   f.active = false;
+  f.trailing = false;
   f.ballsLeft = 0;
   f.chain = 0;
   closeAttacker(state);
@@ -871,8 +897,14 @@ function checkRoundEnd(state) {
     const endCtx = moment(state, 'onRoundEnd', {
       round: { n: state.round, budget: state.budget, quota: state.quota, launches: state.launched, paid: state.won },
       cleared: true, bonus, value: bonus, tray: { balls: state.tray },
+      // Pulls a part may carry into the next round. Without it the one part
+      // that writes here threw, was set aside as broken, and stayed inert for
+      // the rest of the session with the player's balls already spent on it.
+      carry: { launches: 0 },
     });
     if (endCtx) {
+      const carried = endCtx.carry ? Number(endCtx.carry.launches) : 0;
+      state.carryLaunches = Number.isFinite(carried) ? Math.max(0, Math.min(30, Math.floor(carried))) : 0;
       const given = endCtx.value !== bonus ? endCtx.value : endCtx.bonus;
       if (Number.isFinite(given) && given >= 0) bonus = Math.round(given);
     }

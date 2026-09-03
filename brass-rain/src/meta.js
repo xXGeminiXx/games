@@ -146,7 +146,8 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=58';
+import { priceAt } from './economy.js?v=59';
+import { num as coins } from './format.js?v=59';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -270,7 +271,7 @@ export const NODES = [
   },
   {
     id: 'wider_gate', name: 'A Wider Slot', tier: 2, cost: 6, needs: ['pin_hammer'], resets: 2,
-    text: 'The slot filed wider, from 3.6 across to 4.4. The two nails guarding its shoulders stand farther apart to match, so more balls find their way in.',
+    text: 'The slot filed 0.8 wider, and the two nails guarding its shoulders stand farther apart to match, so more balls find their way in. Every machine cuts its slot a little differently, so what it starts at is the machine\'s own.',
     visible: 'A measurably wider slot, with the two shoulder nails that guard it visibly pushed out.',
     gives: { gateWidth: 0.8 },
   },
@@ -281,7 +282,7 @@ export const NODES = [
     gives: { shopOffers: 1 },
   },
   {
-    id: 'worn_reroll', name: 'Cheaper New Parts', tier: 2, cost: 5, needs: ['bench_stool'], resets: 2,
+    id: 'worn_reroll', name: 'Cheaper To Ask Again', tier: 2, cost: 5, needs: ['bench_stool'], resets: 2,
     text: 'Asking the workbench for different parts costs 30 percent fewer balls, including after the price has already climbed.',
     visible: null,
     gives: { rerollDiscount: 0.30 },
@@ -309,13 +310,13 @@ export const NODES = [
   },
   {
     id: 'nail_gauge', name: 'Bend Nails Farther', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
-    text: 'A nail head travels half again as far, 2.4 across instead of 1.6.',
+    text: 'A nail head leans more than twice as far, 2.45 across instead of 0.95.',
     visible: 'The ring drawn around a picked nail is half again as wide, and covers nails it could not before.',
     gives: { bendReach: 1.5 },
   },
   {
     id: 'long_lamp', name: 'Longer Bonuses', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
-    text: 'A bonus runs 30 balls longer, 120 instead of 90, and rolls straight into another one more often, 36 percent of the time instead of 30.',
+    text: 'A bonus runs 30 balls longer, 60 instead of 30, and rolls straight into another one more often, 36 percent of the time instead of 30.',
     visible: null,
     gives: { feverBalls: 30, continueBonus: 0.06 },
   },
@@ -581,12 +582,6 @@ export function resetThreshold(cfg, meta) {
  * The sentence is the whole point of this function. A greyed-out button with
  * no reason on it is how a layer becomes a stat page nobody visits.
  */
-function coins(v) {
-  const n = Math.max(0, Number(v) || 0);
-  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'K';
-  return String(Math.round(n));
-}
 
 export function canReset(cfg, meta, floor) {
   const L = lifetimeScrip(meta, floor);

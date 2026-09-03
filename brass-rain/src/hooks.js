@@ -29,7 +29,7 @@
 // a part that is wrong should cost its own effect and nothing else.
 // ---------------------------------------------------------------------------
 
-import { baseMods } from './run.js?v=58';
+import { baseMods } from './run.js?v=59';
 
 export const MOMENTS = [
   'onRunStart', 'onRoundStart', 'onShopOpen', 'onLaunch', 'onPinHit', 'onPocket',
@@ -105,7 +105,17 @@ export function fire(bench, ids, moment, ctx) {
     if (list.indexOf(moment) < 0) continue;
     try {
       const r = f.apply(ctx, moment);
-      if (typeof r === 'number' && Number.isFinite(r) && 'value' in ctx) ctx.value = r;
+      if (typeof r === 'number' && Number.isFinite(r)) {
+        if ('value' in ctx) ctx.value = r;
+        // A fitting reads the moment's own name for the number - a payout, a
+        // refund, a bonus - so the next one along has to find what the last
+        // one did to it there. Writing only `value` left every fitting working
+        // from the original, and the last one bolted in was the only one that
+        // counted for anything.
+        if ('payout' in ctx) ctx.payout = r;
+        if ('refund' in ctx) ctx.refund = r;
+        if ('bonus' in ctx) ctx.bonus = r;
+      }
     } catch (e) {
       // One bad part is switched off. The machine keeps running.
       bench.broken.add(id);
@@ -137,11 +147,17 @@ export function buildMods(cfg, bench, ids, extra) {
     }
   }
   if (extra && typeof extra === 'object') {
+    // `extra` is a COMPLETE set of multipliers, built from these same defaults
+    // by the part fitter, so it is folded in as the difference from them. Added
+    // whole it counted every default twice. Most defaults are neutral and
+    // survived that; the one that is not - a ball through the slot buys one
+    // reel spin - became two, on every machine in the game.
+    const base = baseMods();
     for (const k of Object.keys(mods)) {
       const v = Number(extra[k]);
       if (!Number.isFinite(v)) continue;
-      if (MULTIPLY.has(k)) mods[k] *= v;
-      else mods[k] += v;
+      if (MULTIPLY.has(k)) mods[k] *= (base[k] ? v / base[k] : v);
+      else mods[k] += v - base[k];
     }
   }
 

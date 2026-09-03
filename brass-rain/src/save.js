@@ -18,11 +18,11 @@
 //   another program wrote, and none of those may stop the game from starting.
 // ---------------------------------------------------------------------------
 
-import { signBlob } from './nights.js?v=58';
-import { serializeBends, restoreBends } from './board.js?v=58';
-import { serializeBalls, restoreBalls } from './physics.js?v=58';
-import { serializeFloor, restoreFloor } from './floor.js?v=58';
-import { serializeQuality } from './quality.js?v=58';
+import { signBlob } from './nights.js?v=59';
+import { serializeBends, restoreBends } from './board.js?v=59';
+import { serializeBalls, restoreBalls } from './physics.js?v=59';
+import { serializeFloor, restoreFloor } from './floor.js?v=59';
+import { serializeQuality } from './quality.js?v=59';
 
 export function saveKey(cfg) { return cfg.identity.storagePrefix + ':save'; }
 
@@ -50,6 +50,10 @@ export function serialize(cfg, game) {
       speed: run.speed,
       time: run.time,
       over: run.over,
+      // The bench: which hand this round deals, and how many rerolls have been
+      // paid for. Both are needed or a reopened bench is a free reroll.
+      shopSeed: run.shopSeed,
+      rerolls: Math.max(0, Math.floor(game.rerolls || 0)),
       fever: { ...run.fever },
       // The windows turning beside the centre are not written down one by
       // one: they go back on the queue, so a run resumes owing exactly the
@@ -142,9 +146,14 @@ export function restoreRun(cfg, run, obj) {
   run.time = num(obj.time, 0);
   run.over = !!obj.over;
   run.bendsLeft = int(obj.bendsLeft, cfg.board.bendsPerRound);
+  run.shopSeed = int(obj.shopSeed, run.shopSeed) >>> 0;
 
   if (obj.fever) {
     run.fever.active = !!obj.fever.active;
+    // Whether the pocket is already running on the window the parts left
+    // behind it. Without this a reload in the middle of one asks them for
+    // another.
+    run.fever.trailing = !!obj.fever.trailing;
     run.fever.ballsLeft = int(obj.fever.ballsLeft, 0);
     run.fever.chain = int(obj.fever.chain, 0);
     run.fever.mult = num(obj.fever.mult, 1);
