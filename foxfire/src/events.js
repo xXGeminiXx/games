@@ -19,8 +19,8 @@
 // wood is waiting in a log the wind brought down. Nothing here draws.
 // ---------------------------------------------------------------------------
 
-import { hash, unit } from './rng.js?v=10';
-import { nearestOpen } from './world.js?v=10';
+import { hash, unit } from './rng.js?v=11';
+import { nearestOpen } from './world.js?v=11';
 
 // These lines belong in content.js, in pools under CONTENT.events, and are
 // read from there as soon as they are written; they sit here so the events
