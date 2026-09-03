@@ -7,10 +7,10 @@
 // word it differently.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=9';
-import { fill } from '../config.js?v=9';
-import { hash } from './rng.js?v=9';
-import { TEXT as EVENTS } from './events.js?v=9';
+import { CONTENT } from '../content.js?v=10';
+import { fill } from '../config.js?v=10';
+import { hash } from './rng.js?v=10';
+import { TEXT as EVENTS } from './events.js?v=10';
 
 function walk(root, key) {
   let node = root;
@@ -43,10 +43,10 @@ export function line(seed, key, values, salt) {
   return fill(list[i], values);
 }
 
-/** A short line from the furniture set, filled. */
+/** A short line from the furniture set, filled. Keys may be dotted. */
 export function ui(key, values) {
-  const s = CONTENT.ui[key];
-  return s === undefined ? String(key) : fill(s, values);
+  const s = walk(CONTENT.ui, key);
+  return typeof s === 'string' ? fill(s, values) : String(key);
 }
 
 /** Names for a scale: the level and what its nodes are called. */

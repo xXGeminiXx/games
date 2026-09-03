@@ -28,7 +28,7 @@
 
   /* The floor: the whole window, behind everything. */
   #floor{position:fixed;inset:0;z-index:0}
-  #floor canvas{display:block;width:100%;height:100%}
+  #floor canvas{display:block;width:100%;height:100%;cursor:crosshair}
 
   /* The specimen label, pinned to the top left of the floor: the figures a
      player checks constantly, so they are set at reading size, the words in
@@ -54,6 +54,18 @@
   #label #income{color:var(--moss)}
   #label #minerals{color:var(--mineral)}
 
+  /* The chain under the figures: where the sugar comes from, and what happens
+     to the minerals between the ground and the trees. It is the whole of how
+     the game works, so it is on the label rather than three panels down. */
+  #label p.chain{margin-top:.15rem;font-size:.95em}
+  #label p.chain>i{margin-right:.15em}
+  #label p.chain>span{margin-right:.85em}
+  #label p.chain>span:last-child{margin-right:0}
+  #label p.chain>span>b{margin-left:.3em;font-weight:600}
+  #label #st-source>span>b{color:var(--sugar)}
+  #label #st-minerals>span>b{color:var(--mineral)}
+  #label #min-lost>b{color:var(--rust-ink)}
+
   /* The journal: cream paper down the right, scrolling inside itself. It is
      wide enough for the longest line it holds to sit on one line. */
   #journal{
@@ -63,6 +75,16 @@
     padding:1rem 1.15rem 1.75rem;
   }
   #tagline{margin:0 0 .8rem;font-style:italic;font-size:1rem;color:var(--faded)}
+
+  /* The compass. One line at the top of the journal naming the thing most
+     worth doing next and the figures behind it. It sits on its own tone of
+     paper with a rule down its left edge, because it is the one thing on the
+     page that is not a record of what happened. */
+  #next{
+    margin:0 0 1.1rem;padding:.5rem .75rem;font-size:1.0625rem;line-height:1.45;
+    background:var(--paper-deep);border-left:3px solid var(--rust-ink);color:var(--ink);
+  }
+  #next:empty{display:none}
   .panel{margin:0 0 1.15rem}
   .panel:last-of-type{margin-bottom:0}
   h2{
@@ -95,6 +117,8 @@
   #hand{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem}
   #handline{color:var(--faded);font-size:1rem}
   #tipline{color:var(--faded);font-size:1rem}
+  #aimline{color:var(--faded);font-size:1rem;margin-top:.35rem}
+  #aim-clear{border-color:var(--rust-ink);color:var(--rust-ink)}
 
   /* The trees ledger. One block a kind rather than a row: a name, what there
      is of it, the figures, the two decisions, and the note. Nothing is in a
@@ -105,6 +129,9 @@
   .tree .thead{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .6rem}
   .tree .name{font-weight:600}
   .tree .count{color:var(--faded);font-size:1rem}
+  /* The kind paying most for the next mineral, marked on its own head so the
+     decision the share ticks make does not have to be worked out. */
+  .tree .best{color:var(--rust-ink);font-size:1rem;font-weight:600}
   .tree .figs{display:flex;flex-wrap:wrap;gap:0 1.1rem;margin-top:.15rem}
   .tree .fig i{font-style:normal;color:var(--faded);font-size:.95rem;margin-right:.35em}
   .tree .fig b{font-weight:600}
@@ -146,7 +173,16 @@
   .season-2 #season-name{color:var(--rust-ink)}
   .season-2 #season-bar{border-top-color:var(--rust-ink)}
 
-  /* Reach. */
+  /* Reach. How much of this scale the threads are in, and the mark on it
+     where enough has been reached to fold the whole level away. A share of
+     something finite is the one figure here worth a bar rather than a
+     sentence. */
+  #reach-bar{
+    position:relative;height:.55rem;margin:0 0 .5rem;
+    background:var(--paper-deep);border:1px solid var(--rule);
+  }
+  #reach-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--moss)}
+  #reach-mark{position:absolute;top:-.15rem;bottom:-.15rem;width:2px;background:var(--rust-ink)}
   #reachline,#beyondline,#belowline{color:var(--faded);font-size:1rem;margin:0 0 .35rem}
   #beyondline:empty,#belowline:empty{margin:0}
   #beyond{border-color:var(--rust-ink);color:var(--rust-ink)}
@@ -183,9 +219,13 @@
   /* A phone: the floor keeps the top third and the journal slides up over the
      rest of it. Nothing is beside anything, so nothing can be cut off. */
   @media (max-width:760px){
-    #journal{top:34vh;left:0;right:0;width:auto;border-left:0;border-top:1px solid var(--rule);padding:.85rem .9rem 1.4rem}
+    #journal{top:40vh;left:0;right:0;width:auto;border-left:0;border-top:1px solid var(--rule);padding:.85rem .9rem 1.4rem}
     #label{left:.7rem;top:.7rem;max-width:calc(100% - 1.4rem)}
     #log{max-height:min(26vh,16rem)}
+    /* Five lines of label over a strip of floor leaves no floor. The chain is
+       the same story the compass and the tips line tell in the journal, and on
+       a narrow window the journal is where there is room for it. */
+    #label p.chain{display:none}
   }
   @media (max-height:620px){
     #log{max-height:11rem}
@@ -324,7 +364,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="b6757a89fa31">
+<meta name="build" content="e09adede32e0">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -374,17 +414,16 @@
   <canvas id="v"></canvas>
   <div id="label">
     <p><b id="title"></b><span id="st-level" hidden><i id="lbl-level"></i><span id="level"></span></span><span id="st-area" hidden><i id="lbl-area"></i><span id="area"></span></span></p>
-    <p><span id="st-sugar"><i id="lbl-sugar"></i><span id="sugar">0</span></span><span id="st-income" hidden><span id="income"></span><i id="lbl-income"></i></span><span id="st-minerals" hidden><i id="lbl-minerals"></i><span id="minerals"></span></span><span id="st-tips" hidden><i id="lbl-tips"></i><span id="tips"></span></span></p>
+    <p><span id="st-sugar"><i id="lbl-sugar"></i><span id="sugar">0</span></span><span id="st-income" hidden><span id="income"></span><i id="lbl-income"></i></span><span id="st-tips" hidden><i id="lbl-tips"></i><span id="tips"></span></span></p>
+    <p class="chain" id="st-source" hidden><i id="lbl-source"></i><span id="src-wood"></span><span id="src-trade"></span><span id="src-below"></span></p>
+    <p class="chain" id="st-minerals" hidden><i id="lbl-minerals"></i><span id="minerals"></span><span id="min-carried"></span><span id="min-lost"></span></p>
   </div>
 </div>
 
 <aside id="journal">
   <p id="tagline"></p>
 
-  <section class="panel" id="entries-panel">
-    <h2 id="fieldhint"></h2>
-    <div id="log"></div>
-  </section>
+  <p id="next"></p>
 
   <section class="panel" id="hand-panel">
     <div id="hand"><button id="reach"></button><span id="handline"></span></div>
@@ -392,8 +431,18 @@
 
   <section class="panel" id="tips-panel" hidden>
     <h2 id="p-tips"></h2>
-    <div class="acts"><button id="buy-tip"></button><button id="buy-tips-max"></button></div>
+    <div class="acts"><button id="buy-tip"></button><button id="buy-tips-max"></button><button id="aim-clear" hidden></button></div>
     <p id="tipline"></p>
+    <p id="aimline"></p>
+  </section>
+
+  <section class="panel" id="reach-panel" hidden>
+    <h2 id="p-reach"></h2>
+    <p id="reachline"></p>
+    <div id="reach-bar"><span id="reach-fill"></span><i id="reach-mark"></i></div>
+    <div class="acts"><button id="extend"></button><button id="beyond" hidden></button></div>
+    <p id="beyondline"></p>
+    <p id="belowline" hidden></p>
   </section>
 
   <section class="panel" id="trees-panel" hidden>
@@ -406,14 +455,6 @@
     <h2 id="p-season"></h2>
     <p><span id="season-name"></span><span id="season-left"></span></p>
     <div id="season-track"><i class="mk"></i><i class="mk"></i><i class="mk"></i><i class="mk"></i><span id="season-bar"></span></div>
-  </section>
-
-  <section class="panel" id="reach-panel" hidden>
-    <h2 id="p-reach"></h2>
-    <p id="reachline"></p>
-    <div class="acts"><button id="extend"></button><button id="beyond" hidden></button></div>
-    <p id="beyondline"></p>
-    <p id="belowline" hidden></p>
   </section>
 
   <section class="panel" id="traits-panel" hidden>
@@ -436,6 +477,11 @@
     <div id="genome" hidden></div>
   </section>
 
+  <section class="panel" id="entries-panel">
+    <h2 id="fieldhint"></h2>
+    <div id="log"></div>
+  </section>
+
   <div id="tools">
     <button id="export"></button>
     <button id="import"></button>
@@ -452,8 +498,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=9';
-import { createGame } from './src/game.js?v=9';
+import { CONFIG, applyIdentity } from './config.js?v=10';
+import { createGame } from './src/game.js?v=10';
 
 applyIdentity(document);
 

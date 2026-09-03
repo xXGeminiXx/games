@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=9';
-import { noise } from './world.js?v=9';
-import { hash, unit } from './rng.js?v=9';
-import { angleGap, burntSet } from './events.js?v=9';
+import { seasonOf } from './season.js?v=10';
+import { noise } from './world.js?v=10';
+import { hash, unit } from './rng.js?v=10';
+import { angleGap, burntSet } from './events.js?v=10';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -261,8 +261,11 @@ export function createView(canvas, cfg, doc) {
 
   const targetScale = (state) => {
     const f = frame();
-    const extent = Math.max(1, state.ring * cfg.world.ringWidth + V.pad);
-    return Math.min(f.w, f.h) / (2 * extent * V.margin);
+    // The reach, plus the ground kept in view past it - but never closer in
+    // than cellsMin, so the ground the next ring will open is already on the
+    // screen and a log is a log rather than a wall.
+    const extent = Math.max(1, state.ring * cfg.world.ringWidth + V.pad) * V.margin;
+    return Math.min(f.w, f.h) / (2 * Math.max(extent, num(V.cellsMin, 0)));
   };
 
   // -- the floor ------------------------------------------------------------
@@ -486,6 +489,146 @@ export function createView(canvas, cfg, doc) {
   const sprites = new Map();
 
   /**
+   * How much of a thing's colour is put down.
+   *
+   * Ground the threads have not got to is somebody else's: it is drawn faint
+   * and the mist over it does the rest, so a glance separates the logs being
+   * eaten from the logs merely lying there. Everything the fungus holds is
+   * drawn whole. Every shape below multiplies its own alpha by this.
+   */
+  let paintAlpha = 1;
+
+  /** Screen pixels per cell for the frame being drawn, so a shape can size
+   *  itself in cells without every one of them being handed the scale. */
+  let pxNow = 1;
+
+  // Where the middle of the ground sat in the last frame, in canvas pixels.
+  // A press on the floor is turned back into a place on the ground through
+  // exactly these numbers rather than through a second fit of the same
+  // ground, because two fits drift and the mark then lands somewhere the
+  // player did not press.
+  let lastCx = 0, lastCy = 0;
+
+  // -- what the threads are carrying ----------------------------------------
+  //
+  // A fungus moves what it takes. Minerals come out of bare soil and out of
+  // the wood it is eating, run to the middle and back out to the trees; the
+  // sugar the trees pay for them, and the sugar in the wood, runs back to the
+  // middle. Drawn as it moves, the whole economy is on the floor: which ground
+  // is paying, which is spent, and how hard the fungus is working.
+  //
+  // Every reached place was reached along exactly one thread, so the threads
+  // are a tree rooted at the middle and what a thread carries is the sum of
+  // what everything past it produces. Threads are held in the order they were
+  // laid, so a pass backwards over them adds every branch into its own stem
+  // before that stem is read.
+  let flowKey = '';
+  let flowAt = -1e9;     // simulation time the sums were last made at
+  let flowSug = null;    // sugar running toward the middle, per thread
+  let flowMin = null;    // minerals running toward the middle, per thread
+  let flowOut = null;    // minerals running out to the trees, per thread
+  let flowPeak = [0, 0, 0];
+  // What each place is putting in a second, against the busiest place on the
+  // floor. A log eaten hollow falls to nothing here and goes dark, which is
+  // the one thing on the floor that says the ground is spent and more is
+  // wanted.
+  let nodePay = null;
+  let nodePayPeak = 0;
+
+  const flowSums = (state, world, rt, market, roster) => {
+    const threads = state.threads;
+    const n = threads.length;
+    // Remade when the shape of the network changes or the market moves. The
+    // market figure is rounded hard, so a rate creeping up by a hair does not
+    // cost a pass over every thread on the floor.
+    let paid = 0, sent = 0;
+    for (const key in market) { paid += market[key].got || 0; sent += market[key].sent || 0; }
+    const key = n + '|' + state.level + '|' + state.reached.length
+      + '|' + paid.toExponential(2) + '|' + sent.toExponential(2);
+    // A log emptying and a pool growing move these figures every step, so the
+    // key alone would rebuild them on every frame. Four times a second is
+    // faster than an eye reads a change and a fraction of the cost.
+    if (key === flowKey || state.t - flowAt < 0.25) return n > 0 && nodePay !== null;
+    flowKey = key;
+    flowAt = state.t;
+    if (!nodePay || nodePay.length < world.nodes.length) nodePay = new Float64Array(world.nodes.length);
+    nodePay.fill(0);
+    nodePayPeak = 0;
+
+    if (!flowSug || flowSug.length < n) {
+      const room = Math.max(64, n * 2);
+      flowSug = new Float64Array(room);
+      flowMin = new Float64Array(room);
+      flowOut = new Float64Array(room);
+    }
+    flowSug.fill(0, 0, n); flowMin.fill(0, 0, n); flowOut.fill(0, 0, n);
+
+    // The thread every place was reached along.
+    const edgeOf = new Map();
+    for (let e = 0; e < n; e++) edgeOf.set(threads[e][1], e);
+
+    // What one place puts into the network a second. A log gives sugar and
+    // minerals while there is anything left in it; bare soil gives minerals; a
+    // tree gives back the sugar it pays and takes the minerals it is sent, both
+    // shared out of its pool by how big it is.
+    const woodRate = cfg.wood.eatRate;
+    const own = (id) => {
+      const node = world.nodes[id];
+      if (!node) return null;
+      if (node.kind === 'wood') {
+        const stock = state.wood[id] || 0;
+        if (!(stock > 0)) return null;
+        return [woodRate, woodRate * cfg.wood.mineralsPerSugar, 0];
+      }
+      if (node.kind === 'soil') return [0, cfg.soil.rate, 0];
+      const tree = state.trees[id];
+      if (!tree || tree.dead) return null;
+      const sp = roster[tree.sp];
+      const row = sp && market[sp.key];
+      if (!row || !(row.size > 0)) return null;
+      const share = tree.s / row.size;
+      return [(row.got || 0) * share, 0, (row.sent || 0) * share];
+    };
+
+    // The log the spore came down on is never the far end of a thread, so it
+    // is measured on its own. It is also the whole organism on the first
+    // frame, which is the one moment the light on it has to be right.
+    const at0 = own(world.origin);
+    if (at0) {
+      nodePay[world.origin] = at0[0] + at0[1] + at0[2];
+      nodePayPeak = nodePay[world.origin];
+    }
+    if (!n) { flowPeak = [0, 0, 0]; return false; }
+
+    for (let e = n - 1; e >= 0; e--) {
+      const to = threads[e][1];
+      if (rt.reached.has(to)) {
+        const o = own(to);
+        if (o) {
+          flowSug[e] += o[0]; flowMin[e] += o[1]; flowOut[e] += o[2];
+          const busy = o[0] + o[1] + o[2];
+          nodePay[to] = busy;
+          if (busy > nodePayPeak) nodePayPeak = busy;
+        }
+      }
+      const up = edgeOf.get(threads[e][0]);
+      if (up !== undefined && up !== e) {
+        flowSug[up] += flowSug[e];
+        flowMin[up] += flowMin[e];
+        flowOut[up] += flowOut[e];
+      }
+    }
+    let a = 0, b = 0, c = 0;
+    for (let e = 0; e < n; e++) {
+      if (flowSug[e] > a) a = flowSug[e];
+      if (flowMin[e] > b) b = flowMin[e];
+      if (flowOut[e] > c) c = flowOut[e];
+    }
+    flowPeak = [a, b, c];
+    return true;
+  };
+
+  /**
    * The size a stamp is drawn at: the next rung of a geometric ladder at or
    * above what is wanted. Stamps are then scaled down to the exact size, so an
    * easing camera reuses the ones it has instead of drawing a new set every
@@ -637,9 +780,10 @@ export function createView(canvas, cfg, doc) {
     const c = Math.cos(a), sn = Math.sin(a);
     const dw = w * shown, dh = h * shown;
     ctx.setTransform(dpr * c, dpr * sn, -dpr * sn, dpr * c, dpr * x, dpr * y);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = paintAlpha;
     ctx.drawImage(stamp.canvas, -dw / 2, -dh / 2, dw, dh);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 1;
   };
 
   /** A canopy seen from above: lit from the top left, dark at the trunk. */
@@ -647,7 +791,7 @@ export function createView(canvas, cfg, doc) {
     if (!ok(x) || !ok(y) || !(r > 0.4)) return;
     const T = V.tree;
     if (!detail) {
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * paintAlpha;
       ctx.fillStyle = colour;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
@@ -670,8 +814,9 @@ export function createView(canvas, cfg, doc) {
     });
     if (!stamp) return;
     const dw = w * shown;
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = paintAlpha;
     ctx.drawImage(stamp.canvas, x - dw / 2, y - dw / 2, dw, dw);
+    ctx.globalAlpha = 1;
   };
 
   /**
@@ -698,24 +843,69 @@ export function createView(canvas, cfg, doc) {
     }
     if (burnt < 1) {
       ctx.strokeStyle = P.dead;
-      ctx.globalAlpha = 0.85 * (1 - burnt);
+      ctx.globalAlpha = 0.85 * (1 - burnt) * paintAlpha;
       ctx.stroke();
     }
     if (burnt > 0) {
       ctx.strokeStyle = col(B.snag, 'night');
-      ctx.globalAlpha = clamp01(num(B.snagAlpha, 0.95) * burnt);
+      ctx.globalAlpha = clamp01(num(B.snagAlpha, 0.95) * burnt) * paintAlpha;
       ctx.stroke();
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = paintAlpha;
     ctx.fillStyle = P.bark;
     ctx.beginPath();
     ctx.arc(x, y, Math.max(0.5, r * 0.22), 0, TAU);
     ctx.fill();
+    ctx.globalAlpha = 1;
     if (burnt > 0) {
       blob(ctx, paint, col(B.ember, 'rust'), x, y,
         Math.max(0.6, r * clamp01(num(B.emberRadius, 0.5))),
-        clamp01(num(B.emberAlpha, 0.45) * burnt));
+        clamp01(num(B.emberAlpha, 0.45) * burnt) * paintAlpha);
     }
+  };
+
+  /**
+   * Bare soil the threads are in: a damp patch is already in the floor, so
+   * what is drawn here is what the fungus is taking out of it - a pale mineral
+   * bloom over the patch and a scatter of grains in it. Unreached soil stays
+   * as it lies, which is why bare ground is invisible until it is worked.
+   */
+  const mineralPatch = (x, y, r, id, take) => {
+    if (!ok(x) || !ok(y) || !(r > 1)) return;
+    const F = V.flow;
+    const colour = col(F.mineral, 'frost');
+    blob(ctx, paint, colour, x, y, r, clamp01(0.14 + 0.2 * clamp01(take)) * paintAlpha);
+    if (r < 5) return;
+    const grains = 7;
+    ctx.fillStyle = colour;
+    ctx.globalAlpha = clamp01(0.4 + 0.35 * clamp01(take)) * paintAlpha;
+    for (let k = 0; k < grains; k++) {
+      const a = unit(id, 'g:' + k) * TAU;
+      const d = Math.sqrt(unit(id, 'gd:' + k)) * r * 0.8;
+      const g = Math.max(0.6, r * 0.055);
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, g, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  /**
+   * The sheath: pale thread wrapped round a place the fungus holds, drawn as
+   * light lying on it rather than as an outline round it. It burns at what the
+   * place is putting into the network, so a log eaten hollow goes dark where it
+   * lies, bare soil that is being worked keeps its light, and the ground worth
+   * more tips is the ground that is brightest. `pay` is 0 to 1 against the
+   * busiest place on the floor.
+   */
+  const sheath = (x, y, r, pay, colour) => {
+    const Hd = V.held;
+    if (!ok(x) || !ok(y) || !(r > num(Hd.minPixels, 3.5))) return;
+    const dim = num(Hd.dim, 0);
+    const lit = clamp01(dim + (1 - dim) * Math.pow(clamp01(pay), num(Hd.bias, 1.5)));
+    if (!(lit > 0.02)) return;
+    blob(ctx, paint, colour, x, y, r,
+      clamp01(num(Hd.sheathAlpha, 0.34) * lit), 0, 0, num(Hd.sheathCore, 0.2));
   };
 
   // -- the frame ------------------------------------------------------------
@@ -743,6 +933,8 @@ export function createView(canvas, cfg, doc) {
     const s = ok(px) && px > 1e-4 ? px : 1;
     const f = frame();
     const cx = f.cx, cy = f.cy;
+    pxNow = s;
+    lastCx = cx; lastCy = cy;
     const detail = s >= V.massBelow;
 
     const season = seasonOf(cfg, state.t);
@@ -753,6 +945,15 @@ export function createView(canvas, cfg, doc) {
     const burn = burnOf(state);
     const dry = !!ev.drought;
     const fallen = ev.fallen || {};
+
+    // How much of what the ground gives up is actually being carried away. It
+    // is the one number that decides whether more tips are wanted, so the
+    // mineral bloom on every worked patch is drawn at it: a front that cannot
+    // keep up leaves the ground looking as though it is going to waste, which
+    // is what is happening.
+    const carry = typeof sim.carry === 'function' ? sim.carry() : null;
+    const soilTake = carry && carry.produced > 0
+      ? clamp01(carry.carried / carry.produced) : 1;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalAlpha = 1;
@@ -780,14 +981,19 @@ export function createView(canvas, cfg, doc) {
       ctx.fillRect(0, 0, W, H);
     }
 
-    // What is on the floor. One pass over the nodes: logs first, then the
-    // trees over them, with the unreached ground drawn the same and left to
-    // the mist to veil.
+    // What is on the floor. Two passes over the nodes, because whose ground it
+    // is has to be the first thing a glance answers: everything the threads
+    // have not got to goes down first and faint, then everything they hold
+    // goes down whole and wrapped in a ring of sheath.
     const cells = Math.max(1, V.log.length) * s;
     const pad = Math.max(cells, V.tree.radius * s) * 2;
     const inFrame = (x, y) => x > -pad && x < W + pad && y > -pad && y < H + pad;
     const scaleNow = sim.scale();
     const roster = sim.roster;
+    // What every thread is carrying and what every place is putting in. Both
+    // the light on the ground and the motes running along the threads are
+    // drawn from this, so it is worked out once, before either.
+    const hasFlow = flowSums(state, world, rt, sim.market(), roster);
     const canopyOf = (sp) => {
       const list = P.canopy;
       if (!Array.isArray(list) || !list.length) return P.mossFloor;
@@ -796,29 +1002,43 @@ export function createView(canvas, cfg, doc) {
       return list[idx];
     };
 
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      if (n.kind === 'soil') continue;              // the damp patch is in the floor
-      const x = cx + n.x * s, y = cy + n.y * s;
-      if (!inFrame(x, y)) continue;
-      const reached = rt.reached.has(i);
+    const T = V.tree;
+    const Hd = V.held;
+    const sheathPad = num(Hd.sheathPad, 0.34) * s;
+
+    /**
+     * One place on the floor. `held` says whether the threads are in it, which
+     * is the whole of what separates a log being eaten from a log lying there.
+     * Returns the radius the sheath ring wants, or 0 for a place that wears
+     * none.
+     */
+    const place = (i, n, x, y, held) => {
       // Ground the fire took is not reached any more, but what happened to it
       // is still standing there and is still in the books.
       const char = burn && burn.nodes.has(i) ? burn.fade : 0;
 
+      if (n.kind === 'soil') {
+        // A damp patch is already in the floor. What is drawn here is what the
+        // fungus is taking out of it, so bare ground shows nothing until it is
+        // worked, and then shows how hard.
+        if (!held) return 0;
+        const r = Math.max(1, num(V.floor.dampRadius, 0.8) * s * 0.9);
+        mineralPatch(x, y, r, i, soilTake);
+        return r * 1.05;
+      }
+
       if (n.kind === 'wood') {
         let full = 1;
-        if (reached || char > 0) {
+        if (held || char > 0) {
           const stock = state.wood[i] || 0;
           const whole = cfg.wood.stockBase * n.stock * scaleNow;
           full = whole > 0 ? clamp01(stock / whole) : 0;
         }
         log(x, y, s, i, full, detail, look, fallen[i] > 0, char);
-        continue;
+        return held ? Math.max(2, V.log.length * s * 0.5 * (0.82 + 0.18 * full) + sheathPad) : 0;
       }
 
       // A living tree, a seedling, or a snag with its wood lying beside it.
-      const T = V.tree;
       // A tree that has been reached is known, and stays known if the fire
       // takes the ground back off us: it is still standing there, dead.
       const tree = state.trees[i] || null;
@@ -837,10 +1057,36 @@ export function createView(canvas, cfg, doc) {
           log(x + Math.cos(a) * r * 1.3, y + Math.sin(a) * r * 1.3, s, i + 7919, left, detail, look, false, char);
         }
       } else if (size < T.seedlingBelow) {
-        blob(ctx, paint, P.seedling, x, y, Math.max(1, r * 0.7), 0.9);
+        blob(ctx, paint, P.seedling, x, y, Math.max(1, r * 0.7), 0.9 * paintAlpha);
       } else {
         canopy(x, y, r, canopyOf(tree ? tree.sp : n.sp), detail);
       }
+      return held ? r + sheathPad : 0;
+    };
+
+    // Ground nobody is in: faint, and left to the mist.
+    paintAlpha = clamp01(num(Hd.ghost, 0.3));
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (rt.reached.has(i)) continue;
+      const x = cx + n.x * s, y = cy + n.y * s;
+      if (!inFrame(x, y)) continue;
+      place(i, n, x, y, false);
+    }
+
+    // Ground the threads hold: whole, and ringed.
+    paintAlpha = 1;
+    const rings = [];
+    for (const i of state.reached) {
+      const n = nodes[i];
+      if (!n) continue;
+      const x = cx + n.x * s, y = cy + n.y * s;
+      if (!inFrame(x, y)) continue;
+      const r = place(i, n, x, y, true);
+      if (r > 0) rings.push(x, y, r, nodePay && nodePayPeak > 0 ? nodePay[i] / nodePayPeak : 0);
+    }
+    for (let k = 0; k < rings.length; k += 4) {
+      sheath(rings[k], rings[k + 1], rings[k + 2], rings[k + 3], look.glow);
     }
     ctx.globalAlpha = 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1001,6 +1247,86 @@ export function createView(canvas, cfg, doc) {
       ctx.globalAlpha = 1;
     }
 
+    // What the threads are carrying, drawn as it moves. Pale blue runs out to
+    // the trees and amber runs back, along the same threads the lace drew, so
+    // a glance says which ground pays and which is spent.
+    if (threads.length && detail && hasFlow) {
+      const F = V.flow;
+      const size = Math.max(0.5, num(F.size, 0.075) * s);
+      if (size >= num(F.minPixels, 2.2)) {
+        const budget = Math.max(0, Math.round(num(F.motes, 900)));
+        const cap = Math.max(1, Math.round(num(F.maxPerThread, 4)));
+        const speed = num(F.speed, 1.35);
+        const mineral = col(F.mineral, 'frost');
+        const sugar = col(F.sugar, 'woodPale');
+        // How many motes each stream would like, and what they all have to be
+        // held back by to fit in the budget.
+        const want = (peak, arr) => {
+          if (!(peak > 0)) return 0;
+          let total = 0;
+          for (let e = 0; e < threads.length; e++) {
+            if (arr[e] > 0) total += Math.min(cap, 1 + Math.floor(cap * Math.sqrt(arr[e] / peak)));
+          }
+          return total;
+        };
+        const asked = want(flowPeak[0], flowSug) + want(flowPeak[1], flowMin) + want(flowPeak[2], flowOut);
+        const hold = asked > budget && asked > 0 ? budget / asked : 1;
+
+        // One stream: motes spaced evenly along every thread that carries it,
+        // walking at a fixed speed whichever way the stream runs. A thread's
+        // own offset is fixed, so nothing stutters between frames and a mote
+        // count that changes does not jump the ones already on the wire.
+        const stream = (arr, peak, colour, outward) => {
+          if (!(peak > 0)) return;
+          ctx.fillStyle = colour;
+          ctx.globalAlpha = clamp01(num(F.alpha, 0.85));
+          ctx.beginPath();
+          for (let e = 0; e < threads.length; e++) {
+            const v = arr[e];
+            if (!(v > 0)) continue;
+            const a = nodes[threads[e][0]], b = nodes[threads[e][1]];
+            if (!a || !b) continue;
+            const ax = cx + a.x * s, ay = cy + a.y * s;
+            const bx = cx + b.x * s, by = cy + b.y * s;
+            if (!inFrame(ax, ay) && !inFrame(bx, by)) continue;
+            const phase = unit(threads[e][0] * 131 + threads[e][1], 'flow');
+            const n = Math.floor((1 + Math.floor(cap * Math.sqrt(v / peak))) * hold + phase);
+            if (n < 1) continue;
+            const dx = bx - ax, dy = by - ay;
+            const d = Math.hypot(dx, dy);
+            if (!(d > 1e-6)) continue;
+            // The same bow the lace was drawn with, so a mote rides the thread
+            // it is on rather than the straight line between its ends.
+            const off = (unit(threads[e][0] * 131 + threads[e][1], 'w') - 0.5) * 4 * V.lace.wave * s;
+            const qx = (ax + bx) / 2 - (dy / d) * off, qy = (ay + by) / 2 + (dx / d) * off;
+            const walk = (state.t * speed * s / d + phase) % 1;
+            for (let k = 0; k < n; k++) {
+              let u = (walk + k / n) % 1;
+              if (!outward) u = 1 - u;
+              const w = 1 - u;
+              const px2 = w * w * ax + 2 * w * u * qx + u * u * bx;
+              const py2 = w * w * ay + 2 * w * u * qy + u * u * by;
+              ctx.moveTo(px2 + size, py2);
+              ctx.arc(px2, py2, size, 0, TAU);
+            }
+          }
+          ctx.fill();
+          // A soft pass under the motes, so light seems to be inside the
+          // thread rather than sitting on top of it.
+          if (num(F.glowAlpha, 0) > 0) {
+            ctx.globalAlpha = clamp01(num(F.glowAlpha, 0.22));
+            ctx.lineWidth = size * num(F.glowSize, 2.4);
+            ctx.strokeStyle = colour;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        };
+        stream(flowSug, flowPeak[0], sugar, false);
+        stream(flowMin, flowPeak[1], mineral, false);
+        stream(flowOut, flowPeak[2], mineral, true);
+      }
+    }
+
     // The tips: short bright dashes at the front, pointing where they are
     // going. Past the cap on bodies the front reads as a bright fringe.
     const tips = state.tips;
@@ -1039,6 +1365,62 @@ export function createView(canvas, cfg, doc) {
       ctx.strokeStyle = look.glow;
       ctx.globalAlpha = Math.min(1, V.tip.glow + look.glowAll);
       ctx.stroke();
+      // A bright point at the head of each tail. Without it a tip is another
+      // short pale line among thousands of them, and a front of two thousand
+      // reads as more thread rather than as something moving.
+      //
+      // The head is a stub of a line under a round cap rather than a circle:
+      // an arc of its own for every one of two thousand tips costs a quarter
+      // of the frame in software, and a two-point path stroked wide is the
+      // same disc for a fraction of it.
+      const head = Math.max(0.9, num(V.tip.head, 0.13) * s);
+      if (head >= 1) {
+        ctx.beginPath();
+        for (let k = 0; k < tips.length; k += stride) {
+          const t = tips[Math.floor(k)];
+          if (!t || !ok(t.x) || !ok(t.y)) continue;
+          const x = cx + t.x * s, y = cy + t.y * s;
+          if (!inFrame(x, y)) continue;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 0.01, y);
+        }
+        ctx.strokeStyle = look.glow;
+        ctx.lineWidth = head * 2;
+        ctx.globalAlpha = clamp01(num(V.tip.headAlpha, 1));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Where the front has been sent: an open ring with a short cross through
+    // it, standing on the ground rather than lying on it, so it is not read as
+    // another thing the fungus has found.
+    const aim = state.aim;
+    if (aim && ok(aim.x) && ok(aim.y)) {
+      const M = V.aimMark || {};
+      const ax = cx + aim.x * s, ay = cy + aim.y * s;
+      // One slow beat, so the eye finds it among a thousand other things.
+      const beat = Math.max(0.2, num(M.beat, 3.2));
+      const swell = 1 + num(M.beatDepth, 0.16) * Math.sin((state.t / beat) * TAU);
+      const r = Math.max(4, num(M.radius, 0.75) * s) * swell;
+      const arm = r * num(M.arm, 2);
+      const width = Math.max(1, num(M.width, 0.075) * s);
+      ctx.beginPath();
+      ctx.arc(ax, ay, r, 0, TAU);
+      ctx.moveTo(ax - arm, ay); ctx.lineTo(ax - r * 0.5, ay);
+      ctx.moveTo(ax + r * 0.5, ay); ctx.lineTo(ax + arm, ay);
+      ctx.moveTo(ax, ay - arm); ctx.lineTo(ax, ay - r * 0.5);
+      ctx.moveTo(ax, ay + r * 0.5); ctx.lineTo(ax, ay + arm);
+      // A dark backing under a pale mark, so it reads on litter, on loam, on
+      // snow and on a wedge of ash without changing colour with the season.
+      ctx.strokeStyle = col(M.shadow, 'night');
+      ctx.lineWidth = width * num(M.shadowWidth, 2.6);
+      ctx.globalAlpha = clamp01(num(M.shadowAlpha, 0.4));
+      ctx.stroke();
+      ctx.strokeStyle = col(M.colour, 'lace');
+      ctx.lineWidth = width;
+      ctx.globalAlpha = clamp01(num(M.alpha, 0.95));
+      ctx.stroke();
       ctx.globalAlpha = 1;
     }
 
@@ -1073,8 +1455,17 @@ export function createView(canvas, cfg, doc) {
     }
   };
 
+  /**
+   * A point on the canvas, in CSS pixels from its top left, as a place on the
+   * ground in cells from the middle. The inverse of what the last frame drew.
+   */
+  const at = (x, y) => {
+    const s = ok(px) && px > 1e-4 ? px : 1;
+    return { x: (x - lastCx) / s, y: (y - lastCy) / s };
+  };
+
   return {
-    resize, draw,
+    resize, draw, at,
     get scale() { return px; },
     get size() { return { w: W, h: H }; },
   };

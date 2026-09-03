@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=9';
-import { buildLevel, nearestOpen } from './world.js?v=9';
-import * as Tips from './tips.js?v=9';
-import * as Trees from './trees.js?v=9';
-import * as Tr from './traits.js?v=9';
-import * as Lv from './levels.js?v=9';
-import * as Sp from './spores.js?v=9';
-import * as Rv from './reveal.js?v=9';
-import * as Ev from './events.js?v=9';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=9';
-import { hash } from './rng.js?v=9';
-import * as Lore from './lore.js?v=9';
-import { fmtArea } from './numbers.js?v=9';
+import { CONFIG as DEFAULT } from '../config.js?v=10';
+import { buildLevel, nearestOpen } from './world.js?v=10';
+import * as Tips from './tips.js?v=10';
+import * as Trees from './trees.js?v=10';
+import * as Tr from './traits.js?v=10';
+import * as Lv from './levels.js?v=10';
+import * as Sp from './spores.js?v=10';
+import * as Rv from './reveal.js?v=10';
+import * as Ev from './events.js?v=10';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=10';
+import { hash } from './rng.js?v=10';
+import * as Lore from './lore.js?v=10';
+import { fmtArea, fmtCoin } from './numbers.js?v=10';
 
 export const SAVE_VERSION = 1;
 
@@ -56,6 +56,7 @@ export function freshState(cfg, seed) {
     sugar: 0,
     ring: 1,               // rings of reach open on this level
     tips: [],              // the moving bodies: { x, y, from, to }, at most cfg.tips.bodies
+    aim: null,             // where the front has been sent, in cells: { x, y }
     tipCount: 0,           // how many tips there are; the bodies stand for them
     tipsBought: 0,         // ever, for the price
     relocations: 0,        // a counter the tips hash their moves from
@@ -77,6 +78,7 @@ export function freshState(cfg, seed) {
     rate: { sugar: 0, minerals: 0 },
     litterYear: -1,
     seasonSeen: -1,
+    bestSeen: null,        // the kind that was paying most for the next mineral
     milestones: { tips: 0, area: 0 },
     events: Ev.freshEvents(),  // what the world is doing on its own
     log: [],               // the last lines said, newest first
@@ -231,7 +233,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
     // The tips forage.
     const tipMult = (m.frost && winter) ? 1 : season.tips;
-    Tips.step(state, world, rt, cfg.tips.speed * m.speed * tipMult * dt, cfg.tips.search + m.search, reachNode);
+    Tips.step(state, world, rt, cfg.tips.speed * m.speed * tipMult * dt,
+      cfg.tips.search + m.search, reachNode, aimOf());
 
     let sugar = 0;
     const income = { wood: 0, trade: 0, fell: 0, below: 0 };
@@ -330,6 +333,33 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       if (got > 0) say('firstTrade', { kind: sp.name }, true);
     }
 
+    // What one more point of a kind's share is worth, in sugar a second.
+    // Moving one weight moves the split for every kind, so the whole market is
+    // priced again at the new weights and the difference is what the press
+    // actually buys. It goes on the ledger beside the tick that makes it,
+    // because a share is the only decision here with no other way to check it.
+    const totalAt = (weights) => {
+      const share = Trees.split(flowPerSecond, weights, sizes);
+      let sum = 0;
+      for (const sp of roster) {
+        const S = sizes[sp.key] || 0;
+        if (!(S > 0)) continue;
+        const r = Trees.tradeOf(sp, S, share[sp.key] || 0);
+        sum += r.got * m.trade * m.yield * tradeMult * Trees.seasonMult(sp, season.index);
+      }
+      return sum;
+    };
+    const nowPaid = totalAt(state.weights);
+    for (const sp of roster) {
+      const row = market[sp.key];
+      if (!row || !(row.count > 0)) continue;
+      row.shareGain = 0;
+      if (row.weight >= cfg.trees.weightMax) continue;
+      const trial = Object.assign({}, state.weights);
+      trial[sp.key] = row.weight + 1;
+      row.shareGain = totalAt(trial) - nowPaid;
+    }
+
     // Feeding: sugar to a kind, for growth.
     const boost = {};
     if (m.nurture) {
@@ -410,6 +440,24 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       const first = state.seasonSeen < 0;
       state.seasonSeen = season.index;
       if (!first && state.flags.season) say('season.' + season.index, {}, false, season.year);
+    }
+
+    // Every kind pays best in a season of its own, so the kind worth the
+    // minerals changes as the year does. When it changes hands the journal
+    // says so, which is the only warning a player gets that the split they set
+    // last season is now the wrong one.
+    let bestKind = null;
+    for (const sp of roster) {
+      const row = market[sp.key];
+      if (!row || !(row.count > 0) || !(row.marginal > 0)) continue;
+      if (!bestKind || row.marginal > market[bestKind].marginal) bestKind = sp.key;
+    }
+    if (bestKind && state.bestSeen !== bestKind) {
+      const had = state.bestSeen !== undefined && state.bestSeen !== null;
+      state.bestSeen = bestKind;
+      if (had && state.flags.season) {
+        say('bestKind', { kind: market[bestKind].name }, false, bestKind + ':' + season.year + ':' + season.index);
+      }
     }
 
     // Book it.
@@ -573,6 +621,35 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   // -- actions ---------------------------------------------------------------
 
   /** Push a thread out by hand: one node, from wherever the front is. */
+  // -- where the front has been sent -----------------------------------------
+  //
+  // A place on this ground the tips lean toward. It changes which of the open
+  // places they take first and nothing else: no ground is closed off, no ring
+  // opens any faster, and the level still has to be reached to be folded. What
+  // it buys is order, and order is worth a lot - a stand of the kind that is
+  // paying best this season is worth reaching before a bog is.
+
+  const aimOf = () => {
+    const a = state.aim;
+    if (!a || !Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
+    return { x: a.x, y: a.y, pull: cfg.tips.aimPull };
+  };
+
+  /** Send the front toward a place on the ground, in cells from the middle. */
+  const setAim = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return drain();
+    // Never further out than the ground that is open, so the mark is always
+    // somewhere the tips can actually get to.
+    const edge = state.ring * cfg.world.ringWidth;
+    const d = Math.sqrt(x * x + y * y);
+    if (d > edge && d > 1e-6) { x = x * edge / d; y = y * edge / d; }
+    state.aim = { x, y };
+    say('aimSet', {}, true);
+    return drain();
+  };
+
+  const clearAim = () => { state.aim = null; return drain(); };
+
   const reachByHand = () => {
     state.hand.presses++;
     const k = scale();
@@ -583,7 +660,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     for (let i = 0; i < rt.frontier.size && target < 0; i++) {
       const f = rt.frontier.at(i);
       // -- events.js hook: the hand cannot help itself to ground a rival holds.
-      const id = nearestOpen(world, f, search, state.ring, isReached, isClaimed, Ev.rivalGuard(rt), false);
+      const id = nearestOpen(world, f, search, state.ring, isReached, isClaimed, Ev.rivalGuard(rt), false, aimOf());
       if (id >= 0) { target = id; from = f; }
     }
     state.sugar += cfg.hand.sugar * k;
@@ -705,6 +782,17 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     Tips.gather(state, world, world.origin);
     rebuild();
     say('beyond', { level: Lore.levelInfo(state.level).name }, false, state.level);
+    // What the fold is worth, in the figures it is worth it in. Folding a
+    // level is the largest single thing that happens in this game and it used
+    // to pass without a number: the picture went quiet and the label read a
+    // new name. The ground left behind pays on, and this says how much.
+    state.aim = null;
+    state.bestSeen = null;
+    say('below', {
+      sugar: fmtCoin(state.below.sugar),
+      minerals: fmtCoin(state.below.minerals),
+      level: Lore.levelInfo(state.level - 1).name,
+    }, false, state.level);
     Rv.update(state, cfg, { tipCost: tipCost(1), rootsReached: rt.roots, genome });
     return drain();
   };
@@ -726,6 +814,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     step, advance, drain,
     tipCost, tipsAffordable, carryCapacity: () => carryCapacity(mods()),
     reachByHand, buyTips, buyTipsMax, setWeight, setHarvest, toggleNurture, buyTrait, extend, beyond,
+    setAim, clearAim, aim: () => aimOf(),
     setInstinct, setReserve, instinct: () => instinctBook(),
     area, canFruit, sporesNow,
     ringCost: () => Lv.ringCost(cfg, state.level, state.ring + 1),

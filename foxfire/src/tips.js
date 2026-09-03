@@ -11,8 +11,16 @@
 // would. That is what lets time away be caught up in coarse chunks.
 // ---------------------------------------------------------------------------
 
-import { nearestOpen } from './world.js?v=9';
-import { hash } from './rng.js?v=9';
+import { nearestOpen } from './world.js?v=10';
+import { hash } from './rng.js?v=10';
+
+/** Draws taken from the front when a sent tip has to walk back to it. */
+const RELOCATE_TRIES = 6;
+
+const dist2 = (node, to) => {
+  const dx = node.x - to.x, dy = node.y - to.y;
+  return dx * dx + dy * dy;
+};
 
 /** A set with O(1) add, delete and random access, for the frontier. */
 export class IndexedSet {
@@ -53,8 +61,13 @@ export function makeTip(world, nodeId) {
 /**
  * Move every tip by `budget` cells. `reach(id, fromId)` is called for each
  * node newly arrived at. Returns how many arrivals there were.
+ *
+ * `aim` is where the player has sent the front, as {x, y, pull}, or null. It
+ * leans both choices a tip makes: which of the places beside it to take next,
+ * and, when there is nothing left beside it, which part of the front to walk
+ * back to. Nothing else about a tip changes.
  */
-export function step(state, world, rt, budget, search, reach) {
+export function step(state, world, rt, budget, search, reach, aim) {
   if (!(budget > 0)) return 0;
   // Nothing left to reach and nobody on the way to anything: the whole front
   // waits, and a step costs nothing. A tip already travelling still arrives.
@@ -81,9 +94,9 @@ export function step(state, world, rt, budget, search, reach) {
     let hops = 0;
     while (left > 0 && hops < 256) {
       if (t.to < 0) {
-        let target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, false);
+        let target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, false, aim);
         if (target < 0 && isRival) {
-          target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, true);
+          target = nearestOpen(world, t.from, search, state.ring, isReached, isClaimed, isRival, true, aim);
           if (target >= 0) {
             const n = nodes[target];
             t.pay = (rivalCost - 1) * Math.sqrt((n.x - t.x) * (n.x - t.x) + (n.y - t.y) * (n.y - t.y));
@@ -98,9 +111,21 @@ export function step(state, world, rt, budget, search, reach) {
           if (nearestOpen(world, t.from, search, state.ring, isReached, unclaimed, isRival, false) >= 0) break;
           rt.frontier.delete(t.from);
           if (rt.frontier.size === 0) break;
-          const pick = hash(state.seed, 'relocate:' + k + ':' + state.relocations) % rt.frontier.size;
+          const salt = 'relocate:' + k + ':' + state.relocations;
+          let f = rt.frontier.at(hash(state.seed, salt) % rt.frontier.size);
+          // Sent somewhere, a tip with nothing left beside it walks back to
+          // the part of the front nearest the mark rather than to any part of
+          // it. A handful of draws is enough to lean the whole front over
+          // without walking every place on it every time one tip runs out.
+          if (aim && aim.pull > 0) {
+            let bestD = dist2(nodes[f], aim);
+            for (let j = 1; j < RELOCATE_TRIES; j++) {
+              const other = rt.frontier.at(hash(state.seed, salt + ':' + j) % rt.frontier.size);
+              const d = dist2(nodes[other], aim);
+              if (d < bestD) { bestD = d; f = other; }
+            }
+          }
           state.relocations = (state.relocations + 1) >>> 0;
-          const f = rt.frontier.at(pick);
           t.from = f;
           t.x = nodes[f].x;
           t.y = nodes[f].y;

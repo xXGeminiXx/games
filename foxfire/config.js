@@ -54,6 +54,16 @@ export const CONFIG = {
       tips:     'tips',
       area:     'ground',
       level:    'on',
+      // The chain, in the words a player would use for it. Sugar comes from
+      // two places and the minerals go through three hands on their way to
+      // the trees, and every one of those is a number worth watching.
+      source:   'sugar from',
+      wood:     'wood',
+      trade:    'the trees',
+      below:    'below',
+      dug:      'ground gives',
+      carried:  'tips carry',
+      lost:     'lost',
     },
     // The label's first line: where the organism is, after its name.
     where:       '{level}, ring {ring} of {rings}',
@@ -65,6 +75,8 @@ export const CONFIG = {
     buyTip:      'Grow a tip',
     buyTipMax:   'Max',
     buyTipTip:   'A tip forages on its own for as long as the fungus lives',
+    aimClear:    'Let them spread',
+    aimClearTip: 'Stop sending the front; the tips go back to taking whatever is nearest',
     extend:      'Open the next ring',
     beyond:      'Go beyond',
     fruit:       'Fruit',
@@ -134,12 +146,14 @@ export const CONFIG = {
     },
 
     columns: {
-      size:     'Size',
-      sent:     'Minerals sent',
-      got:      'Sugar paid',
-      rate:     'Price',
+      // The price leads, because it is the one figure a decision is made on.
+      rate:     'Next mineral fetches',
+      got:      'Paying',
+      sent:     'Sent',
+      size:     'Grown',
       rateTip:  'Sugar the next mineral sent here would fetch. Send the minerals where this is highest',
       weight:   'Share',
+      best:     'best price',
     },
   },
 
@@ -216,6 +230,11 @@ export const CONFIG = {
     bodies: 2500,
     // Bulk purchase: how many at once the Max button will try for.
     maxBuy: 100000,
+    // Sending the front: how far a place lying toward the mark is judged
+    // nearer than it is. At 0.6 a place straight toward the mark counts as
+    // two fifths of its distance, so the front leans hard without ever
+    // walking past open ground beside it.
+    aimPull: 0.6,
   },
 
   // -------------------------------------------------------------------------
@@ -403,8 +422,8 @@ export const CONFIG = {
 
     drought: {
       enabled: true,
-      first: 900,       // earliest it can happen, in simulation seconds
-      mean: 2400,       // seconds between droughts, on average
+      first: 720,       // earliest it can happen, in simulation seconds
+      mean: 2100,       // seconds between droughts, on average
       // It begins with a season and ends with it, and only these seasons
       // (spring and summer) can carry one.
       seasons: [0, 1],
@@ -414,8 +433,11 @@ export const CONFIG = {
 
     windthrow: {
       enabled: true,
-      first: 600,
-      mean: 1500,
+      // Inside a first sitting. The wind is the friendliest thing the world
+      // does - five fresh logs and no cost - and a world that says nothing for
+      // half an hour reads as scenery.
+      first: 240,
+      mean: 1200,
       logs: 5,          // how many logs the wind puts on the ground
       // The wood it leaves, in seconds of the income the organism already
       // makes, split across those logs. Well under the mean gap above, which
@@ -447,8 +469,8 @@ export const CONFIG = {
 
     rival: {
       enabled: true,
-      first: 1500,
-      mean: 5400,
+      first: 900,
+      mean: 3600,
       // It comes up past this share of the open reach, out in the ground the
       // threads come to last, which is what gives it time to be anything.
       edge: 0.75,
@@ -514,7 +536,14 @@ export const CONFIG = {
     margin: 1.18,           // the camera fits the reach times this
     ease: 2.2,              // camera easing per second
     pad: 1.5,               // cells of ground kept in view beyond the open reach
-    tipsDrawn: 1500,        // at most this many tips are drawn; the count is shown
+    // The camera never closes in past this many cells of ground either side of
+    // the middle. Fitted to the reach alone it stands on the organism's nose
+    // in the first rings, where one log fills a third of the window and the
+    // ground the next ring will open is off the edge of it. Held back to this,
+    // the ground ahead is always in view, so opening a ring widens into
+    // somewhere already being looked at.
+    cellsMin: 6.5,
+    tipsDrawn: 2500,        // at most this many tips are drawn; the count is shown
     // Below this many screen pixels per cell the picture drops its detail: a
     // log loses its face and its grain, a canopy its shading.
     massBelow: 4.0,
@@ -586,18 +615,88 @@ export const CONFIG = {
       glowAlpha: 0.09,
     },
 
-    // THE TIPS - short bright dashes at the front, never round dots.
+    // THE TIPS - a bright head with a short tail behind it, so the front
+    // reads as a crawling fringe and not as more thread.
     tip: {
-      dash: 0.4,            // in cells
-      width: 0.13,
-      alpha: 0.9,
-      glow: 0.35,           // the tint of glow the front carries in daylight
+      dash: 0.5,            // the tail, in cells
+      width: 0.16,
+      alpha: 0.95,
+      glow: 0.55,           // the tint of glow the front carries in daylight
+      head: 0.13,           // the bright point at the front, in cells
+      headAlpha: 1,
     },
 
-    // THE REACH - the bought ground is the lit clearing; past it, mist.
+    // WHOSE GROUND IT IS. Everything the threads have not got to is somebody
+    // else's ground: it is drawn faint and flat, and the mist over it does the
+    // rest. Everything they have got to is lit, and carries a ring of pale
+    // sheath so a glance says which of the logs on the floor are being eaten.
+    held: {
+      ghost: 0.34,          // how much of a colour unreached ground keeps
+      sheathAlpha: 0.34,    // the light on a place putting in as much as any
+      sheathCore: 0.2,      // the share of it that is solid before the edge softens
+      sheathPad: 0.06,      // how far past the thing itself the light reaches, in cells
+      dim: 0,               // a place putting in nothing at all shows no light
+      bias: 1.5,            // above 1, only the busiest ground carries much light
+      minPixels: 3.5,       // below this many pixels of radius no light is drawn
+    },
+
+    // THE FLOW - what the threads are carrying, drawn as it moves.
+    //
+    // A fungus translocates: everything it takes anywhere goes to the middle
+    // and back out again. Minerals come out of bare soil, sugar out of the
+    // wood and out of the trees, and both run down the threads. Drawn, the
+    // whole economy is on the floor at a glance - which ground is paying,
+    // which is spent, and how hard.
+    flow: {
+      speed: 1.35,          // cells a second a mote travels
+      motes: 900,           // the most motes drawn at once
+      size: 0.075,          // a mote, in cells
+      alpha: 0.85,
+      glowSize: 2.4,        // the soft pass under a mote, as a multiple of its size
+      glowAlpha: 0.22,
+      perFlow: 0.9,         // motes on a thread per unit of what it carries a second
+      maxPerThread: 4,
+      minPixels: 2.2,       // below this many pixels a mote is not worth drawing
+      // What is running: minerals out of the soil, sugar out of the wood and
+      // the trade. Two colours, so which ground pays what is read directly.
+      mineral: 'mineralFlow',
+      sugar:   'sugarFlow',
+    },
+
+    // A PLACE PAYING. Wood being eaten, soil giving up minerals and a tree
+    // trading all pulse where they stand, at a rate set by what they pay, so
+    // the busiest ground is the ground that flickers most.
+    pulse: {
+      radius: 0.55,         // in cells, at full strength
+      alpha: 0.3,
+      seconds: 1.6,         // one beat
+      minPixels: 4,
+    },
+
+    // THE REACH - the ground the threads are in is the lit clearing, and the
+    // ground past it falls away into the shade under the canopy. It used to be
+    // veiled in a pale mist, which put the brightest thing on the screen
+    // outside the organism and left the whole floor reading as one flat blur.
     mist: {
-      max: 0.7,             // how thickly the unbought ground is veiled
-      rings: 1.6,           // rings of ground over which the mist thickens
+      max: 0.66,            // how deep the shade past the reach goes
+      rings: 2.6,           // rings of ground the shade deepens over
+    },
+
+    // THE MARK - where the front has been sent.
+    aimMark: {
+      colour: 'lace',       // pale, so it reads on loam, on litter and on snow
+      shadow: 'night',      // laid under it, so it reads on a pale floor too
+      radius: 0.75,         // in cells
+      arm: 2.0,             // the cross through it, as a multiple of the radius
+      width: 0.075,
+      alpha: 0.95,
+      shadowWidth: 2.6,     // the dark backing, as a multiple of the line
+      shadowAlpha: 0.4,
+      // It breathes, so the eye finds it on a floor with a thousand things
+      // on it. One slow beat: at the bottom of it the mark is this much of
+      // its size, and a beat takes this long.
+      beat: 3.2,            // seconds
+      beatDepth: 0.16,
     },
 
     // BEYOND - how slowly a folded level opens its new clearing.
@@ -686,7 +785,7 @@ export const CONFIG = {
         moss: 'mossFloor', mossAlpha: 0.52,
         damp: 'damp', dampAlpha: 0.5,
         wash: 'mossFloor', washAlpha: 0.06,
-        veil: 'mist', veilAlpha: 1,
+        veil: 'damp', veilAlpha: 0.9,
         frost: 'frost', frostPer: 0,
         snow: 'snow', snowAlpha: 0,
         lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
@@ -698,7 +797,7 @@ export const CONFIG = {
         moss: 'mossFloor', mossAlpha: 0.66,
         damp: 'damp', dampAlpha: 0.5,
         wash: 'mossFloor', washAlpha: 0.03,
-        veil: 'mist', veilAlpha: 1,
+        veil: 'damp', veilAlpha: 0.9,
         frost: 'frost', frostPer: 0,
         snow: 'snow', snowAlpha: 0,
         lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
@@ -710,7 +809,7 @@ export const CONFIG = {
         moss: 'mossFloor', mossAlpha: 0.4,
         damp: 'damp', dampAlpha: 0.5,
         wash: 'rust', washAlpha: 0.09,
-        veil: 'mist', veilAlpha: 1,
+        veil: 'bark', veilAlpha: 0.9,
         frost: 'frost', frostPer: 0,
         snow: 'snow', snowAlpha: 0,
         lace: 'lace', laceAlpha: 1, glow: 'glow', glowAll: 0,
@@ -772,6 +871,13 @@ export const CONFIG = {
     frost:     '#b9c7d6',
     mist:      '#d8d2c2',
     night:     '#1d2530',
+    // What runs in the threads. These are floor colours, not inks: they are
+    // read as moving light against loam and litter rather than as words on
+    // paper, so they are bright where sugar and mineral above are dark.
+    sugarFlow:   '#f6c86a',
+    mineralFlow: '#a8d8ea',
+    // The sheath: pale thread wrapped round something the fungus holds.
+    sheath:      '#eef4e2',
   },
 
   // -------------------------------------------------------------------------
@@ -781,7 +887,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 9,
+    build: 10,
   },
 };
 
@@ -940,6 +1046,7 @@ export function applyIdentity(doc) {
   put('lbl-sugar',    t.stats.sugar);
   put('lbl-income',   t.stats.income);
   put('lbl-minerals', t.stats.minerals);
+  put('lbl-source',   t.stats.source);
   put('lbl-tips',     t.stats.tips);
   put('lbl-area',     t.stats.area);
   put('lbl-level',    t.stats.level);

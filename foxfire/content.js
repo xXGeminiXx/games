@@ -135,6 +135,11 @@ export const CONTENT = {
       'You redraw the map. A year of threading is one mark on {level}.',
       'Seen from {level}, the whole fungus is a single point. You begin again at the middle of it.',
     ],
+    below: [
+      'What is left down on {level} sends up {sugar} sugar a second and {minerals} minerals a second, and it needs nothing from you.',
+      'The old ground pays its own way now: {sugar} sugar and {minerals} minerals a second, arriving from under the new map.',
+      'You keep the books on {level} out of habit. It is {sugar} sugar and {minerals} minerals a second, every second, unattended.',
+    ],
     firstFell: [
       'A {kind} is being drained. It will fall.',
       'The threads have turned on a {kind}. It carries on as though nothing has changed.',
@@ -172,6 +177,16 @@ export const CONTENT = {
         'You came at dusk and the whole lace was lit, cold green, out to the edge.',
       ],
     },
+    aimSet: [
+      'You put a stake in the ground out there. The threads thicken on that side within the day.',
+      'A mark out on the plot, and the front leans toward it.',
+      'You mark where you want it and the growing points take the hint.',
+    ],
+    bestKind: [
+      'The prices have turned. The {kind} pays most for the next mineral now.',
+      'Best price on the plot is the {kind} this season. Move the minerals to it.',
+      'The {kind} has come up. Nothing else on this ground pays as well for a mineral today.',
+    ],
     away: [
       'Away {t}. The fungus kept working.',
       '{t} since the last entry. You read the marks and catch up.',
@@ -231,8 +246,13 @@ export const CONTENT = {
     sporesNeeds: 'This fungus can fruit once it reaches {level}.',
     sporesHeld: '{n} spores unspent.',
     belowLine: '{sugar} sugar/s and {minerals} minerals/s arrive from below.',
+    aimIdle: 'Click the floor and the tips work toward that spot first. Nothing gets closed off - they just get there sooner.',
+    aimSet:  'The tips are working toward the mark.',
     noTrees: 'No living trees reached.',
+    sharesNote: 'Share splits the minerals between the kinds. Every mineral a kind gets fetches less than the one before, so spreading them beats piling them on one kind.',
     treeBest: 'Pays best in {season}.',
+    shareGain: 'One more share here is worth {gain} sugar/s.',
+    shareCost: 'One more share here costs {gain} sugar/s.',
     treeFell: 'One grown tree is worth {felled} sugar felled, or {kept} traded each season.',
     treeFeed: 'Feeding pays for itself in {time}.',
     treeFeedNever: 'Feeding wouldn\'t pay for itself here yet.',
@@ -251,6 +271,24 @@ export const CONTENT = {
     instinctExtend: 'The stakes were out a ring further this morning and nobody moved them. It does this for itself now.',
     instinctTips:   'The front thickened overnight where the ground was giving up more than it could carry. You weren\'t here.',
     instinctBeyond: 'It has folded a finished level on its own. You came back to a map you didn\'t draw.',
+
+    // The compass at the top of the journal. One of these is showing at any
+    // moment, and each one says a fact and then the move it argues for.
+    next: {
+      hand:     'Press Grow a thread. Each press eats a little of the log and pushes the threads out.',
+      firstTip: 'You can afford a tip. A tip forages on its own and never stops, so buy one and stop pressing.',
+      waste:    'Bare soil and dead wood are giving up {produced} minerals a second and {lost} of it is leaching away. Tips carry the minerals to the trees, so grow more tips.',
+      ring:     'The tips have reached everything inside the line. Open the next ring and there\'s more ground to work.',
+      saving:   'Nothing left to reach inside the line. The next ring costs {cost} and you have {have}.',
+      beyond:   '{Level} is worked out. Go beyond: all of it becomes one place on {next}, and half of what it pays now keeps arriving.',
+      beyondSaving: '{Level} is threaded end to end. Going beyond costs {cost} and you have {have}. It turns all of this into one place on {next}.',
+      beyondNeeds: 'Going beyond needs {need} places on {level} reached and you have {reached}. The tips are still getting there.',
+      market:   '{Best} pays {bestPrice} for the next mineral and {Worst} pays {worstPrice}. Give {Best} more of the share and take it off {Worst}.',
+      trait:    'You can afford {name}. A trait lasts as long as this fungus does.',
+      winter:   'Winter. The trees pay a quarter of the usual until spring. The wood and the soil don\'t care.',
+      winterEvergreen: 'Winter, and the evergreen trade is holding. The trees pay six tenths of the usual until spring where they would have paid a quarter.',
+      idle:     'Sugar is piling up. It buys tips, ground, and traits, and nothing else.',
+    },
   },
 
   // -------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 // only has to remember which nodes have been reached.
 // ---------------------------------------------------------------------------
 
-import { hash, unit } from './rng.js?v=9';
+import { hash, unit } from './rng.js?v=10';
 
 /** Number of lattice cells inside a disc of the given radius. */
 export function cellsInDisc(radius) {
@@ -138,15 +138,28 @@ export function openedCount(world, ring) {
  * events.js: `isRival` names ground another fungus holds. It is passed over
  * like reached ground unless the caller asks for it with `takeRival`, which
  * is how ground is contested rather than simply walked into.
+ *
+ * `aim` is a place on this ground the player has sent the front toward, as
+ * {x, y, pull}. A node lying that way is judged nearer than it is - a node
+ * straight toward the mark counts as (1 - pull) of its distance - so the front
+ * leans without ever refusing ground beside it. It is a pure function of the
+ * positions, so a coarse step and a fine one still choose the same node.
  * @returns node id, or -1
  */
-export function nearestOpen(world, fromId, search, ring, isReached, isClaimed, isRival, takeRival) {
+export function nearestOpen(world, fromId, search, ring, isReached, isClaimed, isRival, takeRival, aim) {
   const from = world.nodes[fromId];
   if (!from) return -1;
   const span = Math.ceil(search);
   const s2 = search * search;
+  let ax = 0, ay = 0, pull = 0;
+  if (aim) {
+    ax = aim.x - from.x;
+    ay = aim.y - from.y;
+    const len = Math.sqrt(ax * ax + ay * ay);
+    if (len > 1e-6) { ax /= len; ay /= len; pull = aim.pull > 0 ? aim.pull : 0; }
+  }
   let best = -1;
-  let bestD = Infinity;
+  let bestScore = Infinity;
   for (let di = -span; di <= span; di++) {
     for (let dj = -span; dj <= span; dj++) {
       const id = world.byCell.get((from.i + di) + ',' + (from.j + dj));
@@ -158,7 +171,12 @@ export function nearestOpen(world, fromId, search, ring, isReached, isClaimed, i
       const dx = n.x - from.x, dy = n.y - from.y;
       const d = dx * dx + dy * dy;
       if (d > s2) continue;
-      if (d < bestD || (d === bestD && id < best)) { bestD = d; best = id; }
+      let score = d;
+      if (pull > 0 && d > 1e-12) {
+        const cos = (dx * ax + dy * ay) / Math.sqrt(d);
+        if (cos > 0) score = d * (1 - pull * cos);
+      }
+      if (score < bestScore || (score === bestScore && id < best)) { bestScore = score; best = id; }
     }
   }
   return best;

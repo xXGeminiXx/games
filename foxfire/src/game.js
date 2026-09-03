@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=9';
-import { createSim, restoreSim, openedState } from './sim.js?v=9';
-import * as Save from './save.js?v=9';
-import * as Sp from './spores.js?v=9';
-import * as Lore from './lore.js?v=9';
-import { hash } from './rng.js?v=9';
-import { createUI } from './ui.js?v=9';
-import { createView } from './view.js?v=9';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=9';
+import { storageKey } from '../config.js?v=10';
+import { createSim, restoreSim, openedState } from './sim.js?v=10';
+import * as Save from './save.js?v=10';
+import * as Sp from './spores.js?v=10';
+import * as Lore from './lore.js?v=10';
+import { hash } from './rng.js?v=10';
+import { createUI } from './ui.js?v=10';
+import { createView } from './view.js?v=10';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=10';
 
 /**
  * @param {object} o
@@ -70,7 +70,23 @@ export function createGame(o) {
   actions.extend = wrap(() => sim.extend(), true);
   actions.beyond = wrap(() => sim.beyond(), true);
   actions.buyPerk = wrap((id) => { Sp.buyPerk(cfg, sim.genome, id); return []; }, true);
+  actions.setAim = wrap((x, y) => sim.setAim(x, y), true);
+  actions.clearAim = wrap(() => sim.clearAim(), true);
   actions.fruit = () => fruit();
+
+  // A press on the floor sends the front toward that place. Where the press
+  // landed is read back through the picture's own projection rather than
+  // through a second fit of the same ground: two fits drift, and the mark then
+  // stands somewhere the player did not press.
+  if (canvas && canvas.addEventListener) {
+    canvas.addEventListener('click', (e) => {
+      const box = typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : null;
+      const x = (e.clientX || 0) - (box ? box.left : 0);
+      const y = (e.clientY || 0) - (box ? box.top : 0);
+      const at = view.at(x, y);
+      actions.setAim(at.x, at.y);
+    });
+  }
 
   // -- the clock -------------------------------------------------------------
 

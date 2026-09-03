@@ -10,12 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=9';
-import * as Tr from './traits.js?v=9';
-import * as Sp from './spores.js?v=9';
-import { fill } from '../config.js?v=9';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=9';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=9';
+import * as Lore from './lore.js?v=10';
+import * as Advice from './advice.js?v=10';
+import * as Tr from './traits.js?v=10';
+import * as Sp from './spores.js?v=10';
+import { fill } from '../config.js?v=10';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=10';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=10';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -52,6 +53,7 @@ export function createUI(doc, sim, cfg, actions) {
   bind('reach', () => actions.reach());
   bind('buy-tip', () => actions.buyTips(1));
   bind('buy-tips-max', () => actions.buyTipsMax());
+  bind('aim-clear', () => actions.clearAim());
   bind('extend', () => actions.extend());
   bind('beyond', () => actions.beyond());
 
@@ -110,14 +112,51 @@ export function createUI(doc, sim, cfg, actions) {
 
   // -- the specimen label ------------------------------------------------------
 
+  // One figure on a chain line: the word for it, then the rate. A part with
+  // nothing in it leaves the line rather than standing at zero.
+  const chainPart = (id, word, value, on) => {
+    const e = el(id);
+    if (!e) return;
+    e.hidden = !on;
+    if (!on) return;
+    if (e._word !== word) {
+      e._word = word;
+      e.textContent = '';
+      const i = doc.createElement('i');
+      i.textContent = word;
+      const b = doc.createElement('b');
+      e.appendChild(i);
+      e.appendChild(b);
+      e._value = b;
+    }
+    const shown = fmtRate(value);
+    if (e._value.textContent !== shown) e._value.textContent = shown;
+  };
+
   const renderLabel = (f, rate, info) => {
     text('sugar', fmt(state.sugar));
     show('st-income', !!f.tips);
     text('income', (rate.sugar < 0 ? '' : T.gain) + fmtCoin(rate.sugar));
-    show('st-minerals', !!f.trees);
-    text('minerals', fmtRate(rate.minerals));
     show('st-tips', !!f.tips);
     text('tips', fmtCount(state.tipCount));
+
+    // The chain. Where the sugar came from this second, and what happened to
+    // the minerals between the ground and the trees. Both lines arrive with
+    // the trees, because until then there is only one source and nothing is
+    // being carried anywhere.
+    show('st-source', !!f.trees);
+    show('st-minerals', !!f.trees);
+    if (f.trees) {
+      const income = sim.income();
+      chainPart('src-wood', T.stats.wood, income.wood, true);
+      chainPart('src-trade', T.stats.trade, income.trade + income.fell, true);
+      chainPart('src-below', T.stats.below, income.below, income.below > 0);
+      const c = sim.carry();
+      const lost = Math.max(0, c.produced - c.carried);
+      chainPart('minerals', T.stats.dug, c.produced, true);
+      chainPart('min-carried', T.stats.carried, rate.minerals, true);
+      chainPart('min-lost', T.stats.lost, lost, lost > c.produced * 0.005);
+    }
 
     show('st-level', !!f.reach);
     const last = state.ring >= cfg.world.rings;
@@ -135,7 +174,7 @@ export function createUI(doc, sim, cfg, actions) {
   // The figures on one kind, in the order they are read. Each one carries its
   // own word, so nothing depends on a heading further up the page and nothing
   // sits in a column that a narrow window could cut off.
-  const FIGURES = ['size', 'sent', 'got', 'rate'];
+  const FIGURES = ['rate', 'got', 'sent', 'size'];
 
   // What the player set, read from the state rather than from the market,
   // which is only rebuilt when the simulation steps: a press has to show on
@@ -159,8 +198,13 @@ export function createUI(doc, sim, cfg, actions) {
     name.className = 'name';
     const note = doc.createElement('small');
     note.className = 'count';
+    const best = doc.createElement('small');
+    best.className = 'best';
+    best.textContent = T.columns.best;
+    best.hidden = true;
     head.appendChild(name);
     head.appendChild(note);
+    head.appendChild(best);
     box.appendChild(head);
 
     const figs = doc.createElement('div');
@@ -231,7 +275,7 @@ export function createUI(doc, sim, cfg, actions) {
     noteLine.appendChild(figures);
     box.appendChild(noteLine);
 
-    r = { box, cells, name, note, ticks, pol, feed, row, mark, figures };
+    r = { box, cells, name, note, best, ticks, pol, feed, row, mark, figures };
     treeRows.set(row.key, r);
     el('trees').appendChild(box);
     return r;
@@ -243,6 +287,13 @@ export function createUI(doc, sim, cfg, actions) {
 
   const noteFigures = (row, m) => {
     const bits = [];
+    // What the next tick on this kind is worth, so a share is a decision with
+    // a figure on it rather than a guess.
+    if (row.count > 0 && row.weight < cfg.trees.weightMax && Math.abs(row.shareGain || 0) > 0.005) {
+      bits.push(Lore.ui(row.shareGain > 0 ? 'shareGain' : 'shareCost', {
+        gain: fmtCoin(Math.abs(row.shareGain)),
+      }));
+    }
     if (m.fell && row.felled > 0) {
       bits.push(Lore.ui('treeFell', { felled: fmt(row.felled), kept: fmt(row.kept) }));
     }
@@ -261,6 +312,19 @@ export function createUI(doc, sim, cfg, actions) {
     const season = sim.season();
     const winter = season.index === 3;
     let any = false;
+    // Which kind pays most for the next mineral. It is the whole of the
+    // decision the share ticks make, so it is marked rather than left to be
+    // worked out across three blocks of figures.
+    let bestKey = null;
+    let trading = 0;
+    for (const key in market) {
+      const row = market[key];
+      if (!(row.count > 0) || !(row.marginal > 0)) continue;
+      trading++;
+      if (!bestKey || row.marginal > market[bestKey].marginal) bestKey = key;
+    }
+    // With one kind standing there is no choice to mark.
+    if (trading < 2) bestKey = null;
     for (const sp of sim.roster) {
       const row = market[sp.key];
       if (!row) continue;
@@ -275,6 +339,7 @@ export function createUI(doc, sim, cfg, actions) {
       if (row.mature > 0) bits.push(fill(T.counts.grown, { n: row.mature }));
       if (row.dead > 0) bits.push(fill(T.counts.dead, { n: row.dead }));
       r.note.textContent = bits.join(', ');
+      r.best.hidden = bestKey !== row.key;
       const grown = row.count > 0 ? row.size / (row.count * row.max) : 0;
       r.cells.size.value.textContent = fmtPct(grown);
       r.cells.sent.value.textContent = fmtRate(row.sent);
@@ -304,7 +369,7 @@ export function createUI(doc, sim, cfg, actions) {
     for (const [key, r] of treeRows) {
       if (!market[key] || (market[key].count === 0 && market[key].dead === 0)) r.box.hidden = true;
     }
-    text('treesnote', any ? '' : Lore.ui('noTrees'));
+    text('treesnote', any ? Lore.ui('sharesNote') : Lore.ui('noTrees'));
   };
 
   // -- the traits -------------------------------------------------------------
@@ -491,7 +556,13 @@ export function createUI(doc, sim, cfg, actions) {
 
     renderLabel(f, rate, info);
 
-    // The hand.
+    // The compass: the one thing most worth doing, and the figures for it.
+    text('next', Advice.next(sim, cfg).text);
+
+    // The hand. It leaves the page once the tips are out and working: two
+    // sugar a press is nothing beside what the front brings in, and a control
+    // that says it does nothing is a control to take away.
+    show('hand-panel', !(f.handDone && state.reached.length >= 6));
     text('handline', f.handDone ? Lore.ui('handDone') : Lore.ui('handIdle'));
     const reach = el('reach');
     if (reach) reach.title = T.reachTip;
@@ -507,6 +578,17 @@ export function createUI(doc, sim, cfg, actions) {
       let line = Lore.ui('tipsLine', { n: fmtCount(state.tipCount), cost: fmt(cost) });
       if (f.trees) line += ' ' + Lore.ui(c.produced > c.capacity * 1.02 ? 'carryShort' : 'carryLine', { carried: fmtCoin(c.carried), produced: fmtCoin(c.produced) });
       text('tipline', line);
+
+      // Where the front has been sent. The line says what a press on the floor
+      // does before one is made, and what it did after.
+      const aim = state.aim;
+      text('aimline', Lore.ui(aim ? 'aimSet' : 'aimIdle'));
+      const clear = el('aim-clear');
+      if (clear) {
+        clear.hidden = !aim;
+        if (aim) priced(clear, T.aimClear, '', true);
+        clear.title = T.aimClearTip;
+      }
     }
 
     // The trees.
@@ -533,6 +615,16 @@ export function createUI(doc, sim, cfg, actions) {
       const where = { ring: state.ring, rings: cfg.world.rings, level: last ? Lore.capital(info.name) : info.name,
         reached: fmtCount(state.reached.length), total: fmtCount(total) };
       text('reachline', Lore.ui(last ? 'reachClosed' : 'reachLine', where));
+      // The bar: how much of this scale is threaded, and the mark where enough
+      // of it is to fold the whole level into one place of the next.
+      const fillBar = el('reach-fill');
+      if (fillBar && fillBar.style) {
+        fillBar.style.width = (100 * Math.min(1, state.reached.length / Math.max(1, total))).toFixed(2) + '%';
+      }
+      const markBar = el('reach-mark');
+      if (markBar && markBar.style) {
+        markBar.style.left = (100 * cfg.levels.beyondNeeds).toFixed(2) + '%';
+      }
       const ext = el('extend');
       if (ext) {
         ext.hidden = last;
