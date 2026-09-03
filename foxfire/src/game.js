@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=11';
-import { createSim, restoreSim, openedState } from './sim.js?v=11';
-import * as Save from './save.js?v=11';
-import * as Sp from './spores.js?v=11';
-import * as Lore from './lore.js?v=11';
-import { hash } from './rng.js?v=11';
-import { createUI } from './ui.js?v=11';
-import { createView } from './view.js?v=11';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=11';
+import { storageKey } from '../config.js?v=12';
+import { createSim, restoreSim, openedState } from './sim.js?v=12';
+import * as Save from './save.js?v=12';
+import * as Sp from './spores.js?v=12';
+import * as Lore from './lore.js?v=12';
+import { hash } from './rng.js?v=12';
+import { createUI } from './ui.js?v=12';
+import { createView } from './view.js?v=12';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=12';
 
 /**
  * @param {object} o
@@ -51,6 +51,8 @@ export function createGame(o) {
   const tell = (events) => { for (const e of events) ui.say(e); };
 
   const wrap = (fn, saveAfter) => (...args) => {
+    // Anything pressed means the player is back and has read the note.
+    ui.clearAway();
     const r = fn(...args);
     const events = Array.isArray(r) ? r : (r && r.events) || [];
     tell(events);
@@ -114,6 +116,8 @@ export function createGame(o) {
       if (r.gained.reached > 0) parts.push(Lore.ui('awayPlaces', { n: fmtCount(r.gained.reached) }));
       if (parts.length) line += ' ' + parts.join(', ') + '.';
       ui.log(line);
+      // And at the top of the page, where somebody coming back is looking.
+      ui.awayNote(line);
     }
     return r;
   };

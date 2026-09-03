@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=11';
-import * as Advice from './advice.js?v=11';
-import * as Tr from './traits.js?v=11';
-import * as Sp from './spores.js?v=11';
-import { fill } from '../config.js?v=11';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=11';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=11';
+import * as Lore from './lore.js?v=12';
+import * as Advice from './advice.js?v=12';
+import * as Tr from './traits.js?v=12';
+import * as Sp from './spores.js?v=12';
+import { fill } from '../config.js?v=12';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=12';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=12';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -109,6 +109,22 @@ export function createUI(doc, sim, cfg, actions) {
     if (!event || !event.key) return;
     log(Lore.line(state.seed, event.key, event.values, event.salt));
   };
+
+  // -- what happened while nobody was here --------------------------------------
+  //
+  // An idle game's first job on being opened is to say what it did while it was
+  // alone. That used to be one entry among the others; with the entries at the
+  // foot of the page it would have been off the bottom of the screen, which is
+  // no way to report the thing a player came back for. It stands above
+  // everything until anything is pressed.
+
+  const awayNote = (line) => {
+    const e = el('away');
+    if (!e) return;
+    e.textContent = line || '';
+    e.hidden = !line;
+  };
+  const clearAway = () => awayNote('');
 
   // -- the specimen label ------------------------------------------------------
 
@@ -400,11 +416,23 @@ export function createUI(doc, sim, cfg, actions) {
   const renderTraits = () => {
     if (!state.flags.traits) return;
     const m = sim.mods();
-    for (const t of Tr.offered(cfg, state, m)) {
+    // What can still be bought comes first, cheapest first; what is finished
+    // sits at the foot. A list of thirteen rows where four are actionable is a
+    // list nobody reads, and the four used to be scattered through it.
+    const list = Tr.offered(cfg, state, m);
+    const rank = list.slice().sort((a, b) => {
+      const ca = a.cost === null, cb = b.cost === null;
+      if (ca !== cb) return ca ? 1 : -1;
+      if (ca) return 0;
+      return a.cost - b.cost;
+    });
+    const at = new Map(rank.map((t, i) => [t.id, i]));
+    for (const t of list) {
       const seen = t.level > 0 || (t.cost !== null && state.totals.earned >= t.cost * 0.5);
       if (!seen && !traitRows.has(t.id)) continue;
       const r = traitRow(t.id);
       r.box.hidden = !seen;
+      if (r.box.style) r.box.style.order = String(at.get(t.id));
       const capped = t.cost === null;
       priced(r.b, Lore.trait(t.id).name, capped ? T.bought : fmt(t.cost), !capped && state.sugar >= t.cost);
       // A trait that goes only one deep says so on its own label; saying it
@@ -535,9 +563,13 @@ export function createUI(doc, sim, cfg, actions) {
     text('spores-held', g.spores > 0 ? Lore.ui('sporesHeld', { n: g.spores }) : '');
     const fruit = el('fruit');
     if (fruit) { fruit.hidden = !can; fruit.disabled = !can; }
-    show('p-genome', g.fruitings > 0 || g.spores > 0);
-    show('genome', g.fruitings > 0 || g.spores > 0);
-    if (g.fruitings > 0 || g.spores > 0) {
+    // What the spores would buy, shown before the button that cannot be taken
+    // back is pressed. Fruiting is the largest decision in the game and it
+    // used to be a price with nothing to compare it against.
+    const showGenome = can || g.fruitings > 0 || g.spores > 0;
+    show('p-genome', showGenome);
+    show('genome', showGenome);
+    if (showGenome) {
       for (const p of Sp.offered(cfg, g)) {
         const r = perkRow(p.id);
         const capped = p.cost === null;
@@ -670,5 +702,5 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
-  return { render, say, log, restore, savedNote, renderLog };
+  return { render, say, log, restore, savedNote, renderLog, awayNote, clearAway };
 }

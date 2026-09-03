@@ -11,8 +11,8 @@
 // would. That is what lets time away be caught up in coarse chunks.
 // ---------------------------------------------------------------------------
 
-import { nearestOpen } from './world.js?v=11';
-import { hash } from './rng.js?v=11';
+import { nearestOpen } from './world.js?v=12';
+import { hash } from './rng.js?v=12';
 
 /** Draws taken from the front when a sent tip has to walk back to it. */
 const RELOCATE_TRIES = 6;

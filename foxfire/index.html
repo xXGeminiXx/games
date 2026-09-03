@@ -85,6 +85,15 @@
     background:var(--paper-deep);border-left:3px solid var(--rust-ink);color:var(--ink);
   }
   #next:empty{display:none}
+
+  /* What happened while nobody was here. It stands above the compass because
+     it is the first thing a player wants on coming back, and the entries it
+     used to live among are at the foot of the page. It goes as soon as
+     anything is pressed. */
+  #away{
+    margin:0 0 1.1rem;padding:.5rem .75rem;font-size:1.0625rem;line-height:1.45;
+    background:var(--paper-deep);border-left:3px solid var(--moss);color:var(--ink);
+  }
   .panel{margin:0 0 1.15rem}
   .panel:last-of-type{margin-bottom:0}
   h2{
@@ -197,6 +206,10 @@
   .rrow .lv{grid-area:lv;color:var(--faded);font-size:1rem}
   .rrow .line{grid-area:line;color:var(--faded);font-size:1rem;line-height:1.4}
   #genome{margin-top:.15rem}
+  /* Traits are ordered by what can still be bought, cheapest first, with the
+     finished ones at the foot. The rows are made once and kept, so the order
+     is set on them rather than by moving them about. */
+  #traits{display:flex;flex-direction:column}
 
   /* Instinct: the same rows as the traits, each label switching a habit on or
      off, and under them the share of the sugar instinct leaves alone. */
@@ -364,7 +377,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="5c27e344b622">
+<meta name="build" content="7fd4ef557d35">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -422,6 +435,8 @@
 
 <aside id="journal">
   <p id="tagline"></p>
+
+  <p id="away" hidden></p>
 
   <p id="next"></p>
 
@@ -498,8 +513,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=11';
-import { createGame } from './src/game.js?v=11';
+import { CONFIG, applyIdentity } from './config.js?v=12';
+import { createGame } from './src/game.js?v=12';
 
 applyIdentity(document);
 

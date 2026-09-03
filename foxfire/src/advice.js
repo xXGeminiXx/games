@@ -13,14 +13,23 @@
 // is playing the same game.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=11';
-import * as Tr from './traits.js?v=11';
-import { fmt, fmtCoin } from './numbers.js?v=11';
+import * as Lore from './lore.js?v=12';
+import * as Tr from './traits.js?v=12';
+import { fmt, fmtCoin } from './numbers.js?v=12';
 
 /** The share of the mineral flow going to waste before it is worth saying. */
 const WASTE = 0.08;
 /** How much better the best price has to be before moving a share is worth it. */
 const SPREAD = 1.35;
+/**
+ * While the front is idle and the next ring is the whole bottleneck, a trait
+ * is only worth naming if it costs no more than this share of the ring. A
+ * player who buys every affordable trait during that wait never opens the
+ * ring at all: measured over ten minutes of following this line, the sugar
+ * went 2.56K, 4.32K, 3.02K, 5.12K, 3.35K against a 10.24K ring and the run
+ * stood still on one ring the whole time.
+ */
+const TRAIT_SHARE = 0.25;
 
 /**
  * @returns {{key: string, text: string}} the line, and the key it came from so
@@ -32,9 +41,17 @@ export function next(sim, cfg) {
   const say = (key, values) => ({ key, text: Lore.ui('next.' + key, values) });
 
   // The opening: there is one button, and it is not obvious that pressing it
-  // is meant to be temporary.
+  // is meant to be temporary. So it counts down to the thing that ends it -
+  // ten identical presses with nothing to press toward is the worst minute in
+  // the game, and it is the first one.
   if (state.tipCount === 0) {
-    return state.sugar >= sim.tipCost(1) ? say('firstTip') : say('hand');
+    const cost = sim.tipCost(1);
+    if (state.sugar >= cost) return say('firstTip');
+    const perPress = cfg.hand.sugar * sim.scale();
+    const left = perPress > 0 ? Math.max(1, Math.ceil((cost - state.sugar) / perPress)) : 0;
+    // The wood and the soil are paying too, so it arrives by this press at the
+    // latest. One press left is a different sentence from six.
+    return left > 1 ? say('hand', { n: fmt(left) }) : say('handLast');
   }
 
   const lastRing = state.ring >= cfg.world.rings;
@@ -89,11 +106,15 @@ export function next(sim, cfg) {
   }
 
   // A trait, cheapest first, once one is affordable outright. Ahead of any
-  // waiting, because a trait bought now is working while the waiting happens.
+  // waiting, because a trait bought now is working while the waiting happens -
+  // except while the front is idle and the ring is the whole bottleneck, when
+  // only a trait small enough not to hold the ring up is worth naming.
+  const holding = empty && !lastRing && state.sugar < ringCost;
   if (f.traits) {
     let pick = null;
     for (const t of Tr.offered(cfg, state, sim.mods())) {
       if (t.cost === null || t.cost > state.sugar) continue;
+      if (holding && t.cost > ringCost * TRAIT_SHARE) continue;
       if (!pick || t.cost < pick.cost) pick = t;
     }
     if (pick) return say('trait', { name: Lore.trait(pick.id).name });
@@ -129,5 +150,8 @@ export function next(sim, cfg) {
     return say('winter');
   }
 
-  return say('idle');
+  // Nothing to press. Say what the sugar is piling up toward rather than
+  // listing what sugar is for.
+  if (!lastRing) return say('idle', { cost: fmt(ringCost) });
+  return say('idleLast');
 }

@@ -242,7 +242,7 @@ export const CONTENT = {
     reachClosed: '{level} is open to its edge. {reached} of {total} places reached.',
     beyondLine: 'All of {level} becomes one point of {next}. Half of what it pays now keeps arriving from below.',
     beyondNeeds: 'Reach {pct} of {level} first.',
-    sporesNote: 'Fruiting ends this fungus. It would carry {n} spores.',
+    sporesNote: 'Fruiting ends this fungus. The ground and every trait it learned go with it, and it would carry {n} spores out. What the spores buy holds in every fungus after this one.',
     sporesNeeds: 'This fungus can fruit once it reaches {level}.',
     sporesHeld: '{n} spores unspent.',
     belowLine: '{sugar} sugar/s and {minerals} minerals/s arrive from below.',
@@ -275,7 +275,8 @@ export const CONTENT = {
     // The compass at the top of the journal. One of these is showing at any
     // moment, and each one says a fact and then the move it argues for.
     next: {
-      hand:     'Press Grow a thread. Each press eats a little of the log and pushes the threads out.',
+      hand:     'Press Grow a thread. Each press eats a little of the log and pushes the threads out. {n} more presses and you can afford the first tip.',
+      handLast: 'One more press buys the first tip. A tip forages on its own and never stops.',
       firstTip: 'You can afford a tip. A tip forages on its own and never stops, so buy one and stop pressing.',
       waste:    'Bare soil and dead wood are giving up {produced} minerals a second and {lost} of it is leaching away. Tips carry the minerals to the trees, so grow more tips.',
       ring:     'The tips have reached everything inside the line. Open the next ring and there\'s more ground to work.',
@@ -287,7 +288,8 @@ export const CONTENT = {
       trait:    'You can afford {name}. A trait lasts as long as this fungus does.',
       winter:   'Winter. The trees pay a quarter of the usual until spring. The wood and the soil don\'t care.',
       winterEvergreen: 'Winter, and the evergreen trade is holding. The trees pay six tenths of the usual until spring where they would have paid a quarter.',
-      idle:     'Sugar is piling up. It buys tips, ground, and traits, and nothing else.',
+      idle:     'The tips are still finding ground. Sugar is piling up toward the next ring at {cost}.',
+      idleLast: 'The tips are still working. Sugar is piling up, and it buys tips, ground and traits.',
     },
   },
 
