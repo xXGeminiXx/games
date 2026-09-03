@@ -362,7 +362,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="90216277f12b">
+<meta name="build" content="11c2fec9ada1">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -515,24 +515,24 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=20';
-import { createJuice } from './src/juice.js?v=20';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=20';
-import { createBlockKinds } from './src/blocks.js?v=20';
-import { safeRows } from './src/arrival.js?v=20';
-import { createAwards } from './src/awards.js?v=20';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=20';
-import { createLeaderboard } from './src/leaderboard.js?v=20';
-import * as Tiers from './src/tiers.js?v=20';
-import { createOnboarding } from './src/onboarding.js?v=20';
-import { createVisual } from './src/visual.js?v=20';
-import * as Economy from './src/economy.js?v=20';
-import * as Powers from './src/powers.js?v=20';
-import * as Meta from './src/meta.js?v=20';
-import { createUI } from './src/ui.js?v=20';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=20';
-import { seedForSync, today as utcToday } from './src/daily.js?v=20';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=20';
+         storageKey, applyIdentity } from './config.js?v=21';
+import { createJuice } from './src/juice.js?v=21';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=21';
+import { createBlockKinds } from './src/blocks.js?v=21';
+import { safeRows } from './src/arrival.js?v=21';
+import { createAwards } from './src/awards.js?v=21';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=21';
+import { createLeaderboard } from './src/leaderboard.js?v=21';
+import * as Tiers from './src/tiers.js?v=21';
+import { createOnboarding } from './src/onboarding.js?v=21';
+import { createVisual } from './src/visual.js?v=21';
+import * as Economy from './src/economy.js?v=21';
+import * as Powers from './src/powers.js?v=21';
+import * as Meta from './src/meta.js?v=21';
+import { createUI } from './src/ui.js?v=21';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=21';
+import { seedForSync, today as utcToday } from './src/daily.js?v=21';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=21';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -755,6 +755,7 @@ function fresh(){
   // options and a redeal is a decision rather than a spin.
   S.pow = Powers.createState({ seed: S.seed, swarm: S.balls, essence: 0 });
   S.pow.hostPool = HAND_POOL;
+  S.pow.noMarket = !!S.econ.cashOnly;
   // The hand prices itself off block health, so it has to be on the same
   // difficulty the field is. Without this it quoted one curve while the blocks
   // arrived on another.
@@ -2413,8 +2414,16 @@ function deliverable(){
   return ok;
 }
 
+// Options that only mean anything at the desk. A run with no market has no
+// quote to fill closer to, no book to deepen and no ore to yield more of, so
+// dealing one of these to it is dealing a card that does nothing. The whole
+// LEDGER way to build is trade, and MELT is a way to dump ore.
+const MARKET_ONLY = new Set(
+  Powers.POWER_LIST.filter(d => d.doctrine === 'ledger').map(d => d.id).concat(['melt'])
+);
+
 // The pool is narrowed for THIS game's states only. Every option keeps the
-// rule it was written with; one more is added in front of it, and it answers
+// rule it was written with; two more are added in front of it, and they answer
 // yes for anyone who does not ask to be narrowed.
 const HAND_POOL = deliverable();
 for (const def of Powers.POWER_LIST){
@@ -2423,6 +2432,7 @@ for (const def of Powers.POWER_LIST){
   def.hostGated = true;
   def.req = (s) => {
     if (s && s.hostPool && !s.hostPool.has(def.id)) return false;
+    if (s && s.noMarket && MARKET_ONLY.has(def.id)) return false;
     return own ? own(s) : true;
   };
 }
@@ -2565,6 +2575,7 @@ function syncPowers(){
   S.pow.depth = S.depth;
   S.pow.swarm = Powers.B.of(S.balls);
   S.pow.essence = Powers.B.of(cash());
+  S.pow.noMarket = !!S.econ.cashOnly;
   // What the trade powers are worth at the desk, as plain numbers. The market
   // reads this and never reads the hand, so neither module imports the other.
   S.econ.pow = Powers.tradeMods(S.pow);
@@ -2584,6 +2595,7 @@ function powLoad(saved){
   });
   if (saved) Object.assign(st, saved);
   st.hostPool = HAND_POOL;
+  st.noMarket = !!(S.econ && S.econ.cashOnly);
   Powers.setTier(st, Tiers.dialsFor(S.tier));
   Powers.recompute(st);
   return st;
@@ -3565,6 +3577,7 @@ function rebuildFrom(seed){
   S.econ = Economy.create({ depth: 1, cash: !TRADE, hpAt: (d) => Math.max(1, blockHealth(d)) });
   S.pow = Powers.createState({ seed, swarm: S.balls, essence: 0 });
   S.pow.hostPool = HAND_POOL;
+  S.pow.noMarket = !!S.econ.cashOnly;
   Powers.setTier(S.pow, Tiers.dialsFor(S.tier));
   spoilsPool = 0;
   S.owed = { ball: 0, gold: 0 };

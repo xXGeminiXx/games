@@ -30,7 +30,7 @@
 // which is the part that is code.
 // ===========================================================================
 
-import { CONFIG } from '../config.js?v=20';
+import { CONFIG } from '../config.js?v=21';
 
 /**
  * The tracks an award can be a threshold on.
