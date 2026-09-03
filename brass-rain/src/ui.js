@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=59';
-import { createScene } from './render/scene.js?v=59';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=59';
-import { num, count, duration, mult, pct, fill } from './format.js?v=59';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=59';
-import { nailPos } from './board.js?v=59';
-import { DOORS_ROW } from './render/board-geom.js?v=59';
-import { sketchCabinet } from './cabinets.js?v=59';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=59';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=60';
+import { createScene } from './render/scene.js?v=60';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=60';
+import { num, count, duration, mult, pct, fill } from './format.js?v=60';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=60';
+import { nailPos } from './board.js?v=60';
+import { DOORS_ROW } from './render/board-geom.js?v=60';
+import { sketchCabinet } from './cabinets.js?v=60';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=60';
 
 const SPEEDS = [1, 2, 4];
 
@@ -499,13 +499,18 @@ export async function boot(doc) {
       + count(r.tray) + ' of them.';
 
     el.offers.textContent = '';
+    const hand = game.offers().map(o => o.fitting.id);
     game.offers().forEach((offer, i) => {
       const f = offer.fitting;
+      // What buying this would finish, and what it would set up with another
+      // card in the same hand.
+      const would = wouldFinish(f.id, r.fittings, hand.filter(x => x !== f.id));
       const card = doc.createElement('div');
-      card.className = 'card' + (offer.partners.length ? ' combo' : '');
+      card.className = 'card' + (would.now.length ? ' combo' : '') + (would.soon.length ? ' pairs' : '');
       const text = describe(f, true);
+      const lines = would.now.length + would.soon.length;
       card.innerHTML = '<div class="rar"></div><h4></h4><p></p>'
-        + (offer.partners.length ? '<div class="combos"></div>' : '')
+        + '<div class="combos"></div>'.repeat(lines)
         + '<div class="price"><span></span></div>';
       card.querySelector('.rar').textContent = f.rarity;
       // The rarity goes round the box as well as into the label, in the same
@@ -513,8 +518,21 @@ export async function boot(doc) {
       card.classList.add('r-' + f.rarity);
       card.querySelector('h4').textContent = f.name;
       card.querySelector('p').textContent = text;
-      if (offer.partners.length) {
-        card.querySelector('.combos').textContent = 'Works with ' + offer.partners.map(nameOf).join(', ');
+      // The name of the combination AND what it pays, on the card, at rest.
+      // "Works with X" alone left the whole of the reason to buy it one hover
+      // away, and half of them were a pairing the player could not see at all.
+      const slots = card.querySelectorAll('.combos');
+      let k = 0;
+      for (const sgy of would.now) {
+        const d = slots[k++];
+        d.textContent = 'Finishes ' + sgy.name + ': ' + sgy.text;
+        if (sgy.trap) d.className = 'combos trap';
+      }
+      for (const { sgy, missing } of would.soon) {
+        const d = slots[k++];
+        d.className = 'combos pair';
+        d.textContent = 'With ' + missing.map(nameOf).join(' and ') + ', also on offer: '
+          + sgy.name + '. ' + sgy.text;
       }
       card.querySelector('.price span').textContent = num(offer.price) + ' balls';
       // The same card a bolted-in part shows, so what is on offer and what is
@@ -543,14 +561,21 @@ export async function boot(doc) {
     for (const id of r.fittings) {
       const f = game.bench.byId.get(id);
       const chip = doc.createElement('span');
+      // Finished combinations are marked one way and half finished ones
+      // another, so a part sitting in the machine waiting for its partner is
+      // not indistinguishable from one that is doing nothing.
+      const running = combos.some(c => c.ids.indexOf(id) >= 0);
+      const waiting = !running && partnersOf(id, r.fittings).length > 0;
       chip.className = 'chip r-' + (f ? f.rarity : 'common')
-        + (combos.some(c => c.ids.indexOf(id) >= 0) ? ' combo' : '');
+        + (running ? ' combo' : '') + (waiting ? ' waiting' : '');
       chip.tabIndex = 0;
       const bead = doc.createElement('i');
       bead.setAttribute('aria-hidden', 'true');
       chip.appendChild(bead);
       chip.appendChild(doc.createTextNode(nameOf(id)));
-      chip.setAttribute('aria-label', nameOf(id) + ', ' + (f ? f.rarity : 'common') + '. Click to unbolt.');
+      chip.setAttribute('aria-label', nameOf(id) + ', ' + (f ? f.rarity : 'common')
+        + (running ? ', in a finished combination' : waiting ? ', half of a combination' : '')
+        + '. Click to unbolt.');
       attachTip(chip, () => tipFor(id));
       chip.addEventListener('click', () => { hideTip(); game.sellFitting(id); paintBench(); });
       chip.addEventListener('keydown', (e) => {
@@ -636,6 +661,28 @@ export async function boot(doc) {
       combos: live,
       partners,
     };
+  }
+
+  /**
+   * The combinations one more part would finish, and the ones it would only
+   * get halfway to. `here` is everything else on offer in the same hand, so a
+   * pairing between two cards side by side is visible before either is bought
+   * rather than only after one of them is.
+   */
+  function wouldFinish(id, owned, here) {
+    const cat = game.catalogue;
+    const list = (cat && Array.isArray(cat.SYNERGIES)) ? cat.SYNERGIES : [];
+    const have = new Set(owned);
+    const offered = new Set(here || []);
+    const now = [], soon = [];
+    for (const sgy of list) {
+      if (!sgy || !Array.isArray(sgy.ids) || sgy.ids.indexOf(id) < 0) continue;
+      if (sgy.ids.every(x => have.has(x))) continue;         // already running
+      const missing = sgy.ids.filter(x => x !== id && !have.has(x));
+      if (!missing.length) now.push(sgy);
+      else if (missing.every(x => offered.has(x))) soon.push({ sgy, missing });
+    }
+    return { now, soon };
   }
 
   function partnersOf(id, owned) {

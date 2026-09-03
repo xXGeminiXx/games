@@ -28,9 +28,9 @@
 // and it keeps every promise honest.
 // ---------------------------------------------------------------------------
 
-import { createBoard, addPin, removePinsNear, rebuild, nailPos, POCKET_PAY, POCKET_GATE } from './board.js?v=59';
-import { baseMods } from './run.js?v=59';
-import { rng as makeRng } from './rng.js?v=59';
+import { createBoard, addPin, removePinsNear, rebuild, nailPos, POCKET_PAY, POCKET_GATE } from './board.js?v=60';
+import { baseMods } from './run.js?v=60';
+import { rng as makeRng } from './rng.js?v=60';
 
 // Board units of mouth width per point of probability, measured.
 const GATE_UNITS_PER_POINT = 1 / 0.0042;
@@ -157,7 +157,10 @@ export function fitMachine(cfg, catalogue, ids, extra) {
   // ---- the round ------------------------------------------------------
   mods.payMult *= safeRatio(ratio('payMul'));
   mods.quotaMult *= safeRatio(ratio('quotaMul'));
-  mods.trayGrant += Number.isFinite(model.budgetAdd) ? model.budgetAdd : 0;
+  // Launches, not tray balls. This used to add them to the tray, and a round
+  // never runs out of tray - it runs out of the launches it is rented for - so
+  // everything promising more pulls delivered nothing at all.
+  mods.budget += Number.isFinite(model.budgetAdd) ? Math.round(model.budgetAdd) : 0;
   if (d('trayStart') !== 0 && Number.isFinite(base.trayStart) && base.trayStart > 0) {
     out.run.trayGrant = Math.max(1, Math.round(cfg.run.trayGrant * (model.trayStart / base.trayStart)));
   }

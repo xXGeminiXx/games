@@ -13,6 +13,17 @@
     --chrome:#9aa2a8; --chrome-lit:#ffffff;
     --enamel:#e9e6d6; --enamel2:#d5d1bd;
     --jade:#4fa88a; --oxblood:#5c1d20; --ink:#1a0c0d; --dim:#8c7f76; --rule:#7d5a2e;
+    /* The one accent, and it means LIVE: a value moving right now, and the
+       bonus. It arrives from the palette as one bright colour, which reads on
+       the dark board and cannot be read on a light plaque, so the plaque gets
+       the same hue taken down to an ink. Nothing else on the page may wear
+       either of them. */
+    --live:var(--jade);
+    --live-ink:color-mix(in srgb, var(--jade) 45%, var(--oxblood));
+    --live-wash:color-mix(in srgb, var(--jade) 22%, transparent);
+    /* The four rarities. Measured against the plaque and under a red-green
+       simulation; see the note beside the cards. */
+    --r-common:#727c86; --r-uncommon:#397949; --r-rare:#0069ca; --r-brass:#aa6a00;
     --plaque-shadow: 3px 3px 0 rgba(0,0,0,.45);
     --narrow:"Arial Narrow","Liberation Sans Narrow","Helvetica Neue",Helvetica,Arial,sans-serif;
     --plain:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -33,10 +44,10 @@
   button:hover:not(:disabled){background:#fff}
   button:active:not(:disabled){transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(0,0,0,.35)}
   button:disabled{opacity:.65;cursor:default;box-shadow:none}
-  button.on{background:var(--jade);color:#08201a}
+  button.on{background:var(--brass-lit);color:var(--ink)}
   button.ghost{background:transparent;color:var(--enamel);border-color:rgba(233,230,214,.3);box-shadow:none}
   button.ghost:hover:not(:disabled){background:rgba(233,230,214,.1)}
-  :focus-visible{outline:2px solid var(--jade); outline-offset:2px}
+  :focus-visible{outline:2px solid var(--lamp); outline-offset:2px}
 
   /* ---- the title rail ---------------------------------------------- */
   header{
@@ -85,7 +96,7 @@
   .row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   .row+.row{margin-top:3px}
   .row b{font-weight:600}
-  .live{color:#1d6b55;font-weight:600}
+  .live{color:var(--live-ink);font-weight:600}
 
   /* the quota bar, a filling glass tube */
   .tube{
@@ -105,7 +116,7 @@
   #log{list-style:none;margin:0;padding:0;font-size:11px;color:#6d5348;max-height:112px;overflow:auto}
   #log li{padding:1px 0;border-bottom:1px dotted rgba(92,29,32,.16)}
   #log li:last-child{border-bottom:0}
-  #log li.fever{color:#1d6b55;font-weight:600}
+  #log li.fever{color:var(--live-ink);font-weight:600}
   #log li.lost{color:#9a2f22}
 
   /* ---- the machine face -------------------------------------------- */
@@ -119,7 +130,7 @@
     position:absolute;left:50%;bottom:34px;transform:translateX(-50%);
     padding:4px 16px;border-radius:3px;
     font:600 13px/1 var(--narrow);letter-spacing:.3em;text-transform:uppercase;
-    background:var(--jade);color:#06180f;box-shadow:0 2px 8px rgba(0,0,0,.5);
+    background:var(--live);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.5);
     pointer-events:none;
   }
   #banner[hidden]{display:none}
@@ -136,12 +147,12 @@
   .mouth{position:absolute;left:0;top:0;font:700 9px/1 var(--narrow);letter-spacing:.12em;color:#fff;
     text-shadow:0 1px 2px #000,0 0 4px #000;padding:2px 4px;border-radius:3px;background:rgba(0,0,0,.42);white-space:nowrap}
   .mouth.slot{color:#ffe08a;font-size:10px}
-  .mouth.jackpot{color:#7fe0bd}
+  .mouth.jackpot{color:var(--live)}
   .fly{
     position:absolute;font:600 12px/1 var(--narrow);color:var(--brass-lit);
     text-shadow:0 1px 3px #000;animation:rise 1s ease-out forwards;
   }
-  .fly.jade{color:#7fe0bd}
+  .fly.jade{color:var(--live)}
   @keyframes rise{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-26px)}}
 
   /* ---- the brass counter rail -------------------------------------- */
@@ -168,7 +179,7 @@
     color:#b08637;font-style:normal;margin-bottom:2px;
   }
   .counter b{display:block;font:600 17px/1 var(--narrow);color:var(--lamp)}
-  .counter.hot b{color:#7fe0bd}
+  .counter.hot b{color:var(--live)}
 
   /* ---- overlays ----------------------------------------------------- */
   .sheet{
@@ -237,13 +248,25 @@
     border-radius:5px;padding:10px 11px 11px;box-shadow:var(--plaque-shadow);
     display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid rgba(0,0,0,.3);
   }
-  .card.combo{outline:2px solid var(--jade);outline-offset:1px}
+  /* Marked by the STYLE of the stroke, not by a colour. Every hue left on
+     the page is already spoken for by a rarity, by the brass furniture or by
+     the live accent, and the orange it used to wear sat 20 units from the
+     brass ring under deuteranopia - an orange outline outside a gold one. A
+     dashed stroke survives every kind of colour vision. */
+  .card.combo{outline:2px dashed var(--oxblood);outline-offset:2px}
   .card h4{margin:0;font:600 14px/1.15 var(--narrow);color:var(--ink)}
   .card .rar{
     font:600 9px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:#8a4a3a;
   }
   .card p{margin:0;font-size:12px;color:#5c4038;flex:1 1 auto}
-  .card .combos{font-size:11px;color:#1d6b55;font-weight:600}
+  .card .combos{font-size:11px;color:var(--oxblood);font-weight:600}
+  /* A combination this card would FINISH is a dashed box; one it would only
+     set up with another card in the same hand is a dotted one. Style, not a
+     fifth colour: every hue on the page already means something else. */
+  .card .combos.pair{font-weight:400;font-style:italic}
+  .card .combos.trap{text-decoration:underline dotted 2px}
+  .card.pairs:not(.combo){outline:2px dotted var(--oxblood);outline-offset:2px}
+  .chip.waiting{border-style:dotted;border-color:var(--lamp)}
   .card .price{display:flex;align-items:center;justify-content:space-between;gap:8px}
 
   /* the machine ladder */
@@ -263,7 +286,7 @@
     border:1px solid rgba(176,134,55,.3);border-radius:5px;padding:8px 10px;
     background:rgba(176,134,55,.06);
   }
-  .node.have{border-color:var(--jade);background:rgba(79,168,138,.1)}
+  .node.have{border-color:var(--brass-lit);background:rgba(240,207,131,.12)}
   .node h4{margin:0 0 3px;font:600 12px/1.2 var(--narrow);color:var(--lamp)}
   .node p{margin:0 0 6px;font-size:11px;color:var(--dim)}
 
@@ -286,19 +309,27 @@
   .chip i{width:7px;height:7px;border-radius:50%;flex:0 0 auto;font-style:normal}
   /* An offer wears its rarity round the box, in the bead's colour, and in
      its label as a darker ink that still reads on the plaque. */
-  .card.r-common{box-shadow:0 0 0 2px #9a9382,var(--plaque-shadow)}
-  .card.r-uncommon{box-shadow:0 0 0 2px #5fbf9c,var(--plaque-shadow)}
-  .card.r-rare{box-shadow:0 0 0 2px #6ea8dc,var(--plaque-shadow)}
-  .card.r-brass{box-shadow:0 0 0 2px #b08637,0 0 0 4px rgba(240,207,131,.55),var(--plaque-shadow)}
-  .card.r-common .rar{color:#6a6357}
-  .card.r-uncommon .rar{color:#2a7a5a}
-  .card.r-rare .rar{color:#2c6a9c}
-  .card.r-brass .rar{color:#8a5a14}
-  .chip.r-common i{background:#9a9382}
-  .chip.r-uncommon i{background:#5fbf9c}
-  .chip.r-rare i{background:#6ea8dc}
-  .chip.r-brass i{background:linear-gradient(#f0cf83,#b08637);box-shadow:0 0 0 1px rgba(240,207,131,.5)}
-  .chip.combo{border-color:var(--jade);box-shadow:0 0 0 1px rgba(79,168,138,.4)}
+  /* Four rarities that hold apart on the plaque and for a red-green colour
+     blind player. The old grey and green sat 9 units apart in Lab under
+     deuteranopia, which on a bead with no label beside it is one colour; and
+     three of the four rings were under 3:1 against the plaque they ring, which
+     is not a ring. Measured: every ring now clears 3.4:1 and the closest pair
+     is 27 units apart under both simulations. */
+  .card.r-common{box-shadow:0 0 0 2px var(--r-common),var(--plaque-shadow)}
+  .card.r-uncommon{box-shadow:0 0 0 2px var(--r-uncommon),var(--plaque-shadow)}
+  .card.r-rare{box-shadow:0 0 0 2px var(--r-rare),var(--plaque-shadow)}
+  .card.r-brass{box-shadow:0 0 0 2px var(--r-brass),0 0 0 4px rgba(240,207,131,.55),var(--plaque-shadow)}
+  .card.r-common .rar{color:#3f4750}
+  .card.r-uncommon .rar{color:#204a2a}
+  .card.r-rare .rar{color:#004a92}
+  .card.r-brass .rar{color:#6b4200}
+  /* A bolted-in part carries no label, only this bead, so the bead cannot say
+     its rarity in colour alone. Each one takes a shape of its own too. */
+  .chip.r-common i{background:var(--r-common);border-radius:50%}
+  .chip.r-uncommon i{background:var(--r-uncommon);border-radius:1px}
+  .chip.r-rare i{background:var(--r-rare);border-radius:1px;transform:rotate(45deg)}
+  .chip.r-brass i{background:linear-gradient(#f0cf83,var(--r-brass));border-radius:50%;box-shadow:0 0 0 1px rgba(240,207,131,.5),0 0 0 2px rgba(0,0,0,.35)}
+  .chip.combo{border-style:dashed;border-color:var(--lamp)}
 
   /* The hover card. Fixed to the window and put on the body, so it is never
      clipped by whatever it is hovering inside. */
@@ -315,7 +346,7 @@
   #tip .rar b{color:#7a5c50;font-weight:600;letter-spacing:0;text-transform:none;font-size:11px}
   #tip p{margin:0 0 5px;color:#4a342c}
   #tip .bound{color:#6e5f56;font-style:italic;border-top:1px dotted rgba(92,29,32,.25);padding-top:5px;margin-top:2px}
-  #tip .combos{color:#1d6b55;font-weight:600;margin-top:4px}
+  #tip .combos{color:var(--ink);font-weight:600;margin-top:4px}
   /* a combination that is still missing a part, rather than one in hand */
   #tip .combos.need{color:#795d33}
   #tip .tags{color:#685f57;font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
@@ -336,14 +367,14 @@
   #nights{margin:2px 0 4px;padding-left:18px;font-size:11px;line-height:1.55}
   #nights li b{color:var(--oxblood);font-weight:700}
   #nights li small{color:var(--dim);margin-left:4px}
-  #nights li.now{background:rgba(79,168,138,.22);border-radius:3px;margin-left:-4px;padding-left:4px}
+  #nights li.now{background:var(--live-wash);border-radius:3px;margin-left:-4px;padding-left:4px}
   #nights:empty{display:none}
   /* the full board */
   #bestsBody table{width:100%;border-collapse:collapse;font-size:12px}
   #bestsBody th{text-align:left;font:600 10px/1 var(--narrow);letter-spacing:.14em;text-transform:uppercase;color:var(--brass);padding:6px 8px;border-bottom:1px solid var(--rule)}
   #bestsBody td{padding:6px 8px;border-bottom:1px solid rgba(125,90,46,.35);color:var(--enamel)}
   #bestsBody td.n{text-align:right;font-variant-numeric:tabular-nums}
-  #bestsBody tr.now td{background:rgba(79,168,138,.18);color:var(--lamp)}
+  #bestsBody tr.now td{background:var(--live-wash);color:var(--lamp)}
   #bestsBody tr.top td:first-child{color:var(--brass-lit);font-weight:700}
   #bestsLine{flex:1 1 220px;min-width:0;font:12px/1.4 var(--narrow);color:var(--enamel);background:#20090b;border:1px solid var(--rule);border-radius:3px;padding:5px 8px}
   /* where the last round's balls ended up, column by column across the board */
@@ -501,7 +532,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="0ecbf3af10c9">
+<meta name="build" content="3f74326ddce3">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -751,7 +782,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=59';
+  import { boot } from './src/ui.js?v=60';
   boot(document);
 </script>
 </body>

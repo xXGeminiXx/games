@@ -317,10 +317,65 @@ function clampModel(m) {
 
 // Build the model for a set of owned fittings. `owned` may be ids or objects,
 // and a repeated id stacks its mods that many times.
+/**
+ * Where a combination's multiplier lands on the machine.
+ *
+ * Every name a synergy uses in `on` is a quantity this model already carries,
+ * so completing one changes a number the rest of the game reads. Two of them
+ * are said in the player's words rather than the model's: a combination "on
+ * every pocket" moves all three pay mouths, and one "on the sevens" moves how
+ * many sevens are on the strip, which the seven chance is the square of.
+ */
+const SYNERGY_TARGET = {
+  creamPay:  ['creamPay'],
+  pocketPay: ['creamPay', 'jadePay', 'sidePay'],
+  payout:    ['payMul'],
+  ballMul:   ['payMul'],
+  gateProb:  ['gateProb'],
+  feverEv:   ['feverMult'],
+  feverLen:  ['feverLen'],
+  afterglow: ['feverLen'],
+  cadence:   ['inFlight'],
+  budget:    ['budgetAdd'],
+  sevenProb: ['sevenStops'],
+};
+
+/** Applies every combination the owned set completes. */
+export function applySynergies(model, owned) {
+  const have = new Set(normaliseOwned(owned).map(f => f.id));
+  const done = [];
+  for (const s of SYNERGIES) {
+    if (!s || !Array.isArray(s.ids) || !s.ids.every(id => have.has(id))) continue;
+    const keys = SYNERGY_TARGET[s.on];
+    if (!keys) continue;
+    // Some quantities are a count rather than a rate, and a combination on one
+    // of those has to ADD to it. Multiplying a count that starts at nothing is
+    // the one shape that can never pay whatever the number beside it says.
+    const add = Number(s.add);
+    if (Number.isFinite(add) && add !== 0) {
+      for (const k of keys) if (Number.isFinite(model[k])) model[k] += add;
+      done.push(s.name);
+      continue;
+    }
+    const mult = Number(s.mult);
+    if (!Number.isFinite(mult) || mult <= 0) continue;
+    // The seven chance is the square of how much of the strip is sevens, so a
+    // combination that trebles the chance moves the strip by its root.
+    const factor = s.on === 'sevenProb' ? Math.sqrt(mult) : mult;
+    for (const k of keys) {
+      if (Number.isFinite(model[k])) model[k] *= factor;
+    }
+    done.push(s.name);
+  }
+  return done;
+}
+
 export function buildModel(owned = [], base = BASE_MODEL) {
   const m = { ...base };
   const list = normaliseOwned(owned);
   for (const f of list) applyMods(m, f.mods);
+  // A combination is worth what its card says only if something applies it.
+  applySynergies(m, list);
   return clampModel(m);
 }
 
@@ -1190,8 +1245,11 @@ export const SYNERGIES = [
     text: 'Every pocket pays x1.22. The wheel doubles a pocket that was already worth more.'
   },
   {
-    ids: ['return_rail', 'pocket_magnet'], name: 'Nothing Wasted', on: 'recovery', mult: 1.50,
-    text: 'Balls saved from the out lanes go up x1.50. The tray catches what the magnets miss.'
+    // Both parts hand something back off a lost ball, and what they hand back
+    // goes to the tray, which is never what a round runs out of. The reward
+    // for completing it is on the payout instead, where it is felt.
+    ids: ['return_rail', 'pocket_magnet'], name: 'Nothing Wasted', on: 'payout', mult: 1.20,
+    text: 'Every pocket pays x1.20. Two parts pulling balls back out of the out lanes.'
   },
   {
     ids: ['second_rail', 'third_rail', 'sprocket'], name: 'Every Rail Fitted', on: 'cadence', mult: 1.15,
@@ -1210,8 +1268,11 @@ export const SYNERGIES = [
     text: 'Every pocket pays x1.20. Both parts push at the same ceiling on pocket chance, so the pay rises instead.'
   },
   {
-    ids: ['pawl', 'wear_plate', 'anchor_plate'], name: 'More Pulls', on: 'budget', mult: 1.30,
-    text: 'Effective pull budget x1.30. Pulls added, carried over, and rewarded for going unused.'
+    // A count, so it is given a number of pulls rather than a multiplier: none
+    // of the three parts carries a budget of its own, and a third more of
+    // nothing is nothing.
+    ids: ['pawl', 'wear_plate', 'anchor_plate'], name: 'More Pulls', on: 'budget', add: 20,
+    text: 'Twenty more pulls every round. Pulls added, carried over, and paid for going unused.'
   }
 ];
 
