@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=13';
-import * as Advice from './advice.js?v=13';
-import * as Tr from './traits.js?v=13';
-import * as Sp from './spores.js?v=13';
-import { fill } from '../config.js?v=13';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=13';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=13';
+import * as Lore from './lore.js?v=14';
+import * as Advice from './advice.js?v=14';
+import * as Tr from './traits.js?v=14';
+import * as Sp from './spores.js?v=14';
+import { fill } from '../config.js?v=14';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=14';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=14';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -291,7 +291,7 @@ export function createUI(doc, sim, cfg, actions) {
     noteLine.appendChild(figures);
     box.appendChild(noteLine);
 
-    r = { box, cells, name, note, best, ticks, pol, feed, row, mark, figures };
+    r = { box, cells, name, note, best, ticks, pol, feed, row, mark, figures, figs, ctl };
     treeRows.set(row.key, r);
     el('trees').appendChild(box);
     return r;
@@ -311,7 +311,9 @@ export function createUI(doc, sim, cfg, actions) {
       }));
     }
     if (m.fell && row.felled > 0) {
-      bits.push(Lore.ui('treeFell', { felled: fmt(row.felled), kept: fmt(row.kept) }));
+      bits.push(row.keptBack > 0
+        ? Lore.ui('treeFell', { felled: fmt(row.felled), time: fmtTime(row.keptBack) })
+        : Lore.ui('treeFellIdle', { felled: fmt(row.felled) }));
     }
     if (m.nurture && row.count > 0) {
       bits.push(row.feed > 0
@@ -356,7 +358,18 @@ export function createUI(doc, sim, cfg, actions) {
       if (row.dead > 0) bits.push(fill(T.counts.dead, { n: row.dead }));
       r.note.textContent = bits.join(', ');
       r.best.hidden = bestKey !== row.key;
-      const grown = row.count > 0 ? row.size / (row.count * row.max) : 0;
+      // A kind with nothing standing has nothing to decide: the figures are
+      // all zeros and the ticks and the policy do nothing until a seedling is
+      // up. Its wood is still worth eating, so the block stays and says so.
+      const standing = row.count > 0;
+      r.figs.hidden = !standing;
+      r.ctl.hidden = !standing;
+      if (!standing) {
+        r.mark.textContent = '';
+        r.figures.textContent = Lore.ui('treeGone');
+        continue;
+      }
+      const grown = row.size / (row.count * row.max);
       r.cells.size.value.textContent = fmtPct(grown);
       r.cells.sent.value.textContent = fmtRate(row.sent);
       r.cells.got.value.textContent = fmtRate(row.got);

@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=13';
-import { noise } from './world.js?v=13';
-import { hash, unit } from './rng.js?v=13';
-import { angleGap, burntSet } from './events.js?v=13';
+import { seasonOf } from './season.js?v=14';
+import { noise } from './world.js?v=14';
+import { hash, unit } from './rng.js?v=14';
+import { angleGap, burntSet } from './events.js?v=14';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -1060,6 +1060,14 @@ export function createView(canvas, cfg, doc) {
         blob(ctx, paint, P.seedling, x, y, Math.max(1, r * 0.7), 0.9 * paintAlpha);
       } else {
         canopy(x, y, r, canopyOf(tree ? tree.sp : n.sp), detail);
+        // A tree being drained is on its way out, and standing there it looks
+        // exactly like one that is trading. Its crown greys off as its health
+        // goes, so a stand set to be felled is a thing that can be watched
+        // happening rather than a setting three panels away.
+        if (tree && tree.h < 1) {
+          blob(ctx, paint, P.dead, x, y, r,
+            clamp01((1 - tree.h) * num(V.tree.drainedAlpha, 0.75)) * paintAlpha, 0, 0, T.core);
+        }
       }
       return held ? r + sheathPad : 0;
     };

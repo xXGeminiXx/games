@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=13';
-import { buildLevel, nearestOpen } from './world.js?v=13';
-import * as Tips from './tips.js?v=13';
-import * as Trees from './trees.js?v=13';
-import * as Tr from './traits.js?v=13';
-import * as Lv from './levels.js?v=13';
-import * as Sp from './spores.js?v=13';
-import * as Rv from './reveal.js?v=13';
-import * as Ev from './events.js?v=13';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=13';
-import { hash } from './rng.js?v=13';
-import * as Lore from './lore.js?v=13';
-import { fmtArea, fmtCoin } from './numbers.js?v=13';
+import { CONFIG as DEFAULT } from '../config.js?v=14';
+import { buildLevel, nearestOpen } from './world.js?v=14';
+import * as Tips from './tips.js?v=14';
+import * as Trees from './trees.js?v=14';
+import * as Tr from './traits.js?v=14';
+import * as Lv from './levels.js?v=14';
+import * as Sp from './spores.js?v=14';
+import * as Rv from './reveal.js?v=14';
+import * as Ev from './events.js?v=14';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=14';
+import { hash } from './rng.js?v=14';
+import * as Lore from './lore.js?v=14';
+import { fmtArea, fmtCoin } from './numbers.js?v=14';
 
 export const SAVE_VERSION = 1;
 
@@ -314,7 +314,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         //    against what trade pays it over one season at this price. feed
         //    is how long feeding takes to pay for itself, 0 for not at all.
         best: Trees.bestSeason(sp), worst: Trees.worstSeason(sp),
-        grownSize: 0, felled: 0, kept: 0, feed: 0,
+        grownSize: 0, felled: 0, kept: 0, keptBack: 0, feed: 0,
       };
       const grownSize = mature[sp.key] > 0
         ? matureSize[sp.key] / mature[sp.key]
@@ -322,7 +322,15 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       row.grownSize = grownSize;
       if (m.fell) {
         row.felled = Trees.fellValue(cfg, sp, grownSize, m);
-        row.kept = Trees.keptRate(got, S, grownSize) * season.seasonSeconds;
+        // What one grown tree of this kind is paid a second where it stands.
+        // The ledger used to set the lump against one season of that, which
+        // made felling look obviously right at every price - a lump of 243
+        // against 16 a season is not a decision anyone weighs. What it is
+        // really worth is how long the tree needs to trade its own felling
+        // price back, so that is the figure the ledger carries.
+        const perSecond = Trees.keptRate(got, S, grownSize);
+        row.kept = perSecond;
+        row.keptBack = perSecond > 0 ? row.felled / perSecond : 0;
       }
       if (m.nurture && S > 0) {
         const value = Trees.sizeValue(sp, S, ms, mult);

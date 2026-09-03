@@ -600,6 +600,9 @@ export const CONFIG = {
       trunk: 0.22,          // the dark centre, as a share of the canopy
       lift: 0.24,           // how far the lit side sits toward the top left
       seedlingBelow: 0.16,  // a tree this small a share of its size is a seedling
+      // How grey the crown of a tree being drained goes as its health runs
+      // out, so a stand set to be felled can be watched going.
+      drainedAlpha: 0.75,
       snag: 5,              // bare branches on a dead tree
     },
 
@@ -895,7 +898,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 13,
+    build: 14,
   },
 };
 
