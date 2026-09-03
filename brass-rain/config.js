@@ -694,12 +694,19 @@ export const CONFIG = {
     budgetStep: 4,
 
     // What round n asks for, as a share of what the budget would pay back at
-    // the machine's own rate. Demand crosses 1.000 at round 4, which is the
-    // first round a bare machine can lose, and keeps climbing after it. The
-    // ratio is fixed rather than bending, so the curve is one number.
+    // the machine's own rate. The ratio is fixed rather than bending, so the
+    // curve is one number.
+    //
+    // Measured over 32 bare nights - no parts, no leans, the bot aiming each
+    // round: the clear rate falls smoothly from 100 percent at round one to 67
+    // at round twelve, a bare machine finishes 19 percent of nights, and a
+    // night ends on every round between one and twelve rather than on three of
+    // them. The growth was 1.1727 while the tail of ballsPerPull below was
+    // still collapsing what the machine pays; with that fixed, 1.1727 let a
+    // bare bot finish 42 percent of nights.
     quotaBase: 0,          // unused; the quota is derived from the budget
     demandBase: 0.62,
-    demandGrowth: 1.1727,
+    demandGrowth: 1.195,
     // What the face pays back with nothing bolted into it, measured over four
     // thousand balls at the default handle across eight boards. The quota is
     // derived from this, so measuring it rather than assuming it is what keeps
@@ -724,7 +731,22 @@ export const CONFIG = {
     // Balls sent by one pull of the handle, by round. A machine starts with
     // one ball on the glass at a time, which is the only way the opening reads
     // as a machine rather than a spray. Fittings add to it.
-    ballsPerPull: [1, 1, 1, 2, 2, 3, 4, 6, 8, 11, 15, 20],
+    //
+    // The tail matters more than it looks. A round is rented by the PULL and
+    // the quota is derived from the same number, so sending more balls a pull
+    // costs the player nothing on paper - but balls sent together at one
+    // setting land together, and past about six a pull the machine pays
+    // measurably less for each of them. Measured over six seeds a round, with
+    // the quota put out of reach so every round spends its whole budget:
+    //
+    //   balls a pull    1      2      6     11     15     20
+    //   paid a ball  1.926  1.878  2.725  2.172  1.880  1.628
+    //
+    // It climbs to six and falls away after. The old tail ran to twenty, so
+    // round twelve paid 1.63 a ball against a quota asking 2.43 - a round the
+    // machine could not win however it was played. Ending at nine holds the
+    // whole run between 1.98 and 2.65, and shortens the last rounds with it.
+    ballsPerPull: [1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9],
   },
 
   // -------------------------------------------------------------------------
