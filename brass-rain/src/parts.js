@@ -28,9 +28,9 @@
 // and it keeps every promise honest.
 // ---------------------------------------------------------------------------
 
-import { createBoard, addPin, removePinsNear, rebuild, nailPos, plateClearance, clearOfPlates, clearNailsAlongPlate, liftPocketsOffPlates, screenCover, POCKET_PAY, POCKET_GATE } from './board.js?v=66';
-import { baseMods } from './run.js?v=66';
-import { rng as makeRng } from './rng.js?v=66';
+import { createBoard, addPin, removePinsNear, rebuild, nailPos, plateClearance, clearOfPlates, clearNailsAlongPlate, liftPocketsOffPlates, screenCover, POCKET_PAY, POCKET_GATE } from './board.js?v=67';
+import { baseMods } from './run.js?v=67';
+import { rng as makeRng } from './rng.js?v=67';
 
 // Board units of mouth width per point of probability, measured.
 const GATE_UNITS_PER_POINT = 1 / 0.0042;

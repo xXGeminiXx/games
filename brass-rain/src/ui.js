@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=66';
-import { createScene } from './render/scene.js?v=66';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=66';
-import { num, count, duration, mult, pct, fill } from './format.js?v=66';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=66';
-import { nailPos } from './board.js?v=66';
-import { DOORS_ROW } from './render/board-geom.js?v=66';
-import { sketchCabinet } from './cabinets.js?v=66';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=66';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=67';
+import { createScene } from './render/scene.js?v=67';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=67';
+import { num, count, duration, mult, pct, fill } from './format.js?v=67';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=67';
+import { nailPos } from './board.js?v=67';
+import { DOORS_ROW } from './render/board-geom.js?v=67';
+import { sketchCabinet } from './cabinets.js?v=67';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=67';
 
 const SPEEDS = [1, 2, 4];
 
@@ -64,6 +64,17 @@ export async function boot(doc) {
   // anything it reads has to already exist.
   let lastLog = 0;
   let shownRow = false;
+  // Both of these are read by the first paint, which happens before boot has
+  // finished running, so both have to exist before it does. They only got away
+  // with being declared beside their own functions because the card and the
+  // arcade panel both ship hidden and their painters return before reading
+  // them; taking `hidden` off either div in the page would have blanked the
+  // whole screen with nothing on it but a boot error.
+  let tipOwner = null;
+  const machineRows = new Map();
+  let emptyRow = null;
+  let prestigeUi = null;
+  let lastPoint = null;
 
   // The first-run card. Shown until it is dismissed once, then never again.
   // The flag sits beside the save rather than inside it, so a player who
@@ -758,8 +769,6 @@ export async function boot(doc) {
     node.addEventListener('blur', hideTip);
   }
 
-  let lastPoint = null;
-  let tipOwner = null;
   function place(e, node) {
     const box = el.tip.getBoundingClientRect();
     const pad = 12;
@@ -1215,9 +1224,6 @@ export async function boot(doc) {
   // click - so the browser never saw a click on any of them and not one of
   // these buttons could be pressed by hand. Anything painted every frame must
   // update its text in place; only a change in what rows exist may rebuild.
-  const machineRows = new Map();
-  let emptyRow = null;
-  let prestigeUi = null;
 
   /** What the next single unit of a machine costs at the count now owned. */
   function nextUnitPrice(m, owned) { return m.cost * Math.pow(m.ratio, owned); }
