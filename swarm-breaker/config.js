@@ -32,7 +32,12 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   identity: {
     name: 'Swarm Breaker',
-    tagline: 'aim once. the swarm does the work.',
+    // THE FIRST SENTENCE ANYBODY READS. It has one job: say what the player
+    // does and what they are doing it to, before they have seen a block. The
+    // old line said what the player does and stopped there, so somebody who
+    // had never seen the game still had no idea what was on the other end of
+    // the aim or what losing looked like.
+    tagline: 'aim once a turn. the swarm breaks the blocks coming down at you.',
 
     // Prefixes every browser storage key this game writes. Changing it starts
     // every player from a clean slate; keeping it preserves saves across a
@@ -55,8 +60,13 @@ export const CONFIG = {
     stats: {
       depth:   'depth',      // how far the field has descended
       swarm:   'swarm',      // how many bodies fire each turn
-      essence: 'essence',    // the currency
-      pattern: 'pattern',    // which generator is drawing the field
+      essence: 'cash',       // the currency
+      // THE FOURTH FIGURE ANSWERS ONE QUESTION IN BOTH FIELDS: how close is
+      // this run to ending. It used to name the rule drawing the field -
+      // "drift", "sierpinski" - which is true, unusable, and a word nobody
+      // outside the code had ever seen. The picture behind the blocks still
+      // shows the rule; the number now shows what it costs you.
+      pattern: 'room',       // rows of clearance under the lowest block
       // How much of the board is standing, shown as "16/32". The label has to
       // name the MEASURE and not the thing measured - "field" reads as the
       // name of the playfield, which is already what every other word on
@@ -67,6 +77,28 @@ export const CONFIG = {
     hintIdle:    'drag to aim · release to fire',
     hintFiring:  'the swarm is working',
 
+    // THE COMPASS. One line under the field naming the best thing to do right
+    // now, with the run's own figures in it, rewritten every time the numbers
+    // behind it move. Which line is chosen is decided in src/advice.js; these
+    // are the words. A hole in braces is filled from the run.
+    //
+    // Every one of them has to be true of the state that picks it, so a figure
+    // here is read off the game rather than described in general terms. The
+    // player can ignore all of it at no cost, which is what lets it sit on
+    // screen for a whole run without becoming furniture to click away.
+    compass: {
+      working: '{live} balls out, {broke} broken this turn',
+      start:   'drag down from the swarm and let go. the balls do the rest',
+      crowded: '{pct}% full. the run ends when it fills, so break the biggest clump',
+      last:    'one more row down and the run ends. break the lowest blocks now',
+      closing: '{spare} row{s} of room left. break the lowest blocks or the run ends',
+      buy:     '{cash} cash in hand. {name} costs {cost}: {effect}',
+      marker:  '{n} cyan marker{s} out there. each one you hit joins the swarm',
+      lane:    '{cols} clear column{s} to the ceiling. a ball up there rakes the top row',
+      saving:  '{cash} cash. {name} costs {cost}, {short} to go. broken blocks pay',
+      aim:     '{swarm} balls at {damage} damage each. aim where the blocks are thickest',
+    },
+
     // The banner over a cleared board.
     clearTitle:  'field cleared',
     clearNote:   '+',
@@ -76,6 +108,10 @@ export const CONFIG = {
 
     difficultyLabel: 'difficulty',
     tradeLabel: 'trading',
+    buyingLabel: 'buying powers',
+    // Said once under the field the first time the hand spends for you, so the
+    // number moving on its own is never a mystery.
+    boughtNote: 'bought {name} for {cost}. turn buying off on the menu to choose them yourself',
     // It abandons the run in progress and starts another one. It does not
     // touch awards, best depths or the chosen mode, and RESET is the word
     // players expect to mean exactly that - wiping everything they have.
@@ -172,9 +208,10 @@ export const CONFIG = {
         id: 'swarm',
         name: 'descent',
         tell: 'the main game',
-        blurb: 'Eight columns, one row at a time. The rule drawing the field '
-             + 'changes as you go deeper, and the readout names the one '
-             + 'running now. Play this one first.',
+        // The readout used to name the rule drawing the field and now says how
+        // much room is left, so the sentence that promised the name is gone.
+        blurb: 'Eight columns, one row at a time, and the rule drawing them '
+             + 'changes as you go deeper. Play this one first.',
       },
       {
         id: 'fractal',
@@ -571,7 +608,7 @@ export const CONFIG = {
 
       // The rest of the run.
       { id: 'power-5',   track: 'power',   at: 5,    name: 'sharpened',        note: 'reach 5 damage a hit' },
-      { id: 'rich-1000', track: 'essence', at: 1000, name: 'flush',            note: 'hold 1,000 essence in one run' },
+      { id: 'rich-1000', track: 'essence', at: 1000, name: 'flush',            note: 'hold 1,000 cash in one run' },
       // TIER is what the ladder is called in the code and nowhere a player can
       // see it. On screen it is the difficulty, so that is the word here.
       { id: 'win-1',     track: 'wins',    at: 1,    name: 'past the last row',  note: 'outlast every row a difficulty has' },
@@ -892,6 +929,29 @@ export const CONFIG = {
     onLabel: 'on - four ores and a market',
   },
 
+  // BUYING POWERS. On by default, and the default has to be a good one.
+  //
+  // A player who only ever aims used to fall behind for a reason nothing on
+  // screen explained: cash piles up and does nothing until somebody presses a
+  // button they were never told about. Two measured runs on the default
+  // difficulty died at depth 7 holding 204 and at depth 14 holding 610, each
+  // with two powers they could have paid for sitting in front of them.
+  //
+  // So the hand spends for you between turns, taking the dearest thing it can
+  // afford, and anybody who would rather choose turns it off on the menu and
+  // gets exactly what the game did before. Automatic never redeals, never
+  // touches the market, and never spends in a run that is trading, because
+  // that run's cash has somewhere else to be.
+  buying: {
+    auto: true,
+    autoLabel: 'for me - the hand spends between turns',
+    handLabel: 'by hand - the buttons are yours',
+    // Cash it will keep back rather than spend, as a share of the price of the
+    // thing it is buying. Zero: there is nothing else to save for in a run
+    // that is not trading, and holding cash back is how the old default lost.
+    keep: 0,
+  },
+
   difficulty: {
     defaultTier: 'swell',
 
@@ -1030,7 +1090,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 21,
+    build: 23,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
@@ -1219,6 +1279,7 @@ export function applyIdentity(doc) {
   put('menutag',        CONFIG.identity.tagline);
   put('lbl-difficulty', t.difficultyLabel);
   put('lbl-trade',      t.tradeLabel);
+  put('lbl-buying',     t.buyingLabel);
   put('modes',          t.menuButton);
   put('resume',         t.menuResume);
   put('lbl-mode',       t.menuModeLabel);

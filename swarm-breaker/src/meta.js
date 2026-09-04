@@ -373,7 +373,7 @@ const METRICS = {
     id: 'essence', name: 'ESSENCE', unit: 'essence',
     scopes: ['stretch', 'run'],
     read: s => (s && s.essence != null ? s.essence : 0),
-    blurb: 'essence earned over the run',
+    blurb: 'cash earned over the run',
     reveal: 'stretch',
   },
   blocks: {
@@ -616,7 +616,7 @@ for (const p of PLEDGES) PLEDGE_BY_ID[p.id] = p;
 const REVEALS = [
   { at: 6, id: 'line', what: 'the line appears, read only. it is what the game expects of you.' },
   { at: 10, id: 'wager', what: 'wagering opens: the over or the under on where this run ends' },
-  { at: 16, id: 'stretch', what: 'stretch wagers, and a line on essence earned' },
+  { at: 16, id: 'stretch', what: 'stretch wagers, and a line on cash earned' },
   { at: 22, id: 'blocks', what: 'a line on blocks cleared, and the far rungs of the ladder' },
   { at: 30, id: 'pledges', what: 'pledges: choose the shape of the run before it starts' },
   { at: 42, id: 'dossier', what: 'your own calibration: how often you actually beat each rung' },
@@ -2004,7 +2004,7 @@ function grindAudit(profile) {
       if (!r.ok) { findings.push(`beginRun refused ${t.id} + ${combo.join('+')}`); continue; }
       const kit = runStartKit(r);
       if (kit.swarm !== 1) findings.push(`${t.id}/${combo.join('+')} starts with swarm ${kit.swarm}`);
-      if (npos(kit.essence)) findings.push(`${t.id}/${combo.join('+')} starts with essence`);
+      if (npos(kit.essence)) findings.push(`${t.id}/${combo.join('+')} starts with cash`);
       if (Object.keys(kit.powers).length) findings.push(`${t.id}/${combo.join('+')} starts with powers`);
       endRun(probe, r, { depth: r.startDepth + 1 });
     }

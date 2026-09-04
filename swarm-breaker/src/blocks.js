@@ -23,7 +23,7 @@
 // what lets a run be saved, replayed and tested.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=21';
+import { CONFIG } from '../config.js?v=23';
 
 /** 32 bit mix. Three inputs so a kind depends on the run, the depth and the
  *  column, and never on the order blocks happened to be placed in. */

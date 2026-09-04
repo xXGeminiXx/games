@@ -1081,7 +1081,7 @@ function makeHeader(U) {
     return b;
   }
   toolButton('codex', 'codex');
-  toolButton('feats', 'feats');
+  toolButton('feats', 'awards');
   toolButton('boards', 'ranks');
 
   return {
@@ -1100,7 +1100,7 @@ function makeHeader(U) {
       const essV = r.essence != null ? r.essence : mk.essence;
       const essTxt = r.essenceText != null ? r.essenceText : (mk.essenceText != null ? mk.essenceText : U.fmt(essV));
       setNum(ess.b, essTxt, mlog(essV));
-      setText(ess.s, 'essence');
+      setText(ess.s, 'cash');
 
       // The instrument strip: only the facts this run has actually earned.
       const items = [];
@@ -1251,7 +1251,7 @@ function makeDigest(U) {
       if (entry.depth != null) push('turn', entry.depth);
       if (entry.blocks != null) push('broken', entry.blocks);
       if (entry.damage != null || entry.damageText != null) push('damage', entry.damageText != null ? entry.damageText : U.fmt(entry.damage));
-      if (entry.essence != null || entry.essenceText != null) push('essence', '+' + (entry.essenceText != null ? entry.essenceText : U.fmt(entry.essence)), 'gold');
+      if (entry.essence != null || entry.essenceText != null) push('cash', '+' + (entry.essenceText != null ? entry.essenceText : U.fmt(entry.essence)), 'gold');
       if (entry.swarm != null || entry.swarmText != null) push('swarm', entry.swarmText != null ? entry.swarmText : U.fmt(entry.swarm), 'cy');
       if (entry.materials) for (const mm of entry.materials) {
         push(mm.id, '+' + (mm.text != null ? mm.text : U.fmt(mm.qty)));
@@ -2518,13 +2518,15 @@ function makeHand(U) {
         show(q.rk, true);
         setText(q.kt, s.keystone ? 'keystone' : (s.echo ? 'echo' : ''));
         show(q.kt, !!(s.keystone || s.echo));
-        setText(q.doc, String(s.doctrine || '').toUpperCase());
+        // The family's printed name, which says what it gives you. The id is
+        // the fallback and it is only ever seen if a host forgets to send one.
+        setText(q.doc, String(s.doctrineName || s.doctrine || '').toUpperCase());
         tint(q.doc, s.tint);
         setText(q.ln, s.line || '');
         setText(q.vs, s.visual || '');
         show(q.vs, U.opt.showTells !== false && !!s.visual);
 
-        setText(q.cash, 'buy  ' + (s.costText != null ? s.costText : U.fmt(s.cost)) + ' essence');
+        setText(q.cash, 'buy  ' + (s.costText != null ? s.costText : U.fmt(s.cost)) + ' cash');
         q.cash.disabled = U.busy || s.maxed || !s.affordable || !U.can('power');
         const wantMat = U.opt.rails !== false && s.costMaterialText != null;
         show(q.matl, wantMat);
@@ -2912,7 +2914,7 @@ const SECTIONS = [
     live: (m) => !!(m.wager && m.wager.line),
   },
   {
-    name: 'feats', title: 'feats', open: false, make: makeFeats,
+    name: 'feats', title: 'awards', open: false, make: makeFeats,
     live: (m) => !!(m.feats && m.feats.length),
   },
   {
@@ -2922,7 +2924,7 @@ const SECTIONS = [
   {
     // a reference panel, not a decision surface: it waits until there is
     // enough behind it to be worth opening
-    name: 'codex', title: 'codex', open: false, make: makeCodex,
+    name: 'codex', title: 'powers you have seen', open: false, make: makeCodex,
     live: (m, U) => !!(m.powers && m.powers.codex && (m.powers.codex.taken || 0) >= 3)
       || U.has(m, 'regimes'),
   },
@@ -3235,6 +3237,14 @@ export function createUI(options) {
     watch.paint(deriveWatch(U, model));
 
     // a section that just became live opens itself once and says so
+    //
+    // A SECTION THAT DECLARES ITSELF CLOSED IS A REFERENCE PANEL and unfolding
+    // it anyway buries the row the turn is actually spent on. The awards list
+    // is seventeen tiles, it is on the menu in full, and opening itself on
+    // turn one pushed the two power cards and most of the playfield off the
+    // screen: measured at 1280x800 it took 375 of the deck's 613 pixels and
+    // squeezed the field to 292x348. It still lights up and still says it
+    // arrived; it just waits to be opened.
     let liveCount = 0;
     for (const def of SECTIONS) {
       const sec = secs[def.name];
@@ -3245,8 +3255,10 @@ export function createUI(options) {
         liveCount++;
         if (!seenSec[def.name]) {
           seenSec[def.name] = true;
-          U.state.open[def.name] = true;
-          applyOpen(def.name);
+          if (def.open) {
+            U.state.open[def.name] = true;
+            applyOpen(def.name);
+          }
           cls(sec.el, 'fresh', true);
           setTimeout(() => cls(sec.el, 'fresh', false), 9000);
         }
@@ -3261,8 +3273,15 @@ export function createUI(options) {
     const bare = liveCount <= (opt.bareUntil || 3);
     for (const def of SECTIONS) {
       const sec = secs[def.name];
-      cls(sec.el, 'bare', bare && sec.live);
-      if (bare && sec.live) cls(sec.el, 'shut', false);
+      // A bare deck hides the headers, and a header is the only thing that
+      // opens a section. So a reference panel in a bare deck has no way in and
+      // no way out: forcing it open was the only reason it was readable at
+      // all, and open is exactly where it does the most damage. It waits until
+      // the deck is long enough to grow the caret that opens it.
+      const bareHere = bare && sec.live;
+      if (bareHere && !def.open) { show(sec.el, false); sec.live = false; continue; }
+      cls(sec.el, 'bare', bareHere);
+      if (bareHere) cls(sec.el, 'shut', false);
     }
 
     if (header) header.paint(model);

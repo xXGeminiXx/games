@@ -55,10 +55,28 @@
      coordinates are already scaled by the measured rect, so this needs no
      matching change in the game. */
   canvas{display:block; touch-action:none; max-width:100%; max-height:100%}
+  /* THE LINE UNDER THE FIELD IS THE ONE A PLAYER READS.
+     It used to say "drag to aim" for the whole of a run, which is worth
+     reading once. It now carries the compass - what to do next, with this
+     run's own figures in it - so it gets its own full width row in the
+     reading colour at a reading size, and the controls drop underneath it. */
   footer{
-    width:100%; max-width:520px; padding:8px 12px 14px;
-    color:var(--dim); font-size:11px; display:flex; justify-content:space-between;
-    border-top:1px solid var(--line);
+    width:100%; max-width:520px; padding:8px 12px 12px;
+    color:var(--dim); font-size:11px; display:flex; flex-direction:column;
+    gap:6px; border-top:1px solid var(--line);
+  }
+  /* TWO LINES OF ROOM, ALWAYS. The line rewrites itself every time the run's
+     numbers move, and a footer that grows and shrinks with it drags the whole
+     playfield up and down under the player's aim. So the space is reserved
+     whether the sentence needs it or not, and a longer one is clipped rather
+     than allowed to take a third line. */
+  #hint{
+    color:var(--ink); font-size:12px; line-height:1.35;
+    display:block; width:100%; min-height:2.7em; max-height:2.7em;
+    overflow:hidden;
+  }
+  .foot{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
   }
   /* The deepest this difficulty has been taken, beside the controls hint.
      It reads as a record rather than a target, so it stays as quiet as the
@@ -76,7 +94,7 @@
     border:1px solid var(--line); padding:3px 6px; max-width:230px; cursor:pointer;
   }
   select:hover{color:var(--ink); border-color:var(--swarm)}
-  footer{gap:8px}
+  .foot{gap:8px}
   /* The trading desk. It is taller than four buttons ever were, so it takes a
      bounded share of the window and scrolls inside itself: the field never
      gets pushed off the bottom and the page itself still never scrolls. */
@@ -362,7 +380,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="11c2fec9ada1">
+<meta name="build" content="c0cfe3045b15">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -412,7 +430,7 @@
 <header>
   <div class="stat"><b id="lvl">1</b><span id="lbl-depth">depth</span></div>
   <div class="stat"><b class="swarmv" id="balls">1</b><span id="lbl-swarm">swarm</span></div>
-  <div class="stat"><b class="goldv" id="gold">0</b><span id="lbl-essence">essence</span></div>
+  <div class="stat"><b class="goldv" id="gold">0</b><span id="lbl-essence">cash</span></div>
   <div class="stat"><b id="rule" style="font-size:15px">drift</b><span id="lbl-pattern">pattern</span></div>
 </header>
 
@@ -422,10 +440,12 @@
 
 <footer>
   <span id="hint">drag to aim &middot; release to fire</span>
-  <span id="best"></span>
-  <span class="row">
-    <button id="modes">menu</button>
-    <button id="reset">restart</button>
+  <span class="foot">
+    <span id="best"></span>
+    <span class="row">
+      <button id="modes">menu</button>
+      <button id="reset">restart</button>
+    </span>
   </span>
 </footer>
 
@@ -453,6 +473,11 @@
     <label class="setting">
       <span id="lbl-trade">trading</span>
       <select id="trade" title="trading"></select>
+    </label>
+
+    <label class="setting">
+      <span id="lbl-buying">buying powers</span>
+      <select id="buying" title="buying powers"></select>
     </label>
 
     <span class="lbl" id="lbl-mode">mode</span>
@@ -515,24 +540,25 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=21';
-import { createJuice } from './src/juice.js?v=21';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=21';
-import { createBlockKinds } from './src/blocks.js?v=21';
-import { safeRows } from './src/arrival.js?v=21';
-import { createAwards } from './src/awards.js?v=21';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=21';
-import { createLeaderboard } from './src/leaderboard.js?v=21';
-import * as Tiers from './src/tiers.js?v=21';
-import { createOnboarding } from './src/onboarding.js?v=21';
-import { createVisual } from './src/visual.js?v=21';
-import * as Economy from './src/economy.js?v=21';
-import * as Powers from './src/powers.js?v=21';
-import * as Meta from './src/meta.js?v=21';
-import { createUI } from './src/ui.js?v=21';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=21';
-import { seedForSync, today as utcToday } from './src/daily.js?v=21';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=21';
+         storageKey, applyIdentity } from './config.js?v=23';
+import { createJuice } from './src/juice.js?v=23';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=23';
+import { createBlockKinds } from './src/blocks.js?v=23';
+import { safeRows } from './src/arrival.js?v=23';
+import { createAwards } from './src/awards.js?v=23';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=23';
+import { createLeaderboard } from './src/leaderboard.js?v=23';
+import * as Tiers from './src/tiers.js?v=23';
+import { createOnboarding } from './src/onboarding.js?v=23';
+import { createVisual } from './src/visual.js?v=23';
+import * as Economy from './src/economy.js?v=23';
+import * as Powers from './src/powers.js?v=23';
+import * as Meta from './src/meta.js?v=23';
+import { createUI } from './src/ui.js?v=23';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=23';
+import { seedForSync, today as utcToday } from './src/daily.js?v=23';
+import { advise } from './src/advice.js?v=23';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=23';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -703,6 +729,20 @@ let TRADE = (() => {
     if (v === 'off') return false;
   } catch (e) {}
   return CONFIG.trade.on === true;
+})();
+
+// WHO SPENDS THE CASH.
+//
+// On by default. A run where the player only aims still gets stronger, because
+// the hand takes the dearest thing it can afford between turns. Anybody who
+// would rather pick turns it off and gets the buttons back.
+let AUTOBUY = (() => {
+  try {
+    const v = localStorage.getItem(storageKey('buying'));
+    if (v === 'auto') return true;
+    if (v === 'hand') return false;
+  } catch (e) {}
+  return CONFIG.buying.auto !== false;
 })();
 
 // Which field a run descends through. A mode changes what descends and nothing
@@ -1101,10 +1141,54 @@ function endTurn(){
   checkAwards();
   metaObserve();
   if (S.field.arrival.lost(view())) return die();
+  autoBuy();
   mark();
   digestTurn();
   announceReveals();
   paintShop();
+}
+
+// SPENDING FOR A PLAYER WHO ONLY AIMS.
+//
+// Between turns, take the dearest thing in the hand the run can pay for, and
+// keep going while anything is still affordable. It goes through the same
+// purchase() every button press does, so a run log records it and a replay
+// makes the same purchases in the same order.
+//
+// It stays out of a trading run on purpose. There the cash has somewhere else
+// to be - ore, the refinery, a consignment - and a hand that emptied the purse
+// every turn would be making that call for somebody who chose to make it.
+let saidAutoBuy = false;
+function autoBuy(){
+  if (!AUTOBUY || S.dead || !S.pow || !S.econ || !S.econ.cashOnly) return;
+  // ONE HAND PER TURN. Rebuilding it after every purchase costs a full deal
+  // each time and a turn only ever buys a card or two, so the hand is read
+  // once and the purse is tracked here. A price that moves under a purchase
+  // is caught by purchase() answering zero, which stops the pass.
+  const hand = handNow();
+  const slots = ((hand && hand.slots) || [])
+    .filter(sl => sl && !sl.maxed)
+    .map(sl => ({ sl, cost: Powers.B.toNumber(sl.cost) }))
+    .filter(x => Number.isFinite(x.cost) && x.cost >= 0)
+    .sort((a, b) => b.cost - a.cost);
+  if (!slots.length) return;
+  // ONE A TURN. Emptying the purse every turn is not what a player who knows
+  // the game does, and measured over twenty five turns it ran the swarm from
+  // three to a hundred and thirty two - past what the difficulty ladder is
+  // tuned against. The dearest thing the run can pay for, once, is the pace a
+  // careful player sets by hand.
+  const purse = cash();
+  for (const { sl, cost } of slots){
+    if (cost > purse) continue;
+    if (!purchase('p_' + sl.id, 1)) continue;
+    if (QUIET || saidAutoBuy) return;
+    saidAutoBuy = true;
+    const line = String(CONFIG.text.boughtNote || '')
+      .replace('{name}', String(sl.name || ''))
+      .replace('{cost}', String(sl.costText != null ? sl.costText : cost));
+    if (ui && line) ui.announce({ key: 'autobuy', kind: 'power', title: '', body: line, ttl: 12000 });
+    return;
+  }
 }
 
 /** Every block on the board, gone, in one turn. */
@@ -2909,7 +2993,9 @@ function digestTurn(){
     const any = Economy.toNum(paid) > 0;
     ui.digest(any
       ? { depth: S.depth, blocks: S.turnKills || 0,
-          materials: [{ id: 'essence', qty: paid, text: Economy.fmt(paid) }] }
+          // The label on this row is the id, so it has to be the word the rest
+          // of the game uses for the money.
+          materials: [{ id: 'cash', qty: paid, text: Economy.fmt(paid) }] }
       : null);
     turnHarvest = [];
     return;
@@ -3179,6 +3265,25 @@ if (tradeSel){
     try { localStorage.setItem(storageKey('trade'), TRADE ? 'on' : 'off'); } catch (e) {}
     paintMenu();
     startRun(MODE);
+  };
+}
+
+// Who spends. Unlike the other two this does NOT restart the run: it changes
+// who presses the buttons and nothing about what the run is, so a player can
+// take the wheel halfway down and keep the depth they earned.
+const buySel = document.getElementById('buying');
+if (buySel){
+  [['auto', CONFIG.buying.autoLabel], ['hand', CONFIG.buying.handLabel]].forEach(([v, label]) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    if ((v === 'auto') === AUTOBUY) o.selected = true;
+    buySel.appendChild(o);
+  });
+  buySel.onchange = () => {
+    AUTOBUY = buySel.value === 'auto';
+    try { localStorage.setItem(storageKey('buying'), AUTOBUY ? 'auto' : 'hand'); } catch (e) {}
+    if (AUTOBUY && S && !S.firing && !S.dead) autoBuy();
+    paintShop();
   };
 }
 
@@ -3638,17 +3743,142 @@ function hud(){
   document.getElementById('balls').textContent = S.balls;
   document.getElementById('gold').textContent = cashText();
 
+  // THE FOURTH FIGURE. A field that fills says how full it is; a field that
+  // comes down says how many rows of room are left under it. Both are the same
+  // question - how close is this to ending - and both turn hot at the point it
+  // starts to matter. It used to name the generator drawing the field, which
+  // was a word a player had no use for and no way to learn.
   const say = S.field.arrival.readout(view());
   const rule = document.getElementById('rule');
-  rule.textContent = say ? say.value : figureName();
-  rule.className = (say && say.pressure >= CONFIG.bloom.warnAt) ? 'hotv' : '';
   const lbl = document.getElementById('lbl-pattern');
-  if (lbl) lbl.textContent = say ? CONFIG.text.stats.fill : CONFIG.text.stats.pattern;
+  if (say){
+    rule.textContent = say.value;
+    rule.className = say.pressure >= CONFIG.bloom.warnAt ? 'hotv' : '';
+    if (lbl) lbl.textContent = CONFIG.text.stats.fill;
+  } else {
+    const room = roomLeft();
+    rule.textContent = String(room);
+    rule.className = room <= 2 ? 'hotv' : '';
+    if (lbl) lbl.textContent = CONFIG.text.stats.pattern;
+  }
 
-  document.getElementById('hint').textContent = S.firing
-    ? CONFIG.text.hintFiring
-    : CONFIG.text.hintIdle;
+  paintCompass();
   paintBest();
+}
+
+// THE COMPASS - the one line under the field that says what to do next.
+//
+// A first run gets one decision a turn and a screen of numbers that explain
+// nothing about which way to point. This is the answer to that: the single
+// best move right now, with the run's own figures inside it, rewritten as the
+// figures move. src/advice.js ranks the situations and CONFIG.text.compass
+// holds the words; everything here does is read the run and fill the holes.
+//
+// It is only written to the page when the sentence actually changes, because
+// hud() runs every frame and rewriting a text node sixty times a second for
+// the same string makes the line unselectable and the browser busy.
+let compassWorn = null;
+
+/** Whole rows of clearance under the lowest block. Zero means the next step
+ *  down ends the run, which is the same expression the loss check uses. */
+function roomLeft(){
+  const v = view();
+  let deepest = -1;
+  for (const bl of S.rows) if (bl.r > deepest) deepest = bl.r;
+  return Math.max(0, Math.floor(v.rowsTall - (deepest + 1)));
+}
+
+/** Columns with nothing standing in them, which is what a body needs to reach
+ *  the ceiling untouched and rake the top row on the way back down. */
+function openColumns(){
+  if (!S || !S.rows) return 0;
+  const cols = Math.max(1, COLS | 0);
+  const used = new Set();
+  for (const bl of S.rows) used.add(bl.c);
+  let open = 0;
+  const lo = leftEdgeAt(cols);
+  for (let c = lo; c < lo + cols; c++) if (!used.has(c)) open++;
+  return open;
+}
+
+/** What the compass is allowed to know about the run. Plain numbers only, so
+ *  the module that ranks them can be driven straight from a test. */
+function compassBag(){
+  const v = view();
+  const moving = !!(S.field && S.field.arrival.moves);
+  let deepest = -1;
+  for (const bl of S.rows) if (bl.r > deepest) deepest = bl.r;
+  const markers = { swarm: 0, essence: 0 };
+  for (const p of S.drops){
+    if (p.kind === 'ball') markers.swarm++;
+    else markers.essence++;
+  }
+  const hand = handNow();
+  const money = cash();
+  // The hand already prices itself and already knows what the run can afford,
+  // so both are read off it rather than worked out a second way here. Two
+  // answers to "can I buy this" is how a card reads as buyable while its
+  // button stays dead.
+  const offers = ((hand && hand.slots) || []).map(s => ({
+    name: String(s.name || s.id || ''),
+    cost: Math.round(Powers.B.toNumber(s.cost)),
+    costText: String(s.costText || ''),
+    effect: String(s.line || ''),
+    affordable: !!s.affordable && !s.maxed,
+  }));
+  return {
+    phase: S.dead ? 'over' : (S.firing ? 'firing' : 'aim'),
+    shots: S.shot | 0,
+    depth: S.depth | 0,
+    swarm: S.balls | 0,
+    damage: hitPower(),
+    essence: money,
+    essenceText: cashText(),
+    live: S.live.length,
+    broke: S.turnKills | 0,
+    descends: moving,
+    // WHOLE rows of clearance, floored, off the same expression the loss check
+    // uses: a run is over the moment deepest + 1 reaches rowsTall, so a floor
+    // of zero here means the next step down ends it and the line says so.
+    spare: moving ? roomLeft() : null,
+    fill: moving ? 0 : S.field.arrival.pressure(v),
+    openCols: openColumns(),
+    markers,
+    offers: offers.filter(o => o.name && o.effect),
+  };
+}
+
+function fillHoles(text, vals){
+  return String(text).replace(/\{(\w+)\}/g, (all, k) => (vals[k] === undefined ? all : String(vals[k])));
+}
+
+function paintCompass(){
+  const el = document.getElementById('hint');
+  if (!el) return;
+  // A run that is over keeps whatever the compass last said. The end screen is
+  // over the top of it and swapping the line back to the controls under a
+  // finished run is a sentence nobody can act on.
+  let text = compassWorn === null ? CONFIG.text.hintIdle : compassWorn;
+  try {
+    const pick = advise(compassBag());
+    const words = pick && CONFIG.text.compass && CONFIG.text.compass[pick.key];
+    if (words){
+      const vals = { ...pick.vals };
+      // Plural agreement is the caller's job, so the words stay one sentence
+      // in the config instead of two spellings of the same sentence.
+      for (const k of ['n', 'cols', 'spare']){
+        if (vals[k] !== undefined) vals.s = (Number(vals[k]) === 1) ? '' : 's';
+      }
+      text = fillHoles(words, vals);
+    }
+  } catch (e) {
+    // A compass that throws is worth exactly nothing and the game is worth
+    // everything, so it falls back to the controls it replaced.
+    text = S.firing ? CONFIG.text.hintFiring : CONFIG.text.hintIdle;
+  }
+  if (text === compassWorn) return;
+  compassWorn = text;
+  el.textContent = text;
 }
 
 // HOW MANY SIMULATION STEPS THIS FRAME.

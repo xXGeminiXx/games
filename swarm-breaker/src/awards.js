@@ -30,7 +30,7 @@
 // which is the part that is code.
 // ===========================================================================
 
-import { CONFIG } from '../config.js?v=21';
+import { CONFIG } from '../config.js?v=23';
 
 /**
  * The tracks an award can be a threshold on.
@@ -42,7 +42,7 @@ import { CONFIG } from '../config.js?v=21';
 const TRACKS = {
   depth:   'the deepest any run has reached',
   swarm:   'the largest swarm any run has held',
-  essence: 'the most essence any one run has held',
+  essence: 'the most cash any one run has held',
   power:   'the most damage per hit any run has reached',
   clears:  'boards cleared to nothing, over every run',
   streak:  'the most boards cleared to nothing in a row',

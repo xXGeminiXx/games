@@ -287,36 +287,44 @@ const TUNING = {
 // pool, biases the hand, and colours the swarm on screen.
 // ---------------------------------------------------------------------------
 
+// THE NAME IS WHAT IT DOES.
+//
+// These used to be called LEGION, MONOLITH, FRACTURE, WELL, LEDGER and TITHE.
+// Every one of them was printed in the corner of a power card with no
+// explanation anywhere on the screen, so a player read a word they had never
+// seen attached to a number they could not connect it to. The ids stay as they
+// are because saves and logs carry them; the printed name says what the family
+// of powers actually gives you.
 const DOCTRINES = {
   legion: {
-    id: 'legion', name: 'LEGION', tint: '#5ad1ff',
+    id: 'legion', name: 'MORE BALLS', tint: '#5ad1ff',
     creed: 'more of them than the field can hold',
     reads: 'the swarm band under the floor thickens until it is solid',
   },
   monolith: {
-    id: 'monolith', name: 'MONOLITH', tint: '#ff5c46',
+    id: 'monolith', name: 'HARDER HITS', tint: '#ff5c46',
     creed: 'fewer bodies, each one enormous',
     reads: 'fewer, larger, hotter bodies that leave craters',
   },
   fracture: {
-    id: 'fracture', name: 'FRACTURE', tint: '#ffc94a',
+    id: 'fracture', name: 'ONE SETS OFF THE NEXT', tint: '#ffc94a',
     creed: 'one hit sets off the next',
     reads: 'arcs between blocks and blooms of secondary detonations',
   },
   well: {
-    id: 'well', name: 'WELL', tint: '#b98cff',
+    id: 'well', name: 'BENDS YOUR SHOT', tint: '#b98cff',
     creed: 'the field bends what you fire',
     reads: 'curved trails, orbit rings, and a visible pull at the field floor',
   },
   ledger: {
-    id: 'ledger', name: 'LEDGER', tint: '#6ee7a8',
+    id: 'ledger', name: 'BETTER PRICES', tint: '#6ee7a8',
     creed: 'the field is where your ore comes from',
     reads: 'price marks and fill quality printed beside every payout',
   },
   tithe: {
-    id: 'tithe', name: 'TITHE', tint: '#8f9aa8',
+    id: 'tithe', name: 'BIGGER PAYOUTS', tint: '#8f9aa8',
     creed: 'more out of every block',
-    reads: 'brighter essence payouts and a wider hand of choices',
+    reads: 'brighter cash payouts and a wider hand of choices',
   },
 };
 
@@ -826,8 +834,8 @@ const POWER_LIST = [
   {
     id: 'harvest', name: 'HARVEST', doctrine: 'tithe', tier: 0,
     max: Infinity, base: 48, growth: 1.34,
-    line: r => `+${(30 * r)}% essence from destroyed blocks`,
-    visual: 'essence payouts print larger over the block that paid them',
+    line: r => `+${(30 * r)}% cash from destroyed blocks`,
+    visual: 'cash payouts print larger over the block that paid them',
     effect: (d, r) => { d.harvest += 0.30 * r; },
   },
   {
@@ -850,7 +858,7 @@ const POWER_LIST = [
     id: 'melt', name: 'MELT', doctrine: 'tithe', tier: 1,
     max: Infinity, base: 135, growth: 1.36,
     req: s => doc(s, 'tithe') >= 2,
-    line: r => `dump material straight into essence at a flat ${(0.30 + 0.10 * r).toFixed(2)} per unit - worse than selling it well, and it never asks you to read a price`,
+    line: r => `dump material straight into cash at a flat ${(0.30 + 0.10 * r).toFixed(2)} per unit - worse than selling it well, and it never asks you to read a price`,
     visual: 'a melt action on the material panel that prints one flat figure with no quote beside it',
     effect: (d, r) => { d.melt += 0.30 + 0.10 * r; },
   },
@@ -858,8 +866,8 @@ const POWER_LIST = [
     id: 'interest', name: 'INTEREST', doctrine: 'tithe', tier: 2,
     max: Infinity, base: 300, growth: 1.44,
     req: s => doc(s, 'tithe') >= 4,
-    line: r => `unspent essence grows ${(3 * r)}% every turn`,
-    visual: 'the essence readout ticks upward on its own between turns',
+    line: r => `unspent cash grows ${(3 * r)}% every turn`,
+    visual: 'the cash readout ticks upward on its own between turns',
     effect: (d, r) => { d.interest += 0.03 * r; },
   },
   {
@@ -920,7 +928,7 @@ const POWER_LIST = [
     max: 1, base: 1100, growth: 3,
     req: s => doc(s, 'fracture') >= 7 && doc(s, 'tithe') >= 5,
     line: () => 'blocks broken by arcs and blasts pay in full',
-    visual: 'chain kills print their essence in full rather than dimmed',
+    visual: 'chain kills print their cash in full rather than dimmed',
     effect: d => { d.gleaning = true; },
   },
   {
@@ -1009,8 +1017,8 @@ const ECHO_KEYS = {
     { key: 'e_collapse', label: 'collapse', word: 'IMPLOSION', mag: 0.02, line: m => `the end-of-turn implosion deals a further ${(m * 100).toFixed(1)}% of the turn` },
   ],
   tithe: [
-    { key: 'e_harvest', label: 'essence', word: 'RECKONING', mag: 0.25, line: m => `+${(m * 100).toFixed(0)}% essence from destroyed blocks` },
-    { key: 'e_interest', label: 'interest', word: 'USURY', mag: 0.02, line: m => `unspent essence grows a further ${(m * 100).toFixed(1)}% per turn` },
+    { key: 'e_harvest', label: 'essence', word: 'RECKONING', mag: 0.25, line: m => `+${(m * 100).toFixed(0)}% cash from destroyed blocks` },
+    { key: 'e_interest', label: 'interest', word: 'USURY', mag: 0.02, line: m => `unspent cash grows a further ${(m * 100).toFixed(1)}% per turn` },
   ],
 };
 
@@ -1622,6 +1630,10 @@ function offer(state, depth) {
       id,
       name: def.name,
       doctrine: def.doctrine,
+      // What the family is CALLED on the card. The id is what a save carries;
+      // this is the phrase a player reads, and they are deliberately not the
+      // same string.
+      doctrineName: DOCTRINES[def.doctrine].name,
       tint: DOCTRINES[def.doctrine].tint,
       line: def.echo ? def.line : def.line(r + 1, state),
       visual: def.visual,
