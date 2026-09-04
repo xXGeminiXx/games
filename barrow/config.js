@@ -60,7 +60,7 @@ export const CONFIG = {
     sellLotTip: 'Sells half of what this market takes, so the price holds',
     sellAll:    'All',
     buy:        'Buy',
-    buyTip:     'Buys back a tenth of what the market holds, at today\'s price',
+    buyTip:     'Buys back {n} units for {coin}, which lifts the price back up',
     raise:      'Raise',
     raiseMax:   'Max',
     raiseTip:   'Bones raise the dead. Each button shows what it costs. Max spends every bone you have.',
@@ -143,6 +143,32 @@ export const CONFIG = {
     lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
     seamAhead:   'next is {seam}',
+
+    // THE LINE AT THE TOP. One rung of the ordered list in src/advice.js,
+    // filled with figures read off the run as it stands. Every key here is
+    // reachable and every key that file can return has a line here; the
+    // suite checks both ways. Keep them short enough to read at a glance.
+    compass: {
+      room:      'A room is open. Take one of the two and this barrow keeps it.',
+      gate:      "Somebody's at the gate. They go in {t}.",
+      gateCoin:  'The caller at the gate wants {cost} coin and you have {coin}.',
+      gateEmpty: "The caller at the gate buys {name} and you're holding none. Send them off.",
+      dig:       'Press Dig. One press in {n} turns up a bone, and bones raise the dead.',
+      sell:      "You're holding {n} {name}, worth {coin}. Press Sell.",
+      raise:     '{Bones} bones in hand and a digger costs {cost}. Press Raise.',
+      raiseMore: '{Bones} bones raises {n} more of them. Nothing else spends bones.',
+      face:      "Nothing's digging down. A notch on {name} breaks into {next}.",
+      move:      '{From} pays {low} coin/s a notch and {name} pays {high}. Move one down.',
+      seal:      'Filling in pays {n} relics now. {Name} costs {cost} and holds in every barrow after.',
+      oath:      '{N} relics banked. {Name} costs {cost} and you keep it.',
+      rite:      '{Name} costs {cost}. {line}',
+      wait:      "{Name} costs {cost}. At {rate} that's {t} away.",
+      work:      '{Name} pays {coin} coin/s, the most of any layer open.',
+      bones:     '{Name} is turning up {bones} bones a second.',
+      idle:      'Put some of the horde on a layer and they start digging.',
+      go:        'Show me',
+      tip:       'The one thing most worth doing now',
+    },
   },
 
   // -------------------------------------------------------------------------
@@ -573,8 +599,8 @@ export const CONFIG = {
     panel:  '#0d0f14',
     rule:   '#1b1f28',
     ink:    '#d7dbe3',
-    dim:    '#6c7482',
-    quiet:  '#464c58',
+    dim:    '#707886',
+    quiet:  '#5d6575',
     bone:   '#d9cdb4',
     coin:   '#c9a95a',
     hot:    '#c8553d',
@@ -595,7 +621,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 15,
+    build: 16,
   },
 };
 

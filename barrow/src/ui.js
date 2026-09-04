@@ -11,14 +11,15 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=15';
-import * as Mk from './market.js?v=15';
-import * as H from './horde.js?v=15';
-import * as R from './rites.js?v=15';
-import * as Rb from './rebirth.js?v=15';
-import * as Lore from './lore.js?v=15';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=15';
-import { fill } from '../config.js?v=15';
+import * as Mat from './materials.js?v=16';
+import * as Mk from './market.js?v=16';
+import * as H from './horde.js?v=16';
+import * as R from './rites.js?v=16';
+import * as Rb from './rebirth.js?v=16';
+import * as Lore from './lore.js?v=16';
+import * as Advice from './advice.js?v=16';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=16';
+import { fill } from '../config.js?v=16';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -64,6 +65,7 @@ export function createUI(doc, sim, cfg, actions) {
       hordeBox: byId('st-horde'), depthBox: byId('st-depth'), remBox: byId('st-rem'),
     },
     fieldhint: byId('fieldhint'),
+    compass: byId('compass'), compassSay: byId('compass-say'), compassGo: byId('compass-go'),
     saved: byId('saved'),
   };
 
@@ -359,6 +361,10 @@ export function createUI(doc, sim, cfg, actions) {
         const sat = Mk.saturation(m, sim.flowOf(id), md);
         row.base.textContent = fill(T.ledgerBase, { base: fmtCoin(base) });
         row.takes.textContent = fill(T.ledgerTakes, { absorb: fmt(absorb), t: fmtTime(recovery) });
+        // What one press of Buy costs, worked out on the same terms the
+        // action uses. A button that can spend half a purse says the figure.
+        const q = absorb * cfg.market.buyShare;
+        row.buy.title = fill(T.buyTip, { n: fmt(q), coin: fmtCoin(Mk.quoteBuy(m, q, t, md)) });
         // Bones are raised, not sold by the ton, so their thin market is not
         // flagged as choking.
         const choking = sat > (T.ceilingAt || 1) && id !== Mat.BONES;
@@ -559,6 +565,53 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
+  // -- the line at the top -------------------------------------------------
+
+  // ONE node, built once and only ever retexted. A control rebuilt every frame
+  // cannot be pressed by a mouse: the node under the pointer is replaced
+  // between the press and the release.
+  let compassTarget = null;
+  let compassSaid = '';
+  if (nodes.compassGo) {
+    nodes.compassGo.textContent = T.compass.go;
+    nodes.compassGo.addEventListener('click', () => {
+      const id = compassTarget;
+      if (!id) return;
+      // The relics list is a tab, so pointing at it means opening it first.
+      if (id === 'tab-oaths') { panelTab = 'oaths'; paintTabs(); }
+      const node = byId(id === 'tab-oaths' ? 'rites-panel' : id);
+      if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  /** Whether a panel is out of the part of the page the player can see. */
+  const offScreen = (id) => {
+    if (!id) return false;
+    const node = byId(id === 'tab-oaths' ? 'rites-panel' : id);
+    if (!node || !node.getBoundingClientRect) return false;
+    const r = node.getBoundingClientRect();
+    if (!r.height && !r.width) return false;
+    const h = (doc.documentElement && doc.documentElement.clientHeight) || 0;
+    if (!h) return false;
+    return r.top > h - 40 || r.bottom < 60;
+  };
+
+  const renderCompass = () => {
+    if (!nodes.compassSay) return;
+    let pick;
+    try { pick = Advice.next(sim, cfg); } catch (e) { pick = null; }
+    if (!pick) return;
+    const line = fill(T.compass[pick.key] || '', pick.values);
+    if (line !== compassSaid) { compassSaid = line; nodes.compassSay.textContent = line; }
+    if (nodes.compass) nodes.compass.title = T.compass.tip;
+    compassTarget = pick.target;
+    // The button is offered only when it would actually take the player
+    // somewhere: a panel off the bottom of the column, or the list of what
+    // relics buy, which is on screen but behind a tab.
+    const worth = pick.target === 'tab-oaths' ? panelTab !== 'oaths' : offScreen(pick.target);
+    show(nodes.compassGo, !!pick.target && worth);
+  };
+
   // -- everything ----------------------------------------------------------
 
   const render = () => {
@@ -600,6 +653,7 @@ export function createUI(doc, sim, cfg, actions) {
 
     renderChamber();
     renderVisitor();
+    renderCompass();
 
     // The horde.
     show(nodes.hordePanel, f.raise);

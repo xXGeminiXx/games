@@ -8,11 +8,15 @@
   /* Colors arrive from config.js as custom properties; the values here are
      only what the page shows before that file has run. */
   :root{
-    --void:#07080b; --panel:#0d0f14; --rule:#1b1f28; --ink:#d7dbe3; --dim:#6c7482;
-    --quiet:#464c58; --bone:#d9cdb4; --coin:#c9a95a; --hot:#c8553d; --good:#6fb08a;
+    --void:#07080b; --panel:#0d0f14; --rule:#1b1f28; --ink:#d7dbe3; --dim:#707886;
+    --quiet:#5d6575; --bone:#d9cdb4; --coin:#c9a95a; --hot:#c8553d; --good:#6fb08a;
     --deepink:#9a86c8;
   }
   *{box-sizing:border-box}
+  /* An id rule that sets display outranks the browser's own [hidden]
+     rule, so a panel hidden in code stayed on the page. Everything the
+     game hides is hidden here instead of in eight places. */
+  [hidden]{display:none !important}
   html,body{height:100%;margin:0;background:var(--void);color:var(--ink)}
   body{
     font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -73,6 +77,19 @@
   #panel-tabs button[aria-pressed="true"]:hover{color:var(--ink);border-bottom-color:var(--rule)}
   #panel-tabs button em{font-style:normal;color:var(--deepink);margin-left:7px;letter-spacing:.05em}
 
+  /* The line that names the next move. It stays at the top of the column
+     while the column scrolls, because the panel it points at is often the
+     part of the page that is off the bottom of the screen. */
+  #compass{
+    position:sticky;top:0;z-index:2;background:var(--void);
+    display:flex;gap:12px;align-items:baseline;
+    margin:0 0 10px;padding:2px 0 9px 12px;
+    border-left:2px solid var(--bone);border-bottom:1px solid var(--rule);
+  }
+  #compass-say{color:var(--ink);flex:1}
+  #compass-go{flex:0 0 auto;padding:1px 8px;font-size:11px;color:var(--coin);border-color:var(--rule)}
+  #compass-go:hover:not(:disabled){border-color:var(--coin)}
+
   /* The log: newest on top, fading down, five lines on screen. */
   #log{margin:0 0 12px;min-height:44px}
   #log p{margin:0 0 2px;color:var(--ink)}
@@ -92,11 +109,15 @@
   .wrow .seam{width:64px;color:var(--quiet);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wrow.face .name{color:var(--dim)}
   /* Five notches, each a button: pressing one sets the weight outright. */
-  .wrow .bar{display:inline-flex;justify-content:center;width:54px}
+  .wrow .bar{display:inline-flex;justify-content:center;width:75px}
+  /* Nine pixels wide is not something a mouse hits on purpose, and this is
+     the control the whole panel exists to set. The glyph is unchanged; the
+     button around it is fifteen by twenty-four. */
   .wrow .bar .notch{
-    border:0;background:transparent;padding:0 1px;min-width:0;line-height:18px;
-    color:var(--quiet);border-radius:0;letter-spacing:0;
+    border:0;background:transparent;padding:0;min-width:15px;line-height:24px;
+    color:var(--quiet);border-radius:0;letter-spacing:0;text-align:center;
   }
+  .wrow .bar .notch:hover:not(:disabled){background:var(--rule)}
   .wrow .bar .notch.on{color:var(--bone)}
   .wrow .bar .notch:hover:not(:disabled){color:var(--ink);border-color:transparent}
   .wrow button.w{padding:0 7px;line-height:17px}
@@ -104,7 +125,7 @@
   .wrow i.hot,.ledger.hot{color:var(--hot)}
   /* What the layer pays, under the row that sets it: the one figure that
      says whether the weight above it is worth anything. */
-  .wrow .rate{display:block;margin:1px 0 0 14px;color:var(--quiet);font-size:10.5px;white-space:nowrap}
+  .wrow .rate{display:block;margin:1px 0 0 14px;color:var(--dim);font-size:11px;white-space:nowrap}
   .wrow .rate.hot{color:var(--hot)}
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
@@ -390,7 +411,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="a2dd6ae402f0">
+<meta name="build" content="a1ac41643fa0">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -449,6 +470,7 @@
 </header>
 <main>
   <section id="books">
+    <p id="compass"><span id="compass-say"></span><button id="compass-go" hidden></button></p>
     <div id="log"></div>
     <div id="chamber-panel" class="panel" hidden>
       <h2 id="chamber-title">A room</h2>
@@ -498,8 +520,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=15';
-import { createGame } from './src/game.js?v=15';
+import { CONFIG, applyIdentity } from './config.js?v=16';
+import { createGame } from './src/game.js?v=16';
 
 applyIdentity(document);
 
