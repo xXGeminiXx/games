@@ -28,9 +28,9 @@
 // and it keeps every promise honest.
 // ---------------------------------------------------------------------------
 
-import { createBoard, addPin, removePinsNear, rebuild, nailPos, plateClearance, clearOfPlates, clearNailsAlongPlate, liftPocketsOffPlates, POCKET_PAY, POCKET_GATE } from './board.js?v=63';
-import { baseMods } from './run.js?v=63';
-import { rng as makeRng } from './rng.js?v=63';
+import { createBoard, addPin, removePinsNear, rebuild, nailPos, plateClearance, clearOfPlates, clearNailsAlongPlate, liftPocketsOffPlates, screenCover, POCKET_PAY, POCKET_GATE } from './board.js?v=64';
+import { baseMods } from './run.js?v=64';
+import { rng as makeRng } from './rng.js?v=64';
 
 // Board units of mouth width per point of probability, measured.
 const GATE_UNITS_PER_POINT = 1 / 0.0042;
@@ -256,8 +256,19 @@ export function buildFittedBoard(fittedCfg, seed, shape) {
     if (spot) addPin(board, spot.x, spot.y, b.pinRadius);
   }
   for (let i = 0; i < shape.bumpers; i++) {
-    const spot = freeSpot(fittedCfg, board, r, b.pinRadius * 2.4);
-    if (spot) addPin(board, spot.x, spot.y, b.pinRadius * 2.4);
+    // A bumper is nearly two and a half times a nail, and the lattice has no
+    // gap that size anywhere a player can see it - the only clear ground on
+    // the face is the ground the picture covers. So it is driven the way a
+    // technician drives one: a spot in plain sight, and the few nails in the
+    // way come out.
+    const spot = freeSpot(fittedCfg, board, r, b.pinRadius * 2.4, MOST_PULLED);
+    if (spot) {
+      for (const n of spot.pull) {
+        const at = board.nails.indexOf(n);
+        if (at >= 0) board.nails.splice(at, 1);
+      }
+      addPin(board, spot.x, spot.y, b.pinRadius * 2.4);
+    }
   }
   if (shape.slope) {
     // Steepening a plate walks it into nails that were driven clear of where
@@ -283,28 +294,51 @@ export function buildFittedBoard(fittedCfg, seed, shape) {
   return rebuild(board);
 }
 
-/** A place a nail can stand without closing a gap or blocking furniture. */
-function freeSpot(cfg, board, r, radius) {
+/** The most nails a single bumper may have pulled to make room for it. */
+const MOST_PULLED = 4;
+
+/**
+ * A place a nail can stand: clear of the lattice, clear of the furniture, and
+ * in plain sight.
+ *
+ * `pull` is how many nails may come out to make room, and the answer carries
+ * the ones that have to go. At zero the spot has to be empty already, which is
+ * what an ordinary nail wants; a bumper is too wide for any gap the lattice
+ * leaves and needs the few nails in its way pulled instead.
+ */
+function freeSpot(cfg, board, r, radius, pull) {
   const b = cfg.board;
   const rr = radius === undefined ? b.pinRadius : radius;
+  const mayPull = pull === undefined ? 0 : pull;
   const minSep = 2 * (cfg.physics.ballRadius + rr) + 0.2;
+  // Nothing a part drives goes behind the picture. A nail there is one the
+  // player cannot see and the ball still strikes, which is the one thing the
+  // board refuses to do when it is nailed; a part is held to the same rule.
+  const cover = screenCover(cfg);
+  const clear = cfg.physics.ballRadius + b.pinRadius + 0.6;
+  let best = null;
   for (let tries = 0; tries < 60; tries++) {
     const x = b.fieldLeft + 5 + r.next() * (b.fieldRight - b.fieldLeft - 10);
     const y = b.rowsTop + r.next() * (b.rowsTop + b.rows * b.rowStep - b.rowsTop);
-    let ok = true;
+    if (cover.some(q => Math.abs(x - q.x) < q.w * 0.5 + clear && Math.abs(y - q.y) < q.h * 0.5 + clear)) continue;
+    if (!clearOfPlates(cfg, board, x, y)) continue;
+    let blocked = false;
+    for (const q of board.pockets) {
+      if (Math.abs(x - q.x) < q.w * 0.5 + minSep && Math.abs(y - q.y) < q.h * 0.5 + minSep) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    const inTheWay = [];
     for (const n of board.nails) {
       const p = nailPos(n);
       const dx = p.x - x, dy = p.y - y;
-      if (dx * dx + dy * dy < minSep * minSep) { ok = false; break; }
+      if (dx * dx + dy * dy < minSep * minSep) inTheWay.push(n);
     }
-    if (!ok) continue;
-    if (!clearOfPlates(cfg, board, x, y)) continue;
-    for (const q of board.pockets) {
-      if (Math.abs(x - q.x) < q.w * 0.5 + minSep && Math.abs(y - q.y) < q.h * 0.5 + minSep) { ok = false; break; }
+    if (!inTheWay.length) return { x, y, pull: [] };
+    if (inTheWay.length <= mayPull && (!best || inTheWay.length < best.pull.length)) {
+      best = { x, y, pull: inTheWay };
     }
-    if (ok) return { x, y };
   }
-  return null;
+  return best;
 }
 
 /**
