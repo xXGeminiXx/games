@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=65';
-import { createScene } from './render/scene.js?v=65';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=65';
-import { num, count, duration, mult, pct, fill } from './format.js?v=65';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=65';
-import { nailPos } from './board.js?v=65';
-import { DOORS_ROW } from './render/board-geom.js?v=65';
-import { sketchCabinet } from './cabinets.js?v=65';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=65';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=66';
+import { createScene } from './render/scene.js?v=66';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=66';
+import { num, count, duration, mult, pct, fill } from './format.js?v=66';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=66';
+import { nailPos } from './board.js?v=66';
+import { DOORS_ROW } from './render/board-geom.js?v=66';
+import { sketchCabinet } from './cabinets.js?v=66';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=66';
 
 const SPEEDS = [1, 2, 4];
 
@@ -393,7 +393,12 @@ export async function boot(doc) {
       .find(e => e.kind === 'doors' && !e.pending && !e.done && !e.revealed);
     if (lit && lit.key !== litRow) {
       litRow = lit.key;
-      el.hint.textContent = (lit.doors || 3) + ' doors are lit at the foot of the board. Click one, or press its number, to call it.';
+      // Both halves. The line used to carry only the click, which reads as
+      // something you have to catch; leaving the row alone pays the prize
+      // anyway and is never the wrong move.
+      const n = lit.doors || 3;
+      el.hint.textContent = n + ' doors are lit at the foot of the board. Click one to call it, or press its number: '
+        + 'right pays ' + n + ' times over, wrong pays nothing. Leave them alone and the paying door opens by itself.';
     } else if (!lit && litRow !== null) {
       // The doors have closed. Left alone the line keeps telling the player to
       // click one, through the rest of the round and on into the workbench.
@@ -1249,7 +1254,8 @@ export async function boot(doc) {
       + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
       + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
       + ' because your best game reached round ' + Math.max(r.bestRound, 0)
-      + ', so playing well is the best thing you can do for the arcade. You hold ' + num(r.scrip) + ' coins.';
+      + ', so playing well is the best thing you can do for the arcade. You hold ' + num(r.scrip) + ' coins and '
+      + num(Math.floor((game.meta && game.meta.marks) || 0)) + ' stars.';
 
     if (!el.bulkbar._built) {
       for (const step of BULK_STEPS) {
@@ -1335,15 +1341,15 @@ export async function boot(doc) {
         const d = doc.createElement('div');
         d.className = 'node';
         d.innerHTML = '<h4></h4><p></p>';
-        d.querySelector('h4').textContent = node.name;
+        const h4 = d.querySelector('h4');
+        h4.textContent = node.name;
         d.querySelector('p').textContent = node.text;
         const b = doc.createElement('button');
         b.type = 'button';
-        b.textContent = 'Buy for ' + num(node.cost) + ' stars';
         b.addEventListener('click', () => { const res = game.buyNode(node.id); if (!res.ok) say(res.why); paintFloor(); });
         d.appendChild(b);
         wrap.appendChild(d);
-        nodes.set(node.id, { d, b });
+        nodes.set(node.id, { d, b, h4 });
       }
       box.appendChild(wrap);
     }
@@ -1357,22 +1363,38 @@ export async function boot(doc) {
     const pending = game.pendingMarks();
     const can = typeof m.canReset === 'function' ? m.canReset(cfg, game.meta, game.floor) : { ok: false, why: '' };
 
-    prestigeUi.p.textContent = can.ok
-      ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
-        + num(pending) + ' stars. Stars buy permanent upgrades, listed below, and those never go away no '
-        + 'matter how many times you start over. You have ' + num((game.meta && game.meta.marks) || 0) + ' stars now.'
-      : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.');
+    // What you hold is said first and said always. It used to be buried in the
+    // half of a sentence that only ran while a start-over was available, so a
+    // player who had just started over could not find out how many stars they
+    // had anywhere in the game.
+    const held = Math.floor((game.meta && game.meta.marks) || 0);
+    prestigeUi.p.textContent = 'You have ' + num(held) + (held === 1 ? ' star' : ' stars') + '. '
+      + (can.ok
+        ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
+          + num(pending) + ' more. Stars buy the permanent upgrades below, and those never go away no '
+          + 'matter how many times you start over.'
+        : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.'));
 
     prestigeUi.sell.textContent = 'Sell the arcade for ' + num(pending) + ' stars';
     prestigeUi.sell.style.display = can.ok ? '' : 'none';
 
+    // Every card is drawn from nodeStatus, which is the one thing that knows
+    // the current price, whether it is reachable and why not. Reading the
+    // catalogue entry instead priced every upgrade at its first level forever,
+    // and hid the only upgrade that can be bought more than once the moment it
+    // was bought once - which left a player with stars and nothing to spend
+    // them on.
     for (const node of (Array.isArray(m.NODES) ? m.NODES : [])) {
       const ui = prestigeUi.nodes.get(node.id);
       if (!ui) continue;
-      const have = !!(game.meta.nodes && game.meta.nodes[node.id]);
-      ui.d.className = 'node' + (have ? ' have' : '');
-      ui.b.style.display = have ? 'none' : '';
-      ui.b.disabled = (game.meta.marks || 0) < node.cost;
+      const st = typeof m.nodeStatus === 'function'
+        ? m.nodeStatus(cfg, game.meta, node.id)
+        : { done: false, unlocked: true, affordable: false, cost: node.cost, level: 0, why: '' };
+      ui.d.className = 'node' + (st.done ? ' have' : '');
+      ui.h4.textContent = node.name + (st.level > 0 && !st.done ? ' - bought ' + num(st.level) + ' times' : '');
+      ui.b.style.display = st.done ? 'none' : '';
+      ui.b.disabled = !st.affordable;
+      ui.b.textContent = st.unlocked ? 'Buy for ' + num(st.cost) + (st.cost === 1 ? ' star' : ' stars') : st.why;
     }
   }
 

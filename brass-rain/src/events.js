@@ -119,8 +119,8 @@
 // `run.events`. Nothing here draws anything.
 // ---------------------------------------------------------------------------
 
-import { POCKET_PAY } from './board.js?v=65';
-import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=65';
+import { POCKET_PAY } from './board.js?v=66';
+import { summonFor, doorsFor, themeForCabinet } from './render/themes.js?v=66';
 
 /** The per-run event state. Never null on a run. */
 export function createEvents() {
@@ -635,6 +635,27 @@ function buildDoors(state, e, def) {
   e.prize = Math.max(0, Math.round(prizes[Math.floor(state.rng.next() * prizes.length) % prizes.length]));
   e.revealed = false;
   e.holdBalls = clampInt(num(def.showBalls, 4), 1, 60);
+  // A row of doors is the one thing on this machine that asks the player to
+  // reach for it, and its life is counted in balls like everything else on the
+  // face. That works until the machine is built up: every part that sends
+  // balls faster shortens the row, and measured, a bare machine leaves it open
+  // eighteen seconds while a built one at four times speed leaves it open half
+  // a second. Nobody can make a choice in half a second.
+  //
+  // So the row is given the number of balls that will actually pass in the
+  // window it was written for, measured from what this round has been sending
+  // rather than assumed. Its life is still counted in balls and it still
+  // cannot outlive the round, and a faster machine simply spends more of them
+  // on the same few seconds. Speed still shortens it, because a player who
+  // asks for four times speed is asking for that too.
+  const perMinute = Math.max(1, num(state.cfg.launch && state.cfg.launch.perMinute, 60));
+  const seconds = e.balls / (perMinute / 60);
+  const elapsed = num(state.time, 0);
+  const sent = num(state.stats && state.stats.launched, 0);
+  const rate = elapsed > 1 && sent > 0 ? sent / elapsed : perMinute / 60;
+  const room = Math.max(0, num(state.budget, 0) - num(state.launched, 0));
+  e.balls = clampInt(Math.round(seconds * rate), e.balls, Math.max(e.balls, room));
+  e.ballsLeft = e.balls;
   return true;
 }
 

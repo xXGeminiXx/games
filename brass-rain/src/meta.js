@@ -146,8 +146,8 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=65';
-import { num as coins } from './format.js?v=65';
+import { priceAt } from './economy.js?v=66';
+import { num as coins } from './format.js?v=66';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -666,7 +666,7 @@ export function nodeStatus(cfg, meta, id) {
   }
 
   const affordable = unlocked && !done && held >= cost;
-  if (unlocked && !done && !affordable) why = 'Costs ' + cost + ' marks.';
+  if (unlocked && !done && !affordable) why = 'Costs ' + cost + (cost === 1 ? ' star' : ' stars') + '.';
   if (done) why = node.repeatable ? 'Every page is written.' : 'Already in the notebook.';
 
   return { id, exists: true, level, cost, unlocked, affordable, done, why, node };
