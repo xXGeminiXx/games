@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=10';
-import { format, clearBonus, raiseCost } from './economy.js?v=10';
-import { kindDef, costOf } from './works.js?v=10';
-import { idsOf } from './traits.js?v=10';
+import { fill } from '../config.js?v=11';
+import { format, clearBonus, raiseCost } from './economy.js?v=11';
+import { kindDef, costOf } from './works.js?v=11';
+import { idsOf } from './traits.js?v=11';
 
 const LOG_SHOWN = 8;
 
@@ -252,10 +252,12 @@ export function createUi(cfg, doc, win, api) {
       put(el.sell, t.sell + ' +' + Math.floor(sel.spent * cfg.economy.sellRefund));
       setDisabled(el.sell, state.phase === 'over');
     } else {
+      // With no tower picked the button still has a target, and it says which.
+      const best = api.bestUpgrade();
       put(el.selinfo, t.nothing);
-      put(el.upgrade, t.upgrade);
+      put(el.upgrade, best ? fill(t.upgradeBest, { name: best.def.name, cost: Math.ceil(best.cost) }) : t.upgradeNone);
       put(el.sell, t.sell);
-      setDisabled(el.upgrade, true);
+      setDisabled(el.upgrade, !best || best.cost > state.ore || state.phase === 'over');
       setDisabled(el.sell, true);
     }
 
@@ -382,14 +384,10 @@ export function createUi(cfg, doc, win, api) {
     if (list.length && !coversRoad(state)) return c.reach;
     if (cheap && ore >= cheapCost) return fill(c.buy, { ore, name: cheap.name, cost: cheapCost });
 
-    let up = null;
-    for (const w of list) {
-      if (w.tier >= cfg.works.maxTier) continue;
-      const def = kindDef(cfg, w.kind);
-      const price = Math.ceil(costOf(cfg, def, w.tier + 1));
-      if (!up || price < up.cost) up = { cost: price, name: def.name, tier: w.tier + 1 };
+    const up = api.bestUpgrade();
+    if (up && ore >= Math.ceil(up.cost)) {
+      return fill(c.upgrade, { ore, name: up.def.name, t: up.tier, cost: Math.ceil(up.cost) });
     }
-    if (up && ore >= up.cost) return fill(c.upgrade, { ore, name: up.name, t: up.tier, cost: up.cost });
 
     let lift = Infinity;
     for (const i of roadCells(state)) {

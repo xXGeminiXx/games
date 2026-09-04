@@ -6,14 +6,14 @@
 // writes the page, and this file decides when each of them happens.
 // ---------------------------------------------------------------------------
 
-import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=10';
-import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=10';
-import { countAlive } from './motes.js?v=10';
-import { kindDef, workAt, stats } from './works.js?v=10';
-import { createIso } from './render/iso.js?v=10';
-import { createGround } from './render/ground.js?v=10';
-import { createScene } from './render/scene.js?v=10';
-import { createUi } from './ui.js?v=10';
+import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine, bestUpgrade } from './run.js?v=11';
+import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=11';
+import { countAlive } from './motes.js?v=11';
+import { kindDef, workAt, stats } from './works.js?v=11';
+import { createIso } from './render/iso.js?v=11';
+import { createGround } from './render/ground.js?v=11';
+import { createScene } from './render/scene.js?v=11';
+import { createUi } from './ui.js?v=11';
 
 export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const keyMeta = cfg.identity.storagePrefix + '.meta';
@@ -79,7 +79,18 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
     preview: (type, kind, i) => preview(state, type, kind, i),
     aliveSurge: () => countAlive(state.pool, true),
     summary: () => summary(state),
-    upgrade() { const w = api.selected(); return w ? actUpgrade(state, w.id) : { ok: false }; },
+    bestUpgrade: () => bestUpgrade(state),
+    upgrade() {
+      const w = api.selected();
+      if (w) return actUpgrade(state, w.id);
+      // Nothing picked: take the tower that needs it most and show which one
+      // took it, so the button is never dead and never a mystery.
+      const best = bestUpgrade(state);
+      if (!best) return { ok: false };
+      const r = actUpgrade(state, best.work.id);
+      if (r.ok) selectedId = best.work.id;
+      return r;
+    },
     sell() { const w = api.selected(); if (!w) return { ok: false }; const r = actSell(state, w.id); if (r.ok) selectedId = 0; return r; },
     callSurge: () => actCall(state),
     setSpeed: (n) => actSpeed(state, n),

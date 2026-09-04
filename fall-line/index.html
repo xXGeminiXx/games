@@ -94,7 +94,7 @@
   #earthcost{color:var(--dim);margin:6px 0 10px;min-height:14px;font-size:11px}
   #selinfo{color:var(--dim);line-height:1.45;margin-bottom:7px;white-space:pre-line}
 
-  /* The Melt's forecast and the log. */
+  /* What is coming, and the log. */
   #forecast{line-height:1.45;white-space:pre-line}
   #forecast .ink{color:var(--ink)}
   #forecast .trait{color:var(--melt)}
@@ -288,7 +288,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="ecff3817aa04">
+<meta name="build" content="c5a5df9e91f4">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -339,8 +339,8 @@
   <div id="tools">
     <button id="help">Help</button>
     <button id="newrun">New run</button>
-    <button id="export">Export</button>
-    <button id="import">Import</button>
+    <button id="export">Copy save</button>
+    <button id="import">Paste save</button>
   </div>
 </header>
 
@@ -354,29 +354,29 @@
   </aside>
 
   <aside id="meltcard" class="card tr">
-    <h2 id="p-melt">The Melt</h2>
+    <h2 id="p-melt">Next wave</h2>
     <div id="forecast"></div>
   </aside>
 
   <aside id="inst" class="card bl">
     <div id="stats">
       <div class="stat"><b id="ore">0</b><span id="lbl-ore">Ore</span></div>
-      <div class="stat"><b id="hearth">0</b><span id="lbl-hearth">Hearth</span></div>
-      <div class="stat"><b id="surge">0</b><span id="lbl-surge">Surge</span></div>
-      <div class="stat"><b id="best">0</b><span id="lbl-best">Best</span></div>
+      <div class="stat"><b id="hearth">0</b><span id="lbl-hearth">Fire</span></div>
+      <div class="stat"><b id="surge">0</b><span id="lbl-surge">Wave</span></div>
+      <div class="stat"><b id="best">0</b><span id="lbl-best">Best wave</span></div>
     </div>
     <div id="clock">
       <div id="speed"></div>
       <button id="pause">Pause</button>
-      <button id="call">Call surge</button>
+      <button id="call">Call the wave</button>
     </div>
   </aside>
 
   <aside id="groundcard" class="card br">
-    <h2 id="p-earth">Earthworks</h2>
+    <h2 id="p-earth">The ground</h2>
     <div class="row2"><button id="raise">Raise</button><button id="cut">Lower</button></div>
     <div id="earthcost"></div>
-    <h2 id="p-selected">Selected</h2>
+    <h2 id="p-selected">This tower</h2>
     <div id="selinfo"></div>
     <div class="row2"><button id="upgrade">Upgrade</button><button id="sell">Sell</button></div>
   </aside>
@@ -396,7 +396,7 @@
   </div>
   <div id="overbox" class="box" hidden>
     <div class="bcard">
-      <h3 id="overtitle">The hearth is out</h3>
+      <h3 id="overtitle">The fire is out</h3>
       <div class="scroll"><div id="overtext"></div></div>
       <div class="actions"><button id="overnew">New run</button></div>
     </div>
@@ -409,8 +409,8 @@
 </div>
 
 <script type="module">
-  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=10';
-  import { createGame } from './src/game.js?v=10';
+  import { CONFIG, applyIdentity, appliedOverrides } from './config.js?v=11';
+  import { createGame } from './src/game.js?v=11';
 
   applyIdentity(document);
   if (appliedOverrides.length) console.log('config overrides:', appliedOverrides.join(' '));

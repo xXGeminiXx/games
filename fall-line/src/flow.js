@@ -13,7 +13,7 @@
 // and allocates only the two arrays it hands back.
 // ---------------------------------------------------------------------------
 
-import { KIND } from './terrain.js?v=10';
+import { KIND } from './terrain.js?v=11';
 
 export const SQRT2 = Math.SQRT2;
 

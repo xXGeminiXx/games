@@ -15,7 +15,7 @@
 // to line. Rebuilding is the only place any of that arithmetic happens.
 // ---------------------------------------------------------------------------
 
-import { mixHex, scaleLightness } from './oklab.js?v=10';
+import { mixHex, scaleLightness } from './oklab.js?v=11';
 
 /** Edge bits, named for the direction the neighbour lies in. */
 const E_BACKX = 1;   // upper-left edge, toward the cell at x - 1

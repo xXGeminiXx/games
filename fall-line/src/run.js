@@ -7,18 +7,18 @@
 // calls the actions.
 // ---------------------------------------------------------------------------
 
-import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=10';
-import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=10';
-import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=10';
-import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=10';
-import { stepWorks } from './works.js?v=10';
-import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=10';
-import { clearBonus, callBonus } from './economy.js?v=10';
-import { checkAwards, awardDef } from './awards.js?v=10';
-import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=10';
-import { stream, hash } from './rng.js?v=10';
-import { idsOf } from './traits.js?v=10';
-import { fill } from '../config.js?v=10';
+import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=11';
+import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=11';
+import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=11';
+import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt, stats } from './works.js?v=11';
+import { stepWorks } from './works.js?v=11';
+import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=11';
+import { clearBonus, callBonus } from './economy.js?v=11';
+import { checkAwards, awardDef } from './awards.js?v=11';
+import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=11';
+import { stream, hash } from './rng.js?v=11';
+import { idsOf } from './traits.js?v=11';
+import { fill } from '../config.js?v=11';
 
 const LOG_KEEP = 40;
 
@@ -417,6 +417,45 @@ export function newRun(state, seed) {
 }
 
 /** The lines the run-over card shows. */
+/**
+ * The tower another level does the most for, for a player who has picked none.
+ *
+ * Upgrading used to need three things a first-time player has no reason to
+ * know: that towers have levels at all, that a tower is picked by clicking it
+ * on the field, and that the button in the corner then wakes up. A player who
+ * never found that never upgraded anything, and a run of level one towers
+ * falls behind whatever else they do. So the button always has a target: a
+ * tower the water actually walks past comes first, because a level on a tower
+ * nothing goes near buys nothing, and among those the cheapest next level.
+ * Clicking a tower still overrides it for anyone who wants to choose.
+ */
+export function bestUpgrade(state) {
+  const { cfg, terrain, works } = state;
+  const road = new Set(state.fallLine || []);
+  for (const branch of (state.fallLines || [])) for (const i of branch) road.add(i);
+  const W = terrain.W;
+  let best = null;
+  for (const w of works.list) {
+    if (w.tier >= cfg.works.maxTier) continue;
+    const def = kindDef(cfg, w.kind);
+    if (!def) continue;
+    const cost = costOf(cfg, def, w.tier + 1);
+    const st = stats(cfg, terrain, works, w);
+    const reach = st.range || st.aura || 0;
+    let onRoad = false;
+    for (const i of road) {
+      const dx = (i % W) + 0.5 - w.x;
+      const dy = Math.floor(i / W) + 0.5 - w.y;
+      if (dx * dx + dy * dy <= reach * reach) { onRoad = true; break; }
+    }
+    const rank = onRoad ? 0 : 1;
+    if (!best || rank < best.rank || (rank === best.rank && cost < best.cost)) {
+      best = { work: w, def, cost, rank, tier: w.tier + 1 };
+    }
+  }
+  return best;
+}
+
 export function summary(state) {
   const { cfg, stats } = state;
   const s = cfg.text.summary;
