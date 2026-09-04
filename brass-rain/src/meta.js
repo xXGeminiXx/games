@@ -146,8 +146,8 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=68';
-import { num as coins } from './format.js?v=68';
+import { priceAt } from './economy.js?v=69';
+import { num as coins } from './format.js?v=69';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -588,10 +588,10 @@ export function canReset(cfg, meta, floor) {
   const minScrip = tune(cfg, 'minScrip');
 
   if (!(L > 0)) {
-    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. Trade balls for coins and buy arcade machines with them - they earn on their own, even while you are away - and the total climbs.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. Trade balls for coins and your arcade turns them into machines - they earn on their own, even while you are away - and the total climbs.', marks: 0, need: resetThreshold(cfg, meta) };
   }
   if (L < minScrip) {
-    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. You are at ' + coins(L) + '. Arcade machines are what get you there: buy them with your coins and they earn on their own, even while you are away.', marks: 0, need: resetThreshold(cfg, meta) };
+    return { ok: false, why: 'Starting over pays stars once you have earned ' + coins(minScrip) + ' coins in all. You are at ' + coins(L) + '. Arcade machines are what get you there, and your coins are spent on them for you: they earn on their own, even while you are away.', marks: 0, need: resetThreshold(cfg, meta) };
   }
 
   const marks = pendingMarks(cfg, meta, floor);

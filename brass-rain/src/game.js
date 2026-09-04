@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=68';
+import { loadConfig } from '../config.js?v=69';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=68';
-import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=69';
+import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote, autoSpend, bestBuy,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=68';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=68';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=68';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=68';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=68';
-import { rng as makeRng } from './rng.js?v=68';
-import { offerCabinets, freshSeed } from './cabinets.js?v=68';
-import * as Save from './save.js?v=68';
-import { showState } from './render/reach.js?v=68';
-import { skinForCabinet } from './render/themes.js?v=68';
-import { chooseDoor as callDoor } from './events.js?v=68';
+         handMult, restoreFloor } from './floor.js?v=69';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=69';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=69';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=69';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=69';
+import { rng as makeRng } from './rng.js?v=69';
+import { offerCabinets, freshSeed } from './cabinets.js?v=69';
+import * as Save from './save.js?v=69';
+import { showState } from './render/reach.js?v=69';
+import { skinForCabinet } from './render/themes.js?v=69';
+import { chooseDoor as callDoor } from './events.js?v=69';
 
 // A gap between frames longer than this is time the player was away, not a
 // slow frame. The same number decides whether a reopened page was away at all.
@@ -53,8 +53,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=68');
-  const metaModule = await optional('./meta.js?v=68');
+  const catalogue = await optional('./fittings.js?v=69');
+  const metaModule = await optional('./meta.js?v=69');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -404,8 +404,27 @@ function loadSave(game, saved) {
   const at = Number(saved.at);
   if (Number.isFinite(at) && at > 0) {
     const seconds = Math.max(0, (Date.now() - at) / 1000);
-    if (seconds > AWAY_SECONDS) game.away = tickFloor(game.cfg, game.floor, seconds, metaEffects(game));
+    if (seconds > AWAY_SECONDS) { game.away = tickFloor(game.cfg, game.floor, seconds, metaEffects(game)); spendIdle(game); }
   }
+}
+
+/**
+ * Puts idle coins to work.
+ *
+ * Coins buy arcade machines and buy nothing else, so a coin held is a coin
+ * earning nothing. Left to the player this is a panel that has to be found,
+ * opened and worked; the arcade does it by itself unless it is turned off.
+ * What was bought goes in the run's own log, so it is never money that quietly
+ * disappeared.
+ */
+function spendIdle(game) {
+  if (!game.floor || game.floor.autobuy === false) return 0;
+  const res = autoSpend(game.cfg, game.floor);
+  if (res.bought > 0) {
+    game.autoBought = (game.autoBought || 0) + res.bought;
+    game.autoSpent = (game.autoSpent || 0) + res.spent;
+  }
+  return res.bought;
 }
 
 function api(game) {
@@ -552,6 +571,7 @@ function api(game) {
       const balls = game.run.tray;
       if (balls <= 0) return 0;
       const got = cashOut(game.cfg, game.floor, balls, metaEffects(game));
+      spendIdle(game);
       if (game.run.round - 1 > game.floor.bestRound) game.floor.bestRound = game.run.round - 1;
       game.run.tray = 0;
       newRun(game, Number.isFinite(nextSeed) ? nextSeed >>> 0 : freshSeed(game.cfg));
@@ -571,6 +591,13 @@ function api(game) {
       return seed;
     },
     quoteMachine(id, want) { return quote(game.cfg, game.floor, id, want); },
+    /** Whether the arcade spends its own coins, and the switch for it. */
+    autobuy() { return game.floor.autobuy !== false; },
+    setAutobuy(on) { game.floor.autobuy = !!on; if (on) spendIdle(game); save(game); changed(game); },
+    /** What the arcade would buy next, so the page can say what is coming. */
+    nextBuy() { return bestBuy(game.cfg, game.floor); },
+    /** How much the arcade has bought for itself since the page was opened. */
+    boughtForYou() { return { machines: game.autoBought || 0, coins: game.autoSpent || 0 }; },
     buyMachine(id, want) { const n = buyMachine(game.cfg, game.floor, id, want); if (n) changed(game); return n; },
     attendantPrice(id) { return attendantPrice(game.cfg, id); },
     hireAttendant(id) { const ok = hireAttendant(game.cfg, game.floor, id); if (ok) changed(game); return ok; },
@@ -815,6 +842,7 @@ export function frame(game, now) {
   if (game.dropped > AWAY_SECONDS) {
     const caught = tickFloor(game.cfg, game.floor, game.dropped, metaEffects(game));
     if (caught.gained > 0) game.away = caught;
+    spendIdle(game);
     game.dropped = 0;
     save(game);
     // An hour is not a frame the card drew. Measuring it would put an hour in
@@ -830,6 +858,7 @@ export function frame(game, now) {
   if (game.view === VIEW_MACHINE) stepRun(run, dt, game.out);
 
   tickFloor(game.cfg, game.floor, dt, metaEffects(game));
+  spendIdle(game);
 
   if (wasPhase !== PHASE_SHOP && run.phase === PHASE_SHOP) openBench(game);
   if (wasPhase !== PHASE_OVER && run.phase === PHASE_OVER) {

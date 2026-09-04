@@ -19,7 +19,7 @@
 // for by the played half rather than replacing it.
 // ---------------------------------------------------------------------------
 
-import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=68';
+import { priceAt, priceOf, maxAffordable, bulkBuy } from './economy.js?v=69';
 
 /** The floor as it stands at the start of everything. */
 export function createFloor(cfg) {
@@ -34,6 +34,11 @@ export function createFloor(cfg) {
     cashed: 0,        // balls ever handed to the counter
     bestRound: 0,     // the deepest round any run has reached
     games: 0,         // finished games, counted since this was added
+    // Coins buy arcade machines and nothing else, so a coin sitting still is
+    // a coin doing nothing. On by default: a player who never opens the panel
+    // still has an arcade that grows, and turning it off leaves every button
+    // exactly as it was.
+    autobuy: true,
     lastTick: 0,
   };
 }
@@ -121,6 +126,60 @@ export function buyMachine(cfg, floor, id, want) {
   return q.k;
 }
 
+/**
+ * What one more of a machine adds per second, before the multipliers every
+ * machine shares.
+ *
+ * The shared ones - how deep the best game got, and what the stars are worth -
+ * multiply every machine equally, so they cancel out of a comparison between
+ * two machines and are left out. What does not cancel is the milestone step:
+ * the tenth of a machine is worth far more than the ninth, so the unit that
+ * completes a milestone can be the best coin on the floor even when its
+ * neighbour looks cheaper.
+ */
+export function unitGain(cfg, floor, id) {
+  const def = machineDef(cfg, id);
+  if (!def) return 0;
+  const n = floor.owned[id] || 0;
+  return def.income * ((n + 1) * milestoneMult(cfg, n + 1) - n * milestoneMult(cfg, n));
+}
+
+/** The machine whose next unit buys the most income per coin, or null. */
+export function bestBuy(cfg, floor) {
+  let best = null;
+  let bestRate = 0;
+  for (const m of cfg.floor.machines) {
+    const price = unitPrice(cfg, floor, m.id);
+    if (!Number.isFinite(price) || price <= 0 || price > floor.scrip) continue;
+    const rate = unitGain(cfg, floor, m.id) / price;
+    if (rate > bestRate) { bestRate = rate; best = m.id; }
+  }
+  return best;
+}
+
+/**
+ * Spends idle coins on the best value on the floor, over and over, while
+ * anything is affordable.
+ *
+ * There is nothing else to spend a coin on, so this can never cost the player
+ * anything; the only judgement in it is WHICH machine, and that is settled by
+ * income per coin with the milestone step counted. `steps` caps one call so a
+ * large sum landing at once cannot hold a frame.
+ */
+export function autoSpend(cfg, floor, steps = 400) {
+  if (floor.autobuy === false) return { bought: 0, spent: 0 };
+  let bought = 0;
+  const before = floor.scrip;
+  for (let i = 0; i < steps; i++) {
+    const id = bestBuy(cfg, floor);
+    if (!id) break;
+    const k = buyMachine(cfg, floor, id, 1);
+    if (k <= 0) break;
+    bought += k;
+  }
+  return { bought, spent: Math.max(0, before - floor.scrip) };
+}
+
 /** What an attendant for a machine costs. */
 export function attendantPrice(cfg, id) {
   const def = machineDef(cfg, id);
@@ -172,6 +231,7 @@ export function tickFloor(cfg, floor, seconds, meta) {
 /** Everything the floor knows, small enough to sit inside a save. */
 export function serializeFloor(floor) {
   return {
+    autobuy: floor.autobuy !== false,
     owned: floor.owned,
     attendants: floor.attendants,
     scrip: floor.scrip,
@@ -195,6 +255,9 @@ export function restoreFloor(cfg, obj) {
   floor.cashed = num(obj.cashed);
   floor.bestRound = num(obj.bestRound);
   floor.games = num(obj.games);
+  // Saves written before this existed have no flag, and the answer for them is
+  // the same as for a new arcade: on.
+  floor.autobuy = obj.autobuy !== false;
   return floor;
 }
 

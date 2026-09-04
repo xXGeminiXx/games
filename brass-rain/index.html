@@ -107,7 +107,8 @@
   .tube.done i{background:linear-gradient(#e0b34f,#a97a1e)}
 
   /* the handle */
-  #handle{width:100%;margin:4px 0 2px;accent-color:#a97a1e}
+  #handle{width:100%;margin:4px 0 0;accent-color:#a97a1e}
+  .scale{display:flex;justify-content:space-between;font-size:10px;color:#7a5c50;margin:0 0 3px}
   input[type=range]{width:100%}
   .knobrow{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
   .knobrow button{font-size:11px;padding:3px 8px;flex:0 0 auto}
@@ -119,6 +120,19 @@
   #log li.fever{color:var(--live-ink);font-weight:600}
   #log li.lost{color:#9a2f22}
 
+  /* The column of panels scrolls when the window is short - at 1024x700 the
+     last two are entirely below the fold - and a column with no edge showing
+     reads as a column with nothing under it. This rides the bottom of the
+     scroll box while there is more to see. */
+  #more{
+    position:sticky;bottom:-11px;z-index:2;
+    margin:-9px -11px -11px -13px;padding:9px 0 8px;
+    text-align:center;font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--brass-lit);pointer-events:none;
+    background:linear-gradient(rgba(22,7,8,0),rgba(22,7,8,.9) 62%);
+  }
+  #more[hidden]{display:none}
+
   /* ---- the machine face -------------------------------------------- */
   #face{flex:1 1 auto;min-width:0;position:relative;background:#120507;overflow:hidden}
   #view{display:block;width:100%;height:100%}
@@ -126,18 +140,28 @@
   /* Sits under the lit sign on top of the cabinet rather than across it. The
      sign is drawn as part of the machine and scales with the window, so this
      is anchored to the bottom of the face where there is no cabinet art. */
+  /* The banner and the live line share the foot of the board, stacked rather
+     than each pinned to their own offset: the line runs to three rows on a
+     short window and the banner was printed straight through it. */
+  #foot{
+    position:absolute;left:0;right:0;bottom:7px;
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    pointer-events:none;
+  }
   #banner{
-    position:absolute;left:50%;bottom:34px;transform:translateX(-50%);
     padding:4px 16px;border-radius:3px;
     font:600 13px/1 var(--narrow);letter-spacing:.3em;text-transform:uppercase;
     background:var(--live);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.5);
-    pointer-events:none;
   }
   #banner[hidden]{display:none}
+  /* The live line. It names the best next move with the numbers behind it and
+     is rewritten as the game runs, so it is text to be read rather than a
+     caption to be glanced at: a step up in size and in contrast over the
+     fixed sentence it replaced. */
   #hint{
-    position:absolute;left:50%;bottom:8px;transform:translateX(-50%);max-width:78%;
-    font-size:12px;color:#c8b8a4;text-align:center;pointer-events:none;
-    text-shadow:0 1px 3px #000;
+    max-width:86%;
+    font-size:13px;line-height:1.4;color:#e6d8bf;text-align:center;
+    text-shadow:0 1px 3px #000,0 0 8px #000;
   }
   #flyer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
   /* Every mouth is named on the face, from the board's own geometry: the
@@ -363,7 +387,7 @@
      whatever gives a machine its own name and color. */
   .cab .theme{font:600 10px/1 var(--narrow);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
   .cab .theme:empty{display:none}
-  /* the board of best nights */
+  /* the board of best games */
   #nights{margin:2px 0 4px;padding-left:18px;font-size:11px;line-height:1.55}
   #nights li b{color:var(--oxblood);font-weight:700}
   #nights li small{color:var(--dim);margin-left:4px}
@@ -532,7 +556,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="54df9fa6cd79">
+<meta name="build" content="253353a12f38">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -585,7 +609,7 @@
     <button id="toRow" title="See three other machines and sit at one. Picking one starts a new game." type="button">Change machine</button>
     <button id="toFloor" title="Buy arcade machines with your coins - they earn on their own, even while you are away - and start over for stars." type="button">Your arcade</button>
     <button id="toSettings" title="Picture quality, a new game, erasing everything." type="button">Settings</button>
-    <button id="toBests" title="Your best finished games, ranked." type="button">Best nights</button>
+    <button id="toBests" title="Your best finished games, ranked." type="button">Best games</button>
     <button id="toHelp" title="How the machine works, in plain words." type="button">Help</button>
   </div>
 </header>
@@ -604,6 +628,9 @@
       <h2>The handle</h2>
       <input id="handle" type="range" min="0" max="1" step="0.005" value="0.62"
              aria-label="How hard the handle throws a ball">
+      <!-- The number under the slider is a bare 0 to 1 and means nothing on its
+           own. The ends of the travel say which way is which. -->
+      <div class="scale"><span>soft, drops near</span><span>hard, throws far</span></div>
       <div class="row"><span class="sub">Power</span><b id="strengthOut">0.62</b></div>
       <div class="row"><span class="sub">Balls per pull</span><b id="perPull">1</b></div>
       <div class="knobrow">
@@ -632,7 +659,7 @@
       <p class="sub" id="floorHint"></p>
     </section>
     <section class="plaque" id="pNights">
-      <h2>Best nights</h2>
+      <h2>Best games</h2>
       <ol id="nights"></ol>
       <p class="sub" id="nightsLede">Finish a game and it goes on the board. Beat your best round to climb it.</p>
     </section>
@@ -642,14 +669,18 @@
       <ul id="log"></ul>
     </section>
 
+    <div id="more" hidden>More below</div>
+
   </aside>
 
   <section id="face">
     <canvas id="view"></canvas>
     <div id="flyer"></div>
     <div id="mouths"></div>
-    <div id="banner" hidden></div>
-    <div id="hint"></div>
+    <div id="foot">
+      <div id="banner" hidden></div>
+      <div id="hint"></div>
+    </div>
   </section>
 </main>
 
@@ -755,7 +786,7 @@
       <li><b>The slot in the middle spins the reels.</b> That narrow mouth is the one worth aiming at.</li>
       <li><b>Three matching reels start a BONUS.</b> The jackpot pocket swings open and pays hard for the next hundred balls or so. This is how you get ahead.</li>
       <li><b>Between rounds you shop.</b> Balls you haven't launched buy parts at the workbench, and you can bend nails to steer the rain toward the slot.</li>
-      <li><b>Cash balls out for coins.</b> Coins buy machines for your arcade, and those earn coins around the clock, even while you're away. Once you have earned a few thousand coins in all, starting over trades the arcade for stars, and stars buy upgrades that never go away.</li>
+      <li><b>Cash balls out for coins.</b> Your arcade spends them on machines by itself, and those earn coins around the clock, even while you're away. Once you have earned a few thousand coins in all, starting over trades the arcade for stars, and stars buy upgrades that never go away.</li>
       <li><b>When a row of doors lights up at the foot of the board, click one.</b> Right pays as many times over as there are doors, wrong pays nothing, and left alone the paying door opens by itself.</li>
     </ol>
     <div class="sheetfoot">
@@ -767,10 +798,10 @@
 <!-- help -->
 <div class="sheet" id="bests" hidden>
   <div class="panel">
-    <h1>Best nights</h1>
+    <h1>Best games</h1>
     <p class="lede" id="bestsLede">Every game you have finished, best first: the round that ended it, then the balls won on the way.</p>
     <div id="bestsBody"></div>
-    <div class="sheetfoot"><input id="bestsLine" type="text" readonly aria-label="Your best night, as a line to send"><button id="shareBests" type="button" title="Put your best night on the clipboard, to send to someone who thinks they can beat it.">Copy my best night</button><button id="closeBests" type="button">Close</button></div>
+    <div class="sheetfoot"><input id="bestsLine" type="text" readonly aria-label="Your best game, as a line to send"><button id="shareBests" type="button" title="Put your best game on the clipboard, to send to someone who thinks they can beat it.">Copy my best game</button><button id="closeBests" type="button">Close</button></div>
   </div>
 </div>
 <div class="sheet" id="help" hidden>
@@ -782,7 +813,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=68';
+  import { boot } from './src/ui.js?v=69';
   boot(document);
 </script>
 </body>

@@ -92,7 +92,6 @@ export const CONFIG = {
     settings:   'Settings',
 
     // Sentences. Braces are filled in at the point of use.
-    firstLine:  'Pull the handle. Balls arc over the top and rain down through the nails. Pockets pay balls back, and the slot in the middle spins the reels.',
     quotaLine:  '{have} of {need}',
     roundWon:   'Round {n} cleared.',
     roundLost:  'Out of pulls, {short} short of the goal. Pick a machine to play again.',

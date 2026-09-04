@@ -15,17 +15,21 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=68';
-import { createScene } from './render/scene.js?v=68';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=68';
-import { num, count, duration, mult, pct, fill } from './format.js?v=68';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=68';
-import { nailPos } from './board.js?v=68';
-import { DOORS_ROW } from './render/board-geom.js?v=68';
-import { sketchCabinet } from './cabinets.js?v=68';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=68';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=69';
+import { createScene } from './render/scene.js?v=69';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=69';
+import { num, count, duration, mult, pct, fill } from './format.js?v=69';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=69';
+import { nailPos } from './board.js?v=69';
+import { DOORS_ROW } from './render/board-geom.js?v=69';
+import { sketchCabinet } from './cabinets.js?v=69';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=69';
+import { makeCompass, pick, write } from './advice.js?v=69';
 
 const SPEEDS = [1, 2, 4];
+
+/** How long the line under the board holds still while its subject does. */
+const HINT_DWELL = 1400;
 
 export async function boot(doc) {
   const game = await createGame({});
@@ -53,8 +57,25 @@ export async function boot(doc) {
   // only rewrites when the standing actually moves.
   let nightsList = [];
   let liveKey = '';
-  // The last lit row the hint spoke for, so it speaks once per row.
-  let litRow = null;
+  // The line under the board. `compass` counts what each setting of the handle
+  // has done this game, `saidUntil` holds a one-off message - what an arcade
+  // paid while the page was closed, why a part could not be bolted in - on
+  // screen for a few seconds before the live line takes the space back, and
+  // `lastHint` keeps the frame from writing the same sentence sixty times a
+  // second.
+  const compass = makeCompass();
+  let saidUntil = 0;
+  let lastHint = '';
+  // The line carries live counters, so left alone it rewrites itself on nearly
+  // every ball and a moving sentence is a sentence nobody finishes reading.
+  // A change of subject goes up at once; the same subject with new numbers in
+  // it waits out HINT_DWELL, so the figures step instead of streaming.
+  let lastKey = '';
+  let hintAt = 0;
+  // When the cue on the left column was last worked out. Reading a scroll box's
+  // height forces the browser to lay the page out, which is not something to do
+  // sixty times a second for a word that changes twice a minute.
+  let cueAt = 0;
   // The tags on the mouths, keyed by mouth id. Declared here with the rest
   // of the state because the first paint runs before boot has finished.
   const mouthTags = new Map();
@@ -133,7 +154,7 @@ export async function boot(doc) {
     on(el.toBests, 'click', () => openBests());
     on(el.closeBests, 'click', () => hide(el.bestsSheet));
     on(el.shareBests, 'click', async () => {
-      // The best night as one line, on the clipboard. Nothing is sent
+      // The best game as one line, on the clipboard. Nothing is sent
       // anywhere; the player pastes it wherever they like.
       const line = el.bestsLine ? el.bestsLine.value : '';
       if (!line) return;
@@ -141,7 +162,7 @@ export async function boot(doc) {
       try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(line); done = true; } } catch (e) { done = false; }
       if (!done && el.bestsLine) { el.bestsLine.focus(); el.bestsLine.select(); }
       el.shareBests.textContent = done ? 'Copied' : 'Select and copy';
-      setTimeout(() => { el.shareBests.textContent = 'Copy my best night'; }, 1800);
+      setTimeout(() => { el.shareBests.textContent = 'Copy my best game'; }, 1800);
     });
     on(el.closeHelp, 'click', () => hide(el.helpSheet));
     on(el.primerGo, 'click', () => closePrimer());
@@ -327,8 +348,10 @@ export async function boot(doc) {
       const mm = game.metaModule;
       const offer = mm && typeof mm.canReset === 'function' ? mm.canReset(cfg, game.meta, game.floor) : { ok: false };
       const stars = offer && offer.ok && typeof game.pendingMarks === 'function' ? game.pendingMarks() : 0;
+      const buying = typeof game.autobuy === 'function' && game.autobuy();
       el.floorHint.textContent = stars > 0 ? 'Starting over pays ' + num(stars) + (stars === 1 ? ' star' : ' stars') + ' right now - open Your arcade. Stars buy upgrades that never go away.'
         : r.income > 0 ? ''
+        : buying ? 'Trade balls for coins and your arcade buys itself a machine the moment it can afford one. Machines earn while you are away, and that is what earns stars.'
         : r.scrip >= cheapest && cheapest > 0 ? 'You can buy your first arcade machine now - open Your arcade. Machines earn coins on their own, even while you are away.'
         : 'Trade balls for coins, then buy arcade machines. They earn while you are away, and that is what earns stars.';
     }
@@ -352,10 +375,20 @@ export async function boot(doc) {
 
     el.oddsMatch.textContent = pct(r.matchChance);
     el.oddsCont.textContent = pct(r.continueChance);
+    // These two are counted off the balls this game has already sent, and they
+    // are the only reading a player gets of whether the handle is set well.
+    // They used to say "reading..." until forty balls had gone down, which at
+    // one ball a pull is forty pulls of nothing where the numbers should be.
+    // Now they show from the fifth ball and say when the count is still short.
     const gateRate = r.stats.launched > 0 ? r.stats.gates / r.stats.launched : 0;
-    el.oddsGate.textContent = r.stats.launched < 40 ? 'reading...' : pct(gateRate);
+    const thin = r.stats.launched < 40 ? ' so far' : '';
+    // A share of nothing reads as 0.00%, which is a number where the honest
+    // answer is that it has not happened yet.
+    el.oddsGate.textContent = r.stats.launched < 5 ? 'reading...'
+      : r.stats.gates <= 0 ? 'none yet' : pct(gateRate) + thin;
     const back = r.stats.launched > 0 ? r.stats.won / r.stats.launched : 0;
-    el.oddsBack.textContent = r.stats.launched < 40 ? 'reading...' : back.toFixed(2);
+    el.oddsBack.textContent = r.stats.launched < 5 ? 'reading...'
+      : r.stats.won <= 0 ? 'none yet' : back.toFixed(2) + thin;
 
     el.scrip.textContent = num(r.scrip);
     el.income.textContent = num(r.income) + ' /s';
@@ -373,13 +406,6 @@ export async function boot(doc) {
     el.face.classList.toggle('bending', r.view === VIEW_BENCH);
 
     if (r.over) {
-      el.hint.textContent = fill(cfg.text.roundLost, { short: num(r.quota - r.won) });
-      // The end of a game is where a player decides what to do next, so if
-      // starting over would pay, the same line says so.
-      const mm = game.metaModule;
-      const offer = mm && typeof mm.canReset === 'function' ? mm.canReset(cfg, game.meta, game.floor) : { ok: false };
-      const stars = offer && offer.ok && typeof game.pendingMarks === 'function' ? game.pendingMarks() : 0;
-      if (stars > 0) el.hint.textContent += ' Or start over from Your arcade: it pays ' + num(stars) + (stars === 1 ? ' star' : ' stars') + ' right now.';
       // The night goes on the board the moment it ends, once.
       const seed = game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1;
       if (game.run && !banked.has(game.run)) {
@@ -394,28 +420,9 @@ export async function boot(doc) {
         paintNights(res.list);
       }
       if (el.rowSheet.hidden && !shownRow) { shownRow = true; openRow(); }
-    } else if (!el.helpSheet.hidden || r.stats.launched > 6) {
-      // once the player is going, the hint belongs to whatever is happening
-    } else {
-      el.hint.textContent = cfg.text.firstLine;
     }
-    // A lit row of doors says how to play it, once, the moment it lights.
-    const lit = (game.run.events && Array.isArray(game.run.events.active) ? game.run.events.active : [])
-      .find(e => e.kind === 'doors' && !e.pending && !e.done && !e.revealed);
-    if (lit && lit.key !== litRow) {
-      litRow = lit.key;
-      // Both halves. The line used to carry only the click, which reads as
-      // something you have to catch; leaving the row alone pays the prize
-      // anyway and is never the wrong move.
-      const n = lit.doors || 3;
-      el.hint.textContent = n + ' doors are lit at the foot of the board. Click one to call it, or press its number: '
-        + 'right pays ' + n + ' times over, wrong pays nothing. Leave them alone and the paying door opens by itself.';
-    } else if (!lit && litRow !== null) {
-      // The doors have closed. Left alone the line keeps telling the player to
-      // click one, through the rest of the round and on into the workbench.
-      litRow = null;
-      if (!r.over) el.hint.textContent = cfg.text.firstLine;
-    }
+    paintHint(r);
+    paintCue();
 
     if (r.away && r.away.gained > 0) {
       showAway(r.away);
@@ -423,6 +430,66 @@ export async function boot(doc) {
     }
     if (!el.settingsSheet.hidden) paintSettings();
     if (!el.floorSheet.hidden) paintFloor();
+  }
+
+  /**
+   * The line under the board.
+   *
+   * Recomputed every frame from what the game already reads, so it never goes
+   * stale and never has to be dismissed. A one-off message written by `say`
+   * holds the space for a few seconds first.
+   */
+  function paintHint(r) {
+    compass.observe({
+      seed: game.run && Number.isFinite(game.run.seed) ? game.run.seed : -1,
+      launched: r.stats.launched, gates: r.stats.gates, strength: r.strength,
+    });
+    const t = now();
+    if (t < saidUntil) return;
+    const p = pick(compassState(r));
+    const text = write(p);
+    if (!text || text === lastHint) return;
+    if (p.key === lastKey && t - hintAt < HINT_DWELL) return;
+    lastKey = p.key;
+    lastHint = text;
+    hintAt = t;
+    el.hint.textContent = text;
+  }
+
+  /** Everything the line needs, as plain numbers. */
+  function compassState(r) {
+    const lit = (game.run.events && Array.isArray(game.run.events.active) ? game.run.events.active : [])
+      .find(e => e.kind === 'doors' && !e.pending && !e.done && !e.revealed);
+    const bench = r.view === VIEW_BENCH;
+    const mm = game.metaModule;
+    const canReset = r.over && mm && typeof mm.canReset === 'function' ? mm.canReset(cfg, game.meta, game.floor) : { ok: false };
+    return {
+      over: !!r.over,
+      bench,
+      doors: lit ? (lit.doors || 3) : 0,
+      round: r.round, quota: r.quota, won: r.won, tray: r.tray,
+      pullsLeft: r.pullsLeft, perBall: r.perBall, nextBonus: r.nextBonus,
+      launched: r.launched, everLaunched: r.stats.launched,
+      inFlight: r.inFlight, auto: !!r.auto, strength: r.strength,
+      fever: !!r.fever, feverLeft: r.feverLeft,
+      bendsLeft: r.bendsLeft,
+      slotsFree: r.fittings.length < r.slots,
+      offers: bench ? game.offers().map(o => ({ name: o.fitting.name, price: o.price })) : [],
+      stars: canReset && canReset.ok && typeof game.pendingMarks === 'function' ? game.pendingMarks() : 0,
+      bands: compass.tally(),
+    };
+  }
+
+  /** Says so while the column of panels has more under the fold. */
+  function paintCue() {
+    const t = now();
+    if (t - cueAt < 400) return;
+    cueAt = t;
+    const box = el.plaques;
+    if (!box || !el.more) return;
+    const room = (box.scrollHeight || 0) - (box.clientHeight || 0);
+    const under = room - (box.scrollTop || 0);
+    el.more.hidden = !(room > 6 && under > 6);
   }
 
   function paintRail(r) {
@@ -888,7 +955,7 @@ export async function boot(doc) {
     const r = game.reading();
     el.rowTitle.textContent = r.over ? 'That game is over' : 'Pick a machine to play';
     el.rowLede.textContent = r.over
-      ? 'Round ' + r.round + ' beat you' + (lastRank > 0 ? ' - your ' + ordinal(lastRank) + ' best night. ' : '. ') + 'Pick where to play next. Every machine has its nails, its '
+      ? 'Round ' + r.round + ' beat you' + (lastRank > 0 ? ' - your ' + ordinal(lastRank) + ' best game so far. ' : '. ') + 'Pick where to play next. Every machine has its nails, its '
         + 'pockets and its slot in different places, so what pays on one doesn\'t pay on the next. '
         + 'Each machine below was measured by dropping a few hundred balls through it.'
       : 'Every machine has its nails, its pockets and its slot in different places, so what pays on one '
@@ -914,12 +981,18 @@ export async function boot(doc) {
       d.innerHTML = '<h4></h4><div class="theme"></div><canvas class="sketch"></canvas><div class="big"></div><p></p>'
         + '<dl><dt>Balls reaching the slot</dt><dd class="n1"></dd>'
         + '<dt>Nails on the board</dt><dd class="n2"></dd>'
-        + '<dt>Machine number</dt><dd class="n3"></dd></dl>'
+        + '<dt>Its number on the floor</dt><dd class="n3"></dd></dl>'
         + '<div class="warn"></div>';
       d.querySelector('h4').textContent = label;
       const doorCount = cab.skin && Number.isFinite(cab.skin.doors) ? cab.skin.doors : 3;
-      const sends = cab.skin && cab.skin.summon ? ' - sends ' + String(cab.skin.summon).replace(/^A pair of /i, '').replace(/^An? /i, '').toLowerCase() : '';
-      d.querySelector('.theme').textContent = (cab.layout ? cab.layout + ' board' : '') + ' - lights ' + doorCount + ' doors' + sends;
+      const creature = cab.skin && cab.skin.summon
+        ? String(cab.skin.summon).replace(/^A pair of /i, '').replace(/^An? /i, '').toLowerCase() : '';
+      // Three coined phrases in a row said nothing to anybody who had not read
+      // the source: "LADDER BOARD - LIGHTS 6 DOORS - SENDS BLACK HOLE". Said
+      // the way a person would say it, with the shape name kept as a name.
+      d.querySelector('.theme').textContent = (cab.layout ? 'The ' + cab.layout.toLowerCase() + ' shape' : 'This shape')
+        + ' - ' + doorCount + ' doors to pick from when a row lights'
+        + (creature ? ' - a ' + creature + ' crosses the board' : '');
       drawSketch(d.querySelector('.sketch'), sketchCabinet(cfg, cab.seed), cab.skin);
 
       const big = d.querySelector('.big');
@@ -1068,7 +1141,7 @@ export async function boot(doc) {
     }
   }
 
-  // ---- the board of best nights -------------------------------------------
+  // ---- the board of best games --------------------------------------------
   //
   // A game ends two ways: it dies, or its balls are banked for coins. Both are
   // nights, and a banked round-twenty game outranks a lost round-eight one.
@@ -1136,7 +1209,7 @@ export async function boot(doc) {
     el.nightsLede.textContent = 'This game would land ' + ordinal(rank) + ' right now. Beat round ' + nightsList[0].round + ' to take the top.';
   }
 
-  /** The full board, one click from anywhere: every night kept, best first. */
+  /** The full board, one click from anywhere: every game kept, best first. */
   function openBests() {
     const list = loadNights();
     const body = el.bestsBody;
@@ -1165,7 +1238,7 @@ export async function boot(doc) {
     if (el.bestsLine) {
       const best = list[0];
       el.bestsLine.value = best
-        ? 'Brass Rain - my best night: round ' + best.round + ' on ' + (best.machine || 'a machine') + ', ' + num(best.won || 0) + ' balls. Beat it: xxgeminixx.github.io/games/brass-rain/'
+        ? 'Brass Rain - my best game: round ' + best.round + ' on ' + (best.machine || 'a machine') + ', ' + num(best.won || 0) + ' balls. Beat it: xxgeminixx.github.io/games/brass-rain/'
         : '';
       el.bestsLine.hidden = !best;
       if (el.shareBests) el.shareBests.hidden = !best;
@@ -1258,10 +1331,15 @@ export async function boot(doc) {
     const finished = game.floor && game.floor.games ? game.floor.games : 0;
     el.floorLede.textContent = (started ? 'Games played: ' + started + (finished ? ', finished: ' + finished : '') + '. ' : '') + 'You own these machines. They earn '
       + num(r.income) + ' coins a second whether you\'re at the handle or not, even with the page closed. '
-      + 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
-      + ' because your best game reached round ' + Math.max(r.bestRound, 0)
-      + ', so playing well is the best thing you can do for the arcade. You hold ' + num(r.scrip) + ' coins and '
-      + num(Math.floor((game.meta && game.meta.marks) || 0)) + ' stars.';
+      + (r.bestRound > 0
+        ? 'Everything they earn is multiplied by ' + mult(game.handMultiplier())
+          + ' because your best game cleared round ' + num(r.bestRound) + ', and clearing a deeper one raises it again. '
+        : 'Clear a round at the machine and everything they earn gets multiplied - the deeper you get, the bigger it is. ')
+      + 'You hold ' + num(r.scrip) + ' coins and '
+      + num(Math.floor((game.meta && game.meta.marks) || 0)) + ' stars.'
+      + (typeof game.autobuy === 'function' && game.autobuy()
+        ? ' Your coins are being spent for you, on whichever machine buys the most per coin. Turn that off to pick them yourself.'
+        : ' You are picking the machines yourself.');
 
     if (!el.bulkbar._built) {
       for (const step of BULK_STEPS) {
@@ -1271,11 +1349,33 @@ export async function boot(doc) {
         b.addEventListener('click', () => { bulk = step; paintFloor(); });
         el.bulkbar.appendChild(b);
       }
+      // The switch for an arcade that spends its own coins. Built once with
+      // the rest of the bar, because a button rebuilt every frame cannot be
+      // pressed by a mouse.
+      const auto = doc.createElement('button');
+      auto.type = 'button';
+      auto.style.marginLeft = '14px';
+      auto.title = 'Coins buy arcade machines and nothing else. While this is on, '
+        + 'every coin you earn is spent on the best value on the floor the moment you can afford it.';
+      auto.addEventListener('click', () => {
+        if (typeof game.setAutobuy === 'function') game.setAutobuy(!game.autobuy());
+        paintFloor();
+      });
+      el.bulkbar.appendChild(auto);
+      el.bulkbar._auto = auto;
       el.bulkbar._built = true;
     }
-    Array.from(el.bulkbar.children).forEach((b, i) => {
-      b.classList.toggle('on', BULK_STEPS[i] === bulk);
-    });
+    // Only the bulk steps take the lit class; the switch beside them carries
+    // its own state.
+    for (let i = 0; i < BULK_STEPS.length; i++) {
+      const b = el.bulkbar.children[i];
+      if (b) b.classList.toggle('on', BULK_STEPS[i] === bulk);
+    }
+    if (el.bulkbar._auto) {
+      const on = typeof game.autobuy === 'function' ? game.autobuy() : false;
+      el.bulkbar._auto.textContent = on ? 'Buying for you: on' : 'Buying for you: off';
+      el.bulkbar._auto.classList.toggle('on', on);
+    }
 
     const body = el.machines.tBodies[0];
     if (!machineRows.size) buildMachineRows(body);
@@ -1376,9 +1476,9 @@ export async function boot(doc) {
     const held = Math.floor((game.meta && game.meta.marks) || 0);
     prestigeUi.p.textContent = 'You have ' + num(held) + (held === 1 ? ' star' : ' stars') + '. '
       + (can.ok
-        ? 'Sell every machine in your arcade and build it again from nothing. You lose the arcade and keep '
-          + num(pending) + ' more. Stars buy the permanent upgrades below, and those never go away no '
-          + 'matter how many times you start over.'
+        ? 'Sell every machine in your arcade and build it again from nothing. The machines go, your '
+          + 'stars stay, and you are paid ' + num(pending) + ' more on top. Stars buy the permanent '
+          + 'upgrades below, and those never go away no matter how many times you start over.'
         : (can.why || 'There\'s nothing to start over from yet. Keep playing and building the arcade.'));
 
     prestigeUi.sell.textContent = 'Sell the arcade for ' + num(pending) + ' stars';
@@ -1491,7 +1591,15 @@ export async function boot(doc) {
     say(line);
   }
 
-  function say(text) { el.hint.textContent = text; }
+  // A one-off message: it takes the line under the board and keeps it for a
+  // few seconds, then the live line comes back on its own. Before this the
+  // next frame overwrote it, so an arcade's takings while the page was closed
+  // were shown for about sixteen milliseconds.
+  function say(text, ms) {
+    el.hint.textContent = text;
+    lastHint = text;
+    saidUntil = now() + (Number.isFinite(ms) ? ms : 7000);
+  }
 
   // -------------------------------------------------------------------
   function startScene(doc2, elements, config, g) {
@@ -1570,7 +1678,7 @@ const HELP = [
     + 'together, and the card says so when they do.'],
   ['Bending the nails', 'Also at the workbench: drag any nail on the board to the right to bend it. Bending steers where balls fall, and there are only a few bends per round, so the good ones are the nails that feed balls into the slot. The chart at the workbench shows where the last round actually ended up, which is how you tell which nails are worth bending.'],
   ['Picking a machine', (f) => 'There are ' + f.machines + ' machines, and the pockets, the slot and the funnel sit somewhere else on each. Each lights its own number of doors and sends its own creature across the board. Change machine at the top of the screen to see three of them measured for you. The number that matters most is how many balls come back for each ball spent. Picking a machine starts a new game, so what you win on a machine is worth checking before you sit down for hours.'],
-  ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines for your arcade. Those machines earn coins every second on their own, including while the page is closed. What they earn is multiplied by how far you\'ve gotten at the handle, so playing well is the best thing you can do for the arcade.'],
+  ['Coins and your arcade', 'Cash your balls in at the counter and they become COINS. Coins buy machines for your arcade, and those machines earn coins every second on their own, including while the page is closed. You don\'t have to pick them: the arcade spends your coins on whichever machine buys the most income per coin, the moment it can afford one. There\'s a switch in the arcade panel if you\'d rather choose them yourself. What they earn is multiplied by how far you\'ve gotten at the handle, so playing well is the best thing you can do for the arcade.'],
   ['Stars and starting over', 'Once the arcade is large enough you can sell all of it and build it again from nothing. Doing that pays STARS. Stars buy permanent upgrades that survive every restart. The arcade rebuilds far faster the second time, and starting over never takes stars away.'],
 ];
 
@@ -1589,6 +1697,7 @@ function index(doc) {
     toRow: $('toRow'), rowSheet: $('row'), rowTitle: $('rowTitle'), rowLede: $('rowLede'),
     cabinets: $('cabinets'), rowLater: $('rowLater'),
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),
+    plaques: $('plaques'), more: $('more'),
     benchSheet: $('bench'), benchLede: $('benchLede'), offers: $('offers'),
     owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'), bendBars: $('bendBars'),
     nights: $('nights'), nightsLede: $('nightsLede'), floorHint: $('floorHint'),
