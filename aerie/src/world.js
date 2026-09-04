@@ -1,8 +1,8 @@
 // The island as textures: height and moisture, what the land can hold, and
 // what is left of it. The CPU keeps one copy of the height (for the camera
 // and for clicks) and reads a small summary of the richness once a second.
-import { fullscreen, target, pingpong, bindScreen } from './gl.js?v=18';
-import { rng } from './rng.js?v=18';
+import { fullscreen, target, pingpong, bindScreen } from './gl.js?v=19';
+import { rng } from './rng.js?v=19';
 
 export function createWorld(gl, cfg, S) {
   const F = cfg.world.field;
@@ -102,5 +102,45 @@ export function createWorld(gl, cfg, S) {
     return { avail, remaining: allFull > 0 ? allRich / allFull : 1 };
   };
 
-  return Object.assign(world, { F, groundAt, generate, landPoint, step, summary, heightCpu });
+  /**
+   * Where on the island the carrier would do best, and what it is getting
+   * where it is now, on the same scale.
+   *
+   * It reuses the richness readback the summary already took this second, so
+   * it costs no GPU work at all: the 64x64 grid becomes a summed-area table
+   * and scoring a spot is then four lookups, whatever the reach.
+   */
+  const bestSpot = (range, from) => {
+    const N = 64, cell = cfg.world.size / N;
+    const r = Math.max(1, Math.round(range / cell));
+    const sat = new Float64Array((N + 1) * (N + 1));
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const o = (j * N + i) * 4;
+        const v = richCpu[o] + richCpu[o + 1] + richCpu[o + 2] + richCpu[o + 3];
+        sat[(j + 1) * (N + 1) + (i + 1)] = v + sat[j * (N + 1) + (i + 1)] + sat[(j + 1) * (N + 1) + i] - sat[j * (N + 1) + i];
+      }
+    }
+    const box = (i, j) => {
+      const i0 = Math.max(0, i - r), i1 = Math.min(N, i + r + 1);
+      const j0 = Math.max(0, j - r), j1 = Math.min(N, j + r + 1);
+      return sat[j1 * (N + 1) + i1] - sat[j0 * (N + 1) + i1] - sat[j1 * (N + 1) + i0] + sat[j0 * (N + 1) + i0];
+    };
+    const coord = (i) => ((i + 0.5) / N - 0.5) * cfg.world.size;
+    const index = (w) => Math.max(0, Math.min(N - 1, Math.floor((w / cfg.world.size + 0.5) * N)));
+    let at = null, best = -1;
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const x = coord(i), z = coord(j);
+        const h = groundAt(x, z);
+        // the carrier hangs over land, not over open water and not on a peak
+        if (!(h > cfg.world.sea + 2 && h < cfg.world.height * 0.8)) continue;
+        const v = box(i, j);
+        if (v > best) { best = v; at = [x, z]; }
+      }
+    }
+    return { at, best, here: box(index(from[0]), index(from[1])) };
+  };
+
+  return Object.assign(world, { F, groundAt, generate, landPoint, step, summary, bestSpot, heightCpu });
 }

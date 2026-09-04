@@ -1,7 +1,7 @@
 // The chart table: a column of glass cards on the right. Everything the
 // player reads or presses is here; nothing is drawn on the canvas as text.
-import { fmt, rate, count, pct } from './numbers.js?v=18';
-import { fill } from '../content.js?v=18';
+import { fmt, rate, count, pct } from './numbers.js?v=19';
+import { fill } from '../content.js?v=19';
 
 export function createUI(doc, cfg, content, eco, on) {
   const $ = (id) => doc.getElementById(id);
@@ -13,9 +13,10 @@ export function createUI(doc, cfg, content, eco, on) {
     hold: $('hold'), holdRows: $('hold-rows'), fleet: $('fleet'), specialists: $('specialists'), specRows: $('spec-rows'),
     carrier: $('carrier'), upRows: $('up-rows'), voyage: $('voyage'), island: $('island'), remaining: $('remaining'),
     castOff: $('castoff'), castOffCost: $('castoff-cost'), log: $('log'), anchorHint: $('anchor-hint'),
+    compass: $('compass'), hintLine: $('hintline'),
     exportBtn: $('export'), importBtn: $('import'), resetBtn: $('reset'), saveBox: $('savebox'), range: $('range'),
     fold: $('fold'), quality: $('quality'), rateOut: $('rate'), perfBtn: $('perf'), keysBtn: $('keys'), keyHelp: $('keyhelp'), keyRows: $('key-rows'), keyClose: $('keyclose'),
-    specWarn: $('spec-warn'), rangeRow: $('range-row'),
+    specWarn: $('spec-warn'), rangeRow: $('range-row'), table: $('table'), more: $('more'),
   };
   const L = content.labels;
 
@@ -146,7 +147,7 @@ export function createUI(doc, cfg, content, eco, on) {
     el.fold.title = label;
     el.fold.setAttribute('aria-label', label);
     el.fold.setAttribute('aria-expanded', String(!folded));
-    el.anchorHint.textContent = folded ? L.hintFolded : L.hint;
+    if (el.hintLine) el.hintLine.textContent = folded ? L.hintFolded : L.hint;
   };
   el.fold.addEventListener('click', on.fold);
 
@@ -176,15 +177,42 @@ export function createUI(doc, cfg, content, eco, on) {
   el.hire.title = content.hints.hire;
   el.castOff.title = fill(content.hints.castOff, { x: cfg.economy.islandRichness, y: cfg.economy.islandPrice });
 
+  // ---- the compass line -------------------------------------------------
+  // One sentence over the picture naming the move worth making now. It is
+  // written here rather than into the chart table because the table scrolls
+  // and this must not: a player who never scrolls still reads it.
+  let compassKey = '';
+  const advise = (line, key) => {
+    if (!el.compass) return;
+    if (key === compassKey && el.compass.textContent === line) return;
+    compassKey = key;
+    el.compass.textContent = line;
+  };
+
   // ---- the deck log: newest on top, bounded ----
-  const log = (line) => {
+  // A tag lets a line that keeps happening replace itself instead of stacking.
+  // Hiring drone after drone used to flush the log in three presses, and the
+  // lines it flushed were the ones that had just taught the player something.
+  const log = (line, tag = '') => {
+    const first = el.log.firstChild;
+    if (tag && first && first.dataset && first.dataset.tag === tag) { first.textContent = line; return; }
     const p = doc.createElement('p');
     p.textContent = line;
+    if (tag) p.dataset.tag = tag;
     el.log.insertBefore(p, el.log.firstChild);
     while (el.log.children.length > 8) el.log.removeChild(el.log.lastChild);
   };
 
   const show = (node, yes) => { if (node) node.hidden = !yes; };
+
+  /** Whether the column has more below the bottom of the window right now. */
+  const showMore = () => {
+    if (!el.more || !el.table) return;
+    const t = el.table;
+    const over = t.scrollHeight > t.clientHeight + 8 && t.scrollTop + t.clientHeight < t.scrollHeight - 8;
+    el.more.hidden = !over;
+  };
+  if (el.table) el.table.addEventListener('scroll', showMore);
   // "timber", "timber and ice", "timber, fish and ice"
   const list = (a) => (a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 
@@ -242,6 +270,10 @@ export function createUI(doc, cfg, content, eco, on) {
     for (const u in cfg.economy.upgrades) {
       const r = upRows[u];
       const lvl = eco.level(u), max = cfg.economy.upgrades[u].max;
+      // Nothing more can be bought here, so the row stops being a control and
+      // becomes a fact. Four dead buttons is a card of things that look
+      // pressable and are not.
+      r.classList.toggle('done', lvl >= max);
       r.querySelector('[data-cost]').textContent = lvl >= max ? L.maxed : fmt(eco.upgradeCost(u));
       r.querySelector('[data-lvl]').textContent = lvl ? fill(L.level, { n: lvl }) : '';
       const un = countFor('upgrade', u);
@@ -254,6 +286,7 @@ export function createUI(doc, cfg, content, eco, on) {
     el.castOffCost.textContent = fmt(eco.castOffCost());
     el.castOff.disabled = !eco.actions.castOff.can();
     el.range.textContent = fmt(eco.range());
+    showMore();
   };
 
   // The view settings are not gated behind progress the way the game's own
@@ -268,7 +301,8 @@ export function createUI(doc, cfg, content, eco, on) {
     show(el.specialists, flags.specialists);
     show(el.carrier, flags.carrier);
     show(el.voyage, flags.voyage);
+    showMore();
   };
 
-  return { el, log, update, reveal, get bulk() { return bulk; }, show, showQuality, showTarget, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
+  return { el, log, advise, update, reveal, get bulk() { return bulk; }, show, showQuality, showTarget, showFold, showKeys, get keysOpen() { return !el.keyHelp.hidden; } };
 }

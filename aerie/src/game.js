@@ -1,25 +1,27 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=18';
-import { fill } from '../content.js?v=18';
-import { makeShaders } from './shaders.js?v=18';
-import { createWorld } from './world.js?v=18';
-import { createDrones } from './drones.js?v=18';
-import { createView } from './view.js?v=18';
-import { createEconomy } from './economy.js?v=18';
-import { createSave, createPrefs } from './save.js?v=18';
-import { createUI } from './ui.js?v=18';
-import { createControls } from './controls.js?v=18';
-import { createQuality } from './quality.js?v=18';
-import { createPerfLog } from './perflog.js?v=18';
-import { loop, createGL } from './gl.js?v=18';
-import { rng } from './rng.js?v=18';
-import { fmt, duration } from './numbers.js?v=18';
+import { withOverrides, applyIdentity } from '../config.js?v=19';
+import { fill } from '../content.js?v=19';
+import { makeShaders } from './shaders.js?v=19';
+import { createWorld } from './world.js?v=19';
+import { createDrones } from './drones.js?v=19';
+import { createView } from './view.js?v=19';
+import { createEconomy } from './economy.js?v=19';
+import { createAdvice } from './advice.js?v=19';
+import { createSave, createPrefs } from './save.js?v=19';
+import { createUI } from './ui.js?v=19';
+import { createControls } from './controls.js?v=19';
+import { createQuality } from './quality.js?v=19';
+import { createPerfLog } from './perflog.js?v=19';
+import { loop, createGL } from './gl.js?v=19';
+import { rng } from './rng.js?v=19';
+import { fmt, duration } from './numbers.js?v=19';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
   applyIdentity(cfg, doc);
   const S = makeShaders(cfg);
   const eco = createEconomy(cfg);
+  const advice = createAdvice(cfg, eco);
   const save = createSave(cfg, storage);
   const prefs = createPrefs(cfg, storage);
   const perf = createPerfLog(cfg, storage);
@@ -80,8 +82,8 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       syncFleet();
       // One drone is a moment worth naming; a wing of them is a fleet figure.
       if (eco.state.drones === cfg.drones.start + 1) ui.log(content.log.firstHire);
-      else if (many === 1) ui.log(fill(content.log.hire, { n: eco.state.drones }));
-      else ui.log(fill(content.log.hireMany, { n: fmt(many), total: fmt(eco.state.drones) }));
+      else if (many === 1) ui.log(fill(content.log.hire, { n: eco.state.drones }), 'hire');
+      else ui.log(fill(content.log.hireMany, { n: fmt(many), total: fmt(eco.state.drones) }), 'hire');
     },
     wing: () => { if (eco.actions.wing.do()) { syncFleet(); ui.log(fill(content.log.wing, { n: cfg.economy.wingSize })); } },
     specialist: (k, n) => {
@@ -89,12 +91,12 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       if (!eco.actions.specialist.do(k, many)) return;
       syncFleet();
       ui.log(many === 1 ? fill(content.log.specialist, { kind: content.kinds[k] })
-                        : fill(content.log.specialistMany, { n: fmt(many), kind: content.kinds[k] }));
+                        : fill(content.log.specialistMany, { n: fmt(many), kind: content.kinds[k] }), 'spec-' + k);
     },
     upgrade: (u, n) => {
       const many = Math.max(1, n | 0);
       if (!eco.actions.upgrade.do(u, many)) return;
-      ui.log(fill(content.log.upgrade, { name: cfg.economy.upgrades[u].name, n: eco.level(u) }));
+      ui.log(fill(content.log.upgrade, { name: cfg.economy.upgrades[u].name, n: eco.level(u) }), 'up-' + u);
       if (u === 'hangars') cfg.carrier.scale = 1 + 0.06 * eco.level('hangars');
     },
     castOff: () => {
@@ -120,9 +122,15 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       const obj = save.decode(s);
       if (!obj || !obj.eco) { ui.log(content.log.badImport); return; }
       save.write(obj);
+      keepSaving = false;
       location.reload();
     },
-    reset: () => { if (doc.defaultView && doc.defaultView.confirm && !doc.defaultView.confirm(content.labels.resetConfirm)) return; save.clear(); location.reload(); },
+    reset: () => {
+      if (doc.defaultView && doc.defaultView.confirm && !doc.defaultView.confirm(content.labels.resetConfirm)) return;
+      keepSaving = false;
+      save.clear();
+      location.reload();
+    },
     // the window's own controls
     quality: (name) => {
       if (!quality.choose(name)) return;
@@ -173,7 +181,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   }
 
   const controls = createControls(cfg, {
-    fly: (dx, dz) => view.fly(dx, dz),
+    fly: (dx, dz) => { view.fly(dx, dz); tookTheWheel(); },
     camera: view.control,
     actions,
     panel: actions.fold,
@@ -185,15 +193,28 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   // handful of lines, and a few camera-side clicks used to push out the very
   // messages the game had just spent an unlock teaching.
   let saidAnchor = false;
+  // When the player last took the carrier themselves. The carrier finds its
+  // own ground when the land runs down, and a hand on the wheel stops it doing
+  // that for a while - being overruled by the game a second after choosing
+  // where to sit would be worse than never being helped at all.
+  let handAt = -1e9;
+  const tookTheWheel = () => { handAt = clock; };
   canvas.addEventListener('click', (e) => {
     const p = view.pick(e.clientX, e.clientY);
     if (!p) return;
     view.state.anchor = p;
+    tookTheWheel();
     if (!saidAnchor) { saidAnchor = true; ui.log(content.log.anchor); }
   });
 
   const snapshot = () => ({ eco: eco.snapshot(), seed: cfg.world.seed, anchor: view.state.anchor, at: Date.now() });
-  const persist = () => save.write(snapshot());
+  // Starting over and importing both write storage and then reload the page,
+  // and a reload fires the unload save on the way out - which put the run that
+  // was just thrown away straight back on top of it. Neither button did
+  // anything at all. Once a save has been deliberately replaced or cleared,
+  // this run stops writing.
+  let keepSaving = true;
+  const persist = () => { if (keepSaving) save.write(snapshot()); };
 
   // ---- reveal: panels arrive when they matter ----
   const checkReveal = () => {
@@ -205,6 +226,34 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
     if (!flags.voyage && (s.remaining <= cfg.reveal.voyageAtDepletion || s.lifetime >= cfg.reveal.voyageAtFunds)) { flags.voyage = true; ui.log(content.log.voyageOpen); changed = true; }
     if (changed) ui.reveal(flags);
   };
+  // The compass line. It reads the same ledger the panel does, so it can
+  // never name a figure the player cannot find on screen.
+  const showAdvice = () => {
+    const a = advice.read();
+    const line = content.advice[a.key];
+    if (line) ui.advise(fill(line, a.vars), a.key);
+  };
+
+  // The carrier looks for better ground when the land under it is worked
+  // down. It is the one thing in the game a player has to think of on their
+  // own, and nobody did: it is on by default and a hand on the wheel outranks
+  // it. What it finds costs nothing to work out - it reads the same richness
+  // grid the summary already brought back this second.
+  let driftAt = 0, saidDrift = false;
+  const drift = () => {
+    const D = cfg.carrier.drift;
+    if (!D || !D.on) return;
+    if (clock - handAt < D.afterHand || clock - driftAt < D.every) return;
+    const s = eco.state;
+    const bestKind = K.reduce((a, k) => (s.avail[k] > s.avail[a] ? k : a), K[0]);
+    if (s.avail[bestKind] >= D.below) return;
+    driftAt = clock;
+    const spot = world.bestSpot(eco.range(), [view.state.carrier[0], view.state.carrier[2]]);
+    if (!spot.at || !(spot.best > spot.here * D.better)) return;
+    view.state.anchor = spot.at;
+    if (!saidDrift) { saidDrift = true; ui.log(content.log.drift); }
+  };
+
   const priceWarned = {};
   const checkPrices = () => {
     for (const k of K) {
@@ -215,11 +264,12 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   };
 
   // ---- the loop ----
-  let summaryT = 0, saveT = 0, uiT = 0;
+  let summaryT = 0, saveT = 0, uiT = 0, clock = 0;
   const speed = () => eco.droneSpeed();
   let qualityT = 0, perfT = 0;
   const stop = loop((dt, t) => {
     const h = Math.min(dt, 0.05);
+    clock += dt;
     // The keys get the real frame, not the simulation's clamped one. That
     // clamp is there so a long frame cannot make the world jump; applying it
     // to input instead makes the camera crawl on exactly the machines that
@@ -237,6 +287,8 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       eco.tick(1, sum.avail);
       checkReveal();
       checkPrices();
+      drift();
+      showAdvice();
     }
     view.draw(t, eco.range(), 0.0009, h);
     // Watch the frames and let the guard move the resolution if it must.
@@ -270,6 +322,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   G.onContextLost(() => { persist(); ui.log(content.log.contextLost); });
   G.onContextRestored(() => { location.reload(); });
   ui.update({ active: drones.active });
+  showAdvice();
 
-  return { cfg, eco, world, drones, view, ui, save, prefs, perf, quality, controls, stop, persist, snapshot };
+  return { cfg, eco, world, drones, view, ui, save, prefs, perf, quality, controls, advice, stop, persist, snapshot };
 }

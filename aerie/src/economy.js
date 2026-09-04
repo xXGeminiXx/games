@@ -122,11 +122,14 @@ export function createEconomy(cfg, rngLike = Math.random) {
     const n = Math.log(rest) / Math.log(r);
     return Number.isFinite(n) ? Math.max(0, Math.min(E.hireMaxAtOnce, Math.floor(n))) : 0;
   };
-  const wingCost = () => {
-    let c = 0, n = state.drones;
-    for (let i = 0; i < E.wingSize; i++) { c += E.hireBase * Math.pow(E.hireGrowth * Math.pow(E.hangarDiscount, level('hangars')), n - cfg.drones.start); n++; }
-    return c * E.wingDiscount;
-  };
+  // Ten drones at a discount, priced off the same series a single drone uses.
+  // It used to build its own price by multiplying the growth ratio by the
+  // hangar discount, which puts the ratio below one from the first hangar
+  // level on: each drone in the wing cost less than the one before it and the
+  // whole wing collapsed toward nothing. A fleet of 393 with twelve hangar
+  // levels was offered ten more for 2e-111 with a single drone priced at
+  // 62.5M beside it.
+  const wingCost = () => hireCostN(E.wingSize) * E.wingDiscount;
   const specialistCost = () => hireCost() * E.specialistCost;
   const upgradeCost = (u) => E.upgrades[u].base * Math.pow(E.upgrades[u].growth, level(u));
   const castOffCost = () => E.castOffBase * Math.pow(E.castOffGrowth, state.island - 1);

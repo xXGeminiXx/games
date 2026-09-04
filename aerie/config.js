@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=18';
+import { oklch } from './src/palette.js?v=19';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 18,             // the ?v= tag every import carries; bump on every src change
+    build: 19,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -34,7 +34,7 @@ export const CONFIG = {
   // The four things the land holds. Suitability is decided on the GPU from
   // height, slope and moisture; these are the economy's numbers.
   kinds: {
-    ore:    { name: 'ore',    where: 'scree and cliff faces', basePrice: 9,  rate: 0.42 },
+    ore:    { name: 'ore',    where: 'rocky slopes and cliffs', basePrice: 9,  rate: 0.42 },
     timber: { name: 'timber', where: 'the pine lowlands',     basePrice: 5,  rate: 0.7 },
     fish:   { name: 'fish',   where: 'the shallows',          basePrice: 6,  rate: 0.6 },
     ice:    { name: 'ice',    where: 'above the snowline',    basePrice: 16, rate: 0.28 },
@@ -63,6 +63,19 @@ export const CONFIG = {
     range: 70,            // radius of land the drones will work
     speed: 9,             // how fast it glides to a new anchor
     scale: 1.0,           // hull size; hull upgrades grow it
+    // The carrier looks after itself. The ground it hangs over runs down as
+    // the fleet works it, and a player who never thought to move the carrier
+    // simply watched their income fall - 12 hours into a real save the best
+    // trade under it was down to 27 percent of what the land holds. So it
+    // finds better ground on its own. Clicking or flying still wins outright
+    // and stops it choosing for a while, so anyone who wants the wheel has it.
+    drift: {
+      on: true,
+      below: 0.35,        // best availability that starts it looking
+      better: 1.4,        // how much richer the new ground has to be to bother
+      afterHand: 45,      // seconds to leave the carrier alone after a player moves it
+      every: 8,           // seconds between looks
+    },
   },
 
   economy: {
@@ -88,10 +101,10 @@ export const CONFIG = {
     priceFloor: 0.22,     // fraction of base a price cannot fall below
     // carrier upgrades: [cost, growth, effect per level]
     upgrades: {
-      hold:    { name: 'hold',          base: 90,  growth: 2.1, effect: 0.35, max: 30, does: 'each level: +35% to everything the drones bring back' },
-      range:   { name: 'range',         base: 140, growth: 2.3, effect: 12,   max: 12, does: 'each level: +12 to how far from the carrier the drones will work' },
-      engines: { name: 'drone engines', base: 120, growth: 2.2, effect: 0.18, max: 20, does: 'each level: +18% drone speed, so every trip is quicker' },
-      hangars: { name: 'hangars',       base: 260, growth: 2.6, effect: 1,    max: 12, does: 'the first level hires ten drones at once. every level after that slows how fast the next hire gets more expensive' },
+      hold:    { name: 'bigger loads',  base: 90,  growth: 2.1, effect: 0.35, max: 30, does: 'each level: +35% to everything the drones bring back' },
+      range:   { name: 'longer reach',  base: 140, growth: 2.3, effect: 12,   max: 12, does: 'each level: +12 to how far from the carrier the drones will work' },
+      engines: { name: 'faster drones', base: 120, growth: 2.2, effect: 0.18, max: 20, does: 'each level: +18% drone speed, so every trip is quicker' },
+      hangars: { name: 'cheaper drones', base: 260, growth: 2.6, effect: 1,   max: 12, does: 'each level: every new drone costs less than it would have. the first level also lets you hire ten at once, at a discount' },
     },
     hangarDiscount: 0.94, // hire growth multiplier per hangar level (compounding)
     // casting off to the next island
@@ -115,6 +128,23 @@ export const CONFIG = {
     voyageAtDepletion: 0.45,  // island richness fraction remaining
     voyageAtFunds: 900,
     wingsAtHangars: 1,
+  },
+
+  // The compass line: when each piece of advice applies. These are the
+  // thresholds behind the one sentence at the corner of the picture.
+  // Measured on a live run: a fresh anchor reads 0.49 to 0.96 per kind and a
+  // trade with none of its ground in reach reads 0.01, so a best-of-the-four
+  // under 0.3 means the carrier is sitting on worked ground.
+  advice: {
+    thinLand: 0.3,        // best availability below this: the ground is worked down
+    dryLand: 0.03,        // a trade with this little left has nothing for its specialists
+    emptyIsland: 0.2,     // below this remaining, moving the carrier will not help
+    floodedDemand: 0.55,  // the biggest earner's price below this fraction of base
+    healthyDemand: 0.85,  // another trade above this is worth moving effort to
+    smallShare: 0.25,     // while saving for a voyage, only name a buy this small
+    hangarWorth: 1.0,     // name hangars when they cost no more than this many drones
+    every: 1,             // seconds between recalculations
+    words: { drone: 'another drone', specialist: 'a specialist', voyage: 'leaving for the next island', instant: 'under a second' },
   },
 
   camera: {
@@ -271,7 +301,11 @@ export const CONFIG = {
     ground: oklch(0.86, 0.012, 230),   // the page behind everything
     glass: oklch(0.95, 0.008, 230),
     ink: oklch(0.22, 0.02, 250),
-    dim: oklch(0.5, 0.02, 250),
+    // The cards are glass over the world, so the paper under a dim string is
+    // whatever the island is doing behind it. Measured on a real frame at
+    // 0.5: 4.4 to 4.9 to one against the sky, and worse over water and scree.
+    // 0.45 holds above 4.5 wherever the panel sits.
+    dim: oklch(0.45, 0.02, 250),
     rule: oklch(0.8, 0.015, 240),
     accent: oklch(0.66, 0.19, 45),     // signal orange
     good: oklch(0.55, 0.11, 150),

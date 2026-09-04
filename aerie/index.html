@@ -16,8 +16,25 @@
   body{font:14px/1.4 'Bahnschrift','Barlow Condensed','Roboto Condensed','Arial Narrow',system-ui,sans-serif;font-variant-numeric:tabular-nums;overflow:hidden}
   #c{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
   /* the chart table: a column of glass cards down the right */
-  #table{position:absolute;top:0;right:0;bottom:0;width:min(360px,100%);padding:16px 16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:none}
-  #table>*{pointer-events:auto}
+  /* The column runs past the window as soon as the market and the carrier
+     arrive - 1,539 px of cards in an 800 px window on a real save. It takes
+     pointer events so its scrollbar can be dragged, and so a click meant for
+     a card never flies the carrier across the sea instead. */
+  #table{position:absolute;top:0;right:0;bottom:0;width:min(360px,100%);padding:16px 16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+  /* Chrome draws its scrollbar as an overlay that shows up only once you are
+     already scrolling, and styling it does not change that - measured, the
+     column reserves no width for one at all. So the column gets an edge of
+     its own: a fade and an arrow at the foot of it whenever there is more
+     below. Without it the voyage, the deck log and the window controls were
+     simply not there as far as the player could tell. The scrollbar rules
+     below still dress the bar in browsers that draw a classic one. */
+  #more{position:absolute;right:0;bottom:0;width:min(360px,100%);height:44px;pointer-events:none;z-index:3;background:linear-gradient(to top,color-mix(in oklab,var(--ground) 94%,transparent),transparent)}
+  #more::after{content:'';position:absolute;left:50%;bottom:11px;width:8px;height:8px;margin-left:-6px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg)}
+  body.folded #more{display:none}
+  #table::-webkit-scrollbar{width:9px}
+  #table::-webkit-scrollbar-thumb{background:color-mix(in oklab,var(--dim) 45%,transparent);border-radius:5px;border:2px solid transparent;background-clip:padding-box}
+  #table::-webkit-scrollbar-thumb:hover{background:color-mix(in oklab,var(--dim) 70%,transparent);background-clip:padding-box}
+  #table::-webkit-scrollbar-track{background:transparent}
   .card{background:color-mix(in oklab,var(--glass) 78%,transparent);backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);border:1px solid color-mix(in oklab,var(--rule) 70%,transparent);padding:10px 12px 11px;box-shadow:0 1px 0 #fff6 inset}
   .card h2{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
   #brand{font-size:20px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;margin:0}
@@ -30,9 +47,13 @@
   .row .v{min-width:56px;text-align:right}
   /* How many a purchase buys. The chosen one is the only lit thing in the row,
      so the row reads as one setting rather than six buttons. */
-  #bulkrow{gap:6px}
+  /* Six quantities and a label in a 360 px column: let the strip wrap under
+     the label rather than run off the side of the card, which clipped the
+     last of them against the window. */
+  #bulkrow{gap:6px;flex-wrap:wrap}
+  #bulk{flex:1 1 auto;justify-content:flex-end}
   .bulk-label{flex:1 1 auto;color:var(--dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
-  #bulk{display:flex;gap:4px}
+  #bulk{display:flex;gap:4px;flex-wrap:wrap}
   #bulk button{
     font:inherit;font-size:11px;padding:2px 7px;cursor:pointer;
     background:transparent;color:var(--dim);
@@ -59,10 +80,21 @@
   .note{margin:6px 0 0;font-size:12px}
   .warn{color:var(--bad)}
   .head .k{text-transform:none}
+  /* an upgrade with nothing left to buy states what it reached instead of
+     offering a control that cannot be pressed */
+  .row.done button,.row.done button:disabled{border-color:transparent;background:transparent;padding-left:0;pointer-events:none;opacity:1;cursor:default}
+  .row.done button b{font-weight:400;color:var(--dim)}
   #tools{display:flex;gap:6px;flex-wrap:wrap}
   #tools button{flex:0 0 auto;font-size:12px;padding:3px 8px}
   #savebox{width:100%;height:56px;font:11px ui-monospace,monospace;margin-top:6px;border:1px solid var(--rule);background:#fff}
-  #anchor-hint{position:absolute;left:16px;bottom:14px;color:var(--ink);background:color-mix(in oklab,var(--glass) 70%,transparent);padding:4px 9px;font-size:12px;pointer-events:none;max-width:calc(100% - 32px)}
+  /* the compass strip: the one move worth making now, and under it the
+     controls a new player still needs. It sits on the picture rather than in
+     the chart table so it is never scrolled out of sight. */
+  #anchor-hint{position:absolute;left:16px;bottom:14px;color:var(--ink);background:color-mix(in oklab,var(--glass) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid color-mix(in oklab,var(--rule) 60%,transparent);padding:6px 11px 7px;font-size:12px;pointer-events:none;max-width:min(600px,calc(100% - 400px))}
+  body.folded #anchor-hint{max-width:min(600px,calc(100% - 32px))}
+  #compass{margin:0;font-size:14px;line-height:1.35}
+  #compass:empty{display:none}
+  #hintline{margin:3px 0 0;color:var(--dim);font-size:12px}
   /* folding the table away: the canvas already fills the window behind it,
      so hiding the column uncovers the world without resizing anything */
   #fold{position:absolute;top:14px;z-index:4;right:calc(min(360px,100%) + 20px);width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;background:color-mix(in oklab,var(--glass) 82%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--rule);flex:0 0 auto;transition:right .18s ease,border-color .12s}
@@ -85,8 +117,9 @@
   @media (max-width:640px){
     #table{width:100%;top:auto;max-height:52%;padding:10px}
     #funds{font-size:26px}
-    #anchor-hint{bottom:auto;top:52px}
+    #anchor-hint,body.folded #anchor-hint{bottom:auto;top:52px;max-width:calc(100% - 24px)}
     #fold,body.folded #fold{top:12px;right:12px}
+    #more{width:100%}
   }
 
 /* A thumb, not a pointer: on touch devices every control gets a real target
@@ -229,7 +262,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="714907360604">
+<meta name="build" content="4e2cfa92ed64">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -276,13 +309,14 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="anchor-hint">W A S D to fly, drag to look, click the land to move the carrier, ? for keys</div>
+<div id="anchor-hint"><p id="compass"></p><p id="hintline">W A S D to fly, drag to look, click the land to move the carrier, ? for keys</p></div>
 <button id="fold" title="hide the panel" aria-label="hide the panel" aria-expanded="true"><b>&rsaquo;</b></button>
 <div class="card" id="keyhelp" hidden>
   <h2 data-t="sections.keys">Keys</h2>
   <div id="key-rows"></div>
   <div class="row kclose" style="border-top:0"><button id="keyclose"><b data-t="labels.closeKeys">close</b><i>Esc</i></button></div>
 </div>
+<div id="more" hidden></div>
 <div id="table">
   <div class="card">
     <p id="brand">Aerie</p>
@@ -299,7 +333,7 @@
       <span id="bulk"></span>
     </div>
     <div class="row"><button id="hire" class="big"><b id="hire-label" data-t="labels.hire">hire a drone</b><i id="hire-cost"></i></button></div>
-    <div class="row"><button id="wing" hidden><b>hire a wing</b><i id="wing-cost"></i></button></div>
+    <div class="row"><button id="wing" hidden><b>hire ten at once</b><i id="wing-cost"></i></button></div>
     <div id="specialists" hidden>
       <h2 style="margin-top:8px" data-t="sections.specialists">Specialists</h2>
       <div id="spec-rows"></div>
@@ -314,17 +348,17 @@
   </div>
   <div class="card" id="carrier" hidden>
     <h2 data-t="sections.carrier">Carrier</h2>
-    <div class="stat" id="range-row"><span data-t="labels.range">range</span><span id="range"></span></div>
+    <div class="stat" id="range-row"><span data-t="labels.range">reach</span><span id="range"></span></div>
     <div id="up-rows"></div>
   </div>
   <div class="card" id="voyage" hidden>
-    <h2 data-t="sections.voyage">Voyage</h2>
+    <h2 data-t="sections.voyage">Next island</h2>
     <div class="stat"><span id="island">island 1</span><span><span class="dim" data-t="labels.richness">land remaining</span> <span id="remaining">100%</span></span></div>
-    <div class="row"><button id="castoff" class="big"><b>cast off</b><i id="castoff-cost"></i></button></div>
+    <div class="row"><button id="castoff" class="big"><b>leave for the next island</b><i id="castoff-cost"></i></button></div>
     <p class="dim note" data-t="labels.castOffHint">Leave this island for the next one, which is richer and pays more. The fleet and the carrier come with you. You can't come back.</p>
   </div>
   <div class="card">
-    <h2 data-t="sections.log">Deck log</h2>
+    <h2 data-t="sections.log">Log</h2>
     <div id="log"></div>
     <div id="tools" style="margin-top:8px">
       <button id="keys" data-t="labels.keys">keys</button><button id="perf" data-t="labels.perf">performance log</button><button id="export" data-t="labels.export">export save</button><button id="import" data-t="labels.import">import save</button><button id="reset" data-t="labels.reset">start over</button>
@@ -341,9 +375,9 @@
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=18';
-  import { CONTENT } from './content.js?v=18';
-  import { createGame } from './src/game.js?v=18';
+  import { CONFIG } from './config.js?v=19';
+  import { CONTENT } from './content.js?v=19';
+  import { createGame } from './src/game.js?v=19';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>
