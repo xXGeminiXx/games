@@ -22,15 +22,15 @@
 // the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=4';
-import { CONTENT, fill } from '../content.js?v=4';
-import { Game } from './game.js?v=4';
-import { Board } from './board.js?v=4';
-import { format, counter } from './format.js?v=4';
-import { toNumber, cmp } from './bignum.js?v=4';
-import { createSave } from './save.js?v=4';
-import { affordability } from './purchase.js?v=4';
-import { createComposer } from './rules-ui.js?v=4';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=5';
+import { CONTENT, fill } from '../content.js?v=5';
+import { Game } from './game.js?v=5';
+import { Board } from './board.js?v=5';
+import { format, counter } from './format.js?v=5';
+import { toNumber, cmp } from './bignum.js?v=5';
+import { createSave } from './save.js?v=5';
+import { affordability } from './purchase.js?v=5';
+import { createComposer } from './rules-ui.js?v=5';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -57,7 +57,11 @@ export function boot() {
 
   const save = createSave({
     key: cfg.identity.storageKey,
-    migrations: [],
+    // A saved run keeps the last sixty lines of what happened AS TEXT, so a run
+    // started under older wording puts those exact words back on the panel
+    // whatever the game says today. The log is a few seconds of history and it
+    // fills again immediately, so it is dropped rather than translated.
+    migrations: [(j) => { if (j && Array.isArray(j.log)) j.log = []; return j; }],
     interval: cfg.save.intervalSeconds,
     serialize: () => { game.lastSeen = Date.now(); return game.toJSON(); },
   });
@@ -72,7 +76,7 @@ export function boot() {
 
   const board = new Board($('c'), cfg, content);
   const purse = counter({ rate: 9 });
-  purse.snap(toNumber(game.funds));
+  purse.snap(toNumber(game.cash()));
 
   const ui = new UI(cfg, content, game, board, save, purse);
   window.game = game;
@@ -96,10 +100,13 @@ function fillStatic(content) {
 }
 
 // The opening sheet, filled from the board it is standing in front of.
-function fillIntro(content, pit) {
+function fillIntro(content, pit, cfg) {
   const steps = $('intro-steps');
   if (!steps || steps.childElementCount) return;
   const v = pit ? { bid: pit.bid, ask: pit.ask, cut: pit.ask - pit.bid } : {};
+  // The first rung's price comes off the shop rather than being written into
+  // the sentence, so retuning it cannot leave the opening screen lying.
+  v.clerk = coins(cfg.ladder.clerk.base);
   for (const line of content.intro.steps) steps.appendChild(el('li', null, fill(line, v)));
 }
 
@@ -134,7 +141,7 @@ class UI {
     this.bind();
     this.resize();
     addEventListener('resize', () => this.resize());
-    if (fresh) { fillIntro(this.content, this.game.activePit()); this.sheet('intro', true); }
+    if (fresh) { fillIntro(this.content, this.game.activePit(), this.cfg); this.sheet('intro', true); }
     else this.showAway();
     this.save.start();
     this.last = performance.now();
@@ -170,7 +177,7 @@ class UI {
 
     const g = this.game;
     const hz = g.tickHz();
-    this.acc += dt * hz;
+    if (this.paused()) this.acc = 0; else this.acc += dt * hz;
     let ran = 0;
     const cap = this.cfg.sim.maxCatchUpTicks;
     const was = g.activePit();
@@ -185,7 +192,7 @@ class UI {
       if (ran > 0 && p === was) this.throwMoney(p);
     }
 
-    this.purse.set(toNumber(g.funds));
+    this.purse.set(toNumber(g.cash()));
     this.purse.update(dt);
     this.board.render(this.view(), dt);
 
@@ -207,6 +214,12 @@ class UI {
     const kept = Math.round(matched * (f.sellPrice - f.buyPrice));
     if (kept === 0) return;
     this.board.pop((kept > 0 ? '+' : '') + fmt(kept), kept > 0 ? 'buy' : 'sell');
+  }
+
+  // The market stands still behind a sheet the game opened itself. The player
+  // opened the key list, so that one keeps running.
+  paused() {
+    return !$('intro').hidden || !$('away').hidden;
   }
 
   view() {
@@ -266,10 +279,14 @@ class UI {
     this.nextLine();
 
     this.section('buy', SHOP.some((s) => g.shown(s.reveal)));
+    this.spendable();
     this.section('clerks', g.bought.clerk > 0);
     this.section('markets', g.shown('pits'));
     this.section('corner', g.shown('corner'));
     this.section('city', g.shown('city'));
+    // A heading over an empty list is the first thing a new player's eye lands
+    // on in the panel, and it says nothing has happened yet in four words less.
+    this.section('log', g.log.length > 0);
 
     for (const row of this.shop.values()) row.update();
     this.markets();
@@ -282,6 +299,19 @@ class UI {
   }
 
   section(id, on) { const s = $('sec-' + id); if (s) s.hidden = !on; }
+
+  // THE PURSE AND THE SHOP HAVE TO AGREE. The wall carries every coin the run
+  // owns; a quote standing on the board is holding some of them, and the shop
+  // spends what is left. Saying both here is the difference between "needs 30
+  // more" reading as a rule and reading as a fault.
+  spendable() {
+    const g = this.game, c = this.content.labels;
+    const spend = g.wallet();
+    const held = Math.max(0, Math.round(toNumber(g.cash()) - toNumber(spend)));
+    this.say('spendable', held > 0
+      ? fill(c.spendableHeld, { n: coins(spend), held: coins(held) })
+      : fill(c.spendable, { n: coins(spend) }));
+  }
 
   // The sentences laid over the picture.
   slate(p) {
@@ -339,26 +369,27 @@ class UI {
   // put the game down for a week reads this and carries on.
   nextLine() {
     const g = this.game, c = this.content.labels, p = g.activePit();
-    // A line that says SAVE UP for something already in the purse reads as a
-    // game that has not noticed. Each goal has the sentence for both states.
-    const goal = (id, key) => {
-      const q = g.quoteFor(id, 1);
-      const now = q.count > 0;
-      return fill(c[key + (now ? 'Now' : '')], { n: coins(now ? q.total : q.price) });
-    };
     let text = '';
+    // THE KEY GETS NAMED BEFORE ANY GOAL DOES. The run opens with more money
+    // than the shop's first rung needs, so this line went straight to "save up
+    // 900" and nothing a new player looked at ever said which key does the only
+    // thing there is to do. It steps aside the moment a board is written by
+    // hand: past that the desk says when to wipe, and saying it twice in two
+    // different sets of words is the noise this panel is meant to avoid.
+    const stale = p && (!p.bidOn && !p.askOn ? 1 : p.staleness());
     if (!g.fills) text = c.nextFirstFill;
+    else if (!g.wipes) text = stale > 0.62 ? c.nextWipeNow : c.nextWipe;
     else if (!g.shown('clerks')) text = c.nextWipe;
-    else if (g.bought.clerk === 0) text = goal('clerk', 'nextBuyClerk');
+    else if (g.bought.clerk === 0) text = fill(c.nextBuyClerk, { n: coins(this.priceOfNext('clerk')) });
     if (!text && g.shown('city') && !g.canLeave()) text = fill(c.nextCity, { n: g.cornersToLeave() - g.corners });
     if (!text && g.shown('corner') && p) text = fill(c.nextCorner, { pit: p.name, have: Math.round(p.share * 100) + '%' });
     if (!text && g.shown('pits')) {
       const next = this.cfg.pitOrder.find((k) => !g.pits.has(k) && !g.cornered.has(k));
       if (next && g.order.length < g.slots()) {
-        text = fill(c[g.canOpen(next) ? 'nextOpenPitNow' : 'nextOpenPit'], { n: coins(g.pitCost(next)), pit: this.cfg.pits[next].name });
+        text = fill(c.nextOpenPit, { n: coins(g.pitCost(next)), pit: this.cfg.pits[next].name });
       }
     }
-    if (!text && g.shown('ladder')) text = goal('size', 'nextBuySize');
+    if (!text && g.shown('ladder')) text = fill(c.nextBuySize, { n: coins(this.priceOfNext('size')) });
     this.say('next', text || c.nextNone);
   }
 
@@ -375,7 +406,7 @@ class UI {
   lit() {
     const prices = {};
     for (const [id, row] of this.shop) prices[id] = row.priceOfOne();
-    for (const ch of this.afford.update(this.game.funds, prices)) {
+    for (const ch of this.afford.update(this.game.wallet(), prices)) {
       const row = this.shop.get(ch.id);
       if (row) row.flash(ch.affordable);
     }
@@ -578,7 +609,7 @@ class UI {
     this.say('city-rep', fill(c.cityRep, { n: g.reputation }));
     for (const [id, r] of this.spendRows) {
       const q = g.spendQuote(id, 1);
-      const text = `${r.spec.label}, ${q.price} ${c.reputation}  (${fill(c.cityHave, { n: g.spent[id] })})`;
+      const text = fill(c.citySpendRow, { label: r.spec.label, n: q.price, k: g.spent[id] });
       if (r.b.textContent !== text) r.b.textContent = text;
       r.b.disabled = q.count <= 0;
     }
@@ -685,6 +716,7 @@ class UI {
     if (!p.bidOn && !p.askOn) p.push();
     p.recentre();
     p.place();
+    this.game.wipes++;
     this.game.note(fill(this.content.events.wiped, { bid: p.bid, ask: p.ask }));
     this.refresh();
   }
@@ -711,6 +743,14 @@ class UI {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const g = this.game, k = e.key;
+    if (this.paused()) {
+      if (k === 'Escape' || k === 'Enter' || k === ' ') {
+        this.sheet('intro', false);
+        this.sheet('away', false);
+        e.preventDefault();
+      }
+      return;
+    }
     if (k === ' ' || k === 'r' || k === 'R') this.wipe();
     else if (k === 's' || k === 'S' || k === 'f' || k === 'F') this.dump();
     else if (k === 'x' || k === 'X' || k === 'q' || k === 'Q') this.toggleBoard();
@@ -721,7 +761,7 @@ class UI {
     else if (k === '=' || k === '+') this.step('size', 1);
     else if (k === 'p' || k === 'P') this.fold();
     else if (k === '?') this.showKeys();
-    else if (k === 'Escape') { this.sheet('keys', false); this.sheet('away', false); return; }
+    else if (k === 'Escape') { this.sheet('keys', false); return; }
     else return;
     e.preventDefault();
   }
@@ -754,9 +794,13 @@ class UI {
     if (!r.ticksDue) return;
     const c = this.content.labels;
     $('away-title').textContent = fill(c.away, { away: r.away, counted: r.counted });
-    $('away-body').textContent = cmp(r.gained, 0) > 0
+    const p = this.game.activePit();
+    const held = p ? p.position : 0;
+    const stock = held > 0 ? ' ' + fill(c.awayHolding, { n: held })
+      : held < 0 ? ' ' + fill(c.awayOwing, { n: -held }) : '';
+    $('away-body').textContent = (cmp(r.gained, 0) > 0
       ? fill(c.awayRan, { funds: coins(r.gained) })
-      : c.awayNothing;
+      : c.awayNothing) + stock;
     this.sheet('away', true);
     this.save.write('resume');
   }

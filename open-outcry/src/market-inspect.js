@@ -16,7 +16,7 @@
 // exposes each as a method as well.
 // ---------------------------------------------------------------------------
 
-import { BUY } from './orderbook.js?v=4';
+import { BUY } from './orderbook.js?v=5';
 
 export const ROLE_NAMES = ['producer', 'consumer', 'speculator', 'player'];
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);

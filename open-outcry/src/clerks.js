@@ -16,8 +16,8 @@
 // One engine per pit, so a card written for grain cannot fire on oil.
 // ---------------------------------------------------------------------------
 
-import { createRegistry } from './rules.js?v=4';
-import { PLAYER_ID, SELL } from './market.js?v=4';
+import { createRegistry } from './rules.js?v=5';
+import { PLAYER_ID, SELL } from './market.js?v=5';
 
 // Which reading and which action arrive with which clerk. A tier is a count of
 // clerks hired across the whole run.
@@ -49,9 +49,11 @@ const READ = {
   rumour: (p) => !!p.rumourKnown,
 };
 
+// What the number beside a reading is counted in, in the words the rest of the
+// game uses. It used to say ticks and units, which are the engine's words.
 const UNITS = {
-  mid: 'ticks', stale: 'ticks', drift: 'ticks', spread: 'ticks',
-  position: 'units', volume: 'units', flow: 'units', cash: '', disagreement: '',
+  mid: 'coins', stale: 'coins', drift: 'coins', spread: 'coins',
+  position: 'sacks', volume: 'sacks', flow: 'sacks', cash: '', disagreement: '',
 };
 
 const DO = {

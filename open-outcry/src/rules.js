@@ -286,7 +286,7 @@ export function createEngine({ registry, rules = [], maxFiresPerTick = 1, tick =
       const target = c.value;
       const pass = target > 0 ? delta >= target : target < 0 ? delta <= target : delta !== 0;
       const sign = delta > 0 ? '+' : '';
-      return { pass, observed: v, note: `changed ${sign}${round(delta)} since last tick` };
+      return { pass, observed: v, note: `changed ${sign}${round(delta)} just now` };
     }
 
     if (c.op === 'for') {

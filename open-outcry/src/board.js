@@ -27,12 +27,16 @@
 // the wall after a trade are the only two animations on the slate.
 // ---------------------------------------------------------------------------
 
-import { createHand } from './chalk.js?v=4';
-import { alpha as withAlpha } from './oklch.js?v=4';
-import { hash2f } from './rng.js?v=4';
+import { createHand } from './chalk.js?v=5';
+import { alpha as withAlpha } from './oklch.js?v=5';
+import { hash2f } from './rng.js?v=5';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+// The least of the wall the going rate's own walk is allowed to have. Below
+// this the walk is a straight line and the picture says nothing.
+const WALK_SHARE = 0.45;
 
 export class Board {
   constructor(canvas, cfg, content) {
@@ -586,28 +590,42 @@ export class Board {
     // labels are already sitting in it - so the chart stops higher.
     const y0 = top * 0.47, y1 = top * (this.portrait ? 0.84 : 0.93);
 
-    // The window has to hold your own prices as well as the walk, or the lines
-    // that matter most are the ones that fall off the wall.
-    let lo = Infinity, hi = -Infinity;
-    for (const v of h) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    // The window holds the walk and your own two prices. THE WALK KEEPS A
+    // FLOOR ON THE WALL: stretching the window far enough to reach a board the
+    // price has run away from flattens the walk into a straight line, and that
+    // is the exact moment the walk is worth looking at. Past the floor the two
+    // red rules go to the edge instead, hard against it, which is what being
+    // off the board looks like.
+    let walkLo = Infinity, walkHi = -Infinity;
+    for (const v of h) { if (v < walkLo) walkLo = v; if (v > walkHi) walkHi = v; }
+    let lo = walkLo, hi = walkHi;
     if (view.showQuote) { lo = Math.min(lo, view.bid); hi = Math.max(hi, view.ask); }
     const pad10 = Math.max(1, (hi - lo) * 0.12);
     lo -= pad10; hi += pad10;
     if (!(hi > lo)) hi = lo + 1;
-    const yOf = (v) => lerp(y1, y0, (v - lo) / (hi - lo));
+    const walkSpan = Math.max(1, (walkHi - walkLo) * 1.24);   // the walk, with the same margin
+    if (walkSpan / (hi - lo) < WALK_SHARE) {
+      const middle = (walkHi + walkLo) / 2;
+      const half = walkSpan / (2 * WALK_SHARE);
+      lo = middle - half; hi = middle + half;
+    }
+    const yOf = (v) => lerp(y1, y0, clamp((v - lo) / (hi - lo), 0, 1));
 
     // Your two prices, ruled across the whole wall in red.
     if (view.showQuote) {
       // On a short wall the two prices are a few pixels apart and their names
-      // land on top of each other. The lines stay where the prices are; the
-      // words are pushed apart far enough to be read.
-      const ya = yOf(view.ask), yb = yOf(view.bid);
+      // land on top of each other, and a board the price has run away from
+      // puts both of them on the same edge. The pair is pushed apart far enough
+      // to be read and then slid back inside the wall, keeping what you charge
+      // above what you pay.
       const need = s * 1.25;
-      const mid = (ya + yb) / 2;
-      const spread = Math.max(need, Math.abs(yb - ya)) / 2;
-      const labelY = { ask: mid - spread, bid: mid + spread };
+      let ya = yOf(view.ask), yb = yOf(view.bid);
+      if (yb - ya < need) { const m = (ya + yb) / 2; ya = m - need / 2; yb = m + need / 2; }
+      if (ya < y0) { const d = y0 - ya; ya += d; yb += d; }
+      if (yb > y1) { const d = yb - y1; ya -= d; yb -= d; }
+      const at = { ask: ya, bid: yb };
       for (const [key, price, text] of [['ask', view.ask, charge], ['bid', view.bid, pay]]) {
-        const y = yOf(price);
+        const y = at[key];
         g.strokeStyle = p.red;
         g.globalAlpha = 0.5;
         g.lineWidth = 1.4;
@@ -618,7 +636,7 @@ export class Board {
         g.stroke();
         g.setLineDash([]);
         g.globalAlpha = 1;
-        this.slot(g, 'q-' + key, `${text} ${price}`, x1 + s, labelY[key] + s * 0.36, s, { colour: p.red, width: 0.95 });
+        this.slot(g, 'q-' + key, `${text} ${price}`, x1 + s, at[key] + s * 0.36, s, { colour: p.red, width: 0.95 });
       }
     }
 

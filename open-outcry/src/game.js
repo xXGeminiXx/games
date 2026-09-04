@@ -19,14 +19,14 @@
 // upward for the rest of the run.
 // ---------------------------------------------------------------------------
 
-import { Pit } from './pit.js?v=4';
-import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=4';
-import { quote } from './purchase.js?v=4';
-import { catchUp, summary } from './offline.js?v=4';
-import { createEngine } from './rules.js?v=4';
-import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=4';
-import { rng } from './rng.js?v=4';
-import { fill, pick } from '../content.js?v=4';
+import { Pit } from './pit.js?v=5';
+import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=5';
+import { quote } from './purchase.js?v=5';
+import { catchUp, summary } from './offline.js?v=5';
+import { createEngine } from './rules.js?v=5';
+import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=5';
+import { rng } from './rng.js?v=5';
+import { fill, pick } from '../content.js?v=5';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -42,6 +42,7 @@ export class Game {
     this.cornersEver = 0;       // pits taken over the whole run
     this.cornered = new Set();  // a pit taken here cannot be opened here again
     this.fills = 0;
+    this.wipes = 0;                 // boards written by hand, so the line teaching the key can stop
     this.volumeTotal = 0;
     this.picks = 0;                 // how many content picks have been made, so a load repeats them
     this.bought = { size: 0, clerk: 0, seat: 0, runner: 0 };
@@ -362,6 +363,20 @@ export class Game {
         p.place();
         this.take(p.sweep());
       }
+      // The board writes itself once it has stood right off the price for a
+      // while. It is the floor under a player who never touches anything, and
+      // a hand beats it every time by not waiting.
+      if (p.attended && p.bidOn) {
+        p.offPrice = p.staleness() >= 1 ? p.offPrice + 1 : 0;
+        if (p.offPrice >= this.cfg.pit.selfWriteTicks) {
+          p.offPrice = 0;
+          p.recentre();
+          this.take(-p.fund(this.spare()));
+          p.place();
+          this.take(p.sweep());
+        }
+      } else p.offPrice = 0;
+
       p.record();
       this.stepRumour(p, quiet);
       if (p.tick % this.cfg.pit.anchorEvery === 0) p.anchor();
@@ -421,9 +436,16 @@ export class Game {
   // income stops, and the run is over with a large number on the wall. So the
   // shop spends what is LEFT once the quotes are covered, and the size rung is
   // gated by whether the player can still stand behind it.
+  // A BOARD THAT IS DOWN NEEDS NOTHING HELD BACK. Nothing is escrowed while
+  // the prices are off the wall, so counting them here took money out of the
+  // shop that no quote was standing on: a purse of 342 with the board down
+  // could not buy a 30 coin thing, and the shop said "needs 30 more".
   reserve() {
     let r = 0;
-    for (const p of this.openPits()) r += Math.max(1, p.bid) * Math.max(1, p.size);
+    for (const p of this.openPits()) {
+      if (!p.bidOn) continue;
+      r += Math.max(1, p.bid) * Math.max(1, p.size);
+    }
     return Math.ceil(r * this.cfg.pit.reserveOfQuote);
   }
 
@@ -617,6 +639,7 @@ export class Game {
       cornersEver: this.cornersEver,
       cornered: [...this.cornered],
       fills: this.fills,
+      wipes: this.wipes,
       volumeTotal: this.volumeTotal,
       picks: this.picks,
       bought: { ...this.bought },
@@ -642,6 +665,7 @@ export class Game {
     g.cornersEver = j.cornersEver || 0;
     g.cornered = new Set(j.cornered || []);
     g.fills = j.fills || 0;
+    g.wipes = j.wipes || 0;
     g.volumeTotal = j.volumeTotal || 0;
     g.picks = j.picks || 0;
     g.bought = { size: 0, clerk: 0, seat: 0, runner: 0, ...(j.bought || {}) };

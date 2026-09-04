@@ -38,7 +38,7 @@
 // question on purpose.
 // ---------------------------------------------------------------------------
 
-import { duration } from './format.js?v=4';
+import { duration } from './format.js?v=5';
 
 // Twelve hours. The point of a cap is that an idle game cannot pay out a
 // week of production in one lump without wrecking its own curve; the number

@@ -27,8 +27,8 @@
 // first thing the tests check.
 // ---------------------------------------------------------------------------
 
-import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=4';
-import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=4';
+import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=5';
+import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=5';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -50,6 +50,7 @@ export class Pit {
     this.size = cfg.pit.startSize;
     this.spread = cfg.pit.startSpread;
     this.lean = 0;              // ticks the whole quote is shifted, set by a clerk
+    this.offPrice = 0;              // ticks the board has stood right off the price
     this.bidOn = true;
     this.askOn = true;
     this.bidIds = [];           // resting order ids, so a standing quote is left
