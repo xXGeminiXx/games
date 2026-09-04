@@ -13,9 +13,9 @@
 // is playing the same game.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=16';
-import * as Tr from './traits.js?v=16';
-import { fmt, fmtCoin } from './numbers.js?v=16';
+import * as Lore from './lore.js?v=17';
+import * as Tr from './traits.js?v=17';
+import { fmt, fmtCoin } from './numbers.js?v=17';
 
 /** The share of the mineral flow going to waste before it is worth saying. */
 const WASTE = 0.08;
@@ -93,7 +93,11 @@ export function next(sim, cfg) {
   // the same minerals, and the prices move with the year. This sits above
   // saving for a ring on purpose: while the sugar piles up, moving the shares
   // is the one thing that makes it pile up faster.
-  if (f.trees) {
+  //
+  // It is only ever said to a player who has taken the split over. Left alone,
+  // the minerals already go where they fetch the most and keep up with the
+  // seasons, so naming it would be asking for a press that changes nothing.
+  if (f.trees && !state.shareAuto) {
     const market = sim.market();
     let best = null, worst = null;
     for (const key in market) {

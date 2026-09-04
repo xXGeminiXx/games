@@ -20,8 +20,8 @@
 // reads are the ones the simulation pays.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=16';
-import { unit } from './rng.js?v=16';
+import { scale } from './levels.js?v=17';
+import { unit } from './rng.js?v=17';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {
@@ -88,6 +88,71 @@ export function tradeOf(species, S, m) {
     marginal: (species.rate / species.need) * Math.exp(-x),
     sat,
   };
+}
+
+/**
+ * Split a mineral flow so every kind is paying the same for its next mineral.
+ *
+ * A kind's price falls the more it is sent, so the flow is worth the most when
+ * no kind is still paying more than another for one more. That point is one
+ * price L: a kind takes minerals until its own price has fallen to L, and a
+ * kind whose first mineral is worth less than L takes nothing. The price at m
+ * is `(rate/need) * exp(-m/(need*S)) * mult`, so the minerals that bring it to
+ * L are `need * S * ln(top/L)` where top is what its first mineral fetches.
+ * That total falls as L rises, so L is found by halving the range.
+ *
+ * This is what the split does unless the player has taken it over. Splitting
+ * the flow evenly instead is what a player who never touches the ledger gets,
+ * and it leaves money on the table every second of the run for a reason
+ * nothing on the page can teach.
+ *
+ * @param {number} flow    minerals a second to divide
+ * @param {Array}  roster  the kinds at this level
+ * @param {object} sizes   key -> standing size, 0 or absent for none standing
+ * @param {object} mults   key -> what this kind's payment is multiplied by now
+ * @returns {object} key -> minerals a second
+ */
+export function bestSplit(flow, roster, sizes, mults) {
+  const out = {};
+  const live = [];
+  let top = 0;
+  for (const sp of roster) {
+    const S = sizes[sp.key] || 0;
+    out[sp.key] = 0;
+    if (!(S > 0) || !(sp.rate > 0) || !(sp.need > 0)) continue;
+    const mult = mults && mults[sp.key] !== undefined ? mults[sp.key] : 1;
+    const first = (sp.rate / sp.need) * mult;      // what its next mineral fetches at nothing sent
+    if (!(first > 0)) continue;
+    live.push({ key: sp.key, first, span: sp.need * S });
+    if (first > top) top = first;
+  }
+  if (!(flow > 0) || live.length === 0 || !(top > 0)) return out;
+  if (live.length === 1) { out[live[0].key] = flow; return out; }
+
+  const wanted = (L) => {
+    let sum = 0;
+    for (const k of live) if (k.first > L) sum += k.span * Math.log(k.first / L);
+    return sum;
+  };
+  // At L just under `top` only the best kind takes anything, so the demand is
+  // near nothing; at L near zero it is unbounded. Halve until the demand is
+  // the flow.
+  let lo = top * 1e-12, hi = top;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (wanted(mid) > flow) lo = mid; else hi = mid;
+  }
+  const L = (lo + hi) / 2;
+  let sum = 0;
+  for (const k of live) {
+    const m = k.first > L ? k.span * Math.log(k.first / L) : 0;
+    out[k.key] = m;
+    sum += m;
+  }
+  // The solve lands a hair off; hand the flow out in the proportions it found
+  // so nothing is invented and nothing leaks.
+  if (sum > 0) for (const k of live) out[k.key] = flow * out[k.key] / sum;
+  return out;
 }
 
 /** Split a mineral flow across kinds by weight. Kinds with no trees get none. */

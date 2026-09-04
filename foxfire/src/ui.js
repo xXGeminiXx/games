@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=16';
-import * as Advice from './advice.js?v=16';
-import * as Tr from './traits.js?v=16';
-import * as Sp from './spores.js?v=16';
-import { fill } from '../config.js?v=16';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=16';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=16';
+import * as Lore from './lore.js?v=17';
+import * as Advice from './advice.js?v=17';
+import * as Tr from './traits.js?v=17';
+import * as Sp from './spores.js?v=17';
+import { fill } from '../config.js?v=17';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=17';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=17';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -201,7 +201,7 @@ export function createUI(doc, sim, cfg, actions) {
   // which is only rebuilt when the simulation steps: a press has to show on
   // the ledger at once, and two presses in the same tenth of a second have to
   // count from what the first one left behind.
-  const weightOf = (key) => (state.weights[key] === undefined ? cfg.trees.weightNew : state.weights[key]);
+  const weightOf = (key) => sim.shareOf(key);
   const policyOf = (key) => state.harvest[key] || 0;
 
   const treeRows = new Map();
@@ -262,7 +262,7 @@ export function createUI(doc, sim, cfg, actions) {
       tick.title = T.weightTip;
       tick.addEventListener('click', () => {
         const cur = weightOf(row.key);
-        actions.setWeight(row.key, (i === cur ? i - 1 : i) - cur);
+        actions.setShare(row.key, i === cur ? i - 1 : i);
       });
       share.appendChild(tick);
       ticks.push(tick);
@@ -328,8 +328,35 @@ export function createUI(doc, sim, cfg, actions) {
     return bits.join(' ');
   };
 
+  // The switch above the ledger. The split follows the best price by itself,
+  // and this is what hands it over. Nothing below it has to be touched for the
+  // trade to work; a player who wants to drive presses this, or any tick.
+  let autoSwitch = null;
+  const autoRow = () => {
+    if (autoSwitch) return autoSwitch;
+    const host = el('trees-auto');
+    if (!host) return null;
+    const b = doc.createElement('button');
+    b.className = 'rite';
+    b.addEventListener('click', () => actions.setShareAuto(!sim.shareAuto()));
+    const line = doc.createElement('span');
+    line.className = 'line';
+    host.appendChild(b);
+    host.appendChild(line);
+    autoSwitch = { b, line };
+    return autoSwitch;
+  };
+
   const renderTrees = () => {
     if (!state.flags.trees) return;
+    const auto = autoRow();
+    if (auto) {
+      const on = sim.shareAuto();
+      priced(auto.b, T.shareAuto, on ? T.instinct.on : T.instinct.off, true);
+      auto.b.className = 'rite' + (on ? ' on' : '');
+      auto.b.title = T.shareAutoTip;
+      auto.line.textContent = Lore.ui(on ? 'shareAutoOn' : 'shareAutoOff');
+    }
     const market = sim.market();
     const m = sim.mods();
     const season = sim.season();

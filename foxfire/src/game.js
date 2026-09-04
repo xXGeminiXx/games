@@ -13,15 +13,15 @@
 // the genome kept and the closing lines already in its log, and reloads.
 // ---------------------------------------------------------------------------
 
-import { storageKey } from '../config.js?v=16';
-import { createSim, restoreSim, openedState } from './sim.js?v=16';
-import * as Save from './save.js?v=16';
-import * as Sp from './spores.js?v=16';
-import * as Lore from './lore.js?v=16';
-import { hash } from './rng.js?v=16';
-import { createUI } from './ui.js?v=16';
-import { createView } from './view.js?v=16';
-import { fmtTime, fmt, fmtCount } from './numbers.js?v=16';
+import { storageKey } from '../config.js?v=17';
+import { createSim, restoreSim, openedState } from './sim.js?v=17';
+import * as Save from './save.js?v=17';
+import * as Sp from './spores.js?v=17';
+import * as Lore from './lore.js?v=17';
+import { hash } from './rng.js?v=17';
+import { createUI } from './ui.js?v=17';
+import { createView } from './view.js?v=17';
+import { fmtTime, fmt, fmtCount } from './numbers.js?v=17';
 
 /**
  * @param {object} o
@@ -64,6 +64,8 @@ export function createGame(o) {
   actions.buyTips = wrap((n) => sim.buyTips(n), true);
   actions.buyTipsMax = wrap(() => sim.buyTipsMax(), true);
   actions.setWeight = wrap((key, d) => sim.setWeight(key, d));
+  actions.setShare = wrap((key, v) => sim.setShare(key, v), true);
+  actions.setShareAuto = wrap((on) => sim.setShareAuto(on), true);
   actions.setHarvest = wrap((key, p) => sim.setHarvest(key, p), true);
   actions.toggleNurture = wrap((key) => sim.toggleNurture(key), true);
   actions.buyTrait = wrap((id) => sim.buyTrait(id), true);

@@ -41,28 +41,28 @@ export const CONTENT = {
   // TRAITS - one line each, stating what changes
   // -------------------------------------------------------------------------
   traits: {
-    lignin:     { name: 'Lignin enzymes',   line: 'Dead wood is broken down half again as fast' },
-    cables:     { name: 'Rhizomorphs',      line: 'Tips run in bootlace cables and travel faster' },
-    branching:  { name: 'Branching',        line: 'Every new tip costs less than it did' },
-    reach:      { name: 'Foraging',         line: 'A tip looks further for the next place to reach' },
-    symbiosis:  { name: 'Symbiosis',        line: 'Every tree pays more for what it\'s sent' },
-    parasitism: { name: 'Parasitism',       line: 'A tree can be drained and felled for its wood' },
-    transfer:   { name: 'Transfer',         line: 'Sugar can be sent to a kind of tree so it grows faster' },
-    rot:        { name: 'Rot',              line: 'A felled tree leaves more wood behind it' },
-    frost:      { name: 'Frost hardiness',  line: 'Cold no longer slows the tips in winter' },
-    reserve:    { name: 'Reserves',         line: 'The fungus keeps working for more hours while you\'re away' },
-    evergreen:  { name: 'Evergreen trade',  line: 'The trees keep paying a little through the winter' },
+    lignin:     { name: 'Eats wood faster', line: 'Dead wood is broken down half again as fast' },
+    cables:     { name: 'Faster tips',      line: 'Tips run in bootlace cables and travel faster' },
+    branching:  { name: 'Cheaper tips',     line: 'Every new tip costs less than it did' },
+    reach:      { name: 'Tips look further', line: 'A tip looks further for the next place to reach' },
+    symbiosis:  { name: 'Trees pay more',   line: 'Every tree pays more for what it\'s sent' },
+    parasitism: { name: 'Cut trees down',   line: 'A tree can be drained and felled for its wood' },
+    transfer:   { name: 'Feed the trees',   line: 'Sugar can be sent to a kind of tree so it grows faster' },
+    rot:        { name: 'More wood',        line: 'A tree you cut down leaves more wood behind it' },
+    frost:      { name: 'Cold stops nothing', line: 'Cold no longer slows the tips in winter' },
+    reserve:    { name: 'Runs longer alone', line: 'The fungus keeps working for more hours while you\'re away' },
+    evergreen:  { name: 'Trees pay in winter', line: 'The trees keep paying a little through the winter' },
     instinctExtend: { name: 'Opens rings itself', line: 'The fungus opens the next ring once the front has nothing left to reach' },
     instinctTips:   { name: 'Grows tips itself',  line: 'The fungus grows the front when the ground gives up more than the tips carry' },
-    instinctBeyond: { name: 'Goes beyond itself',  line: 'The fungus folds a finished level and moves up on its own, once you switch it on' },
+    instinctBeyond: { name: 'Zooms out itself',  line: 'The fungus moves up to the bigger map on its own once a map is finished, if you switch it on' },
   },
 
   genome: {
-    headstart: { name: 'Rich spore',   line: 'Every fungus after this one begins with more tips' },
-    quick:     { name: 'Quick hyphae', line: 'Tips are faster in every fungus after this one' },
-    enzymes:   { name: 'Old enzymes',  line: 'Wood, soil and trees all yield more, in every fungus after this one' },
-    memory:    { name: 'Memory',       line: 'Traits cost less to learn in every fungus after this one' },
-    patience:  { name: 'Patience',     line: 'The fungus keeps working for still more hours away, in every fungus after this one' },
+    headstart: { name: 'More tips to start', line: 'Every fungus after this one begins with more tips' },
+    quick:     { name: 'Faster from the start', line: 'Tips are faster in every fungus after this one' },
+    enzymes:   { name: 'Everything gives more', line: 'Wood, soil and trees all yield more, in every fungus after this one' },
+    memory:    { name: 'Cheaper traits', line: 'Traits cost less to learn in every fungus after this one' },
+    patience:  { name: 'Runs longer still', line: 'The fungus keeps working for still more hours away, in every fungus after this one' },
   },
 
   // -------------------------------------------------------------------------
@@ -208,9 +208,9 @@ export const CONTENT = {
       'Ready to fruit. Ground here would be given up for ground anywhere.',
     ],
     canBeyond: [
-      'Enough of {level} is threaded to go beyond it.',
+      'Enough of {level} is threaded to zoom out from it.',
       'Half of {level} carries thread. What\'s here would keep paying from below.',
-      'You could fold {level} into one point and begin on the ground above it.',
+      'You could turn {level} into one point and begin on the wider ground above it.',
     ],
     milestoneTips: [
       '{n} tips. The edge moves as one front now.',
@@ -249,7 +249,9 @@ export const CONTENT = {
     aimIdle: 'Click the floor and the tips work toward that spot first. Nothing gets closed off - they just get there sooner.',
     aimSet:  'The tips are working toward the mark.',
     noTrees: 'No living trees reached.',
-    sharesNote: 'Share splits the minerals between the kinds by weight. Every mineral a kind gets fetches less than the one before, so a kind paying well wants a bigger share, never the whole flow.',
+    sharesNote: 'Every mineral a kind gets fetches less than the one before, so the best kind wants a bigger share and never the whole flow.',
+    shareAutoOn:  'Nothing here needs setting. The minerals go where they fetch the most and follow the prices as the year turns. Press a share below to take it over.',
+    shareAutoOff: 'You are setting the split. Switch this back on to have it follow the prices again.',
     treeBest: 'Pays best in {season}.',
     shareGain: 'One more share here is worth {gain} sugar/s.',
     shareCost: 'One more share here costs {gain} sugar/s.',
@@ -272,7 +274,7 @@ export const CONTENT = {
     // every purchase is not worth reading.
     instinctExtend: 'The stakes were out a ring further this morning and nobody moved them. It does this for itself now.',
     instinctTips:   'The front thickened overnight where the ground was giving up more than it could carry. You weren\'t here.',
-    instinctBeyond: 'It has folded a finished level on its own. You came back to a map you didn\'t draw.',
+    instinctBeyond: 'It moved up to the bigger map on its own. You came back to ground you didn\'t draw.',
 
     // The compass at the top of the journal. One of these is showing at any
     // moment, and each one says a fact and then the move it argues for.
@@ -283,9 +285,9 @@ export const CONTENT = {
       waste:    'The ground gives up {produced} minerals a second and {lost} of it leaks away. It is the tips that carry minerals to the trees.',
       ring:     'The tips have reached everything inside the line. There\'s more ground past it.',
       saving:   'Nothing left to reach inside the line. The next ring costs {cost} and you have {have}.',
-      beyond:   '{Level} is worked out. All of it becomes one place on {next}, and half of what it pays now keeps arriving.',
-      beyondSaving: '{Level} is threaded end to end. Going beyond costs {cost} and you have {have}. It turns all of this into one place on {next}.',
-      beyondNeeds: 'Going beyond needs {need} places on {level} reached and you have {reached}. The tips are still getting there.',
+      beyond:   '{Level} is worked out. All of it becomes one point on the bigger map, {next}, and half of what it pays now keeps arriving.',
+      beyondSaving: '{Level} is threaded end to end. Zooming out costs {cost} and you have {have}. It turns all of this into one point on {next}.',
+      beyondNeeds: 'Zooming out needs {need} places on {level} reached and you have {reached}. The tips are still getting there.',
       market:   '{Best} pays {bestPrice} for the next mineral and {Worst} only {worstPrice}. The share decides which of them your minerals go to.',
       trait:    'A trait lasts as long as this fungus does, and you can afford {name}.',
       winter:   'Winter. The trees pay a quarter of the usual until spring. The wood and the soil don\'t care.',

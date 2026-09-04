@@ -183,6 +183,10 @@
   .tree .note{color:var(--faded);font-size:1rem;line-height:1.4;margin-top:.3rem}
   .tree .note em.mark{font-style:normal;font-weight:600;margin-right:.4em}
   #treesnote{color:var(--faded);font-size:1rem;margin-top:.35rem}
+  /* The switch that hands the split over. It sits above the kinds because the
+     answer to "which of these do I send to" is that nothing here has to be
+     touched at all. */
+  #trees-auto{margin-bottom:.7rem}
 
   /* The year: one ruled line, four marks, and the point we are at. */
   #season-name{font-weight:600}
@@ -396,7 +400,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="bee64a7be575">
+<meta name="build" content="8c52f986bd89">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -481,6 +485,7 @@
 
   <section class="panel" id="trees-panel" hidden>
     <h2 id="p-trees"></h2>
+    <div id="trees-auto" class="rrow"></div>
     <div id="trees"></div>
     <p id="treesnote"></p>
   </section>
@@ -532,8 +537,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=16';
-import { createGame } from './src/game.js?v=16';
+import { CONFIG, applyIdentity } from './config.js?v=17';
+import { createGame } from './src/game.js?v=17';
 
 applyIdentity(document);
 

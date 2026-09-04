@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=16';
-import { buildLevel, nearestOpen } from './world.js?v=16';
-import * as Tips from './tips.js?v=16';
-import * as Trees from './trees.js?v=16';
-import * as Tr from './traits.js?v=16';
-import * as Lv from './levels.js?v=16';
-import * as Sp from './spores.js?v=16';
-import * as Rv from './reveal.js?v=16';
-import * as Ev from './events.js?v=16';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=16';
-import { hash } from './rng.js?v=16';
-import * as Lore from './lore.js?v=16';
-import { fmtArea, fmtCoin } from './numbers.js?v=16';
+import { CONFIG as DEFAULT } from '../config.js?v=17';
+import { buildLevel, nearestOpen } from './world.js?v=17';
+import * as Tips from './tips.js?v=17';
+import * as Trees from './trees.js?v=17';
+import * as Tr from './traits.js?v=17';
+import * as Lv from './levels.js?v=17';
+import * as Sp from './spores.js?v=17';
+import * as Rv from './reveal.js?v=17';
+import * as Ev from './events.js?v=17';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=17';
+import { hash } from './rng.js?v=17';
+import * as Lore from './lore.js?v=17';
+import { fmtArea, fmtCoin } from './numbers.js?v=17';
 
 export const SAVE_VERSION = 1;
 
@@ -64,7 +64,8 @@ export function freshState(cfg, seed) {
     threads: [],           // [from, to] pairs, for the drawing
     wood: {},              // node id -> sugar left in it
     trees: {},             // node id -> { sp, s, h, dead, wood, regrow }
-    weights: {},           // kind -> share of the mineral flow
+    weights: {},           // kind -> share of the mineral flow, when the player is driving
+    shareAuto: true,       // the minerals follow the best price by themselves
     harvest: {},           // kind -> 0 keep, 1 fell mature, 2 fell all
     nurture: {},           // kind -> true when sugar is being sent
     traits: {},            // id -> level
@@ -287,7 +288,14 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
     // The trade.
     const tradeMult = (winter && m.evergreen) ? cfg.season.evergreenWinter : season.trade;
-    const sent = Trees.split(flowPerSecond, state.weights, sizes);
+    // What each kind is paid is multiplied by the year, the trait and the
+    // kind's own season, so the price a mineral fetches there is too, and the
+    // split has to be made against those prices rather than the bare rates.
+    const mults = {};
+    for (const sp of roster) mults[sp.key] = m.trade * m.yield * tradeMult * Trees.seasonMult(sp, season.index);
+    const sent = state.shareAuto
+      ? Trees.bestSplit(flowPerSecond, roster, sizes, mults)
+      : Trees.split(flowPerSecond, state.weights, sizes);
     const market = {};
     for (const sp of roster) {
       const S = sizes[sp.key] || 0;
@@ -305,7 +313,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       const row = {
         key: sp.key, name: sp.name, count: counts[sp.key] || 0, mature: mature[sp.key] || 0,
         size: S, sent: ms, got, marginal: r.marginal * mult, sat: r.sat,
-        dead: 0, weight: state.weights[sp.key] === undefined ? cfg.trees.weightNew : state.weights[sp.key],
+        dead: 0, weight: 0,   // filled below, once the largest share is known
         policy: state.harvest[sp.key] || 0, nurture: !!state.nurture[sp.key], max: sp.max,
         // -- ledger hook: which season this kind pays best in, and what the
         //    two standing decisions are worth. Grown size is what is actually
@@ -433,6 +441,23 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         continue;
       }
       Trees.grow(tree, sp, dt, season.growth * (1 + (boost[sp.key] || 0)));
+    }
+    // The share each kind is on, as the ticks draw it: what the player set, or
+    // what the automatic split settled on, scaled so the kind getting the most
+    // is full and a kind getting anything at all is never empty.
+    if (state.shareAuto) {
+      let most = 0;
+      for (const key in market) if (market[key].sent > most) most = market[key].sent;
+      for (const key in market) {
+        const row = market[key];
+        row.weight = most > 0 && row.sent > 0
+          ? Math.max(1, Math.round(cfg.trees.weightMax * row.sent / most))
+          : 0;
+      }
+    } else {
+      for (const key in market) {
+        market[key].weight = state.weights[key] === undefined ? cfg.trees.weightNew : state.weights[key];
+      }
     }
     rt.market = market;
 
@@ -703,10 +728,64 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   const buyTipsMax = () => buyTips(tipsAffordable());
 
-  const setWeight = (key, delta) => {
-    const cur = state.weights[key] === undefined ? cfg.trees.weightNew : state.weights[key];
-    state.weights[key] = Math.max(0, Math.min(cfg.trees.weightMax, cur + delta));
+  /**
+   * Write the automatic split into the shares as ticks, so a player taking the
+   * ledger over starts from what it had settled on rather than from a row of
+   * ones. The ticks are whole numbers, so the best kind gets all of them and
+   * the rest are set in proportion, never below one where anything is being
+   * sent at all.
+   */
+  const adoptAuto = () => {
+    const rows = rt.market || {};
+    for (const key in rows) {
+      if (!(rows[key].count > 0)) continue;
+      state.weights[key] = rows[key].weight;
+    }
+  };
+
+  /**
+   * The share a kind is on right now, whoever set it.
+   *
+   * Once the player is driving this is what they set, read from the state and
+   * not from the books: the books are only rebuilt when the simulation steps,
+   * and two presses inside one tick have to count from what the first one
+   * left behind.
+   */
+  const shareOf = (key) => {
+    if (!state.shareAuto) {
+      return state.weights[key] === undefined ? cfg.trees.weightNew : state.weights[key];
+    }
+    const row = (rt.market || {})[key];
+    return row ? row.weight : cfg.trees.weightNew;
+  };
+
+  /**
+   * Set a share outright. The ticks work in absolute values, so nothing can go
+   * wrong between reading the share off the page and writing the new one: a
+   * press that takes the split over from the game used to work out its step
+   * against the old shares and apply it to the adopted ones.
+   */
+  const setShare = (key, value) => {
+    if (state.shareAuto) { adoptAuto(); state.shareAuto = false; }
+    state.weights[key] = Math.max(0, Math.min(cfg.trees.weightMax, Math.round(value)));
     return drain();
+  };
+
+  /** Hand the split back to the game, or take it over as it stands. */
+  const setShareAuto = (on) => {
+    const want = !!on;
+    if (want === !!state.shareAuto) return drain();
+    if (!want) adoptAuto();
+    state.shareAuto = want;
+    return drain();
+  };
+
+  const setWeight = (key, delta) => {
+    // Touching the shares is the player taking the split over, so the step is
+    // taken from the share in force at that moment rather than from whatever
+    // was last written down.
+    const cur = shareOf(key);
+    return setShare(key, cur + delta);
   };
 
   const setHarvest = (key, policy) => {
@@ -821,7 +900,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     mods, scale,
     step, advance, drain,
     tipCost, tipsAffordable, carryCapacity: () => carryCapacity(mods()),
-    reachByHand, buyTips, buyTipsMax, setWeight, setHarvest, toggleNurture, buyTrait, extend, beyond,
+    reachByHand, buyTips, buyTipsMax, setWeight, setShare, setShareAuto, setHarvest, toggleNurture, buyTrait, extend, beyond,
+    shareAuto: () => !!state.shareAuto, shareOf,
     setAim, clearAim, aim: () => aimOf(),
     setInstinct, setReserve, instinct: () => instinctBook(),
     area, canFruit, sporesNow,
@@ -839,6 +919,15 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 export function restoreSim(cfg, snap) {
   if (!snap || !snap.state) return null;
   const state = snap.state;
+  // A save written before the minerals followed the price on their own. It
+  // goes onto auto only if its shares are all still where they started: a
+  // player who set them by hand meant to, and keeps what they set.
+  if (state.shareAuto === undefined) {
+    const w = state.weights || {};
+    let touched = false;
+    for (const k in w) if (w[k] !== cfg.trees.weightNew) touched = true;
+    state.shareAuto = !touched;
+  }
   const genome = snap.genome || Sp.freshGenome();
   return createSim(cfg, { state, genome });
 }
