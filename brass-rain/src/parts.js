@@ -28,9 +28,9 @@
 // and it keeps every promise honest.
 // ---------------------------------------------------------------------------
 
-import { createBoard, addPin, removePinsNear, rebuild, nailPos, POCKET_PAY, POCKET_GATE } from './board.js?v=62';
-import { baseMods } from './run.js?v=62';
-import { rng as makeRng } from './rng.js?v=62';
+import { createBoard, addPin, removePinsNear, rebuild, nailPos, plateClearance, clearOfPlates, clearNailsAlongPlate, liftPocketsOffPlates, POCKET_PAY, POCKET_GATE } from './board.js?v=63';
+import { baseMods } from './run.js?v=63';
+import { rng as makeRng } from './rng.js?v=63';
 
 // Board units of mouth width per point of probability, measured.
 const GATE_UNITS_PER_POINT = 1 / 0.0042;
@@ -260,12 +260,25 @@ export function buildFittedBoard(fittedCfg, seed, shape) {
     if (spot) addPin(board, spot.x, spot.y, b.pinRadius * 2.4);
   }
   if (shape.slope) {
-    for (const g of board.guides) g.y2 += shape.slope * 1.5;
+    // Steepening a plate walks it into nails that were driven clear of where
+    // it used to lie, so the nails it has moved under come out with it.
+    for (const g of board.guides) {
+      g.y2 += shape.slope * 1.5;
+      clearNailsAlongPlate(fittedCfg, board, g);
+    }
   }
+  // Mouths cut above and plates moved above are both new since the board was
+  // built, and either can leave a mouth sitting on the chute - which catches
+  // nearly everything that reaches it and pays more than a round is worth.
+  liftPocketsOffPlates(fittedCfg, board);
   for (let i = 0; i < shape.diverter; i++) {
-    const y = b.fieldTop + (b.fieldBottom - b.fieldTop) * (0.3 + r.next() * 0.35);
-    const x = b.fieldLeft + 8 + r.next() * (b.fieldRight - b.fieldLeft - 16);
-    board.guides.push({ x1: x - 7, y1: y, x2: x + 7, y2: y + 4 });
+    const seg = plateSpot(fittedCfg, board, r);
+    if (!seg) continue;
+    // The plate goes down across a face that is already nailed, so it pulls
+    // the nails it would otherwise trap a ball against - the same nails the
+    // board would never have driven had the plate been there from the start.
+    clearNailsAlongPlate(fittedCfg, board, seg);
+    board.guides.push(seg);
   }
   return rebuild(board);
 }
@@ -285,10 +298,43 @@ function freeSpot(cfg, board, r, radius) {
       if (dx * dx + dy * dy < minSep * minSep) { ok = false; break; }
     }
     if (!ok) continue;
+    if (!clearOfPlates(cfg, board, x, y)) continue;
     for (const q of board.pockets) {
       if (Math.abs(x - q.x) < q.w * 0.5 + minSep && Math.abs(y - q.y) < q.h * 0.5 + minSep) { ok = false; break; }
     }
     if (ok) return { x, y };
+  }
+  return null;
+}
+
+/**
+ * Where an extra plate can be laid across the face.
+ *
+ * A plate is a roof: whatever is under it stops receiving balls. Laid over a
+ * mouth it shuts that mouth, and laid over the show screen it is a plate
+ * nobody can see, so both are kept out from under it. The lattice underneath
+ * is not a reason to reject a spot, because the nails in the way are pulled.
+ */
+function plateSpot(cfg, board, r) {
+  const b = cfg.board;
+  const half = 7, drop = 4;
+  const clear = plateClearance(cfg);
+  for (let tries = 0; tries < 40; tries++) {
+    const y = b.fieldTop + (b.fieldBottom - b.fieldTop) * (0.3 + r.next() * 0.35);
+    const x = b.fieldLeft + 8 + r.next() * (b.fieldRight - b.fieldLeft - 16);
+    const seg = { x1: x - half, y1: y, x2: x + half, y2: y + drop };
+    const roofs = (q) => {
+      for (let s = 0; s <= 14; s++) {
+        const px = seg.x1 + (seg.x2 - seg.x1) * (s / 14);
+        const py = seg.y1 + (seg.y2 - seg.y1) * (s / 14);
+        if (Math.abs(px - q.x) < q.w * 0.5 + clear && Math.abs(py - q.y) < q.h * 0.5 + clear) return true;
+      }
+      return false;
+    };
+    if (board.pockets.some(roofs)) continue;
+    if (b.reel && roofs(b.reel)) continue;
+    if (board.guides.some(g => Math.abs(g.y1 - seg.y1) < clear * 2)) continue;
+    return seg;
   }
   return null;
 }

@@ -18,7 +18,7 @@
 // to read it again.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=62';
+import { rng as makeRng } from './rng.js?v=63';
 
 export const POCKET_OUT = 'out';
 export const POCKET_PAY = 'pay';
@@ -100,7 +100,7 @@ function layOutNails(cfg, board, rng, layout) {
       if (dx * dx + dy * dy < minSep * minSep) return false;
     }
     for (const g of board.guides) {
-      if (pointToSegment(x, y, g) < furnitureClear + cfg.physics.ballRadius) return false;
+      if (pointToSegment(x, y, g) < plateClearance(cfg)) return false;
     }
     for (const q of board.pockets) {
       if (Math.abs(x - q.x) < q.w * 0.5 + furnitureClear &&
@@ -161,6 +161,45 @@ function layOutNails(cfg, board, rng, layout) {
     board.nails.push({ x0: nails[i], y0: nails[i + 1], r: nails[i + 2], bx: 0, by: 0, added: false });
   }
   board.bends = 0;
+}
+
+/**
+ * How close a nail head may stand to a plate.
+ *
+ * Nearer than this and the nail is a dam rather than a nail: a ball running
+ * down the plate cannot pass under the head and cannot climb over it, so it
+ * rattles between the two until it is written off. The face is nailed under
+ * this rule, and anything that lays a plate after the nails are driven has to
+ * hold to it as well, which is why the number lives here and not inside the
+ * one function that first needed it.
+ */
+export function plateClearance(cfg) {
+  return cfg.physics.ballRadius * 2 + cfg.board.pinRadius + 0.6;
+}
+
+/** Whether a nail head at (x,y) would stand clear of every plate on the face. */
+export function clearOfPlates(cfg, board, x, y) {
+  const clear = plateClearance(cfg);
+  for (const g of board.guides) {
+    if (pointToSegment(x, y, g) < clear) return false;
+  }
+  return true;
+}
+
+/**
+ * Pulls every nail a new plate would dam a ball against, and returns how many
+ * came out. A plate laid across the lattice is a plate laid across nails; the
+ * ones it would trap a ball against are pulled, exactly as they would never
+ * have been driven had the plate been there first.
+ */
+export function clearNailsAlongPlate(cfg, board, seg) {
+  const clear = plateClearance(cfg);
+  let pulled = 0;
+  for (let i = board.nails.length - 1; i >= 0; i--) {
+    const p = nailPos(board.nails[i]);
+    if (pointToSegment(p.x, p.y, seg) < clear) { board.nails.splice(i, 1); pulled++; }
+  }
+  return pulled;
 }
 
 /** Distance from a point to a segment. */
@@ -243,9 +282,10 @@ function layOutRails(cfg, board, layout) {
  * attacker's mouth. A pay mouth left on that run catches almost every ball
  * that reaches it - measured at 97 percent on one cabinet, which paid nearly
  * two balls for every one launched and made the gate pointless. Whether that
- * happens is decided by two numbers in a layout being close together, which is
- * far too easy to do by accident, so it is corrected here rather than trusted
- * to whoever writes the next cabinet.
+ * happens is decided by two numbers being close together, which is far too
+ * easy to do by accident, so it is corrected here rather than trusted to
+ * whoever writes the next cabinet or the next part. Anything that cuts a new
+ * mouth or moves a plate after the board is built calls this again.
  */
 /**
  * Where the extra reel windows open around the show screen, in multiples of
@@ -298,7 +338,7 @@ function liftPocketsOffScreen(cfg, board) {
   }
 }
 
-function liftPocketsOffPlates(cfg, board) {
+export function liftPocketsOffPlates(cfg, board) {
   const clear = cfg.physics.ballRadius * 2.6;
   for (const p of board.pockets) {
     if (p.kind !== POCKET_PAY) continue;

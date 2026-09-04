@@ -358,6 +358,15 @@ export const CONFIG = {
                           // thing a real machine does and a stuck ball never
                           // resolves on its own
     nudge: 7,
+    // A ball can be dammed rather than stopped: caught between a nail and a
+    // plate, bouncing hard the whole time and getting nowhere. It never reads
+    // as stopped because it never stops moving, so it is caught by where it is
+    // instead. Measured over 30,000 balls across every part in the catalogue,
+    // no ball that was actually playing stayed inside this circle longer than
+    // 1.2 seconds. A ball still inside it after this long is being held by the
+    // face, and is dropped past whatever is holding it.
+    cageRadius: 2.4,
+    cageTime: 2.5,
     maxAge: 22,           // seconds before a ball in flight is written off, so
                           // no fault in the field can hold a launch forever
     // The outer rail: the arc a launched ball rides up the right side and

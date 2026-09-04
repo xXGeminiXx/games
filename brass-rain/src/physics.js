@@ -17,7 +17,7 @@
 // possible at all.
 // ---------------------------------------------------------------------------
 
-import { pocketAt } from './board.js?v=62';
+import { pocketAt } from './board.js?v=63';
 
 export const RAIL = 0;
 export const FIELD = 1;
@@ -39,6 +39,13 @@ export function createBalls(cap) {
     age: new Float32Array(cap),
     hits: new Uint16Array(cap),
     stuck: new Uint16Array(cap),
+    // Where the ball was last seen making progress, and how long it has been
+    // inside a ball's-width of that spot. A ball rattling in one place is the
+    // one failure a face must never show, and it does not look like a ball
+    // that has stopped, so it is measured by ground covered rather than speed.
+    holdX: new Float32Array(cap),
+    holdY: new Float32Array(cap),
+    held: new Float32Array(cap),
     // What this ball is worth if it lands somewhere that pays. Fittings that
     // enrich a single ball write here rather than reaching into the payout.
     worth: new Float32Array(cap),
@@ -87,6 +94,9 @@ export function launch(cfg, balls, strength, jitter, worth, add, free) {
   balls.age[i] = 0;
   balls.hits[i] = 0;
   balls.stuck[i] = 0;
+  balls.holdX[i] = p.x;
+  balls.holdY[i] = p.y;
+  balls.held[i] = 0;
   balls.worth[i] = worth === undefined ? 1 : worth;
   balls.add[i] = add === undefined ? 0 : add;
   balls.free[i] = free ? 1 : 0;
@@ -105,6 +115,8 @@ export function retire(balls, i) {
     balls.railT[i] = balls.railT[last]; balls.age[i] = balls.age[last];
     balls.hits[i] = balls.hits[last]; balls.worth[i] = balls.worth[last];
     balls.stuck[i] = balls.stuck[last];
+    balls.holdX[i] = balls.holdX[last]; balls.holdY[i] = balls.holdY[last];
+    balls.held[i] = balls.held[last];
     balls.add[i] = balls.add[last]; balls.free[i] = balls.free[last];
   }
 }
@@ -269,6 +281,23 @@ export function stepPhysics(cfg, board, balls, dt, rand, out) {
       balls.stuck[i] = 0;
     }
 
+    // The other way a ball fails to resolve: dammed against a nail by a plate
+    // it cannot pass under, striking brass the whole time and covering no
+    // ground. Nothing above sees it, because at every instant it is moving.
+    // Measured by where it is instead, and dropped below whatever holds it.
+    const cageR = P.cageRadius === undefined ? 2.4 : P.cageRadius;
+    const cageT = P.cageTime === undefined ? 2.5 : P.cageTime;
+    const hx = x - balls.holdX[i], hy = y - balls.holdY[i];
+    if (hx * hx + hy * hy > cageR * cageR) {
+      balls.holdX[i] = x; balls.holdY[i] = y; balls.held[i] = 0;
+    } else if ((balls.held[i] += dt) > cageT) {
+      x += (rand() * 2 - 1) * 0.6;
+      y += cageR + br;
+      vx = 0; vy = P.nudge;
+      balls.holdX[i] = x; balls.holdY[i] = y; balls.held[i] = 0;
+      balls.stuck[i] = 0;
+    }
+
     balls.x[i] = x; balls.y[i] = y; balls.vx[i] = vx; balls.vy[i] = vy;
 
     // Pockets, then the out lane. A pocket is checked against the centre of
@@ -357,6 +386,10 @@ export function restoreBalls(balls, arr) {
     balls.age[i] = arr[k + 6]; balls.hits[i] = arr[k + 7]; balls.worth[i] = arr[k + 8];
     balls.add[i] = arr[k + 9]; balls.free[i] = arr[k + 10];
     balls.spin[i] = 0;
+    balls.stuck[i] = 0;
+    // A restored ball has not been watched yet, so it is watched from where it
+    // is found. Nothing about how it got there is worth keeping in a save.
+    balls.holdX[i] = balls.x[i]; balls.holdY[i] = balls.y[i]; balls.held[i] = 0;
   }
   return balls;
 }
