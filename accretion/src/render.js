@@ -241,7 +241,7 @@
 // CONFIG - every tunable, in one place, so the look can be argued with.
 // =============================================================================
 
-import { look as deathLook } from './deaths.js?v=1';
+import { look as deathLook } from './deaths.js?v=2';
 
 export const CONFIG = {
   // --- frame budget and quality -------------------------------------------

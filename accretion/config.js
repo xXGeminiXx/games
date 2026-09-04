@@ -52,16 +52,38 @@ export const CONFIG = {
 
     // The line along the bottom. It says the least it can and then stops: the
     // first prompt, one nudge to repeat it, and then silence.
-    promptFirst:  'click the void',
+    promptFirst:  'click anywhere',
     promptSecond: 'again',
     promptDone:   '',
 
-    // Shown when the field holds as much mass as a run may hold and a click
-    // can add nothing. It names the control that gets out of it rather than
-    // pointing at a place on the screen, because a direction goes stale the
-    // moment anything moves.
-    promptFull:   'the field is full. it holds all the mass one run can carry. start over for a new one.',
+    // Said once, the first time a run comes within reach of the most mass it
+    // can hold. There is no second line for the wall itself: the line that
+    // says what to do next names it, and names the way through it, which the
+    // one that used to sit here did not - it sent the player to start over
+    // while a row they could already afford was lit on the board.
     promptNearFull: 'the field is nearly full. what is here keeps working, but almost nothing more will fit.',
+
+    // THE LINE THAT SAYS WHAT TO DO NEXT, above the one that says what just
+    // happened. One of these is on screen the whole time, chosen by
+    // src/advice.js from the live figures and filled from them. The holes are
+    // named after what they hold: {name} and {cost} are a row on the board,
+    // {flux} is what is banked, {rate} is what the run earns a second, {eta}
+    // is how long the wait is, {kind} is what the field is straining to make.
+    advice: {
+      first:      'everything you put in the field pulls on everything else. what falls together grows, and growing pays data.',
+      meet:       'click again, near what\'s already there. two things that meet make one bigger thing, and that pays data.',
+      infallOff:  'nothing is falling in. drag the handle on the left to let matter arrive on its own.',
+      fullWanted: 'the field\'s full. it\'s straining to make {kind}: {name} costs {cost} and you have {flux}.',
+      fullBuy:    'the field\'s full. spend what you banked: {name} costs {cost} and you have {flux}.',
+      fullWait:   'the field\'s full and still earning {rate} data a second. {name} costs {cost}: about {eta}.',
+      fullStuck:  'the field\'s full and earning nothing. start over, bottom left, for an empty one. what you bought goes with it.',
+      wantedBuy:  'the field\'s straining to make {kind}. {name} costs {cost} and you have {flux}.',
+      wantedWait: 'the field\'s straining to make {kind}. {name} costs {cost}, you have {flux} at {rate} data a second: about {eta}.',
+      wantedClick: 'the field\'s straining to make {kind}, and {name} costs {cost}. nothing\'s earning, so click the field.',
+      buy:        'you can afford {name}, {cost} data. press it in the list on the left.',
+      wait:       '{name} costs {cost}. you have {flux} at {rate} data a second: about {eta}.',
+      click:      'nothing\'s earning. click the field - two things meeting pays, and growing into the next size up pays more.',
+    },
     // Starting over is not the ending: the ending keeps what was learned and
     // this throws it away, so the question has to say so.
     confirmAgain: 'Start over? This run and everything learned in it are thrown away.',
@@ -99,7 +121,7 @@ export const CONFIG = {
     // known from an earlier universe, the prefix on a node that is waiting on
     // another, and what is said when the board first appears and when an
     // era turns.
-    fluxLabel: 'flux',
+    fluxLabel: 'data',
     known: 'known',
     // Printed before the name of the thing a locked row is waiting on. It is a
     // requirement, not a running order, and the row still carries its price -
@@ -107,13 +129,13 @@ export const CONFIG = {
     // read differently.
     needs: 'needs ',
     // The first line a player gets about the currency and the list it buys.
-    boardAppears: 'what happens in the field earns flux. flux buys the research above.',
+    boardAppears: 'everything that happens in the field earns data. data buys the research above.',
     eraPrefix: 'the era of ',
 
     // THE ENDING. Said once, by the player's own hand.
     endingTitle: 'the universe closes',
     endingClass: 'it was',
-    endingSeeds: 'seeds',
+    endingSeeds: 'arrivals',
     endingMinutes: 'minutes',
     // A run shorter than a minute rounded to "0 minutes", which reads as a
     // fault rather than as a short run.
@@ -121,7 +143,7 @@ export const CONFIG = {
     endingStars: 'stars',
     endingDeaths: 'deaths',
     endingRemnants: 'left behind',
-    endingFlux: 'flux earned',
+    endingFlux: 'data gathered',
     endingAgain: 'begin again, keeping the research',
   },
 
@@ -525,8 +547,12 @@ export const CONFIG = {
     hudLeft: 30,        // px from the left edge; 30 matches the renderer's gutter
     hudTop: 74,         // px from the top; clears the renderer's own two lines
 
-    promptLeft: 30,     // the line along the bottom
-    promptBottom: 30,
+    // THE BOTTOM LEFT, from the floor up: the way out, then what just
+    // happened, then what to do next. The last of those is highest because it
+    // is the one a player reads first and reads most often.
+    promptLeft: 30,     // the line that says what just happened
+    promptBottom: 52,
+    adviceBottom: 74,   // the line that says what to do next, above it
   },
 
   // -------------------------------------------------------------------------
@@ -608,11 +634,16 @@ export const CONFIG = {
   // ground it sits on and the few figures laid over the top.
   // -------------------------------------------------------------------------
   palette: {
+    // MEASURED AGAINST THE GROUND, not chosen by eye. Every one of these is a
+    // contrast ratio against `void`, and the two dim ones used to sit at 3.5
+    // and 2.6 - under the 4.5 a small face needs, which put every sentence in
+    // the game below the line a person can comfortably read at ten pixels on a
+    // black field. The hues are unchanged; only the lightness moved.
     void:   '#04050a',   // the ground everything sits on
-    ink:    '#c8cede',   // body text
-    figure: '#e6ebf5',   // the one number that matters
-    label:  '#5d6579',   // what that number is called
-    quiet:  '#4a5164',   // the prompt along the bottom
+    ink:    '#c8cede',   // body text                       12.9 : 1
+    figure: '#e6ebf5',   // the one number that matters     17.0 : 1
+    label:  '#7e869c',   // what that number is called       5.6 : 1
+    quiet:  '#6d7893',   // the lines along the bottom       4.6 : 1
   },
 
   // -------------------------------------------------------------------------
@@ -759,11 +790,23 @@ export function applyIdentity(doc) {
   const label = byId('masslabel');
   if (label) label.textContent = CONFIG.text.massLabel;
 
+  // What the run banks, named. This key existed and nothing read it, so the
+  // word on screen was whatever the markup happened to say and renaming it
+  // here changed nothing at all.
+  const banked = byId('fluxlabel');
+  if (banked) banked.textContent = CONFIG.text.fluxLabel;
+
   const note = byId('note');
   if (note) {
     note.textContent = CONFIG.text.promptFirst;
     note.style.left = CONFIG.layout.promptLeft + 'px';
     note.style.bottom = CONFIG.layout.promptBottom + 'px';
+  }
+
+  const advice = byId('advice');
+  if (advice) {
+    advice.style.left = CONFIG.layout.promptLeft + 'px';
+    advice.style.bottom = CONFIG.layout.adviceBottom + 'px';
   }
 
   // The tab icon is drawn from the palette rather than shipped as a file, so a

@@ -217,7 +217,7 @@
  * `checksum()` hashes the raw bits of the live state for regression tests.
  */
 
-import * as Stellar from './stellar.js?v=1';
+import * as Stellar from './stellar.js?v=2';
 
 /* ========================================================================== *
  * SECTION 1 - CONSTANTS

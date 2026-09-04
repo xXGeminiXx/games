@@ -69,12 +69,12 @@ export const NODES = Object.freeze([
   { id: 'capture', era: 1, name: 'capture', cost: 1500, needs: 'differentiation',
     line: 'A world heavy enough holds on to gas. The field can make gas giants.',
     does: { unlock: K.GAS_GIANT } },
-  { id: 'infall', era: 1, name: 'infall', cost: 600, needs: 'pressure',
-    line: 'Loose matter falls in on its own, at a rate you set.',
-    does: { law: 'infall', dial: { key: 'infall', label: 'infall rate', min: 0, max: 1, def: 0.5,
-                                   line: 'matter falls in without a click' } } },
+  { id: 'infall', era: 1, name: 'arrivals', cost: 600, needs: 'pressure',
+    line: 'Matter falls in on its own, with no click from you.',
+    does: { law: 'infall', dial: { key: 'infall', label: 'how much arrives', min: 0, max: 1, def: 1,
+                                   line: 'how much falls in each second; it starts at full' } } },
   { id: 'worlds', era: 1, name: 'worlds', cost: 4000, needs: 'capture',
-    line: 'Ends this era. A new list of research takes over. Infall stays.',
+    line: 'Ends this era. A new list of research takes over. Arrivals stay.',
     does: { capstone: true } },
 
   // --- stars ---------------------------------------------------------------
@@ -85,9 +85,9 @@ export const NODES = Object.freeze([
     line: 'Hydrogen ignites. The field can make stars.',
     does: { unlock: K.STAR } },
   { id: 'orbit', era: 2, name: 'orbit', cost: 8000, needs: 'deuterium',
-    line: 'What falls in arrives with sideways motion, and makes systems instead of piles.',
-    does: { law: 'orbit', dial: { key: 'orbit', label: 'orbital speed', min: 0, max: 1, def: 0.8,
-                                  line: 'sideways motion; 100% is a circular orbit' } } },
+    line: 'What falls in arrives moving sideways, so it circles instead of piling up.',
+    does: { law: 'orbit', dial: { key: 'orbit', label: 'how fast it circles', min: 0, max: 1, def: 0.8,
+                                  line: 'how much sideways speed; 100% is a circle that never falls in' } } },
   { id: 'spectroscopy', era: 2, name: 'spectroscopy', cost: 5000, needs: 'fusion',
     line: 'The heaviest star is named: its class, its mass, how long it has left.',
     does: { hud: 'spectroscopy' } },
@@ -108,30 +108,30 @@ export const NODES = Object.freeze([
   { id: 'degeneracy', era: 3, name: 'degeneracy', cost: 180000, needs: 'helium',
     line: 'What\'s left keeps shining. White dwarfs and neutron stars begin to pay.',
     does: { shines: 'remnant', x: 1 } },
-  { id: 'cycle', era: 3, name: 'the stellar cycle', cost: 360000, needs: 'nucleosynthesis',
-    line: 'Thrown gas gathers again sooner, at a pace you set.',
-    does: { law: 'cycle', dial: { key: 'cycle', label: 'cooling time', min: 0, max: 1, def: 0.5,
-                                  line: 'how long thrown gas takes to gather' } } },
+  { id: 'cycle', era: 3, name: 'cooling', cost: 360000, needs: 'nucleosynthesis',
+    line: 'Gas thrown off a dying star cools faster, so it gathers into a new star sooner.',
+    does: { law: 'cycle', dial: { key: 'cycle', label: 'how long gas cools', min: 0, max: 1, def: 1,
+                                  line: 'how long thrown gas takes to gather; it starts at the quickest' } } },
   { id: 'disc', era: 3, name: 'accretion disc', cost: 480000, needs: 'degeneracy',
     line: 'A black hole that feeds outshines a galaxy. Black holes begin to pay.',
     does: { shines: 'hole', x: 1 } },
   { id: 'horizon', era: 3, name: 'the event horizon', cost: 1200000, needs: 'disc',
-    line: 'Ends this era. A new list of research takes over. The stellar cycle stays.',
+    line: 'Ends this era. A new list of research takes over. Cooling stays.',
     does: { capstone: true } },
 
   // --- the cosmos ----------------------------------------------------------
   { id: 'formation', era: 4, name: 'star formation', cost: 1500000, needs: null,
-    line: 'Infall arrives as whole clouds, and the clouds make stars.',
+    line: 'What falls in arrives as whole clouds, and the clouds make stars.',
     does: { law: 'formation', dial: { key: 'formation', label: 'cloud size', min: 0, max: 1, def: 0.5,
-                                      line: 'the size of each cloud that arrives' } } },
+                                      line: 'how many pieces each cloud arrives in; the same matter either way' } } },
   { id: 'clusters', era: 4, name: 'clusters', cost: 3000000, needs: 'formation',
-    line: 'Too many to draw: the field merges what it can\'t show one by one. Condensation pays.',
+    line: 'Too many to draw: the field gathers what it can\'t show one by one, and each gathering pays.',
     does: { pays: 'condense', x: 1 } },
   { id: 'galaxies', era: 4, name: 'galaxies', cost: 6000000, needs: 'clusters',
     line: 'A million stars in one point of light. Everything pays double.',
     does: { pays: 'all', x: 2 } },
   { id: 'web', era: 4, name: 'the web', cost: 12000000, needs: 'galaxies',
-    line: 'Structure at every scale. Everything pays double again.',
+    line: 'Clusters of clusters, all the way up. Everything pays double again.',
     does: { pays: 'all', x: 2 } },
   { id: 'universe', era: 4, name: 'universe', cost: 25000000, needs: 'web',
     line: 'Nothing larger can be made. All that is left is to close it.',
@@ -192,6 +192,7 @@ export function createResearch(known = []) {
     wanted: [],      // kinds the field has earned but may not take
     closed: false,
     counts: {},
+    paid: 0,         // flux paid by events since the last tick, for the rate
   };
 }
 
@@ -286,6 +287,14 @@ export function want(s, kind) {
   if (s.wanted.indexOf(kind) < 0) s.wanted.push(kind);
 }
 
+/**
+ * HOW LONG THE REPORTED RATE REMEMBERS, in seconds. Event income arrives in
+ * lumps - a merge here, a death there - so the instantaneous figure swings
+ * between nothing and hundreds and tells a player nothing at all. This is the
+ * time constant that turns those lumps into a number worth printing.
+ */
+const RATE_MEMORY = 3;
+
 function pay(s, amount, cls) {
   // A class the field has not learned to be paid for yet sits at 0, and that
   // zero has to survive: `||` would read it as missing and hand back 1, which
@@ -295,6 +304,7 @@ function pay(s, amount, cls) {
   const v = amount * m;
   s.flux += v;
   s.earned += v;
+  s.paid += v;
   return v;
 }
 
@@ -336,16 +346,28 @@ export function onEvent(s, ev) {
  * Returns the flux paid this tick.
  */
 export function tick(s, dt, census) {
-  if (s.closed || !(dt > 0)) { s.rate = 0; return 0; }
+  if (s.closed || !(dt > 0)) { s.rate = 0; s.paid = 0; return 0; }
   const per =
     PAY.starPerSecond * (census.starLum || 0) * (s.mult.star || 1) +
     PAY.giantPerSecond * (census.giants || 0) * (s.mult.giant || 1) +
     PAY.remnantPerSecond * (census.remnants || 0) * (s.mult.remnant || 0) +
     PAY.holePerSecond * (census.holes || 0) * (s.mult.hole || 0);
-  const rate = per * (s.mult.all || 1);
-  s.rate = rate;
-  if (rate <= 0) return 0;
-  const v = rate * dt;
+  const shine = per * (s.mult.all || 1);
+
+  // WHAT THE RATE REPORTS. It used to be `shine` alone, which is the income
+  // from things that are lit - and there is none of that until a star exists,
+  // which is the whole of the first two eras. Measured on a real save: 20,284
+  // flux earned over eight minutes, every last unit of it from merges and
+  // promotions, with the rate reading empty the entire time. Everything the
+  // field pays is counted here now, smoothed, so the figure a player is asked
+  // to plan against is the one they are actually earning.
+  const events = s.paid / dt;
+  s.paid = 0;
+  const k = 1 - Math.exp(-dt / RATE_MEMORY);
+  s.rate += (shine + events - s.rate) * k;
+
+  if (shine <= 0) return 0;
+  const v = shine * dt;
   s.flux += v;
   s.earned += v;
   return v;

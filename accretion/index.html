@@ -7,7 +7,7 @@
 <style>
   /* Colours arrive from config.js as custom properties; the values here are
      only what the page shows before that file has run. */
-  :root{--void:#04050a; --ink:#c8cede; --figure:#e6ebf5; --label:#5d6579; --quiet:#4a5164}
+  :root{--void:#04050a; --ink:#c8cede; --figure:#e6ebf5; --label:#7e869c; --quiet:#6d7893}
   html,body{height:100%;margin:0;background:var(--void);overflow:hidden}
   body{
     font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -30,30 +30,61 @@
   #hud #starrow{margin-top:10px}
   #hud #starrow b{font-size:16px;display:inline-block;margin-right:8px}
   #hud #starrow[hidden]{display:none}
+  /* THE BOTTOM LEFT, in the order a player needs it: what to do next, then
+     what just happened, then the way out. Starting over sat at the top of that
+     stack on a first load, where it was the brightest thing on an empty screen
+     and the only control a new player could see. */
+  #advice{
+    position:fixed; left:30px; bottom:74px; color:var(--ink); font-size:12px;
+    line-height:1.5; max-width:min(64ch, calc(100vw - 60px));
+    pointer-events:none;
+  }
   #note{
-    position:fixed; left:30px; bottom:30px; color:var(--quiet); font-size:11px;
+    position:fixed; left:30px; bottom:52px; color:var(--quiet); font-size:11px;
     pointer-events:none;
   }
   /* A run that fills its field cannot be clicked any further, and every other
      way out of it was a console command. This is the way out, kept as quiet as
-     the prompt above it so it is there without asking to be pressed. */
+     the lines above it so it is there without asking to be pressed. */
   #again{
-    position:fixed; left:30px; bottom:52px;
+    position:fixed; left:30px; bottom:30px;
     background:none; border:0; padding:0;
     color:var(--label); font:inherit; font-size:10px;
     text-transform:uppercase; letter-spacing:.11em; cursor:pointer;
   }
   #again:hover, #again:focus-visible{color:var(--figure); outline:none}
-  /* The research window: at most six rows, in the same gutter as the mass. */
-  #board{position:fixed; left:30px; top:178px; width:280px; font-size:11px; line-height:1.35}
-  #board #era{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--label);margin-bottom:8px}
-  #board .node,#board .law{padding:5px 8px 6px;margin:0 0 4px -8px;border-left:1px solid transparent;opacity:.55}
-  #board .node.can{opacity:1;cursor:pointer;border-left-color:var(--label)}
-  #board .node.can:hover{background:rgba(200,206,222,.06)}
+  /* The research window: at most six rows, in the same gutter as the mass.
+
+     STATE IS CARRIED BY COLOUR RATHER THAN BY OPACITY. Fading a row fades its
+     description with it, and at .3 over this ground a ten pixel line lands at
+     a contrast of 2.0 - present on screen and unreadable. A row now keeps its
+     full weight and says what it is by which colour its name takes.
+
+     AND IT IS BOUNDED. The window is six rows plus every law the run has
+     collected, which by the fourth era is nine or ten blocks: measured at
+     578 px, against 412 px of room in a 700 px window. The last handle sat
+     52 px below the bottom edge and no hand could reach it, and at 800 px it
+     sat underneath all three lines along the bottom. It stops short of them
+     now and scrolls. */
+  #board{
+    position:fixed; left:30px; top:178px; width:280px; font-size:11px; line-height:1.35;
+    max-height:calc(100vh - 300px); overflow-y:auto; overscroll-behavior:contain;
+    padding-right:6px; scrollbar-width:thin; scrollbar-color:var(--label) transparent;
+  }
+  /* The era's name holds the top of the column while the rest of it scrolls
+     under, so a scrolled window opens on a heading rather than on a sentence
+     cut through the middle. */
+  #board #era{
+    position:sticky; top:0; z-index:1; background:var(--void);
+    font-size:10px; text-transform:uppercase; letter-spacing:.11em; color:var(--label);
+    padding:2px 0 6px; margin-bottom:2px;
+  }
+  #board .node,#board .law{padding:5px 8px 6px;margin:0 0 4px -8px;border-left:1px solid transparent}
+  #board .node.can{cursor:pointer;border-left-color:var(--label)}
+  #board .node.can .name,#board .node.can .cost{color:var(--figure)}
+  #board .node.can:hover{background:rgba(200,206,222,.08)}
   #board .node.wanted{border-left-color:var(--figure)}
-  #board .node.wanted .name{color:var(--figure)}
-  #board .node.shut{opacity:.3}
-  #board .law{opacity:.85}
+  #board .node.shut .name{color:var(--label)}
   #board .head{display:flex;justify-content:space-between;gap:12px}
   #board .name{color:var(--ink)}
   #board .cost{color:var(--label);font-variant-numeric:tabular-nums}
@@ -210,7 +241,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="3a508637b306">
+<meta name="build" content="3f6f981ba50d">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -257,12 +288,13 @@
 </head>
 <body>
 <canvas id="v"></canvas>
-<div id="hud"><b id="mass">0</b><span id="masslabel">bound mass</span>
-  <div id="fluxrow"><b id="flux">0</b><span id="fluxlabel">flux</span><i id="fluxrate"></i></div>
+<div id="hud"><b id="mass">0</b><span id="masslabel">total mass</span>
+  <div id="fluxrow"><b id="flux">0</b><span id="fluxlabel">data</span><i id="fluxrate"></i></div>
   <div id="starrow" hidden><b id="star"></b><span id="starlabel"></span></div></div>
 <div id="board"><div id="era"></div><div id="nodes"></div><div id="laws"></div></div>
 <div id="ending"></div>
-<div id="note">click the void</div>
+<div id="advice"></div>
+<div id="note">click anywhere</div>
 <button id="again" type="button">start over</button>
 
 <script type="module">
@@ -278,11 +310,11 @@
 // the view can draw, and names things the first time they happen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=1';
-import { createSim, restoreSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=1';
-import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=1';
-import * as Stellar from './src/stellar.js?v=1';
-import { createGame } from './src/game.js?v=1';
+import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=2';
+import { createSim, restoreSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=2';
+import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=2';
+import * as Stellar from './src/stellar.js?v=2';
+import { createGame } from './src/game.js?v=2';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
@@ -447,7 +479,10 @@ function seedWorld(wx, wy, opts) {
   // against an exponential ladder.
   const st = sim.stats ? sim.stats() : null;
   const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
-  if (held >= seed.massCeiling) { say(CONFIG.text.promptFull, CONFIG.text.captionSeconds); return; }
+  // The wall. Nothing is said here: the line that says what to do next names
+  // the wall and the way through it in one sentence, and a second line
+  // repeating the first half of that was on screen for the rest of the run.
+  if (held >= seed.massCeiling) return;
   // Said once, the first time a run comes within reach of its ceiling. The
   // field keeps taking clicks after this; the line only exists so the wall is
   // not the first anyone hears of it.

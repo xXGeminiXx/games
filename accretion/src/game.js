@@ -13,9 +13,10 @@
  * that a player reads more than once.
  */
 
-import * as R from './research.js?v=1';
-import * as Stellar from './stellar.js?v=1';
-import * as Rebirth from './rebirth.js?v=1';
+import * as R from './research.js?v=2';
+import * as Advice from './advice.js?v=2';
+import * as Stellar from './stellar.js?v=2';
+import * as Rebirth from './rebirth.js?v=2';
 
 const SAVE_VERSION = 2;
 
@@ -44,7 +45,11 @@ export function createGame(o) {
   let rebirth = Rebirth.createState();
   let infallDebt = 0;
   let lastSave = 0;
-  let lastHud = 0;
+  // The readout and the line that says what to do next are drawn on the FIRST
+  // frame, then at the usual cadence. Starting this at zero left both blank
+  // for the first fifth of a second, which is the fifth of a second a player
+  // spends deciding whether anything is there.
+  let lastHud = -Infinity;
   let boardDirty = true;
   let seeds = 0;             // every seed that ever landed, clicked or fallen
   let elapsed = 0;           // seconds of play this universe
@@ -53,15 +58,12 @@ export function createGame(o) {
   const el = (id) => (doc && typeof doc.getElementById === 'function' ? doc.getElementById(id) : null);
   const fluxEl = el('flux'), rateEl = el('fluxrate'), eraEl = el('era'), nodesEl = el('nodes'), lawsEl = el('laws');
   const starRow = el('starrow'), starEl = el('star'), starLabel = el('starlabel');
-  const endingEl = el('ending'), boardEl = el('board');
+  const endingEl = el('ending'), boardEl = el('board'), adviceEl = el('advice');
 
-  function fmt(n) {
-    if (!Number.isFinite(n)) return '0';
-    if (n < 1000) return String(Math.floor(n));
-    if (n < 1e6) return (n / 1e3).toFixed(n < 1e4 ? 2 : 1) + 'k';
-    if (n < 1e9) return (n / 1e6).toFixed(2) + 'M';
-    return n.toExponential(2);
-  }
+  // One formatter for every figure a player reads, shared with the line that
+  // says what to do next, so a price on the board and the same price in a
+  // sentence can never be written two different ways.
+  const fmt = Advice.figure;
 
   /* ---------------------------------------------------------------------- *
    * Applying what a node does
@@ -336,10 +338,51 @@ export function createGame(o) {
     }
   }
 
+  /**
+   * THE LINE THAT SAYS WHAT TO DO NEXT.
+   *
+   * Everything else on the page answers a question a player has not asked yet:
+   * what the field weighs, what each row does, what just happened. None of it
+   * says which of the six rows to press, or that the run is at a wall, or how
+   * long the wait is. This does, from the live figures, every time they move.
+   *
+   * The reading handed over is deliberately plain - names and numbers, no
+   * simulation objects - so the ranking can be tested without a field.
+   */
+  function renderAdvice(stats) {
+    if (!adviceEl) return;
+    const seed = CONFIG.seeding;
+    const held = stats && stats.totalMass ? stats.totalMass.m * Math.pow(10, stats.totalMass.e) : 0;
+
+    // A law that is held with its handle at zero does nothing, and the handle
+    // is a long way from the empty field it explains.
+    let idleLaw = '';
+    for (const id of research.laws) if (!(R.dial(research, id) > 0)) { idleLaw = id; break; }
+
+    const rows = R.board(research).map(row => ({
+      id: row.node.id,
+      name: row.node.name,
+      cost: row.cost,
+      open: row.open,
+      affordable: row.affordable,
+      unlocks: row.node.does.unlock !== undefined ? KIND_NAME[row.node.does.unlock] : '',
+    }));
+
+    const said = Advice.advise({
+      seeds, era: research.era, flux: research.flux, rate: research.rate,
+      full: held >= seed.massCeiling, closed: !!closing || research.closed,
+      idleLaw, rows,
+      wanting: research.wanted.map(k => KIND_NAME[k]).filter(Boolean),
+    });
+
+    const lines = (T.advice || {});
+    adviceEl.textContent = said ? Advice.fill(lines[said.key] || '', said.values) : '';
+  }
+
   function renderFlux() {
     if (fluxEl) fluxEl.textContent = fmt(research.flux);
     renderStar();
-    if (rateEl) rateEl.textContent = research.rate > 0.005 ? '+' + (research.rate < 10 ? research.rate.toFixed(1) : fmt(research.rate)) + '/s' : '';
+    if (rateEl) rateEl.textContent = research.rate > 0.05 ? '+' + Advice.rateFigure(research.rate) + '/s' : '';
     // Affordability changes as flux climbs; re-render the board when a row
     // crosses its price rather than every frame.
     if (nodesEl && nodesEl.children) {
@@ -397,9 +440,9 @@ export function createGame(o) {
       const c = research.counts;
       const lines = [
         (T.endingClass || 'it was') + ' ' + closing.name,
-        `${fmt(seeds)} ${T.endingSeeds || 'seeds'}, ${spanOfPlay()}`,
+        `${fmt(seeds)} ${T.endingSeeds || 'arrivals'}, ${spanOfPlay()}`,
         `${fmt((c.ignite || 0) + (c.second || 0))} ${T.endingStars || 'stars'}, ${fmt((c.nebula || 0) + (c.supernova || 0) + (c.collapse || 0) + (c.detonation || 0))} ${T.endingDeaths || 'deaths'}, ${fmt(c.remnant || 0)} ${T.endingRemnants || 'left behind'}`,
-        `${fmt(research.earned)} ${T.endingFlux || 'flux earned'}`,
+        `${fmt(research.earned)} ${T.endingFlux || 'data gathered'}`,
       ];
       for (const l of lines) endingEl.appendChild(make('div', 'line', l));
       const again = make('div', 'again', T.endingAgain || 'begin again, keeping the research');
@@ -439,7 +482,7 @@ export function createGame(o) {
       R.tick(research, dt, takeCensus(getSim().getRenderView()));
       runInfall(dt, stats);
     }
-    if (now - lastHud >= G.hudEveryMs) { lastHud = now; renderFlux(); if (boardDirty) renderBoard(); }
+    if (now - lastHud >= G.hudEveryMs) { lastHud = now; renderFlux(); renderAdvice(stats); if (boardDirty) renderBoard(); }
     if (now - lastSave >= G.saveEverySeconds * 1000) { lastSave = now; save(false); }
   }
 
@@ -504,6 +547,7 @@ export function createGame(o) {
     orbitShare,
     onEvent, tick, buy, renderBoard, renderFlux,
     record, save, load, adopt, forget, newRun,
+    renderAdvice,
     board: () => R.board(research),
   };
 }
