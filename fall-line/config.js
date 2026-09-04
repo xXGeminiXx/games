@@ -54,6 +54,9 @@ export const CONFIG = {
     upgrade:   'Upgrade',
     sell:      'Sell',
     helpButton:'Help',
+    startButton:'Start',
+    moreButton:'The rest of the rules',
+    closeButton:'Close',
     newRun:    'New run',
     newRunSure:'Start a new run? This run ends now.',
     export:    'Export',
@@ -65,7 +68,17 @@ export const CONFIG = {
     topTier:   'Top tier',
     boosted:   'boosted',
     nothing:   'No tower selected. Click one on the field to see what it does.',
-    firstLine: 'Ore builds towers and moves the ground. Raise ground in the road and the Melt takes longer to reach you.',
+    // The line above the field when the pointer is off it: one move, named,
+    // with the figures it will actually cost and pay right now.
+    compass: {
+      first:    'First move: pick {name} in the tray, then click a cell the dashed road runs through. It costs {cost} ore and you have {ore}.',
+      reach:    'Nothing you built reaches the dashed road. Sell one for its ore back and set it down on the dashes.',
+      buy:      '{ore} ore in hand. Another {name} standing on the road costs {cost}.',
+      upgrade:  '{ore} ore in hand. Taking that {name} up to tier {t} costs {cost}.',
+      sculpt:   '{ore} ore in hand. The cheapest lift on the road is {cost} ore, and every level the Melt climbs costs it time.',
+      earn:     '{ore} ore. Every kill pays {kill}, and holding surge {n} with nothing through pays {bonus}.',
+      hurt:     'Hearth at {hp} of {max}. It takes {regen} back at the end of every surge, so a surge you hold is ground won back.',
+    },
 
     // The ground panel and the sentences that say why a cell will not move.
     earthNote: 'Raise ground in the road and the Melt has to climb it, which is slow. Raise {raise}+ ore a level, lower {cut} ore.',
@@ -146,6 +159,15 @@ export const CONFIG = {
       loaded:   'Resumed on surge {n}.',
       saveBad:  'The old save couldn\'t be read and was set aside.',
     },
+
+    // What a player reads before the first click. Short on purpose: the rest
+    // of the rules are one button away and the run is held until Start.
+    opening: [
+      'The Melt runs down off the snow every surge and takes the fastest way to your hearth. Hold it off.',
+      'There is no track and no wall. It climbs anything, and climbing is slow, so a longer road is a road that kills more.',
+      'Your first minute: put two Bolts on the dashed road, then raise a cell or two of the road so the Melt has to climb over.',
+      'Nothing moves while this is open. Press Start when you are ready, and Help at the top brings it back.',
+    ],
 
     help: [
       'The Melt comes down off the snowline every surge and flows the fastest way to your hearth.',
@@ -385,8 +407,22 @@ export const CONFIG = {
     snow: '#f3f5f6',
     hearthTop: '#5a3a2e',
     ember: '#d9482b',
-    fallLine: '#2c6ca6',
-    fallLineAlpha: 0.7,
+    // The road is the one thing the whole game turns on, so it is drawn as a
+    // route on a survey sheet: a pale casing cleared through the ground under
+    // it, then the dashes over that. Blue on green alone is a difference of
+    // hue with almost none of lightness, which is no line at all on a dim
+    // screen or to an eye that mixes the two.
+    fallLine: '#123f6b',
+    fallLineAlpha: 1,
+    fallLineWidth: 2,
+    fallLineCasing: '#f2ead9',
+    fallLineCasingAlpha: 0.78,
+    fallLineCasingWidth: 3.2,
+    // The snowline and the hearth are lettered on the sheet, the way a survey
+    // names the features it draws.
+    label: '#8c5a1c',
+    labelHalo: '#f4eee0',
+    labelSize: 11,
     work: '#e3a63a',
     workInk: '#2a2620',
     workTick: '#7a4b16',
@@ -449,7 +485,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 9,
+    build: 10,
   },
 };
 

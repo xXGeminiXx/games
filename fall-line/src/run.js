@@ -7,18 +7,18 @@
 // calls the actions.
 // ---------------------------------------------------------------------------
 
-import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=9';
-import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=9';
-import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=9';
-import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=9';
-import { stepWorks } from './works.js?v=9';
-import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=9';
-import { clearBonus, callBonus } from './economy.js?v=9';
-import { checkAwards, awardDef } from './awards.js?v=9';
-import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=9';
-import { stream, hash } from './rng.js?v=9';
-import { idsOf } from './traits.js?v=9';
-import { fill } from '../config.js?v=9';
+import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=10';
+import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=10';
+import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=10';
+import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt } from './works.js?v=10';
+import { stepWorks } from './works.js?v=10';
+import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=10';
+import { clearBonus, callBonus } from './economy.js?v=10';
+import { checkAwards, awardDef } from './awards.js?v=10';
+import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=10';
+import { stream, hash } from './rng.js?v=10';
+import { idsOf } from './traits.js?v=10';
+import { fill } from '../config.js?v=10';
 
 const LOG_KEEP = 40;
 
@@ -420,11 +420,16 @@ export function newRun(state, seed) {
 export function summary(state) {
   const { cfg, stats } = state;
   const s = cfg.text.summary;
-  return [
+  const lines = [
     fill(s.reached, { surge: cfg.text.surge, n: state.surge }),
     fill(s.tally, {
       held: stats.surgesHeld, kills: stats.kills, motes: cfg.text.motes, ore: Math.round(stats.oreEarned),
     }),
-    fill(s.best, { best: state.meta.bestReached }),
   ];
+  // The best run is only worth naming once there is an earlier one to beat.
+  // A first run that ended on surge one used to be told its best was surge
+  // zero, which is a number no run can reach.
+  const best = Math.max(state.meta.bestReached, state.surge);
+  if (best > state.surge) lines.push(fill(s.best, { best }));
+  return lines;
 }

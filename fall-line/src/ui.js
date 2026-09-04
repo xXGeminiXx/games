@@ -7,10 +7,10 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=9';
-import { format } from './economy.js?v=9';
-import { kindDef, costOf } from './works.js?v=9';
-import { idsOf } from './traits.js?v=9';
+import { fill } from '../config.js?v=10';
+import { format, clearBonus, raiseCost } from './economy.js?v=10';
+import { kindDef, costOf } from './works.js?v=10';
+import { idsOf } from './traits.js?v=10';
 
 const LOG_SHOWN = 8;
 
@@ -19,7 +19,7 @@ export function createUi(cfg, doc, win, api) {
   const el = {};
   for (const id of ['ore', 'hearth', 'surge', 'best', 'speed', 'pause', 'call', 'hint', 'build', 'raise', 'cut',
     'earthcost', 'selinfo', 'upgrade', 'sell', 'forecast', 'log', 'awards', 'help', 'newrun', 'export', 'import',
-    'helpbox', 'helptitle', 'helplines', 'helpclose', 'overbox', 'overtitle', 'overtext', 'overnew']) {
+    'helpbox', 'helptitle', 'helplines', 'helpclose', 'helpmore', 'overbox', 'overtitle', 'overtext', 'overnew']) {
     el[id] = doc.getElementById(id);
   }
   const last = new Map();
@@ -79,8 +79,6 @@ export function createUi(cfg, doc, win, api) {
 
   if (el.call && t.callHint) el.call.title = t.callHint;
 
-  clear(el.helplines);
-  if (el.helplines) for (const line of t.help) el.helplines.appendChild(make('p', '', line));
   put(el.helptitle, cfg.identity.name);
   put(el.overtitle, t.over);
 
@@ -92,6 +90,10 @@ export function createUi(cfg, doc, win, api) {
   if (el.call) el.call.addEventListener('click', () => api.callSurge());
   if (el.help) el.help.addEventListener('click', () => showHelp(true));
   if (el.helpclose) el.helpclose.addEventListener('click', () => showHelp(false));
+  if (el.helpmore) el.helpmore.addEventListener('click', () => writeHelp(false));
+  // A sheet with the field showing all round it invites a click beside it, and
+  // a click that does nothing reads as a page that has stopped working.
+  if (el.helpbox) el.helpbox.addEventListener('click', (ev) => { if (ev.target === el.helpbox) showHelp(false); });
   if (el.newrun) el.newrun.addEventListener('click', () => {
     if (win.confirm ? win.confirm(t.newRunSure) : true) api.newRun();
   });
@@ -108,10 +110,31 @@ export function createUi(cfg, doc, win, api) {
   let helpOpen = false;
   if (el.helpbox) el.helpbox.hidden = true;
   if (el.overbox) el.overbox.hidden = true;
-  function showHelp(on) {
-    helpOpen = !!on;
-    if (el.helpbox) el.helpbox.hidden = !helpOpen;
+
+  /**
+   * Fill the sheet. A player opening the game for the first time gets four
+   * lines and a button, because a wall of rules in front of a field nobody has
+   * seen yet is read by nobody; every other opening gets the whole thing. The
+   * rest of the rules are one press away either way.
+   */
+  function writeHelp(opening) {
+    clear(el.helplines);
+    const lines = opening ? t.opening : t.help;
+    if (el.helplines) for (const line of lines) el.helplines.appendChild(make('p', opening ? 'ink' : '', line));
+    setClass(el.helpbox, 'full', !opening);
+    put(el.helpclose, opening ? t.startButton : t.closeButton);
+    if (el.helpmore) el.helpmore.hidden = !opening;
   }
+
+  function showHelp(on, opening) {
+    helpOpen = !!on;
+    if (helpOpen) writeHelp(!!opening);
+    if (el.helpbox) el.helpbox.hidden = !helpOpen;
+    // Nothing attacks a player who is reading. The run is held while the sheet
+    // is up and let go the moment it closes.
+    if (api.holdRun) api.holdRun(helpOpen);
+  }
+  writeHelp(false);
 
   // ---- per-frame ----------------------------------------------------------
 
@@ -298,9 +321,91 @@ export function createUi(cfg, doc, win, api) {
     return type === 'raise' ? t.earthTop : t.earthLow;
   }
 
+  /**
+   * Every cell the Melt may walk: the road it will take plus every branch off
+   * the other starts. Rebuilt only when the ground or the road changed.
+   */
+  let roadKey = '';
+  let roadSet = new Set();
+  function roadCells(state) {
+    const key = state.flowVersion + '|' + (state.fallLine ? state.fallLine.length : 0);
+    if (key === roadKey) return roadSet;
+    roadKey = key;
+    roadSet = new Set(state.fallLine || []);
+    for (const branch of (state.fallLines || [])) for (const i of branch) roadSet.add(i);
+    return roadSet;
+  }
+
+  /** Whether anything standing can reach any cell of that road. */
+  let coverKey = '';
+  let coverAns = true;
+  function coversRoad(state) {
+    const list = state.works.list;
+    const road = roadCells(state);
+    const key = roadKey + '|' + list.length + '|' + list.reduce((a, w) => a + w.tier, 0);
+    if (key === coverKey) return coverAns;
+    coverKey = key;
+    coverAns = false;
+    const W = state.terrain.W;
+    for (const w of list) {
+      const reach = api.workStats(w);
+      const r = (reach.range || reach.aura || 0);
+      if (r <= 0) continue;
+      for (const i of road) {
+        const dx = (i % W) + 0.5 - w.x;
+        const dy = Math.floor(i / W) + 0.5 - w.y;
+        if (dx * dx + dy * dy <= r * r) { coverAns = true; return coverAns; }
+      }
+    }
+    return coverAns;
+  }
+
+  /**
+   * One line naming the move worth making right now, with the figures it will
+   * cost and pay at this moment. A player who says they do not follow the game
+   * is not asking for more rules; they are asking what to press.
+   */
+  function compassLine(state) {
+    const c = t.compass;
+    const ore = Math.floor(state.ore);
+    const cap = cfg.hearth.hp;
+    const hp = Math.max(0, Math.ceil(state.hearthHp));
+    if (hp < cap * 0.5) return fill(c.hurt, { hp, max: cap, regen: cfg.hearth.regenPerSurge });
+
+    const open = cfg.works.kinds.filter(d => api.isUnlocked(d.id));
+    let cheap = null;
+    for (const d of open) if (!cheap || costOf(cfg, d, 1) < costOf(cfg, cheap, 1)) cheap = d;
+    const cheapCost = cheap ? Math.ceil(costOf(cfg, cheap, 1)) : 0;
+
+    const list = state.works.list;
+    if (cheap && !list.length) return fill(c.first, { name: cheap.name, cost: cheapCost, ore });
+    if (list.length && !coversRoad(state)) return c.reach;
+    if (cheap && ore >= cheapCost) return fill(c.buy, { ore, name: cheap.name, cost: cheapCost });
+
+    let up = null;
+    for (const w of list) {
+      if (w.tier >= cfg.works.maxTier) continue;
+      const def = kindDef(cfg, w.kind);
+      const price = Math.ceil(costOf(cfg, def, w.tier + 1));
+      if (!up || price < up.cost) up = { cost: price, name: def.name, tier: w.tier + 1 };
+    }
+    if (up && ore >= up.cost) return fill(c.upgrade, { ore, name: up.name, t: up.tier, cost: up.cost });
+
+    let lift = Infinity;
+    for (const i of roadCells(state)) {
+      if (state.terrain.kind[i] !== 0) continue;
+      if (state.terrain.h[i] >= cfg.terrain.maxHeight) continue;
+      const price = raiseCost(cfg, state.terrain.h[i]);
+      if (price < lift) lift = price;
+    }
+    if (Number.isFinite(lift) && ore >= lift) return fill(c.sculpt, { ore, cost: fmt1(lift) });
+
+    return fill(c.earn, { ore, kill: fmt1(state.plan ? state.plan.ore : 0),
+      n: state.surge, bonus: Math.round(clearBonus(cfg, state.surge)) });
+  }
+
   function hintText(state, tool, hover) {
     if (state.phase === 'over') return t.over;
-    const firstMinute = state.surge === 1 && state.phase === 'countdown';
     if (hover.cell < 0) {
       if (tool.type === 'build') {
         const def = kindDef(cfg, tool.kind);
@@ -309,8 +414,7 @@ export function createUi(cfg, doc, win, api) {
       if (tool.type === 'raise' || tool.type === 'cut') {
         return fill(t.toolHint, { tool: tool.type === 'raise' ? t.raise : t.cut });
       }
-      if (firstMinute) return t.firstLine;
-      return '';
+      return compassLine(state);
     }
     const h = state.terrain.h[hover.cell];
     const kind = state.terrain.kind[hover.cell];
@@ -338,15 +442,16 @@ export function createUi(cfg, doc, win, api) {
       const line = def.name + ', ' + fill(t.tier, { t: w.tier }).toLowerCase() + ', on ' + where + '.';
       return chosen && chosen.id === w.id ? line : line + ' ' + t.clickToSelect;
     }
-    // Before the first surge the ground reading gives way to the one line that
-    // says what the ground is for.
-    if (firstMinute) return t.firstLine;
-    return where.charAt(0).toUpperCase() + where.slice(1) + '.';
+    // The snowline and the hearth are worth naming under the pointer. Plain
+    // ground with no tool in hand is worth nothing: its height is already in
+    // the picture, and the line does better work naming the next move.
+    if (kind === 1 || kind === 2) return where.charAt(0).toUpperCase() + where.slice(1) + '.';
+    return compassLine(state);
   }
 
   const fmt1 = (v) => (Math.round(v * 10) / 10).toString();
 
-  return { update, showHelp, isHelpOpen: () => helpOpen, el };
+  return { update, showHelp, isHelpOpen: () => helpOpen, compassLine, el };
 }
 
 

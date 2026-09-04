@@ -6,14 +6,14 @@
 // writes the page, and this file decides when each of them happens.
 // ---------------------------------------------------------------------------
 
-import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=9';
-import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=9';
-import { countAlive } from './motes.js?v=9';
-import { kindDef, workAt, stats } from './works.js?v=9';
-import { createIso } from './render/iso.js?v=9';
-import { createGround } from './render/ground.js?v=9';
-import { createScene } from './render/scene.js?v=9';
-import { createUi } from './ui.js?v=9';
+import { createRun, step, newRun, preview, actSculpt, actBuild, actUpgrade, actSell, actCall, actSpeed, actPause, unlocked, summary, logLine } from './run.js?v=10';
+import { restore, loadMeta, saveMeta, loadSave, storeSave, clearSave, exportString, importString } from './save.js?v=10';
+import { countAlive } from './motes.js?v=10';
+import { kindDef, workAt, stats } from './works.js?v=10';
+import { createIso } from './render/iso.js?v=10';
+import { createGround } from './render/ground.js?v=10';
+import { createScene } from './render/scene.js?v=10';
+import { createUi } from './ui.js?v=10';
 
 export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const keyMeta = cfg.identity.storagePrefix + '.meta';
@@ -38,6 +38,7 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
   const scene = createScene(cfg, canvas, iso, ground);
 
   const tool = { type: null, kind: null };
+  let held = false;
   const hover = { cell: -1, tool: null, kind: null, ok: false, range: 0, height: 0 };
   let selectedId = 0;
   const sceneState = { terrain: null, works: null, pool: null, fallLine: null, fallLines: null, fx: null, hover, selected: null, time: 0, reducedMotion: false };
@@ -92,6 +93,10 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
       save();
       return state;
     },
+    // The sheet holds the run while it is up. Kept apart from the player's own
+    // pause so closing the sheet never resumes a run they had paused, and so
+    // the hold is never written into a save.
+    holdRun(on) { held = !!on; },
     exportString: () => exportString(state),
     importString(s) {
       const got = importString(s);
@@ -250,7 +255,7 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
     if (dt < 0) dt = 0;
 
     fit();
-    if (!state.paused && state.phase !== 'over') {
+    if (!state.paused && !held && state.phase !== 'over') {
       acc += dt * state.speed;
       const h = cfg.sim.dt;
       let guard = 0;
@@ -296,7 +301,7 @@ export function createGame({ doc, win, canvas, cfg, storage, now, seed }) {
     win.addEventListener('beforeunload', save);
     doc.addEventListener('visibilitychange', () => { if (doc.visibilityState === 'hidden') save(); });
     fit();
-    if (meta.runs === 0 && !saved) ui.showHelp(true);
+    if (meta.runs === 0 && !saved) ui.showHelp(true, true);
     last = 0;
     win.requestAnimationFrame(frame);
   }

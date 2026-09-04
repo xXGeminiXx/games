@@ -14,10 +14,14 @@
 
 import {
   drawWork, addMoteMark, addMoteTail, drawEmber, addRadialTicks, addHexRing,
-} from './glyphs.js?v=9';
-import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=9';
+} from './glyphs.js?v=10';
+import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=10';
 
 const SQRT2 = Math.SQRT2;
+
+/** The sheet's own hand for the notes it letters on the field. */
+const FIELD_LABEL_FONT = '"Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif';
+
 const clock = (typeof performance !== 'undefined' && performance && performance.now)
   ? () => performance.now()
   : () => 0;
@@ -225,9 +229,16 @@ export function createScene(cfg, canvas, iso, ground) {
       ctx.moveTo(ax, ay);
       ctx.lineTo(iso.sx, iso.sy);
     }
+    // The casing is drawn solid and unbroken so the road still reads while the
+    // dashes over it are in their gaps.
+    ctx.setLineDash([]);
+    ctx.lineWidth = cfg.render.fallLineCasingWidth;
+    ctx.globalAlpha = cfg.render.fallLineCasingAlpha;
+    ctx.strokeStyle = cfg.render.fallLineCasing;
+    ctx.stroke();
     ctx.setLineDash([4, 3]);
     ctx.lineDashOffset = offset || 0;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = cfg.render.fallLineWidth;
     ctx.globalAlpha = cfg.render.fallLineAlpha;
     ctx.strokeStyle = cfg.render.fallLine;
     ctx.stroke();
@@ -255,15 +266,70 @@ export function createScene(cfg, canvas, iso, ground) {
         ctx.lineTo(iso.sx, iso.sy);
       }
     }
+    ctx.setLineDash([]);
+    ctx.lineWidth = cfg.render.fallLineCasingWidth * 0.62;
+    ctx.globalAlpha = cfg.render.fallLineCasingAlpha * 0.7;
+    ctx.strokeStyle = cfg.render.fallLineCasing;
+    ctx.stroke();
     ctx.setLineDash([3, 4]);
     ctx.lineDashOffset = offset || 0;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = cfg.render.fallLineAlpha * 0.55;
+    ctx.lineWidth = cfg.render.fallLineWidth * 0.7;
+    ctx.globalAlpha = cfg.render.fallLineAlpha * 0.72;
     ctx.strokeStyle = cfg.render.fallLine;
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
+  }
+
+  /**
+   * The two ends of the field, lettered on the sheet. Where the Melt comes
+   * from and what it is walking at are the two facts the picture cannot say on
+   * its own, and a player who has to be told them in a panel has to look away
+   * from the field to learn them. Drawn last, over everything, with a paper
+   * halo so the letters hold over any band of ground.
+   */
+  function drawFieldLabels(terrain) {
+    const W = terrain.W;
+    const r = cfg.render;
+    const marks = [];
+    // The snowline sits at the top corner of the diamond, where the line above
+    // the field already runs, so its name is lettered on the snow itself
+    // rather than in the air over it. The hearth has clear paper above it.
+    if (terrain.snowline && terrain.snowline.length) {
+      marks.push({ cells: terrain.snowline, text: cfg.text.snowline, lift: -iso.th * 1.4 });
+    }
+    if (terrain.hearth && terrain.hearth.length) {
+      marks.push({ cells: terrain.hearth, text: cfg.text.hearth, lift: iso.th * 1.5 });
+    }
+    if (!marks.length) return;
+    ctx.save();
+    ctx.font = '600 ' + r.labelSize + 'px ' + FIELD_LABEL_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    for (const mark of marks) {
+      let ax = 0, ay = 0, top = 0, hi = 0;
+      for (let k = 0; k < mark.cells.length; k++) {
+        const i = mark.cells[k];
+        const cx = i % W, cy = Math.floor(i / W);
+        ax += cx + 0.5; ay += cy + 0.5;
+        if (terrain.h[i] > hi) hi = terrain.h[i];
+      }
+      ax /= mark.cells.length; ay /= mark.cells.length;
+      iso.project(ax, ay, hi);
+      // Whole pixels: the sheet has no blur anywhere and a letter set on a
+      // fractional baseline is the one soft thing on it.
+      const lx = Math.round(iso.sx);
+      top = Math.round(iso.sy - mark.lift);
+      const label = String(mark.text).toUpperCase();
+      ctx.strokeStyle = r.labelHalo;
+      ctx.strokeText(label, lx, top);
+      ctx.fillStyle = r.label;
+      ctx.fillText(label, lx, top);
+    }
+    ctx.restore();
   }
 
   function drawWorksRow(terrain, works, d, time) {
@@ -534,6 +600,7 @@ export function createScene(cfg, canvas, iso, ground) {
       if (works) drawProjectiles(terrain, works.projectiles);
       drawFx(terrain, state.fx, step);
       drawCursors(state);
+      drawFieldLabels(terrain);
       drawGrain();
 
       const ms = clock() - t0;
