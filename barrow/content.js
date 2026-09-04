@@ -169,7 +169,7 @@ export const CONTENT = {
   //
   // A boon is one of: dig, bones, absorb, value, face, soft (raise cost),
   // windfall (seconds of the current income, paid at once), diggers (a share
-  // of the horde, raised free), rem (relics paid when the barrow is filled in).
+  // of the diggers, raised free), rem (relics paid when the barrow is filled in).
   // -------------------------------------------------------------------------
   chambers: {
     bands: [
@@ -290,7 +290,7 @@ export const CONTENT = {
             'It was set from the far side. Whoever placed it went down first and stayed.',
           ],
           offers: [
-            { name: 'Break it', line: 'A week of work and half the horde. Then it\'s open.', boon: { face: 2.6 } },
+            { name: 'Break it', line: 'A week of work and half of them. Then it\'s open.', boon: { face: 2.6 } },
             { name: 'Work around it', line: 'The flanking cuts open four layers at once.', boon: { value: 1.6, absorb: 1.5 } },
           ],
         },
@@ -404,7 +404,7 @@ export const CONTENT = {
       passed: 'They walk back down the track in the rain.',
     },
     reeve: {
-      name: 'A county man',
+      name: 'A tax man',
       lines: [
         'A man rides out from the county about the noise. He\'s owed something, and he\'ll say what once he\'s paid.',
         'The county wants a cut of whatever is coming out of this field.',
@@ -467,11 +467,11 @@ export const CONTENT = {
   rites: {
     hands:     { name: 'Sharper spades', line: 'They dig 50% faster.',
                  long: 'Every level makes the dead dig 50% faster than they did.' },
-    grave:     { name: 'Mass grave',     line: 'A bone raises 50% more.',
+    grave:     { name: 'More from a bone', line: 'A bone raises 50% more.',
                  long: 'Every level makes each bone raise 50% more of the dead.' },
-    ledger:    { name: 'Price book',     line: 'The numbers under every price.',
+    ledger:    { name: 'Show the numbers', line: 'The figures under every price.',
                  long: 'Shows every market\'s base price, how much it takes, how fast it comes back and how full it is. You can buy at those prices as well as sell.' },
-    picks:     { name: 'Grave picks',    line: 'They dig down 25% faster.',
+    picks:     { name: 'Better picks',   line: 'They dig down 25% faster.',
                  long: 'The floor under the deepest cut gives way 25% faster for every level.' },
     broker:    { name: 'Hire a seller',  line: 'He sells for you, for a cut.',
                  long: 'He sells into the room each market has and takes a cut of the coin. He never sells bones.' },
@@ -481,19 +481,19 @@ export const CONTENT = {
                  long: 'Every market shrugs off what you sold into it 25% faster.' },
     foresight: { name: 'Prices ahead',   line: 'See where a price is going.',
                  long: 'The chart draws the swell in every price ahead of now as well as behind, so you can sell into the top of it.' },
-    assay:     { name: 'Read the floor', line: 'Know the next layer early.',
+    assay:     { name: 'See one layer down', line: 'Know the next layer early.',
                  long: 'You see the next layer down, and what it\'s worth, before they break into it.' },
     workings:  { name: 'Keep a layer open', line: 'One more old layer keeps working.',
                  long: 'The dead keep one more layer behind them working instead of walking away from it.' },
-    crier:     { name: 'Pay a crier',    line: 'Visitors come sooner, pay more.',
+    crier:     { name: 'Spread the word', line: 'Visitors come sooner, pay more.',
                  long: 'Word gets around. People come up the track 15% sooner per level and pay 25% better when they get there.' },
-    vigil:     { name: 'Night shift',    line: 'They dig 4 hours longer alone.',
+    vigil:     { name: 'Longer alone',   line: '4 more hours while you are gone.',
                  long: 'The dead work 12 hours while you\'re away, and 4 hours longer for every level of this.' },
-    survey:    { name: 'Sound the shaft', line: 'Name the next 5 layers now.',
+    survey:    { name: 'See five layers down', line: 'Name the next 5 layers now.',
                  long: 'The next five layers down show their names and their ground on the panel and on the hill before anybody stands in them.' },
-    records:   { name: 'Keep the books',  line: '3 more relics for filling in.',
+    records:   { name: 'More relics',     line: '3 more relics for filling in.',
                  long: 'Every level is 3 more relics when you fill this barrow in.' },
-    pits:      { name: 'Open the old pits', line: 'The ground holds 45% more of them.',
+    pits:      { name: 'Work the burials', line: 'The ground holds 45% more of them.',
                  long: 'They stop cutting clean and start working the burials. Every level turns up 45% more of the dead out of the same ground.' },
   },
 
@@ -534,11 +534,11 @@ export const CONTENT = {
   // The numbers live in config.oaths.
   // -------------------------------------------------------------------------
   oaths: {
-    dead:    { name: 'Start with a horde',   line: 'Every barrow opens with 8 of them.',
-               long: 'Every barrow after this one opens with a horde already on its feet, 4x bigger for every level.' },
+    dead:    { name: 'Start with diggers',   line: 'Every barrow opens with 8 of them.',
+               long: 'Every barrow after this one opens with diggers already on their feet, 4x bigger for every level.' },
     ground:  { name: 'Start layers down',    line: 'Every barrow opens 1 layer already cut.',
                long: 'Every barrow after this one opens with one more layer already cut through for every level.' },
-    books:   { name: 'Start with the books', line: 'Keep the price book, then more.',
+    books:   { name: 'Start with upgrades', line: 'Keep the price book, then more.',
                long: 'Every barrow after this one opens holding what coin bought first: the price book, then prices ahead, then the seller.' },
     hands:   { name: 'Faster hands',         line: 'They dig 35% faster in every barrow.',
                long: 'The dead dig 35% faster per level, in every barrow you\'ll ever open.' },

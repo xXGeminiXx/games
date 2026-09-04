@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=16';
-import { createSim, restoreSim, openedState } from './sim.js?v=16';
-import * as Save from './save.js?v=16';
-import * as Rb from './rebirth.js?v=16';
-import * as Lore from './lore.js?v=16';
-import { hash } from './rng.js?v=16';
-import { createUI } from './ui.js?v=16';
-import { createView } from './view.js?v=16';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=16';
-import * as Mat from './materials.js?v=16';
+import { storageKey, fill } from '../config.js?v=17';
+import { createSim, restoreSim, openedState } from './sim.js?v=17';
+import * as Save from './save.js?v=17';
+import * as Rb from './rebirth.js?v=17';
+import * as Lore from './lore.js?v=17';
+import { hash } from './rng.js?v=17';
+import { createUI } from './ui.js?v=17';
+import { createView } from './view.js?v=17';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=17';
+import * as Mat from './materials.js?v=17';
 
 /**
  * @param {object} o
@@ -76,6 +76,7 @@ export function createGame(o) {
   actions.raise = wrap((count) => { const r = sim.raise(count); save(); return r; });
   actions.setWeight = wrap((key, delta) => { sim.setWeight(key, delta); return []; });
   actions.setWeightAt = wrap((key, value) => { sim.setWeightAt(key, value); return []; });
+  actions.setByHand = wrap((on) => { sim.setByHand(on); save(); return []; });
   actions.buyRite = wrap((id, count) => { const r = sim.buyRite(id, count); save(); return r; });
   actions.takeOffer = wrap((i) => { const r = sim.takeOffer(i); save(); return r; });
   actions.acceptVisitor = wrap(() => { const r = sim.acceptVisitor(); save(); return r; });
@@ -141,7 +142,7 @@ export function createGame(o) {
 
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
-    view.draw(sim.state, sim.state.effort, dt, sim.mods().activeStrata);
+    view.draw(sim.state, sim.state.effort, dt, sim.mods().activeStrata, sim.split());
 
     sinceSave += dt;
     if (sinceSave >= cfg.time.autosaveSeconds) { save(); sinceSave = 0; }

@@ -11,15 +11,15 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=16';
-import * as Mk from './market.js?v=16';
-import * as H from './horde.js?v=16';
-import * as R from './rites.js?v=16';
-import * as Rb from './rebirth.js?v=16';
-import * as Lore from './lore.js?v=16';
-import * as Advice from './advice.js?v=16';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=16';
-import { fill } from '../config.js?v=16';
+import * as Mat from './materials.js?v=17';
+import * as Mk from './market.js?v=17';
+import * as H from './horde.js?v=17';
+import * as R from './rites.js?v=17';
+import * as Rb from './rebirth.js?v=17';
+import * as Lore from './lore.js?v=17';
+import * as Advice from './advice.js?v=17';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=17';
+import { fill } from '../config.js?v=17';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -49,6 +49,7 @@ export function createUI(doc, sim, cfg, actions) {
     log: byId('log'),
     hand: byId('hand'), dig: byId('dig'), sell: byId('sell'), handline: byId('handline'),
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
+    handOver: byId('handover'),
     marketPanel: byId('market-panel'), market: byId('market'),
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
@@ -183,9 +184,9 @@ export function createUI(doc, sim, cfg, actions) {
       // clears it. Stepping a row from five to nothing was five presses, and
       // with ten rows on the panel nobody did it.
       const notches = [];
-      const bar = el('span', { class: 'bar', title: T.weightBarTip });
+      const bar = el('span', { class: 'bar', title: T.shareBarTip });
       for (let i = 1; i <= cfg.horde.maxWeight; i++) {
-        const n = el('button', { class: 'notch', title: T.weightBarTip,
+        const n = el('button', { class: 'notch', title: T.shareBarTip,
           onclick: () => actions.setWeightAt(key, currentWeight(key) === i ? 0 : i) });
         notches.push(n);
         bar.appendChild(n);
@@ -193,19 +194,36 @@ export function createUI(doc, sim, cfg, actions) {
       const meta = el('i');
       const rate = el('small', { class: 'rate', title: T.rowRateTip });
       const tag = el('span', { class: 'seam', text: isFace ? '' : seamTag(key) });
+      const less = el('button', { class: 'w', text: T.shareLess, title: T.shareLessTip, onclick: () => actions.setWeight(key, -1) });
+      const more = el('button', { class: 'w', text: T.shareMore, title: T.shareMoreTip, onclick: () => actions.setWeight(key, 1) });
       const head = el('div', { class: 'wtop' },
         el('span', { class: 'swatch', style: 'background:' + hue }),
         el('span', { class: 'name', text: name, title: isFace ? T.faceLine : seamLine(key) }),
-        tag,
-        el('button', { class: 'w', text: T.weightLess, title: T.weightLessTip, onclick: () => actions.setWeight(key, -1) }),
-        bar,
-        el('button', { class: 'w', text: T.weightMore, title: T.weightMoreTip, onclick: () => actions.setWeight(key, 1) }),
-        meta);
+        tag, less, bar, more, meta);
       head.firstChild.style.background = hue;
       const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') }, head, rate);
       nodes.weights.appendChild(row);
-      weightRows.set(key, { node: row, bar, notches, meta, tag, rate });
+      weightRows.set(key, { node: row, bar, notches, meta, tag, rate, less, more });
     }
+  };
+
+  // One control, and it is optional in both directions: the game splits the
+  // diggers on its own and this hands that over to somebody who wants to.
+  let handOver = null;
+  const buildHandOver = () => {
+    if (handOver || !nodes.handOver) return;
+    const note = el('span', { class: 'lbl' });
+    handOver = el('button', { onclick: () => actions.setByHand(!sim.state.byHand) });
+    nodes.handOver.appendChild(note);
+    nodes.handOver.appendChild(handOver);
+    handOver._note = note;
+  };
+  const paintHandOver = () => {
+    if (!handOver) return;
+    const byHand = !!sim.state.byHand;
+    handOver.textContent = byHand ? T.autoOn : T.autoOff;
+    handOver.title = byHand ? T.autoOnTip : T.autoOffTip;
+    handOver._note.textContent = byHand ? T.autoNoteHand : T.autoNoteGame;
   };
 
   const currentWeight = (key) =>
@@ -669,28 +687,37 @@ export function createUI(doc, sim, cfg, actions) {
         b.node.disabled = !(n > 0) || cost > s.bones + 1e-9;
       }
       buildWeights();
-      const from = sim.activeFrom();
-      const split = H.distribute(s.weights, s.faceWeight, from);
+      buildHandOver();
+      const byHand = !!s.byHand;
+      const split = sim.split();
       const rates = sim.layerRates();
+      // The bar reads out where the diggers are. When the game is doing the
+      // splitting it is a picture of a fraction, not a five-step setting, so
+      // it is filled from the share itself and nothing on the row is a
+      // button; a player who has taken it over gets the buttons back.
+      let top = split.face;
+      for (let k = sim.activeFrom(); k <= s.depth; k++) top = Math.max(top, split.strata[k] || 0);
       for (const [key, r] of weightRows) {
-        const w = key === 'face' ? s.faceWeight : (s.weights[key] || 0);
+        const share = key === 'face' ? split.face : (split.strata[key] || 0);
+        const w = byHand
+          ? (key === 'face' ? s.faceWeight : (s.weights[key] || 0))
+          : (top > 0 ? Math.ceil((share / top) * cfg.horde.maxWeight - 1e-9) : 0);
         for (let i = 0; i < r.notches.length; i++) {
           const on = i < w;
           r.notches[i].textContent = on ? '▌' : '·';
           r.notches[i].className = on ? 'notch on' : 'notch';
+          r.notches[i].disabled = !byHand;
         }
-        // What this layer is actually paying, which is the whole reason to
-        // move a weight. A row on ground its buyers filled hours ago reads
-        // near nothing next to a row a thousand times richer.
+        show(r.less, byHand); show(r.more, byHand);
+        // What this layer is paying, so the picture and the figures agree.
         const rate = rates.get(key === 'face' ? 'face' : Number(key));
         if (rate) {
           const bits = [];
           if (rate.coin > 0.005) bits.push(fill(T.rowRate, { coin: fmtCoin(rate.coin) }));
           if (rate.bones > 0.005) bits.push(fill(T.rowBones, { bones: fmt(rate.bones) }));
-          r.rate.textContent = bits.length ? bits.join('   ') : (w > 0 ? T.rowNothing : '');
-          r.rate.className = 'rate' + (w > 0 && !bits.length ? ' hot' : '');
+          r.rate.textContent = bits.length ? bits.join('   ') : (share > 0 ? T.rowNothing : '');
+          r.rate.className = 'rate' + (share > 0 && !bits.length ? ' hot' : '');
         }
-        const share = key === 'face' ? split.face : (split.strata[key] || 0);
         let meta = fmtPct(share);
         let hot = false;
         if (key === 'face') {
@@ -712,6 +739,8 @@ export function createUI(doc, sim, cfg, actions) {
         r.meta.className = hot ? 'hot' : '';
         r.meta.title = hot ? T.ceilingTip : '';
       }
+      paintHandOver();
+      show(nodes.handOver, f.face || s.depth > 0);
       show(nodes.weights, f.face || s.depth > 0);
     }
 

@@ -97,9 +97,10 @@ export function distribute(weights, faceWeight, from = 0) {
  * @param {object} cfg    the whole config
  * @param {object} mods   every multiplier, from rites.modsOf
  * @param {object} ground this run's layers, from ground.createGround
+ * @param {object} [given] where the diggers stand, if the caller worked it out
  * @returns {number[]}    layers opened during this step, in order
  */
-export function dig(s, dt, cfg, mods, ground) {
+export function dig(s, dt, cfg, mods, ground, given) {
   const opened = [];
   if (!(dt > 0) || !(s.horde > 0)) return opened;
 
@@ -107,7 +108,7 @@ export function dig(s, dt, cfg, mods, ground) {
   const boneMult = (mods && mods.boneMult) || 1;
   const faceMult = (mods && mods.faceMult) || 1;
   const from = activeFrom(s.depth, cfg.horde, mods && mods.activeStrata);
-  const split = distribute(s.weights, s.faceWeight, from);
+  const split = given || distribute(s.weights, s.faceWeight, from);
   const diggerSeconds = s.horde * cfg.horde.digRate * dt;
   const rate = diggerSeconds * digMult;
 

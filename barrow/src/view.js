@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=16';
-import { distribute, activeFrom } from './horde.js?v=16';
-import * as Lore from './lore.js?v=16';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=17';
+import { activeFrom } from './horde.js?v=17';
+import * as Lore from './lore.js?v=17';
 
 /** mulberry32 */
 function rng(seed) {
@@ -353,11 +353,10 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   const roomForDots = () => Math.max(120, Math.min(cfg.particleCap, Math.round(width * height / cfg.pixelsPerDot)));
 
   /** Keep the dot population in step with the horde and the weights. */
-  const populate = (L, s, active) => {
+  const populate = (L, s, active, split) => {
     const want = Math.min(roomForDots(), Math.floor(s.horde));
     while (particles.length > want) particles.pop();
     const from = activeFrom(s.depth, hordeCfg, active);
-    const split = distribute(s.weights, s.faceWeight, from);
     const pickBand = (r) => {
       let acc = 0;
       for (let k = from; k <= s.depth; k++) {
@@ -436,7 +435,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /** Draw one frame. `effort` is digger-seconds spent per layer. */
-  const draw = (s, effort, dt, active) => {
+  const draw = (s, effort, dt, active, split) => {
+    if (!split) split = { strata: [], face: 0 };
     seed = s.seed;
     const L = layout(width, height, s.depth, cfg);
     drawGround(L, s, effort);
@@ -447,7 +447,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       ctx.drawImage(carve.canvas, 0, 0);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    populate(L, s, active);
+    populate(L, s, active, split);
     drawDots(L, s, Math.min(0.1, dt || 0.016));
 
     // Band names on the left, and on the right a bar for the share of the
@@ -456,7 +456,6 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // a run the bands are a few pixels tall and a label on every one is
     // noise, so the writing stops and the bars carry on.
     const from = activeFrom(s.depth, hordeCfg, active);
-    const split = distribute(s.weights, s.faceWeight, from);
     const named = L.bandH >= cfg.labelBandHeight;
     if (named) {
       ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';

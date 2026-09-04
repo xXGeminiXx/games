@@ -17,18 +17,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=16';
-import * as Mat from './materials.js?v=16';
-import * as Mk from './market.js?v=16';
-import * as H from './horde.js?v=16';
-import * as R from './rites.js?v=16';
-import * as Rv from './reveal.js?v=16';
-import * as Ch from './chambers.js?v=16';
-import * as Vi from './visitors.js?v=16';
-import * as Rb from './rebirth.js?v=16';
-import * as Lore from './lore.js?v=16';
-import { createGround } from './ground.js?v=16';
-import { fill } from '../config.js?v=16';
+import { CONFIG as DEFAULT } from '../config.js?v=17';
+import * as Mat from './materials.js?v=17';
+import * as Mk from './market.js?v=17';
+import * as H from './horde.js?v=17';
+import * as Crew from './crew.js?v=17';
+import * as R from './rites.js?v=17';
+import * as Rv from './reveal.js?v=17';
+import * as Ch from './chambers.js?v=17';
+import * as Vi from './visitors.js?v=17';
+import * as Rb from './rebirth.js?v=17';
+import * as Lore from './lore.js?v=17';
+import { createGround } from './ground.js?v=17';
+import { fill } from '../config.js?v=17';
 
 export const SAVE_VERSION = 2;
 
@@ -42,8 +43,9 @@ export function freshState(cfg, seed) {
     horde: 0,
     depth: 0,             // deepest open layer
     weights: [cfg.horde.weightNew],
-    tuned: {},            // layer -> true once the player has set its weight
-    faceWeight: 0,        // set when the face is first shown
+    tuned: {},            // layer -> true once the player has set this row
+    byHand: false,        // the player took the splitting over; nothing forces this
+    faceWeight: 0,        // where the way down sits when it is set by hand
     capProgress: 0,
     stock: {},            // good id -> units held
     seen: {},             // good id -> true once its market has been on the table
@@ -310,14 +312,26 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return H.maxRaisable(bones, state.horde, cfg.horde, md.softMult);
   };
 
+  /**
+   * Where the diggers stand. The game works it out from what each layer's
+   * buyers will actually take, and keeps working it out as the run changes,
+   * so a player who never opens the panel is never behind one who does. It
+   * is only read off the rows when the player has asked to set it by hand.
+   */
+  const crewApi = { state, cfg, ground, mods, marketFor };
+  const split = () => {
+    if (state.byHand) return H.distribute(state.weights, state.faceWeight, activeFrom());
+    return Crew.bestSplit(crewApi);
+  };
+
   /** Bones per second the horde is turning up as it currently stands. */
   const boneRate = () => {
     const md = mods();
     const from = activeFrom();
-    const split = H.distribute(state.weights, state.faceWeight, from);
+    const sp = split();
     let q = 0;
-    for (let k = from; k <= state.depth; k++) q += (split.strata[k] || 0) * ground.at(k).bones;
-    q += split.face * ground.at(state.depth + 1).bones;
+    for (let k = from; k <= state.depth; k++) q += (sp.strata[k] || 0) * ground.at(k).bones;
+    q += sp.face * ground.at(state.depth + 1).bones;
     return q * state.horde * cfg.horde.digRate * md.boneMult;
   };
 
@@ -336,13 +350,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const layerRates = () => {
     const md = mods();
     const from = activeFrom();
-    const split = H.distribute(state.weights, state.faceWeight, from);
+    const sp = split();
     const perSec = state.horde * cfg.horde.digRate * md.digMult;
     const diggerSeconds = state.horde * cfg.horde.digRate;
     const flow = {};                       // good id -> units per second, all layers
     const rows = new Map();
     for (let k = from; k <= state.depth; k++) {
-      const share = split.strata[k] || 0;
+      const share = sp.strata[k] || 0;
       const layer = ground.at(k);
       const parts = [];
       if (share > 0) {
@@ -372,8 +386,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // The dead on the way down bring up no goods, only the bones of the layer
     // they are breaking into.
     rows.set('face', {
-      share: split.face, parts: [], coin: 0,
-      bones: diggerSeconds * split.face * ground.at(state.depth + 1).bones * md.boneMult,
+      share: sp.face, parts: [], coin: 0,
+      bones: diggerSeconds * sp.face * ground.at(state.depth + 1).bones * md.boneMult,
     });
     return rows;
   };
@@ -445,7 +459,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const md = mods();
     const before = Math.floor(state.t / cfg.market.sampleSeconds);
 
-    const opened = H.dig(state, dt, cfg, md, ground);
+    const opened = H.dig(state, dt, cfg, md, ground, split());
     for (const k of opened) {
       events.push({ type: 'opened', k });
       fire(events, 'break:' + k, 'breakthrough', { name: ground.at(k).name }, String(k));
@@ -600,6 +614,30 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return { events, raised: n };
   };
 
+  /**
+   * Hand the splitting to the player, or give it back to the game. Nothing in
+   * the run requires either: this is for somebody who wants to fiddle.
+   * Taking it over starts from wherever the game had the diggers, so the
+   * first press never costs anything.
+   */
+  const setByHand = (on) => {
+    const want = !!on;
+    if (want === !!state.byHand) return want;
+    if (want) {
+      const sp = split();
+      const max = cfg.horde.maxWeight;
+      const from = activeFrom();
+      let top = sp.face;
+      for (let k = from; k <= state.depth; k++) top = Math.max(top, sp.strata[k] || 0);
+      const notches = (x) => (top > 0 ? Math.max(x > 1e-6 ? 1 : 0, Math.round((x / top) * max)) : 0);
+      while (state.weights.length <= state.depth) state.weights.push(0);
+      for (let k = 0; k < state.weights.length; k++) state.weights[k] = k >= from ? notches(sp.strata[k] || 0) : 0;
+      state.faceWeight = notches(sp.face);
+    }
+    state.byHand = want;
+    return want;
+  };
+
   const setWeight = (target, delta) => {
     if (target === 'face') return setWeightAt(target, (state.faceWeight | 0) + delta);
     const k = target | 0;
@@ -648,6 +686,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
+    split, setByHand,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -660,11 +699,11 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     flowOf: (id) => {
       const md = mods();
       const from = activeFrom();
-      const split = H.distribute(state.weights, state.faceWeight, from);
+      const sp = split();
       const perSec = state.horde * cfg.horde.digRate * md.digMult;
       let q = 0;
       for (let k = from; k <= state.depth; k++) {
-        const share = split.strata[k] || 0;
+        const share = sp.strata[k] || 0;
         if (share <= 0) continue;
         const units = perSec * share / ground.at(k).hardness;
         for (const part of ground.mixAt(k)) if ('s' + part.k === id) q += units * part.share;
@@ -706,6 +745,9 @@ export function restoreSim(cfg, snap) {
   if (!Array.isArray(state.effort)) state.effort = [];
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.chamberQueue)) state.chamberQueue = [];
+  // The game does the splitting for everybody, including runs that predate
+  // it. A save with rows the player had actually set by hand keeps them.
+  state.byHand = !!st.byHand || Object.keys((st.tuned && typeof st.tuned === 'object') ? st.tuned : {}).length > 0;
   for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned']) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }

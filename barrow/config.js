@@ -48,7 +48,7 @@ export const CONFIG = {
     stats: {
       coin:   'Coin',
       bones:  'Bones',
-      horde:  'Horde',
+      horde:  'Diggers',
       depth:  'Depth',
       income: 'Coin/s',
       rem:    'Relics',
@@ -56,19 +56,26 @@ export const CONFIG = {
 
     dig:        'Dig',
     sell:       'Sell',
-    sellLot:    'Lot',
-    sellLotTip: 'Sells half of what this market takes, so the price holds',
+    sellLot:    'Some',
+    sellLotTip: 'Sells a small load, so the price barely moves',
     sellAll:    'All',
     buy:        'Buy',
     buyTip:     'Buys back {n} units for {coin}, which lifts the price back up',
     raise:      'Raise',
     raiseMax:   'Max',
     raiseTip:   'Bones raise the dead. Each button shows what it costs. Max spends every bone you have.',
-    weightMore: '+',
-    weightLess: '-',
-    weightMoreTip: 'Put more of the horde on this layer',
-    weightLessTip: 'Take some of the horde off this layer',
-    weightBarTip:  'Press a notch to set how hard this layer is worked. Nothing set by hand moves on its own again',
+    shareMore: '+',
+    shareLess: '-',
+    shareMoreTip: 'Send more of them to this layer',
+    shareLessTip: 'Send fewer of them to this layer',
+    shareBarTip:   'How many of them are digging here',
+    // The one control nobody has to touch.
+    autoOff:    'Let me place them',
+    autoOn:     'Go back to placing them for me',
+    autoOffTip: 'Place the diggers yourself. You never have to',
+    autoOnTip:  'Hand it back and the game keeps them where they earn most',
+    autoNoteGame: 'They move themselves as the ground changes.',
+    autoNoteHand: 'You are placing them. They stay where you put them.',
     // Under each row: what that layer is actually paying and how many of the
     // dead it is turning up, both per second. Deep ground is worth thousands
     // of times what shallow ground is and its buyers are nowhere near full,
@@ -76,7 +83,7 @@ export const CONFIG = {
     rowRate:     '{coin} coin/s',
     rowBones:    '{bones} bones/s',
     rowNothing:  'Nothing yet',
-    rowRateTip:  'What this layer pays and how many of the dead it turns up, every second, at the weights as they stand',
+    rowRateTip:  'What this layer pays and how many of the dead it turns up, every second',
     face:       'Digging down',
     faceLine:   'Put some of them here and they break through to the layer below.',
     export:     'Export',
@@ -102,8 +109,8 @@ export const CONFIG = {
     // "Held" is what a bought row reads, so the units of a good on hand are
     // stock. One word, one meaning.
     columns: {
-      good:   'Good',
-      held:   'Stock',
+      good:   'Material',
+      held:   'On hand',
       price:  'Price',
       demand: 'Demand',
     },
@@ -123,23 +130,23 @@ export const CONFIG = {
       rem:      '{N} relics when you fill it in',
     },
 
-    ledgerBase:  'Base {base}',
+    ledgerBase:  'Usually {base}',
     // Units the market takes over the time it needs to forget them, which is
     // the flow it pays best for. It sits under the demand column, where a
     // figure about the market's appetite belongs.
-    ledgerTakes: '{absorb} / {t}',
+    ledgerTakes: 'takes {absorb}, back in {t}',
     ledgerTakesTip: 'How much this market takes before the price drops, and how long it needs to come back',
     // Appended after a figure and a dash, so these three stay lower case:
     // "38% - oversold 1.7x" reads right and "38% - Oversold" does not.
-    ceilingLine: 'oversold {x}x',
+    ceilingLine: '{x}x more than it buys',
     // Anything past the market's capacity is technically over it, and a run
     // sitting a few percent past is exactly where a player wants to be. Crying
     // oversold there teaches them to ignore the word. It is said once the
     // overshoot is large enough to be costing them something.
     ceilingAt: 1.15,
-    ceilingTip:  'More of this is coming up than the market will buy. The same horde on another layer earns more',
-    lesserGoods: '{n} older goods',
-    lesserTip:   'Everything still held from layers the dead have left behind',
+    ceilingTip:  'More of this is coming up than the buyers will take. The rest of it sells for almost nothing',
+    lesserGoods: '{n} older materials',
+    lesserTip:   'Everything still on hand from layers the dead have left behind',
     lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
     seamAhead:   'next is {seam}',
@@ -157,15 +164,15 @@ export const CONFIG = {
       sell:      "You're holding {n} {name}, worth {coin}. Press Sell.",
       raise:     '{Bones} bones in hand and a digger costs {cost}. Press Raise.',
       raiseMore: '{Bones} bones raises {n} more of them. Nothing else spends bones.',
-      face:      "Nothing's digging down. A notch on {name} breaks into {next}.",
-      move:      '{From} pays {low} coin/s a notch and {name} pays {high}. Move one down.',
+      face:      "Nothing's digging down. Send some of them to {name} and they break into {next}.",
+      move:      '{From} pays {low} coin/s and {name} pays {high}. Send more of them down.',
       seal:      'Filling in pays {n} relics now. {Name} costs {cost} and holds in every barrow after.',
       oath:      '{N} relics banked. {Name} costs {cost} and you keep it.',
       rite:      '{Name} costs {cost}. {line}',
       wait:      "{Name} costs {cost}. At {rate} that's {t} away.",
       work:      '{Name} pays {coin} coin/s, the most of any layer open.',
       bones:     '{Name} is turning up {bones} bones a second.',
-      idle:      'Put some of the horde on a layer and they start digging.',
+      idle:      'Nothing is digging yet.',
       go:        'Show me',
       tip:       'The one thing most worth doing now',
     },
@@ -217,7 +224,11 @@ export const CONFIG = {
     // will take, so an untouched panel spread evenly earns about half what the
     // same horde earns leaning down.
     weightDecay: 1,
-    weightFace: 2,       // weight the way down starts on
+    weightFace: 2,       // where the way down starts when it is set by hand
+    // The share of the diggers kept on the way down when the game is doing
+    // the splitting. Everything the open layers cannot use goes down on top
+    // of this, so a big crew opens ground fast and a small one still moves.
+    faceFloor: 0.25,
   },
 
   // -------------------------------------------------------------------------
@@ -621,7 +632,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 16,
+    build: 17,
   },
 };
 

@@ -20,11 +20,11 @@
 // is named only when it would more than treble what they have kept.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=16';
-import * as R from './rites.js?v=16';
-import * as Rb from './rebirth.js?v=16';
-import * as Lore from './lore.js?v=16';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=16';
+import * as H from './horde.js?v=17';
+import * as R from './rites.js?v=17';
+import * as Rb from './rebirth.js?v=17';
+import * as Lore from './lore.js?v=17';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=17';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -60,8 +60,9 @@ function oathChoice(sim, cfg, relics) {
 }
 
 /**
- * What each worked layer pays for one notch of the horde, so two rows can be
- * compared on the axis the player is actually setting.
+ * What each worked layer pays for the share of the diggers it has, so two
+ * rows can be compared on the same axis. Only used when the player has
+ * asked to place the diggers themselves.
  */
 function perNotch(sim) {
   const rates = sim.layerRates();
@@ -123,13 +124,15 @@ export function next(sim, cfg) {
     }
   }
 
-  // Nobody is breaking into the next layer, so the run has stopped going down.
-  if (f.face && !(s.faceWeight > 0)) {
+  // These two only ever fire for a player who asked to place the diggers
+  // themselves. Left to the game they cannot happen: the way down is always
+  // staffed and no layer is ever worked past what its buyers will take.
+  if (f.face && s.byHand && !(s.faceWeight > 0)) {
     return say('face', { name: cfg.text.face, next: name(s.depth + 1) }, 'horde-panel');
   }
 
   // A layer whose buyers filled up hours ago against one that is paying.
-  const rows = perNotch(sim);
+  const rows = s.byHand ? perNotch(sim) : [];
   if (rows.length > 1) {
     const low = rows[0], high = rows[rows.length - 1];
     if (high.per >= low.per * MOVE_RATIO) {

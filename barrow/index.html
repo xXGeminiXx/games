@@ -127,6 +127,13 @@
      says whether the weight above it is worth anything. */
   .wrow .rate{display:block;margin:1px 0 0 14px;color:var(--dim);font-size:11px;white-space:nowrap}
   .wrow .rate.hot{color:var(--hot)}
+  /* The one control that is never needed: the game splits the diggers and
+     this hands that over to somebody who would rather do it. */
+  #handover{display:flex;gap:10px;align-items:baseline;margin:0 0 8px;flex-wrap:wrap}
+  #handover button{font-size:11px;padding:1px 8px;color:var(--dim)}
+  #handover button:hover:not(:disabled){color:var(--ink)}
+  #handover .lbl{margin:0}
+
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
   /* Somebody at the gate. */
@@ -411,7 +418,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="a1ac41643fa0">
+<meta name="build" content="6f3b0660c811">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -483,7 +490,7 @@
       <div id="visitor-acts"></div>
     </div>
     <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
-    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">The horde</h2><div id="raise"></div><div id="weights"></div></div>
+    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">The horde</h2><div id="raise"></div><div id="handover"></div><div id="weights"></div></div>
     <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
       <h2 id="p-seal">Fill it in</h2>
@@ -520,8 +527,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=16';
-import { createGame } from './src/game.js?v=16';
+import { CONFIG, applyIdentity } from './config.js?v=17';
+import { createGame } from './src/game.js?v=17';
 
 applyIdentity(document);
 
