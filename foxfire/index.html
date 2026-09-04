@@ -85,6 +85,15 @@
     background:var(--paper-deep);border-left:3px solid var(--rust-ink);color:var(--ink);
   }
   #next:empty{display:none}
+  /* The move the line names, as a button on the line. The control it stands
+     in for can be most of a column below, and the line scrolls off the top of
+     the window on the way to it. */
+  #next .line{display:block}
+  #next button.go{
+    margin-top:.5rem;border-color:var(--rust-ink);color:var(--rust-ink);
+    background:var(--paper);font-weight:600;
+  }
+  #next button.go:hover:not(:disabled){background:var(--paper-deep)}
 
   /* What happened while nobody was here. It stands above the compass because
      it is the first thing a player wants on coming back, and the entries it
@@ -111,6 +120,13 @@
   }
   button:hover:not(:disabled),button:active:not(:disabled){background:var(--paper-deep)}
   button:disabled{color:var(--faded);cursor:default}
+  /* A label that cannot be pressed has to read as one. The few buttons that
+     carry an ink of their own are written by id, which beats the plain
+     disabled rule above, so a Go beyond priced out of reach used to be drawn
+     in exactly the ink of one that could be pressed. */
+  #beyond:disabled,#fruit:disabled,#aim-clear:disabled,#next button.go:disabled{
+    color:var(--faded);border-color:var(--rule);
+  }
   button b{font-weight:500}
   button i{font-style:normal;color:var(--faded);margin-left:.45rem;font-size:.92em}
   button:disabled i{color:var(--faded)}
@@ -152,12 +168,15 @@
   .tree .share{display:flex;align-items:center;gap:.35rem}
   .tree .share i{font-style:normal;color:var(--faded);font-size:.95rem}
   .tree .pols{display:flex;flex-wrap:wrap;gap:.4rem}
-  /* The share: five ticks, filled up to the weight, clicked to set it. */
+  /* The share: five ticks, filled up to the weight, clicked to set it. A tick
+     was nine tenths of a rem square, which is fourteen pixels of target for
+     the decision the compass names more often than any other. */
   button.tick{
-    width:.9rem;height:.9rem;padding:0;min-height:0;margin:0;border-radius:0;
+    width:1.5rem;height:1.5rem;padding:0;min-height:0;margin:0;border-radius:0;
     border:1px solid var(--ink);background:var(--paper);
   }
   button.tick.on{background:var(--ink)}
+  .tree .share{gap:.3rem}
   .tree .pols button.on{border-color:var(--rust-ink);color:var(--rust-ink)}
   /* The note under each kind: when it pays best, what a grown tree is worth
      felled against kept, what feeding buys. */
@@ -377,7 +396,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="43885cc4f528">
+<meta name="build" content="bee64a7be575">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -513,8 +532,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=15';
-import { createGame } from './src/game.js?v=15';
+import { CONFIG, applyIdentity } from './config.js?v=16';
+import { createGame } from './src/game.js?v=16';
 
 applyIdentity(document);
 

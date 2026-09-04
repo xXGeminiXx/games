@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=15';
-import * as Advice from './advice.js?v=15';
-import * as Tr from './traits.js?v=15';
-import * as Sp from './spores.js?v=15';
-import { fill } from '../config.js?v=15';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=15';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=15';
+import * as Lore from './lore.js?v=16';
+import * as Advice from './advice.js?v=16';
+import * as Tr from './traits.js?v=16';
+import * as Sp from './spores.js?v=16';
+import { fill } from '../config.js?v=16';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=16';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=16';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -597,6 +597,62 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
+  // -- the compass ---------------------------------------------------------------
+  //
+  // One line naming the move most worth making, and on the end of it the
+  // button that makes it. The control the line points at can be most of a
+  // column away - the share ticks for the kind it names sit nearly a thousand
+  // pixels below the line on a developed run - and the line itself scrolls off
+  // the top of the window on the way there, so a player cannot read the
+  // instruction and carry it out at the same time. The button is built once
+  // and its words, its state and the move it carries are written in place, so
+  // it is never replaced under a mouse that is pressing it.
+
+  const COMPASS = {
+    reach:   () => actions.reach(),
+    tip:     () => actions.buyTips(1),
+    tipsMax: () => actions.buyTipsMax(),
+    ring:    () => actions.extend(),
+    beyond:  () => actions.beyond(),
+    share:   (arg) => actions.setWeight(arg, 1),
+    trait:   (arg) => actions.buyTrait(arg),
+  };
+
+  let compass = null;
+  const compassParts = () => {
+    if (compass) return compass;
+    const host = el('next');
+    if (!host) return null;
+    host.textContent = '';
+    const line = doc.createElement('span');
+    line.className = 'line';
+    const go = doc.createElement('button');
+    go.className = 'go';
+    go.hidden = true;
+    go.addEventListener('click', () => {
+      const act = go._act;
+      if (act && COMPASS[act.do]) COMPASS[act.do](act.arg);
+    });
+    host.appendChild(line);
+    host.appendChild(go);
+    compass = { line, go };
+    return compass;
+  };
+
+  const renderNext = () => {
+    const c = compassParts();
+    const said = Advice.next(sim, cfg);
+    if (!c) return;
+    if (c.line.textContent !== said.text) c.line.textContent = said.text;
+    const act = said.act;
+    const words = act && T.compass ? T.compass[act.label] : null;
+    c.go.hidden = !words;
+    if (!words) { c.go._act = null; return; }
+    c.go._act = act;
+    const label = act.values ? fill(words, act.values) : words;
+    if (c.go.textContent !== label) c.go.textContent = label;
+  };
+
   // -- everything ---------------------------------------------------------------
 
   const render = () => {
@@ -606,8 +662,9 @@ export function createUI(doc, sim, cfg, actions) {
 
     renderLabel(f, rate, info);
 
-    // The compass: the one thing most worth doing, and the figures for it.
-    text('next', Advice.next(sim, cfg).text);
+    // The compass: the one thing most worth doing, the figures for it, and
+    // the press that does it.
+    renderNext();
 
     // The hand. It leaves the page once the tips are out and working: two
     // sugar a press is nothing beside what the front brings in, and a control

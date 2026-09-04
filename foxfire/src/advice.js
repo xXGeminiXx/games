@@ -13,21 +13,23 @@
 // is playing the same game.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=15';
-import * as Tr from './traits.js?v=15';
-import { fmt, fmtCoin } from './numbers.js?v=15';
+import * as Lore from './lore.js?v=16';
+import * as Tr from './traits.js?v=16';
+import { fmt, fmtCoin } from './numbers.js?v=16';
 
 /** The share of the mineral flow going to waste before it is worth saying. */
 const WASTE = 0.08;
 /** How much better the best price has to be before moving a share is worth it. */
 const SPREAD = 1.35;
 /**
- * While the front is idle and the next ring is the whole bottleneck, a trait
- * is only worth naming if it costs no more than this share of the ring. A
+ * While the front is idle and the next thing to buy is the whole bottleneck, a
+ * trait is only worth naming if it costs no more than this share of it. A
  * player who buys every affordable trait during that wait never opens the
  * ring at all: measured over ten minutes of following this line, the sugar
  * went 2.56K, 4.32K, 3.02K, 5.12K, 3.35K against a 10.24K ring and the run
- * stood still on one ring the whole time.
+ * stood still on one ring the whole time. The same wait happens on the last
+ * ring of a level, where what is being saved for is the fold rather than a
+ * ring, and it costs the same thing.
  */
 const TRAIT_SHARE = 0.25;
 
@@ -38,7 +40,12 @@ const TRAIT_SHARE = 0.25;
 export function next(sim, cfg) {
   const state = sim.state;
   const f = state.flags;
-  const say = (key, values) => ({ key, text: Lore.ui('next.' + key, values) });
+  // A line and, where the move it names is a single press, the press itself.
+  // The control the line points at can be a thousand pixels down a column that
+  // scrolls, and the line goes off the top of the window on the way to it, so
+  // the line carries the button: `do` is the action, `arg` what it acts on,
+  // and `label` the key of the words on it.
+  const say = (key, values, act) => ({ key, text: Lore.ui('next.' + key, values), act: act || null });
 
   // The opening: there is one button, and it is not obvious that pressing it
   // is meant to be temporary. So it counts down to the thing that ends it -
@@ -46,12 +53,13 @@ export function next(sim, cfg) {
   // the game, and it is the first one.
   if (state.tipCount === 0) {
     const cost = sim.tipCost(1);
-    if (state.sugar >= cost) return say('firstTip');
+    if (state.sugar >= cost) return say('firstTip', null, { do: 'tip', label: 'tip' });
     const perPress = cfg.hand.sugar * sim.scale();
     const left = perPress > 0 ? Math.max(1, Math.ceil((cost - state.sugar) / perPress)) : 0;
     // The wood and the soil are paying too, so it arrives by this press at the
     // latest. One press left is a different sentence from six.
-    return left > 1 ? say('hand', { n: fmt(left) }) : say('handLast');
+    const grow = { do: 'reach', label: 'hand' };
+    return left > 1 ? say('hand', { n: fmt(left) }, grow) : say('handLast', null, grow);
   }
 
   const lastRing = state.ring >= cfg.world.rings;
@@ -61,7 +69,7 @@ export function next(sim, cfg) {
     return say('beyond', {
       level: Lore.levelInfo(state.level).name,
       next: Lore.levelInfo(state.level + 1).name,
-    });
+    }, { do: 'beyond', label: 'beyond' });
   }
 
   // Throughput. The tips are both the front and the freight, and a front too
@@ -69,15 +77,17 @@ export function next(sim, cfg) {
   // whole run and shows nowhere else.
   const carry = sim.carry();
   if (f.trees && carry.produced > 0 && carry.carried < carry.produced * (1 - WASTE)) {
+    const n = sim.tipsAffordable();
     return say('waste', {
       produced: fmtCoin(carry.produced),
       lost: fmtCoin(carry.produced - carry.carried),
-    });
+    }, n >= 2 ? { do: 'tipsMax', label: 'tips', values: { n: fmt(n) } }
+      : n === 1 ? { do: 'tip', label: 'tip' } : null);
   }
 
   // Ground to open, and the money in hand to open it.
   const ringCost = !lastRing ? sim.ringCost() : 0;
-  if (empty && !lastRing && state.sugar >= ringCost) return say('ring');
+  if (empty && !lastRing && state.sugar >= ringCost) return say('ring', null, { do: 'ring', label: 'ring' });
 
   // The market. Minerals sent where the price is highest fetch more sugar for
   // the same minerals, and the prices move with the year. This sits above
@@ -100,24 +110,30 @@ export function next(sim, cfg) {
           bestPrice: fmtCoin(market[best].marginal),
           worst: market[worst].name,
           worstPrice: fmtCoin(market[worst].marginal),
-        });
+        }, { do: 'share', arg: best, label: 'share', values: { name: Lore.capital(market[best].name) } });
       }
     }
   }
 
   // A trait, cheapest first, once one is affordable outright. Ahead of any
   // waiting, because a trait bought now is working while the waiting happens -
-  // except while the front is idle and the ring is the whole bottleneck, when
-  // only a trait small enough not to hold the ring up is worth naming.
-  const holding = empty && !lastRing && state.sugar < ringCost;
+  // except while the one thing left to buy is the whole bottleneck, when only
+  // a trait small enough not to hold it up is worth naming. On a middle ring
+  // that thing is the next ring; on the last one it is the fold.
+  const foldCost = lastRing && sim.beyondOffered() ? sim.beyondCost() : 0;
+  const holdingFor = (empty && !lastRing && state.sugar < ringCost) ? ringCost
+    : (foldCost > 0 && state.sugar < foldCost) ? foldCost : 0;
   if (f.traits) {
     let pick = null;
     for (const t of Tr.offered(cfg, state, sim.mods())) {
       if (t.cost === null || t.cost > state.sugar) continue;
-      if (holding && t.cost > ringCost * TRAIT_SHARE) continue;
+      if (holdingFor > 0 && t.cost > holdingFor * TRAIT_SHARE) continue;
       if (!pick || t.cost < pick.cost) pick = t;
     }
-    if (pick) return say('trait', { name: Lore.trait(pick.id).name });
+    if (pick) {
+      const name = Lore.trait(pick.id).name;
+      return say('trait', { name }, { do: 'trait', arg: pick.id, label: 'trait', values: { name } });
+    }
   }
 
   // The waiting, and what it is for. A level standing finished with the fold

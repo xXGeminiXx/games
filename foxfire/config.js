@@ -145,6 +145,18 @@ export const CONFIG = {
       dead:  '{n} dead',
     },
 
+    // The words on the compass button. The compass names one move; this is
+    // that move as a label short enough to sit on the end of the line.
+    compass: {
+      hand:   'Grow a thread',
+      tip:    'Grow a tip',
+      tips:   'Grow {n} tips',
+      ring:   'Open the next ring',
+      beyond: 'Go beyond',
+      share:  'Give {name} a bigger share',
+      trait:  'Buy {name}',
+    },
+
     columns: {
       // The price leads, because it is the one figure a decision is made on.
       rate:     'Next mineral fetches',
@@ -898,7 +910,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 15,
+    build: 16,
   },
 };
 
