@@ -11,24 +11,24 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=64';
+import { loadConfig } from '../config.js?v=65';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=64';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=65';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=64';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=64';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=64';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=64';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=64';
-import { rng as makeRng } from './rng.js?v=64';
-import { offerCabinets, freshSeed } from './cabinets.js?v=64';
-import * as Save from './save.js?v=64';
-import { showState } from './render/reach.js?v=64';
-import { skinForCabinet } from './render/themes.js?v=64';
-import { chooseDoor as callDoor } from './events.js?v=64';
+         handMult, restoreFloor } from './floor.js?v=65';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=65';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=65';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=65';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=65';
+import { rng as makeRng } from './rng.js?v=65';
+import { offerCabinets, freshSeed } from './cabinets.js?v=65';
+import * as Save from './save.js?v=65';
+import { showState } from './render/reach.js?v=65';
+import { skinForCabinet } from './render/themes.js?v=65';
+import { chooseDoor as callDoor } from './events.js?v=65';
 
 // A gap between frames longer than this is time the player was away, not a
 // slow frame. The same number decides whether a reopened page was away at all.
@@ -53,8 +53,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=64');
-  const metaModule = await optional('./meta.js?v=64');
+  const catalogue = await optional('./fittings.js?v=65');
+  const metaModule = await optional('./meta.js?v=65');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -742,6 +742,7 @@ export function reading(game) {
     phase: run.phase,
     over: run.phase === PHASE_OVER,
     settling: run.phase === PHASE_SETTLE,
+    playing: run.phase === PHASE_PLAY,
     fever: run.fever.active,
     feverLeft: run.fever.ballsLeft,
     feverChain: run.fever.chain,

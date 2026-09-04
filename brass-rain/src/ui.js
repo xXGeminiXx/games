@@ -15,15 +15,15 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=64';
-import { createScene } from './render/scene.js?v=64';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=64';
-import { num, count, duration, mult, pct, fill } from './format.js?v=64';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=64';
-import { nailPos } from './board.js?v=64';
-import { DOORS_ROW } from './render/board-geom.js?v=64';
-import { sketchCabinet } from './cabinets.js?v=64';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=64';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=65';
+import { createScene } from './render/scene.js?v=65';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=65';
+import { num, count, duration, mult, pct, fill } from './format.js?v=65';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=65';
+import { nailPos } from './board.js?v=65';
+import { DOORS_ROW } from './render/board-geom.js?v=65';
+import { sketchCabinet } from './cabinets.js?v=65';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=65';
 
 const SPEEDS = [1, 2, 4];
 
@@ -394,6 +394,11 @@ export async function boot(doc) {
     if (lit && lit.key !== litRow) {
       litRow = lit.key;
       el.hint.textContent = (lit.doors || 3) + ' doors are lit at the foot of the board. Click one, or press its number, to call it.';
+    } else if (!lit && litRow !== null) {
+      // The doors have closed. Left alone the line keeps telling the player to
+      // click one, through the rest of the round and on into the workbench.
+      litRow = null;
+      if (!r.over) el.hint.textContent = cfg.text.firstLine;
     }
 
     if (r.away && r.away.gained > 0) {
@@ -433,7 +438,10 @@ export async function boot(doc) {
   }
 
   function paintBanner(r) {
-    if (r.fever && !r.over) {
+    // The banner says what the board is doing this instant, so it only speaks
+    // while the board is doing something.
+    const live = r.playing || r.settling;
+    if (r.fever && live) {
       el.banner.hidden = false;
       // The banner wears the machine's accent, with lettering that reads on it.
       // Written every time rather than only when there is one, or a machine

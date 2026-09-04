@@ -13,14 +13,14 @@
 // a round can be read, tested and swept without a canvas anywhere near it.
 // ---------------------------------------------------------------------------
 
-import { rng as makeRng } from './rng.js?v=64';
-import { createBoard, pocket } from './board.js?v=64';
-import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=64';
-import { fire, hasHook } from './hooks.js?v=64';
+import { rng as makeRng } from './rng.js?v=65';
+import { createBoard, pocket } from './board.js?v=65';
+import { createBalls, launch, clearBalls, stepPhysics } from './physics.js?v=65';
+import { fire, hasHook } from './hooks.js?v=65';
 import {
   createEvents, resetEvents, eventsOnLaunch, eventsOnBallHits, eventsOnResolve,
   eventsOnTake, eventsOnReels, eventsOnWideShut, eventsPayMult, isEventPocket,
-} from './events.js?v=64';
+} from './events.js?v=65';
 
 export const PHASE_PLAY = 'play';
 export const PHASE_SETTLE = 'settle';
@@ -887,6 +887,15 @@ function checkRoundEnd(state) {
       // about to swing back in would be setting them against a board that does
       // not exist.
       resetEvents(state);
+      // The lamp goes out with the round. It used to stay lit until the next
+      // round opened, which left the player at the workbench under a banner
+      // promising an open jackpot pocket and a count of balls nobody could
+      // send - and left a save taken there reopening with the flap held open.
+      state.fever.active = false;
+      state.fever.trailing = false;
+      state.fever.ballsLeft = 0;
+      const flap = state.board.pockets.find(p => p.id === 'attacker');
+      if (flap) flap.open = false;
       if (state.phase === PHASE_OVER) {
         state.over = true;
         logLine(state, 'lost', state.cfg.text.roundLost.replace('{short}', String(state.quota - state.won)));
