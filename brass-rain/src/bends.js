@@ -23,14 +23,22 @@
 // stream before it is allowed anywhere near the face. A screen is allowed to
 // be noisy; the confirmation is what decides.
 //
-// It runs in slices while the workbench is open, a few milliseconds a frame,
-// on a board of its own - never the one being drawn, or the nails would jitter
-// as candidates were tried and put back.
+// It runs in slices while the workbench is open, on a board of its own - never
+// the one being drawn, or the nails would jitter as candidates were tried and
+// put back. A slice is a handful of readings and one reading is indivisible,
+// so a slice is a fraction of a second rather than a frame: measured across
+// seven faces, the dearest single slice was 471 ms and a whole search 7 to 10
+// seconds. Nothing is animating at the workbench, which is why the search
+// lives there and nowhere else.
+//
+// What it keeps depends on the face and on nothing else. It used to depend on
+// how busy the machine was, because a reading was bounded by a wall clock;
+// see WORK_PER_BALL.
 // ---------------------------------------------------------------------------
 
-import { bendCheck, bendNail } from './board.js?v=71';
-import { createBalls, launch, stepPhysics } from './physics.js?v=71';
-import { rng } from './rng.js?v=71';
+import { bendCheck, bendNail } from './board.js?v=72';
+import { createBalls, launch, stepPhysics } from './physics.js?v=72';
+import { rng } from './rng.js?v=72';
 
 /** Nails nearest each slot that the screen will try. */
 export const NEAR_NAILS = 16;
@@ -53,19 +61,30 @@ export const CONFIRM_EDGE = 1.02;
 /** Physics steps one measurement may take before it is called finished. */
 const STEP_CAP = 2500;
 /**
- * The longest one measurement may take, in milliseconds.
+ * The most work one measurement may do, counted per ball it was given.
  *
- * The physics costs a step for every ball still falling against every nail on
- * the face, so a lean that traps a hundred balls in a pocket runs the whole
- * step cap with the whole field live: measured at ELEVEN AND A HALF SECONDS
- * inside one frame. A step cap cannot bound that, because the cost of a step
- * is not fixed. A clock can. On a face that behaves, every ball has resolved
- * long before this, so the reading is the same one every time. Set high
- * enough that an ordinary reading never touches it, or the cap itself becomes
- * the noise: at 22 ms it was cutting healthy measurements short and the search
- * came back from a good face with nothing.
+ * The physics costs a step for every ball still falling, so what a reading
+ * costs is not the number of steps it takes but the balls carried through
+ * them. A lean that traps a hundred balls in a pocket keeps the whole field
+ * live for the whole step cap, which measured at ELEVEN AND A HALF SECONDS
+ * inside one frame. The bound therefore goes on that product - balls carried,
+ * summed over steps - which is the thing the cost is proportional to.
+ *
+ * It replaces a wall clock, and the wall clock was the bug. A reading bounded
+ * by a clock is a different reading on a busy machine than on an idle one, so
+ * the same face searched twice found different leans: seed 7, twice in one
+ * process, kept one lean and then three. And the clock was firing on healthy
+ * faces as a matter of course - a plain 700 ball reading costs 326,000 to
+ * 405,000 ball-steps and ran 174 to 630 ms against a 200 ms cap - so most
+ * confirmations were being decided on a clipped sample. A budget counted in
+ * work does what the clock was there to do and gives the same answer on every
+ * machine.
+ *
+ * Set at about 1.7x the dearest healthy reading measured, so an ordinary one
+ * never touches it and a trapped face is still stopped well short of the step
+ * cap.
  */
-const MEASURE_MS = 200;
+export const WORK_PER_BALL = 1000;
 /**
  * Steps with nothing resolving before a measurement gives up.
  *
@@ -108,7 +127,7 @@ function nearest(board, slot, n) {
  * boards can be compared on identical balls; a different name is a different
  * set of balls, which is what a confirmation needs.
  */
-export function measure(cfg, board, stream, balls, strength, maxMs) {
+export function measure(cfg, board, stream, balls, strength, workPerBall) {
   const r = rng(stream);
   const b = createBalls(balls + 8);
   for (let i = 0; i < balls; i++) launch(cfg, b, strength, (r.next() * 2 - 1) * cfg.launch.spread, 1);
@@ -116,15 +135,15 @@ export function measure(cfg, board, stream, balls, strength, maxMs) {
   let steps = 0;
   let stall = 0;
   let live = b.n;
-  const until = Number.isFinite(maxMs) && maxMs > 0 ? Date.now() + maxMs : Infinity;
-  while (b.n > 0 && steps < STEP_CAP && stall < STALL_STEPS) {
+  let work = 0;
+  const per = Number.isFinite(workPerBall) && workPerBall > 0 ? workPerBall : WORK_PER_BALL;
+  const workCap = per * Math.max(1, balls);
+  while (b.n > 0 && steps < STEP_CAP && stall < STALL_STEPS && work < workCap) {
+    work += b.n;
     stepPhysics(cfg, board, b, cfg.physics.step, r.next, out);
     out.flashes.length = 0;
     steps++;
     if (b.n < live) { live = b.n; stall = 0; } else stall++;
-    // Checked every so often rather than every step, so the clock itself is
-    // not most of the cost of a cheap measurement.
-    if ((steps & 31) === 0 && Date.now() > until) break;
   }
   let gates = 0, paid = 0, total = 0;
   for (const e of out.events) {
@@ -202,7 +221,7 @@ export function makePlanner(cfg, board, opts = {}) {
   function tick() {
     if (done) return false;
     if (baseGate === null) {
-      baseGate = measure(cfg, board, screenStream(), screenBalls, strength, MEASURE_MS).gate;
+      baseGate = measure(cfg, board, screenStream(), screenBalls, strength).gate;
       return true;
     }
     if (at < nails.length * dirs.length) {
@@ -214,7 +233,7 @@ export function makePlanner(cfg, board, opts = {}) {
       if (!spot) return true;
       const x = spot.x, y = spot.y;
       bendNail(cfg, board, o.i, x, y);
-      const g = measure(cfg, board, screenStream(), screenBalls, strength, MEASURE_MS).gate;
+      const g = measure(cfg, board, screenStream(), screenBalls, strength).gate;
       bendNail(cfg, board, o.i, o.x0, o.y0);
       tried++;
       if (g > baseGate) {
@@ -231,13 +250,13 @@ export function makePlanner(cfg, board, opts = {}) {
     // The screen is finished. Its picks go to a stream none of them was ever
     // chosen against, one at a time, against the board as it actually stands.
     if (plainGate === null) {
-      plainGate = measure(cfg, board, confirmStream(), confirmBalls, strength, MEASURE_MS).gate;
+      plainGate = measure(cfg, board, confirmStream(), confirmBalls, strength).gate;
       return true;
     }
     if (shortlist.length) {
       const pick = shortlist.shift();
       bendNail(cfg, board, pick.i, pick.x, pick.y);
-      const bent = measure(cfg, board, confirmStream(), confirmBalls, strength, MEASURE_MS).gate;
+      const bent = measure(cfg, board, confirmStream(), confirmBalls, strength).gate;
       if (bent >= plainGate * CONFIRM_EDGE && bent > 0) {
         applied.push([pick.i, pick.x, pick.y]);
         taken.add(pick.i);
