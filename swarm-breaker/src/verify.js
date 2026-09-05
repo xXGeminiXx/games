@@ -29,7 +29,7 @@
 // in it and no wall clock reaches it. See docs/LEADERBOARD.md.
 // ---------------------------------------------------------------------------
 
-import { stateHash, hashHex } from './replay.js?v=24';
+import { stateHash, hashHex } from './replay.js?v=25';
 
 export const LOG_VERSION = 1;
 
@@ -122,6 +122,15 @@ export function createRunLog({ seed, mode, tier, build, daily = null } = {}) {
         mode: String(mode || ''),
         tier: String(tier || ''),
         build: String(build || ''),
+        // WHAT WAS BOUGHT AFTER THE LAST SHOT.
+        //
+        // A purchase between turns belongs to the turn that follows it, and
+        // the final one has no turn to follow. It still changed the swarm and
+        // the money the run ended on, so a replay that skips it lands on
+        // different figures and reports a run as failing to match itself.
+        // Left out while every purchase was a button press at the start of a
+        // turn; a run that spends for the player makes one of these every time.
+        tail: pending.map(p => p.slice()),
         turns: turns.map(t => (t.b
         ? { d: t.d.slice(), v: t.v.slice(), b: t.b.map(p => p.slice()) }
         : { d: t.d.slice(), v: t.v.slice() })),
@@ -134,6 +143,10 @@ export function createRunLog({ seed, mode, tier, build, daily = null } = {}) {
         while (out.turns.length && JSON.stringify(out).length > MAX_LOG_CHARS) out.turns.pop();
         out.truncated = true;
       }
+      // A closing purchase only means anything at the end of the run it closed.
+      // A log with turns cut off it no longer reaches that end, so it carries
+      // none rather than one attached to the wrong moment.
+      if (!out.tail.length || out.truncated) delete out.tail;
       return out;
     },
   };
@@ -173,6 +186,16 @@ export function validateLog(log, { maxTurns = MAX_TURNS } = {}) {
       }
     }
   }
+  // The purchases after the last shot get the same reading. A log written
+  // before they were recorded simply has none, which is still a valid log.
+  if (log.tail !== undefined) {
+    if (!Array.isArray(log.tail) || log.tail.length > MAX_BUYS_PER_TURN) return 'the closing purchase list is bad';
+    for (const p of log.tail) {
+      if (!Array.isArray(p) || p.length !== 2) return 'a closing purchase is malformed';
+      if (typeof p[0] !== 'string' || !/^[a-z][a-z0-9_-]{0,15}$/.test(p[0])) return 'a closing purchase names a bad offer';
+      if (!Number.isInteger(p[1]) || p[1] < 1 || p[1] > 1e9) return 'a closing purchase buys a bad count';
+    }
+  }
   return null;
 }
 
@@ -192,6 +215,17 @@ export function logHash(log) {
     nums.push(buys.length);
     for (const [id, n] of buys) {
       // The offer id folded in by its characters, so 'ball' and 'gain' differ.
+      for (let i = 0; i < id.length; i++) nums.push(id.charCodeAt(i));
+      nums.push(n);
+    }
+  }
+  // Folded in the same way a turn's purchases are, so a closing purchase
+  // cannot be edited after the fact any more than a shot can. A log with none
+  // hashes exactly as it did before they were written down.
+  const tail = log.tail || [];
+  if (tail.length) {
+    nums.push(tail.length);
+    for (const [id, n] of tail) {
       for (let i = 0; i < id.length; i++) nums.push(id.charCodeAt(i));
       nums.push(n);
     }

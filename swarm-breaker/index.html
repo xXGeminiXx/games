@@ -391,7 +391,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="d576c271b4d7">
+<meta name="build" content="5cd43ba9f214">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -551,25 +551,25 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=24';
-import { createJuice } from './src/juice.js?v=24';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=24';
-import { createBlockKinds } from './src/blocks.js?v=24';
-import { safeRows } from './src/arrival.js?v=24';
-import { createAwards } from './src/awards.js?v=24';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=24';
-import { createLeaderboard } from './src/leaderboard.js?v=24';
-import * as Tiers from './src/tiers.js?v=24';
-import { createOnboarding } from './src/onboarding.js?v=24';
-import { createVisual } from './src/visual.js?v=24';
-import * as Economy from './src/economy.js?v=24';
-import * as Powers from './src/powers.js?v=24';
-import * as Meta from './src/meta.js?v=24';
-import { createUI } from './src/ui.js?v=24';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=24';
-import { seedForSync, today as utcToday } from './src/daily.js?v=24';
-import { advise } from './src/advice.js?v=24';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=24';
+         storageKey, applyIdentity } from './config.js?v=25';
+import { createJuice } from './src/juice.js?v=25';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=25';
+import { createBlockKinds } from './src/blocks.js?v=25';
+import { safeRows } from './src/arrival.js?v=25';
+import { createAwards } from './src/awards.js?v=25';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=25';
+import { createLeaderboard } from './src/leaderboard.js?v=25';
+import * as Tiers from './src/tiers.js?v=25';
+import { createOnboarding } from './src/onboarding.js?v=25';
+import { createVisual } from './src/visual.js?v=25';
+import * as Economy from './src/economy.js?v=25';
+import * as Powers from './src/powers.js?v=25';
+import * as Meta from './src/meta.js?v=25';
+import { createUI } from './src/ui.js?v=25';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=25';
+import { seedForSync, today as utcToday } from './src/daily.js?v=25';
+import { advise, line as compassLine } from './src/advice.js?v=25';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=25';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1175,7 +1175,10 @@ function endTurn(){
 // player's to make.
 let saidAutoBuy = false;
 function autoBuy(){
-  if (!AUTOBUY || S.dead || !S.pow || !S.econ) return;
+  // A REPLAY NEVER SPENDS. It carries out the purchases written down and no
+  // others; a replay that also chose for itself bought everything twice, and
+  // a run played on the default setting then failed to match its own result.
+  if (!AUTOBUY || QUIET || S.dead || !S.pow || !S.econ) return;
   // ONE HAND PER TURN. Rebuilding it after every purchase costs a full deal
   // each time and a turn only ever buys a card or two, so the hand is read
   // once and the purse is tracked here. A price that moves under a purchase
@@ -3681,6 +3684,13 @@ function replayRun(input){
       if (S.dead) { over = true; break; }
     }
 
+    // Whatever was bought after the last shot. It belongs to no turn, and it
+    // is still part of the swarm and the money the run finished on, so a
+    // replay that stopped at the last shot answered with different figures.
+    // Skipped when the log ran out early, because then this is not where the
+    // run actually ended.
+    if (!over) for (const [id, n] of (log.tail || [])) purchase(id, n);
+
     result = {
       ok: true,
       depth: S.depth, swarm: S.balls, essence: runWorth(), doctrine: 'none',
@@ -3914,10 +3924,6 @@ function compassBag(){
   };
 }
 
-function fillHoles(text, vals){
-  return String(text).replace(/\{(\w+)\}/g, (all, k) => (vals[k] === undefined ? all : String(vals[k])));
-}
-
 function paintCompass(){
   const el = document.getElementById('hint');
   if (!el) return;
@@ -3928,15 +3934,9 @@ function paintCompass(){
   try {
     const pick = advise(compassBag());
     const words = pick && CONFIG.text.compass && CONFIG.text.compass[pick.key];
-    if (words){
-      const vals = { ...pick.vals };
-      // Plural agreement is the caller's job, so the words stay one sentence
-      // in the config instead of two spellings of the same sentence.
-      for (const k of ['n', 'cols', 'spare', 'live']){
-        if (vals[k] !== undefined) vals.s = (Number(vals[k]) === 1) ? '' : 's';
-      }
-      text = fillHoles(words, vals);
-    }
+    // The words, the holes and the plural agreement all belong to the compass,
+    // so there is one place where a sentence is built and one place to test it.
+    if (words) text = compassLine(words, pick.vals);
   } catch (e) {
     // A compass that throws is worth exactly nothing and the game is worth
     // everything, so it falls back to the controls it replaced.

@@ -28,6 +28,29 @@ export const KEYS = [
 
 function say(key, vals) { return { key, vals: vals || {} }; }
 
+/** Counts a compass sentence can be built around. `{s}` agrees with whichever
+ *  of these the sentence actually prints. */
+const COUNTS = ['live', 'n', 'cols', 'spare', 'swarm'];
+
+/**
+ * One compass sentence, filled in.
+ *
+ * The `{s}` hole is what keeps a line one sentence in the config instead of
+ * two spellings of the same one, and it has to agree with the count the
+ * sentence is built around - not with whichever number happens to be in the
+ * bag. A rung hands over figures it does not print (the marker line carries
+ * the swarm size for the rungs below it), so agreeing with the wrong one
+ * reads as "2 cyan marker out there".
+ */
+export function line(words, vals) {
+  const v = Object.assign({}, vals || {});
+  for (const k of COUNTS) {
+    if (v[k] === undefined || !String(words).includes('{' + k + '}')) continue;
+    v.s = Number(v[k]) === 1 ? '' : 's';
+  }
+  return String(words).replace(/\{(\w+)\}/g, (all, k) => (v[k] === undefined ? all : String(v[k])));
+}
+
 /** A number a person reads, in the same shape the readout uses. */
 function round(n) {
   if (!Number.isFinite(n)) return 0;
@@ -154,4 +177,4 @@ export function advise(bag) {
   });
 }
 
-export default { advise, KEYS };
+export default { advise, line, KEYS };

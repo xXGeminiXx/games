@@ -97,7 +97,7 @@ export const CONFIG = {
       marker:  '{n} cyan marker{s} out there. each one you hit joins the swarm',
       lane:    '{cols} clear column{s} to the ceiling. a ball up there rakes the top row',
       saving:  '{cash} cash. {name} costs {cost}, {short} to go. broken blocks pay',
-      aim:     '{swarm} balls at {damage} damage each. aim where the blocks are thickest',
+      aim:     '{swarm} ball{s} at {damage} damage each. aim where the blocks are thickest',
     },
 
     // The banner over a cleared board.
@@ -1092,7 +1092,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 24,
+    build: 25,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.
