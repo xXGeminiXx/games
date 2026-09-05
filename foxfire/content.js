@@ -249,7 +249,7 @@ export const CONTENT = {
     aimIdle: 'Click the floor and the tips work toward that spot first. Nothing gets closed off - they just get there sooner.',
     aimSet:  'The tips are working toward the mark.',
     noTrees: 'No living trees reached.',
-    sharesNote: 'Every mineral a kind gets fetches less than the one before, so the best kind wants a bigger share and never the whole flow.',
+    sharesNote: 'Every mineral a kind gets fetches less than the one before. Send to whoever pays most, and stop when one more there would fetch no more than it would somewhere else.',
     shareAutoOn:  'Nothing here needs setting. The minerals go where they fetch the most and follow the prices as the year turns. Press a share below to take it over.',
     shareAutoOff: 'You are setting the split. Switch this back on to have it follow the prices again.',
     treeBest: 'Pays best in {season}.',

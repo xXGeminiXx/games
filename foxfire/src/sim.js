@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=18';
-import { buildLevel, nearestOpen } from './world.js?v=18';
-import * as Tips from './tips.js?v=18';
-import * as Trees from './trees.js?v=18';
-import * as Tr from './traits.js?v=18';
-import * as Lv from './levels.js?v=18';
-import * as Sp from './spores.js?v=18';
-import * as Rv from './reveal.js?v=18';
-import * as Ev from './events.js?v=18';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=18';
-import { hash } from './rng.js?v=18';
-import * as Lore from './lore.js?v=18';
-import { fmtArea, fmtCoin } from './numbers.js?v=18';
+import { CONFIG as DEFAULT } from '../config.js?v=19';
+import { buildLevel, nearestOpen } from './world.js?v=19';
+import * as Tips from './tips.js?v=19';
+import * as Trees from './trees.js?v=19';
+import * as Tr from './traits.js?v=19';
+import * as Lv from './levels.js?v=19';
+import * as Sp from './spores.js?v=19';
+import * as Rv from './reveal.js?v=19';
+import * as Ev from './events.js?v=19';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=19';
+import { hash } from './rng.js?v=19';
+import * as Lore from './lore.js?v=19';
+import { fmtArea, fmtCoin } from './numbers.js?v=19';
 
 export const SAVE_VERSION = 1;
 
@@ -377,8 +377,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     }
 
     // Feeding: sugar to a kind, for growth.
+    //
+    // What it buys is the season's growth run faster, so in a season with no
+    // growth in it there is nothing to buy and nothing is charged. The ledger
+    // already said as much on the row; the sugar was taken anyway, and a kind
+    // left on Feed paid all winter for no size at all.
     const boost = {};
-    if (m.nurture) {
+    if (m.nurture && season.growth > 0) {
       for (const sp of roster) {
         if (!state.nurture[sp.key]) continue;
         const S = sizes[sp.key] || 0;

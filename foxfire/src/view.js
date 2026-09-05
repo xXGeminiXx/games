@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=18';
-import { noise } from './world.js?v=18';
-import { hash, unit } from './rng.js?v=18';
-import { angleGap, burntSet } from './events.js?v=18';
+import { seasonOf } from './season.js?v=19';
+import { noise } from './world.js?v=19';
+import { hash, unit } from './rng.js?v=19';
+import { angleGap, burntSet } from './events.js?v=19';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -1102,14 +1102,15 @@ export function createView(canvas, cfg, doc) {
       if (r > 0) rings.push(x, y, r, nodePay && nodePayPeak > 0 ? nodePay[i] / nodePayPeak : 0);
     }
     // One beat per place, out of step with its neighbours so the floor breathes
-    // rather than blinking as one thing, and faster where the ground pays more.
-    const beatFor = (pay, salt) => {
+    // rather than blinking as one thing. What a place pays sets how far its
+    // light swings, in the sheath itself; the beat under it runs at one rate.
+    const beatFor = (salt) => {
       const period = Math.max(0.2, num((V.pulse || {}).seconds, 1.6));
       const phase = (state.t / period + salt * 0.618) % 1;
       return 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
     };
     for (let k = 0; k < rings.length; k += 4) {
-      sheath(rings[k], rings[k + 1], rings[k + 2], rings[k + 3], look.glow, beatFor(rings[k + 3], k >> 2));
+      sheath(rings[k], rings[k + 1], rings[k + 2], rings[k + 3], look.glow, beatFor(k >> 2));
     }
     ctx.globalAlpha = 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

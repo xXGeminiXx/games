@@ -696,8 +696,9 @@ export const CONFIG = {
     },
 
     // A PLACE PAYING. Wood being eaten, soil giving up minerals and a tree
-    // trading all pulse where they stand, at a rate set by what they pay, so
-    // the busiest ground is the ground that flickers most.
+    // trading all pulse where they stand, and the more a place pays the
+    // further its light swings, so the busiest ground is the ground that
+    // moves most.
     pulse: {
       radius: 0.55,         // in cells, at full strength
       alpha: 0.3,
@@ -919,7 +920,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 18,
+    build: 19,
   },
 };
 
