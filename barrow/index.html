@@ -113,13 +113,13 @@
   /* Nine pixels wide is not something a mouse hits on purpose, and this is
      the control the whole panel exists to set. The glyph is unchanged; the
      button around it is fifteen by twenty-four. */
-  .wrow .bar .notch{
+  .wrow .bar .step{
     border:0;background:transparent;padding:0;min-width:15px;line-height:24px;
     color:var(--quiet);border-radius:0;letter-spacing:0;text-align:center;
   }
-  .wrow .bar .notch:hover:not(:disabled){background:var(--rule)}
-  .wrow .bar .notch.on{color:var(--bone)}
-  .wrow .bar .notch:hover:not(:disabled){color:var(--ink);border-color:transparent}
+  .wrow .bar .step:hover:not(:disabled){background:var(--rule)}
+  .wrow .bar .step.on{color:var(--bone)}
+  .wrow .bar .step:hover:not(:disabled){color:var(--ink);border-color:transparent}
   .wrow button.w{padding:0 7px;line-height:17px}
   .wrow i{font-style:normal;color:var(--dim);font-size:11px;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wrow i.hot,.ledger.hot{color:var(--hot)}
@@ -133,6 +133,11 @@
   #handover button{font-size:11px;padding:1px 8px;color:var(--dim)}
   #handover button:hover:not(:disabled){color:var(--ink)}
   #handover .lbl{margin:0}
+  /* Every layer nobody is digging any more, on one line. */
+  #spent{display:flex;gap:10px;align-items:baseline;margin:0 0 8px;flex-wrap:wrap}
+  #spent button{font-size:11px;padding:1px 8px;color:var(--dim)}
+  #spent button:hover:not(:disabled){color:var(--ink)}
+  #spent .lbl{margin:0}
 
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
@@ -165,6 +170,9 @@
   #market td.good{white-space:nowrap;text-overflow:ellipsis}
   #market tr.lesserrow td.good{white-space:normal}
   #market small{display:block;color:var(--quiet);font-size:10px;line-height:1.2;white-space:nowrap}
+  /* "takes 538.69K, back in 2s" does not fit on one line in a column sized
+     for a chart, and nowrap clipped the end of it. It wraps to two. */
+  #market small.ledger{white-space:normal;line-height:1.2}
   #market small.sat{color:var(--hot)}
   #market small.seam{color:var(--dim);opacity:.75}
   #market td.num b{font-weight:500}
@@ -283,7 +291,7 @@
      It gets a thumb-sized height and the bar gets wide enough that five of
      them are still separately hittable. */
   .wrow .bar { width: 130px; }
-  .wrow .bar .notch { min-width: 26px; min-height: 32px; }
+  .wrow .bar .step { min-width: 26px; min-height: 32px; }
 }
 </style>
 <!-- plays:start -->
@@ -418,7 +426,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="6f3b0660c811">
+<meta name="build" content="165829466146">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -470,7 +478,7 @@
     <div class="stat" id="st-coin" hidden><b id="coin">0</b><span id="lbl-coin">coin</span></div>
     <div class="stat" id="st-income" hidden><b id="income">0</b><span id="lbl-income">coin/s</span></div>
     <div class="stat" id="st-bones" hidden><b id="bones">0</b><span id="lbl-bones">bones</span></div>
-    <div class="stat" id="st-horde" hidden><b id="horde">0</b><span id="lbl-horde">horde</span></div>
+    <div class="stat" id="st-horde" hidden><b id="horde">0</b><span id="lbl-horde">diggers</span></div>
     <div class="stat" id="st-depth" hidden><b id="depth">0</b><span id="lbl-depth">depth</span></div>
     <div class="stat" id="st-rem" hidden><b id="rem">0</b><span id="lbl-rem">relics</span></div>
   </div>
@@ -490,7 +498,7 @@
       <div id="visitor-acts"></div>
     </div>
     <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
-    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">The horde</h2><div id="raise"></div><div id="handover"></div><div id="weights"></div></div>
+    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">Where they dig</h2><div id="raise"></div><div id="handover"></div><div id="spent" hidden></div><div id="weights"></div></div>
     <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
       <h2 id="p-seal">Fill it in</h2>
@@ -527,8 +535,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=17';
-import { createGame } from './src/game.js?v=17';
+import { CONFIG, applyIdentity } from './config.js?v=18';
+import { createGame } from './src/game.js?v=18';
 
 applyIdentity(document);
 

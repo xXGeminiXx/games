@@ -17,8 +17,8 @@
 // the panel used to make a player fill in by hand.
 // ---------------------------------------------------------------------------
 
-import * as Mk from './market.js?v=17';
-import * as H from './horde.js?v=17';
+import * as Mk from './market.js?v=18';
+import * as H from './horde.js?v=18';
 
 /**
  * The share of the diggers that layer k can take before its buyers stop

@@ -76,6 +76,11 @@ export const CONFIG = {
     autoOnTip:  'Hand it back and the game keeps them where they earn most',
     autoNoteGame: 'They move themselves as the ground changes.',
     autoNoteHand: 'You are placing them. They stay where you put them.',
+    // Layers nobody is digging any more, folded into one line.
+    spent:      '{N} older layers, worked out.',
+    spentWorth: '{N} older layers, worked out. What they left is worth {coin}.',
+    spentShow:  'Show them',
+    spentHide:  'Hide them',
     // Under each row: what that layer is actually paying and how many of the
     // dead it is turning up, both per second. Deep ground is worth thousands
     // of times what shallow ground is and its buyers are nowhere near full,
@@ -166,7 +171,8 @@ export const CONFIG = {
       raiseMore: '{Bones} bones raises {n} more of them. Nothing else spends bones.',
       face:      "Nothing's digging down. Send some of them to {name} and they break into {next}.",
       move:      '{From} pays {low} coin/s and {name} pays {high}. Send more of them down.',
-      seal:      'Filling in pays {n} relics now. {Name} costs {cost} and holds in every barrow after.',
+      seal:      'Filling in pays {n} relics now. That is {Name} at {cost}, and you keep it for good.',
+      sealBeats: 'Filling in pays {n} relics: {Name} at {cost}, yours for good. {Buy} at {coin} goes back in the hole with everything else.',
       oath:      '{N} relics banked. {Name} costs {cost} and you keep it.',
       rite:      '{Name} costs {cost}. {line}',
       wait:      "{Name} costs {cost}. At {rate} that's {t} away.",
@@ -632,7 +638,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 17,
+    build: 18,
   },
 };
 

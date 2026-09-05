@@ -11,15 +11,15 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=17';
-import * as Mk from './market.js?v=17';
-import * as H from './horde.js?v=17';
-import * as R from './rites.js?v=17';
-import * as Rb from './rebirth.js?v=17';
-import * as Lore from './lore.js?v=17';
-import * as Advice from './advice.js?v=17';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=17';
-import { fill } from '../config.js?v=17';
+import * as Mat from './materials.js?v=18';
+import * as Mk from './market.js?v=18';
+import * as H from './horde.js?v=18';
+import * as R from './rites.js?v=18';
+import * as Rb from './rebirth.js?v=18';
+import * as Lore from './lore.js?v=18';
+import * as Advice from './advice.js?v=18';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=18';
+import { fill } from '../config.js?v=18';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -49,7 +49,7 @@ export function createUI(doc, sim, cfg, actions) {
     log: byId('log'),
     hand: byId('hand'), dig: byId('dig'), sell: byId('sell'), handline: byId('handline'),
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
-    handOver: byId('handover'),
+    handOver: byId('handover'), spent: byId('spent'),
     marketPanel: byId('market-panel'), market: byId('market'),
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
@@ -162,12 +162,21 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
+  // Layers with nobody on them are the set, not the state: deep in a run
+  // every layer above the deepest is finished for good and nine rows reading
+  // nothing are nine rows of scenery. They fold into one line that says how
+  // many and what they left, and anybody who wants the list can open it.
+  let showSpent = false;
+
   const weightRows = new Map(); // key -> { node, bar, meta }
-  const buildWeights = () => {
+  const buildWeights = (split) => {
     const s = sim.state;
     const from = sim.activeFrom();
     const keys = [];
-    for (let k = s.depth; k >= from; k--) keys.push(k);
+    for (let k = s.depth; k >= from; k--) {
+      const live = (split.strata[k] || 0) > 1e-9;
+      if (live || showSpent || s.byHand) keys.push(k);
+    }
     if (s.flags.face) keys.push('face');
     const have = Array.from(weightRows.keys());
     const same = have.length === keys.length && have.every((k, i) => k === keys[i]);
@@ -186,7 +195,7 @@ export function createUI(doc, sim, cfg, actions) {
       const notches = [];
       const bar = el('span', { class: 'bar', title: T.shareBarTip });
       for (let i = 1; i <= cfg.horde.maxWeight; i++) {
-        const n = el('button', { class: 'notch', title: T.shareBarTip,
+        const n = el('button', { class: 'step', title: T.shareBarTip,
           onclick: () => actions.setWeightAt(key, currentWeight(key) === i ? 0 : i) });
         notches.push(n);
         bar.appendChild(n);
@@ -226,6 +235,37 @@ export function createUI(doc, sim, cfg, actions) {
     handOver._note.textContent = byHand ? T.autoNoteHand : T.autoNoteGame;
   };
 
+  // The one line that stands for every layer nobody is digging any more.
+  let spentLine = null, spentButton = null;
+  const buildSpent = () => {
+    if (spentLine || !nodes.spent) return;
+    spentLine = el('span', { class: 'lbl' });
+    spentButton = el('button', { onclick: () => { showSpent = !showSpent; render(); } });
+    nodes.spent.appendChild(spentLine);
+    nodes.spent.appendChild(spentButton);
+  };
+  const paintSpent = (split) => {
+    if (!spentLine) return;
+    const s = sim.state;
+    const from = sim.activeFrom();
+    let n = 0, worth = 0;
+    for (let k = from; k <= s.depth; k++) {
+      if ((split.strata[k] || 0) > 1e-9) continue;
+      n++;
+      const id = 's' + k;
+      const held = sim.held(id);
+      if (held > 0) worth += sim.quote(id, held);
+    }
+    // By hand every row is the player's business, so nothing folds.
+    const on = n > 0 && !s.byHand;
+    show(nodes.spent, on);
+    if (!on) return;
+    spentLine.textContent = worth > 0.005
+      ? fill(T.spentWorth, { n: n, coin: fmtCoin(worth) })
+      : fill(T.spent, { n: n });
+    spentButton.textContent = showSpent ? T.spentHide : T.spentShow;
+  };
+
   const currentWeight = (key) =>
     (key === 'face' ? sim.state.faceWeight : sim.state.weights[key]) | 0;
 
@@ -234,15 +274,24 @@ export function createUI(doc, sim, cfg, actions) {
   const marketRows = new Map(); // id -> row parts
   let lesserRow = null;
 
-  /** Which goods get a row of their own, deepest first, bones last. */
+  /**
+   * Which materials get a row of their own, deepest first, bones last.
+   *
+   * A row for something nobody is bringing up any more, with under a unit of
+   * it left on hand, is a picture of a finished layer: it goes in with the
+   * older ones on a single line instead of taking a row of the table.
+   */
   const rowIds = () => {
     const from = sim.activeFrom();
+    const split = sim.split();
     const own = [];
     const lesser = [];
     for (const id of sim.goods()) {
       if (id === Mat.BONES) continue;
       const k = Mat.strataOf(id);
-      if (k >= from) own.push(id); else lesser.push(id);
+      const done = !sim.state.byHand && k < sim.state.depth
+        && !((split.strata[k] || 0) > 1e-9) && sim.held(id) < 1;
+      if (k >= from && !done) own.push(id); else lesser.push(id);
     }
     own.sort((a, b) => Mat.strataOf(b) - Mat.strataOf(a));
     if (sim.goods().includes(Mat.BONES)) own.push(Mat.BONES);
@@ -686,10 +735,11 @@ export function createUI(doc, sim, cfg, actions) {
         b.cost.textContent = b.count === 'max' ? (n > 0 ? '+' + fmtCount(n) : '-') : fmt(Math.ceil(cost * 10) / 10);
         b.node.disabled = !(n > 0) || cost > s.bones + 1e-9;
       }
-      buildWeights();
-      buildHandOver();
-      const byHand = !!s.byHand;
       const split = sim.split();
+      buildWeights(split);
+      buildHandOver();
+      buildSpent();
+      const byHand = !!s.byHand;
       const rates = sim.layerRates();
       // The bar reads out where the diggers are. When the game is doing the
       // splitting it is a picture of a fraction, not a five-step setting, so
@@ -705,7 +755,7 @@ export function createUI(doc, sim, cfg, actions) {
         for (let i = 0; i < r.notches.length; i++) {
           const on = i < w;
           r.notches[i].textContent = on ? '▌' : '·';
-          r.notches[i].className = on ? 'notch on' : 'notch';
+          r.notches[i].className = on ? 'step on' : 'step';
           r.notches[i].disabled = !byHand;
         }
         show(r.less, byHand); show(r.more, byHand);
@@ -740,6 +790,7 @@ export function createUI(doc, sim, cfg, actions) {
         r.meta.title = hot ? T.ceilingTip : '';
       }
       paintHandOver();
+      paintSpent(split);
       show(nodes.handOver, f.face || s.depth > 0);
       show(nodes.weights, f.face || s.depth > 0);
     }

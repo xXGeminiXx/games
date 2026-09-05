@@ -20,11 +20,11 @@
 // is named only when it would more than treble what they have kept.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=17';
-import * as R from './rites.js?v=17';
-import * as Rb from './rebirth.js?v=17';
-import * as Lore from './lore.js?v=17';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=17';
+import * as H from './horde.js?v=18';
+import * as R from './rites.js?v=18';
+import * as Rb from './rebirth.js?v=18';
+import * as Lore from './lore.js?v=18';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=18';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -152,22 +152,29 @@ export function next(sim, cfg) {
   const relics = sim.legacy.remembrance || 0;
   const oath = oathChoice(sim, cfg, relics);
   const pending = sim.canSeal() ? sim.sealYield() : 0;
+  const rites = riteChoice(sim, cfg);
 
-  // Filling the barrow in ends the run, so it is named over a purchase only
-  // when it would more than treble what has been kept and pay for something
-  // permanent on its own.
-  if (pending > 0 && oath && pending >= Math.max(3, relics * 3) && relics + pending >= oath.price) {
-    return say('seal', {
-      n: fmt(pending), name: Lore.oath(oath.def.id).name, cost: fmt(oath.price),
-    }, 'seal-panel');
-  }
-
-  // Relics already banked and something to spend them on.
+  // Relics already banked and something they will buy. Free, instant, and it
+  // does not end the run, so it comes before anything that does.
   if (oath && oath.afford) {
     return say('oath', { n: fmt(relics), name: Lore.oath(oath.def.id).name, cost: fmt(oath.price) }, 'tab-oaths');
   }
 
-  const rites = riteChoice(sim, cfg);
+  // Filling the barrow in when it genuinely pays best. Coin buys things that
+  // go back in the hole with everything else; relics buy things that hold in
+  // every barrow after, so once filling in reaches something permanent that
+  // the relics in hand will not, it is the better move and the line says so
+  // with both figures on it. It never presses anything: ending a run is his.
+  if (pending > 0 && oath && relics + pending >= oath.price) {
+    const words = { n: fmt(pending), name: Lore.oath(oath.def.id).name, cost: fmt(oath.price) };
+    if (rites.best) {
+      words.buy = R.wordsOf(rites.best.def.id).name;
+      words.coin = fmtCoin(rites.best.price);
+      return say('sealBeats', words, 'seal-panel');
+    }
+    return say('seal', words, 'seal-panel');
+  }
+
   if (rites.best) {
     const words = R.wordsOf(rites.best.def.id);
     return say('rite', { name: words.name, cost: fmtCoin(rites.best.price), line: words.line }, 'rites-panel');
@@ -204,7 +211,7 @@ export function next(sim, cfg) {
 /** Every key `next` can return, for the suite and for nothing else. */
 export const KEYS = [
   'room', 'gateEmpty', 'gateCoin', 'gate', 'dig', 'raise', 'sell', 'face',
-  'move', 'raiseMore', 'seal', 'oath', 'rite', 'wait', 'work', 'bones', 'idle',
+  'move', 'raiseMore', 'oath', 'sealBeats', 'seal', 'rite', 'wait', 'work', 'bones', 'idle',
 ];
 
 // Named so a reader of this file can see the two the ordering is built around
