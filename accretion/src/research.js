@@ -157,6 +157,12 @@ export const PAY = Object.freeze({
   // a rung are still where promotion income lives, and large enough that a
   // working field always climbs toward the next thing it can buy.
   promoteResidual: 0.4,
+  // ...and a promotion the field EARNED and was REFUSED pays the same
+  // residual, times the rung it was reaching for. Straining at a rung is work
+  // the field did, and it is the only work left to a run whose field is full:
+  // measured on a real save at the ceiling, the field strained twice in a
+  // minute and earned nothing either time, which is how a run ends up unable
+  // to afford the row that would let it stop straining.
   ignite: 60,           // first light
   giant: 40,            // a star leaving the main sequence
   nebula: 120,          // a planetary nebula
@@ -310,8 +316,9 @@ function pay(s, amount, cls) {
 
 /**
  * What one field event is worth. `ev` is the interface's reading of it:
- *   { kind: 'merge' | 'promote' | 'ignite' | 'giant' | 'nebula' | 'supernova'
- *           | 'collapse' | 'detonation' | 'remnant' | 'second' | 'condense',
+ *   { kind: 'merge' | 'promote' | 'blocked' | 'ignite' | 'giant' | 'nebula'
+ *           | 'supernova' | 'collapse' | 'detonation' | 'remnant' | 'second'
+ *           | 'condense',
  *     rung?: number }
  * Returns the flux paid.
  */
@@ -327,6 +334,7 @@ export function onEvent(s, ev) {
       if (s.counts[key] > PAY.promoteFirst) return pay(s, PAY.promoteResidual * rung);
       return pay(s, PAY.promote * rung);
     }
+    case 'blocked': return pay(s, PAY.promoteResidual * Math.max(1, ev.rung || 1));
     case 'ignite': return pay(s, PAY.ignite);
     case 'giant': return pay(s, PAY.giant);
     case 'nebula': return pay(s, PAY.nebula, 'death');

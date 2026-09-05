@@ -241,7 +241,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="3f6f981ba50d">
+<meta name="build" content="7e6ea64b7a7c">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -310,11 +310,11 @@
 // the view can draw, and names things the first time they happen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=2';
-import { createSim, restoreSim, magToString, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=2';
-import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=2';
-import * as Stellar from './src/stellar.js?v=2';
-import { createGame } from './src/game.js?v=2';
+import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=3';
+import { createSim, restoreSim, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=3';
+import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=3';
+import * as Stellar from './src/stellar.js?v=3';
+import { createGame } from './src/game.js?v=3';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
@@ -479,10 +479,15 @@ function seedWorld(wx, wy, opts) {
   // against an exponential ladder.
   const st = sim.stats ? sim.stats() : null;
   const held = st && st.totalMass ? st.totalMass.m * Math.pow(10, st.totalMass.e) : 0;
-  // The wall. Nothing is said here: the line that says what to do next names
-  // the wall and the way through it in one sentence, and a second line
-  // repeating the first half of that was on screen for the rest of the run.
-  if (held >= seed.massCeiling) return;
+
+  // THE WALL. A full field still takes matter. It used to refuse the seed and
+  // return, which stopped every income the game has: nothing arrives, nothing
+  // merges, no event fires. What arrives now is one body instead of a share of
+  // the field, light enough that the total does not move and heavy enough to
+  // be a thing that falls in and meets something. Nothing is said here either
+  // - the line that says what to do next names the wall and the way through
+  // it in one sentence.
+  const full = held >= seed.massCeiling;
   // Said once, the first time a run comes within reach of its ceiling. The
   // field keeps taking clicks after this; the line only exists so the wall is
   // not the first anyone hears of it.
@@ -494,8 +499,16 @@ function seedWorld(wx, wy, opts) {
   // there - but addBody takes the field's own CODE units, which the ledger
   // re-centres as the run grows. The conversion is asked of the field, which
   // owns the ledger.
-  const perAbs = Math.max(seed.massPerBody,
-                          (held * seed.clickShare) / Math.max(1, seed.bodiesPerClick));
+  const bodies = full ? 1 : Math.max(1, seed.bodiesPerClick);
+  // NO BASE FLOOR ON THE ONE THAT ARRIVES AT THE WALL. The floor exists so an
+  // ordinary click is never smaller than the smallest body the game makes, and
+  // at the ceiling it is the wrong way round: it is the only thing that can
+  // push the total, and against a small ceiling it pushed it 15% in a minute.
+  // The per-body floor below still keeps the mass off zero.
+  const perAbs = full
+    ? Math.min(held * seed.ceilingArrivalShare,
+               Math.pow(2, Stellar.IGNITION_LOG2 - seed.ceilingArrivalBelowIgnition))
+    : Math.max(seed.massPerBody, (held * seed.clickShare) / bodies);
   const per = sim.codeMassFromAbsolute(perAbs);
   const floor = sim.codeMassFromAbsolute(seed.massPerBody * 0.1);
 
@@ -532,8 +545,8 @@ function seedWorld(wx, wy, opts) {
     }
   }
 
-  const step = 6.2831853 / Math.max(1, seed.bodiesPerClick);
-  for (let k = 0; k < seed.bodiesPerClick; k++) {
+  const step = 6.2831853 / bodies;
+  for (let k = 0; k < bodies; k++) {
     // The golden angle keeps successive clicks from landing on the same spokes.
     const jitter = (hash2(clicks, k) - 0.5) * step * seed.angleJitter;
     const a = (clicks * 2.3999632 + k * step + jitter) % 6.2831853;
@@ -738,6 +751,39 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveN
 const fmt = document.getElementById('mass');
 let last = 0;
 
+/**
+ * THE FIGURE IN THE CORNER, IN A UNIT THAT EXISTS OUTSIDE THIS GAME.
+ *
+ * It read "1.02e45" under the words "total mass" - the field's own mass unit,
+ * which nothing on screen names and nothing else is measured in. Everything
+ * beside it is in real units already: the caption above says how many metres
+ * the view spans, the column down the right edge is in metres, and the star
+ * readout is in solar masses. This one was a number with no noun.
+ *
+ * Kilograms while the whole field weighs less than a small star, then suns,
+ * because a run crosses that line once and never reads well on both sides of
+ * it. The conversion is the simulation's own: `Stellar.solar` is what the
+ * ladder is built on, so the figure agrees with the ignition mass by
+ * construction rather than by a constant copied out of it.
+ */
+const KG_PER_SUN = 1.98847e30;
+function withUnit(v, one, many) {
+  if (!(v > 0)) return '0 ' + many;
+  const text = (v >= 0.01 && v < 1e5)
+    ? String(Number(v.toPrecision(3)))
+    : v.toExponential(2).replace('e+', 'e');
+  return text + ' ' + (v === 1 ? one : many);
+}
+function massText(mag) {
+  if (!mag || !(mag.m > 0)) return '0 kg';
+  const log2abs = (Math.log10(mag.m) + mag.e) / Math.log10(2);
+  const suns = Stellar.solar(log2abs);
+  const U = CONFIG.text;
+  return suns >= CONFIG.matter.sunsFrom
+    ? withUnit(suns, U.massSun, U.massSuns)
+    : withUnit(suns * KG_PER_SUN, U.massKilograms, U.massKilograms);
+}
+
 function frame(now) {
   const dt = last ? Math.min(CONFIG.field.maxStepSeconds, (now - last) / 1000) : 1 / 60;
   last = now;
@@ -770,7 +816,7 @@ function frame(now) {
   const world = adapt(sim.getRenderView(), { t: now / 1000, events, extent, exp });
   view.renderFrame(world, now);
 
-  if (s && s.totalMass) fmt.textContent = magToString(s.totalMass, 2);
+  if (s && s.totalMass) fmt.textContent = massText(s.totalMass);
   if (noteUntil && now >= noteUntil) { note.textContent = ''; noteUntil = 0; }
 
   requestAnimationFrame(frame);

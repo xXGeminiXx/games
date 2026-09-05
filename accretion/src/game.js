@@ -13,10 +13,10 @@
  * that a player reads more than once.
  */
 
-import * as R from './research.js?v=2';
-import * as Advice from './advice.js?v=2';
-import * as Stellar from './stellar.js?v=2';
-import * as Rebirth from './rebirth.js?v=2';
+import * as R from './research.js?v=3';
+import * as Advice from './advice.js?v=3';
+import * as Stellar from './stellar.js?v=3';
+import * as Rebirth from './rebirth.js?v=3';
 
 const SAVE_VERSION = 2;
 
@@ -136,8 +136,13 @@ export function createGame(o) {
         R.onEvent(research, { kind: 'merge', rung: e.kind < KIND.STAR ? e.kind : KIND.STAR });
         break;
       case EVENT.BLOCKED:
-        // The field has earned something it may not take. The node lights.
+        // The field has earned something it is not allowed to take. The row
+        // lights - and it pays, at the residual rate, because straining at a
+        // rung is work the field did. Before this a field that could only
+        // strain earned exactly nothing for it, which is how a run at the
+        // ceiling ends up unable to afford the row that would let it climb.
         if (research.era === 0) { R.begin(research); boardDirty = true; }
+        R.onEvent(research, { kind: 'blocked', rung: e.kind });
         if (research.wanted.indexOf(e.kind) < 0) { R.want(research, e.kind); boardDirty = true; }
         break;
       case EVENT.KIND_CHANGE:
@@ -183,10 +188,21 @@ export function createGame(o) {
    * The laws, run every frame
    * ---------------------------------------------------------------------- */
 
-  /** Infall: matter arrives on its own, at a rate the player set. */
+  /** How much the field holds, against the most one run can hold. */
+  function atCeiling(stats) {
+    const held = stats && stats.totalMass ? stats.totalMass.m * Math.pow(10, stats.totalMass.e) : 0;
+    return held >= CONFIG.seeding.massCeiling;
+  }
+
+  /** Arrivals: matter comes in on its own, at a rate the player set. */
   function runInfall(dt, stats) {
     if (!R.hasLaw(research, 'infall')) return;
-    const rate = R.dial(research, 'infall') * G.infallPerSecond;
+    const full = atCeiling(stats);
+    // A FULL FIELD STILL TAKES MATTER, SLOWLY. The wall has to stay a wall, so
+    // what falls in at the ceiling slows to a share of the handle - enough that
+    // things keep meeting, and meeting is what pays for the row that opens the
+    // field up again.
+    const rate = R.dial(research, 'infall') * G.infallPerSecond * (full ? G.ceilingArrivalRate : 1);
     if (!(rate > 0)) return;
     infallDebt += rate * dt;
     const sim = getSim();
@@ -205,7 +221,7 @@ export function createGame(o) {
       const h = hash(seeds * 7919 + 13);
       const a = h * 6.2831853;
       const r = (0.25 + 0.7 * hash(seeds * 104729 + 7)) * Math.max(extCode * 0.5, 1e-6);
-      if (R.hasLaw(research, 'formation') && typeof seedCloud === 'function') {
+      if (!full && R.hasLaw(research, 'formation') && typeof seedCloud === 'function') {
         // Star formation: a whole cloud, each body standing for a share of
         // everything the field already represents.
         const d = R.dial(research, 'formation');

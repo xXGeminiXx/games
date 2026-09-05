@@ -49,6 +49,12 @@ export const CONFIG = {
     // everything in the field, and it is the figure the run's own ceiling is
     // measured against, so what it is called has to be what is measured.
     massLabel: 'total mass',
+    // The unit the figure is printed in. Kilograms while the whole field
+    // weighs less than a small star, then suns, because a run crosses that
+    // line once and no single unit reads well on both sides of it.
+    massKilograms: 'kg',
+    massSun: 'sun',
+    massSuns: 'suns',
 
     // The line along the bottom. It says the least it can and then stops: the
     // first prompt, one nudge to repeat it, and then silence.
@@ -76,7 +82,7 @@ export const CONFIG = {
       fullWanted: 'the field\'s full. it\'s straining to make {kind}: {name} costs {cost} and you have {flux}.',
       fullBuy:    'the field\'s full. spend what you banked: {name} costs {cost} and you have {flux}.',
       fullWait:   'the field\'s full and still earning {rate} data a second. {name} costs {cost}: about {eta}.',
-      fullStuck:  'the field\'s full and earning nothing. start over, bottom left, for an empty one. what you bought goes with it.',
+      fullClick:  'the field\'s full, so nothing you add to it moves the total. it still pays for things meeting, so keep clicking.',
       wantedBuy:  'the field\'s straining to make {kind}. {name} costs {cost} and you have {flux}.',
       wantedWait: 'the field\'s straining to make {kind}. {name} costs {cost}, you have {flux} at {rate} data a second: about {eta}.',
       wantedClick: 'the field\'s straining to make {kind}, and {name} costs {cost}. nothing\'s earning, so click the field.',
@@ -154,9 +160,19 @@ export const CONFIG = {
   // beside the nodes themselves; these are the dials of the layer around it.
   // -------------------------------------------------------------------------
   game: {
-    // Seeds per second at full infall. Each is a click's worth of matter
-    // falling in on its own, once the infall law is held.
+    // Seeds per second at the top of the arrivals handle. Each is a click's
+    // worth of matter falling in on its own, once that law is held.
     infallPerSecond: 1.2,
+
+    // HOW MUCH OF THAT A FULL FIELD STILL GETS. The wall has to stay a wall,
+    // so what falls in at the ceiling slows to about a third. MEASURED at this
+    // setting: the thinnest the trickle ever gets - a field so small that an
+    // arrival is floored at the smallest body the game makes, so it climbs no
+    // rung at all - still closes a four per cent gap in about seventy seconds,
+    // and a run at the shipped ceiling takes a brown dwarf instead and gets
+    // there in about half that. Clicking is still worth exactly what it always
+    // was, so a player who works gets there faster than one who waits.
+    ceilingArrivalRate: 0.35,
     // How often the figures on the page are refreshed. Text costs layout;
     // the field does not need it every frame.
     hudEveryMs: 200,
@@ -287,6 +303,33 @@ export const CONFIG = {
     // when it is nearly there, in the same line every other event uses.
     ceilingWarnAt: 0.9,
 
+    // WHAT A FULL FIELD TAKES IN.
+    //
+    // The ceiling used to refuse a seed outright, and refusing it stopped
+    // everything. Nothing arrives, so nothing merges, so no event fires, so
+    // every income in the game reads zero and the run can never reach the row
+    // that would open it up again. MEASURED on a real save sitting at the
+    // ceiling: nothing arrived in sixty seconds, the run earned 0.4 a second
+    // from two chance collisions, and it needed 308 to afford the cheapest row
+    // on its own board. The line on screen told the player to start over.
+    //
+    // A full field takes ONE body instead, and its weight is whichever of
+    // these two is smaller:
+    //
+    //   a share of what the field already holds, so a small field takes a
+    //   small thing and the total cannot be moved by what arrives;
+    //
+    //   and a cap this many powers of two under the mass that ignites - two,
+    //   which is a brown dwarf, the heaviest thing that is still not a star,
+    //   so what arrives is never itself a star being handed over.
+    //
+    // At the shipped ceiling the cap is the one that binds: a brown dwarf is
+    // one part in a thousand million million million million of 1e45, so the
+    // total does not move. It is a real object all the same - it climbs the
+    // rungs it is allowed, strains at the one it is not, and falls in.
+    ceilingArrivalShare: 1e-6,
+    ceilingArrivalBelowIgnition: 2,
+
     // Clicks after which the prompt goes quiet for good.
     promptFadesAt: 3,
   },
@@ -373,6 +416,11 @@ export const CONFIG = {
     // is being claimed is only that a violently accreting body runs hotter than
     // a settled one, which is true at any scale.
     heatLift: 0.45,
+
+    // WHERE THE READOUT SWITCHES FROM KILOGRAMS TO SUNS, in solar masses. A
+    // twentieth of a sun is where the ladder ignites, so the figure changes
+    // its unit exactly where the field starts making stars.
+    sunsFrom: 0.05,
 
     // THE COLOUR OF MATTER THAT DOES NOT GLOW, as stops of kelvin and hue.
     //

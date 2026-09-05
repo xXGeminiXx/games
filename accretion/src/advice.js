@@ -108,7 +108,10 @@ export function advise(w) {
     if (strained && strained.affordable) return say('fullWanted', Object.assign({ kind: aKind(strained.unlocks) }, price(strained), money));
     if (affordable.length) return say('fullBuy', Object.assign({}, price(affordable[0]), money));
     if (rate > 0 && cheapest) return say('fullWait', Object.assign({}, price(cheapest), money, { eta: eta(cheapest) }));
-    return say('fullStuck');
+    // Nothing banked, nothing earning, and the field will not grow. It is
+    // still not over: what falls in at the ceiling keeps things meeting, and a
+    // click is worth exactly what it always was.
+    return say('fullClick');
   }
 
   // THE FIELD IS ASKING FOR SOMETHING. A blocked promotion lights a row, and
