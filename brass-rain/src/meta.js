@@ -146,8 +146,8 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=69';
-import { num as coins } from './format.js?v=69';
+import { priceAt } from './economy.js?v=70';
+import { num as coins } from './format.js?v=70';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is

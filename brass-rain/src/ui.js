@@ -15,16 +15,16 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=69';
-import { createScene } from './render/scene.js?v=69';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=69';
-import { num, count, duration, mult, pct, fill } from './format.js?v=69';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=69';
-import { nailPos } from './board.js?v=69';
-import { DOORS_ROW } from './render/board-geom.js?v=69';
-import { sketchCabinet } from './cabinets.js?v=69';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=69';
-import { makeCompass, pick, write } from './advice.js?v=69';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=70';
+import { createScene } from './render/scene.js?v=70';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=70';
+import { num, count, duration, mult, pct, fill } from './format.js?v=70';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=70';
+import { nailPos } from './board.js?v=70';
+import { DOORS_ROW } from './render/board-geom.js?v=70';
+import { sketchCabinet } from './cabinets.js?v=70';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=70';
+import { makeCompass, pick, write } from './advice.js?v=70';
 
 const SPEEDS = [1, 2, 4];
 
@@ -169,6 +169,10 @@ export async function boot(doc) {
 
     on(el.reroll, 'click', () => { game.reroll(); paintBench(); });
     on(el.leave, 'click', () => { game.leaveBench(); hide(el.benchSheet); });
+    on(el.autoBend, 'click', () => {
+      if (typeof game.setAutoBend === 'function') game.setAutoBend(!game.autoBend());
+      paintBench();
+    });
     on(el.straighten, 'click', () => {
       game.straightenAll();
       say('Every nail stands straight again, and your ' + game.bendsLeft() + ' bends for this round are back.');
@@ -392,6 +396,11 @@ export async function boot(doc) {
 
     el.scrip.textContent = num(r.scrip);
     el.income.textContent = num(r.income) + ' /s';
+    if (el.ownedCount) {
+      let owned = 0;
+      for (const m of cfg.floor.machines) owned += Math.max(0, Math.floor(game.floor.owned[m.id] || 0));
+      el.ownedCount.textContent = count(owned);
+    }
     el.handMult.textContent = mult(game.handMultiplier());
     el.cash.disabled = r.tray <= 0;
 
@@ -402,6 +411,7 @@ export async function boot(doc) {
 
     if (!r.over) shownRow = false;
     if (r.view === VIEW_BENCH && el.benchSheet.hidden) { show(el.benchSheet); paintBench(); }
+    if (!el.benchSheet.hidden) paintLean(r);
     if (r.view !== VIEW_BENCH && !el.benchSheet.hidden) hide(el.benchSheet);
     el.face.classList.toggle('bending', r.view === VIEW_BENCH);
 
@@ -492,6 +502,38 @@ export async function boot(doc) {
     el.more.hidden = !(room > 6 && under > 6);
   }
 
+  /**
+   * The nails, said live.
+   *
+   * The machine goes on looking for leans while the workbench is open, so this
+   * is written on every frame the bench is showing rather than once when it
+   * opens. Text and one class only: the switch is never rebuilt, because a
+   * button replaced between a press and a release cannot be clicked.
+   */
+  function paintLean(r) {
+    if (!el.bendLede) return;
+    const lean = typeof game.leaning === 'function' ? game.leaning() : { done: true, leaned: 0 };
+    const autoLean = typeof game.autoBend === 'function' ? game.autoBend() : false;
+    const did = !autoLean ? ''
+      : lean.leaned > 0
+        ? 'The machine leaned ' + lean.leaned + (lean.leaned === 1 ? ' nail' : ' nails') + ' toward the slot'
+          + (lean.done ? '. ' : ", and it's still trying more. ")
+      : lean.done
+        ? 'The machine tried leans of its own and none of them sent more balls into the slot, so it left the nails alone. '
+        : "The machine is trying leans of its own right now, and keeps the ones that send more balls into the slot. ";
+    if (el.autoBend) {
+      const label = autoLean ? 'Leaning for you: on' : 'Leaning for you: off';
+      if (el.autoBend.textContent !== label) el.autoBend.textContent = label;
+      el.autoBend.classList.toggle('on', autoLean);
+    }
+    el.bendLede.textContent = did
+      + 'Drag any nail on the board to the right to bend it. Bending steers where the balls '
+      + 'fall, so bend the ones that feed balls into the slot. '
+      + game.bendsLeft() + ' of ' + game.bendsPerRound() + ' bends left this round, '
+      + r.bends + " nails bent so far. A nail won't go into another nail, into a pocket, "
+      + 'or farther than its head reaches. Straighten every nail undoes them all and gives the bends back.';
+  }
+
   function paintRail(r) {
     const cells = [
       ['Balls you hold', count(r.tray), false],
@@ -500,7 +542,10 @@ export async function boot(doc) {
       ['Balls falling', count(r.inFlight), false],
       ['Slot hits', count(r.stats.gates), false],
       ['Bonuses', count(r.stats.fevers), r.fever],
-      ['Best round', count(Math.max(r.bestRound, r.round - 1)), false],
+      // Not "Best round": the plaque above it says "Round 1", and two honest
+      // readings under names that close is one readout contradicting the other.
+      // This one counts rounds BEATEN, ever; that one names the round in play.
+      ['Most rounds beaten', count(Math.max(r.bestRound, r.round - 1)), false],
     ];
     if (!el.rail._built || el.rail._built !== cells.length) {
       el.rail.textContent = '';
@@ -677,11 +722,7 @@ export async function boot(doc) {
     if (!r.fittings.length) el.owned.textContent = 'No parts in this machine yet.';
 
     paintLanding();
-    el.bendLede.textContent = 'Drag any nail on the board to the right to bend it. Bending steers where the balls '
-      + 'fall, so bend the ones that feed balls into the slot. '
-      + game.bendsLeft() + ' of ' + game.bendsPerRound() + ' bends left this round, '
-      + r.bends + ' nails bent so far. A nail won\'t go into another nail, into a pocket, '
-      + 'or farther than its head reaches. Straighten every nail undoes them all and gives the bends back.';
+    paintLean(r);
 
     el.reroll.textContent = 'Show different parts for ' + num(game.rerollPrice()) + ' balls';
     el.reroll.disabled = r.tray < game.rerollPrice();
@@ -1697,9 +1738,10 @@ function index(doc) {
     toRow: $('toRow'), rowSheet: $('row'), rowTitle: $('rowTitle'), rowLede: $('rowLede'),
     cabinets: $('cabinets'), rowLater: $('rowLater'),
     toFloor: $('toFloor'), toSettings: $('toSettings'), toHelp: $('toHelp'),
-    plaques: $('plaques'), more: $('more'),
+    plaques: $('plaques'), more: $('more'), ownedCount: $('ownedCount'),
     benchSheet: $('bench'), benchLede: $('benchLede'), offers: $('offers'),
     owned: $('owned'), slotCount: $('slotCount'), bendLede: $('bendLede'), bendChart: $('bendChart'), bendBars: $('bendBars'),
+    autoBend: $('autoBend'),
     nights: $('nights'), nightsLede: $('nightsLede'), floorHint: $('floorHint'),
     reroll: $('reroll'), leave: $('leave'), straighten: $('straighten'),
     floorSheet: $('floor'), floorLede: $('floorLede'), bulkbar: $('bulkbar'),

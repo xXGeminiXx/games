@@ -97,6 +97,9 @@
   .row+.row{margin-top:3px}
   .row b{font-weight:600}
   .live{color:var(--live-ink);font-weight:600}
+  /* A live value that is also the big number keeps the live colour: this game
+     paints anything moving in the one accent and nothing else in it. */
+  .plaque .big.live{color:var(--live-ink)}
 
   /* the quota bar, a filling glass tube */
   .tube{
@@ -556,7 +559,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="253353a12f38">
+<meta name="build" content="0cc7e8553dab">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -650,8 +653,12 @@
 
     <section class="plaque" id="pFloor">
       <h2>Your arcade</h2>
-      <div class="row"><span class="big" id="scrip">0</span><span class="sub">coins</span></div>
-      <div class="row"><span class="sub">Coins a second, even while away</span><b class="live" id="income">0 /s</b></div>
+      <!-- The rate and the count are the pair that says the arcade is working.
+           The coins in hand sit near zero, because the arcade spends them the
+           moment it can afford another machine, and a balance near zero read on
+           its own looks like a game that has stopped paying. -->
+      <div class="row"><span class="big live" id="income">0 /s</span><span class="sub">coins a second from your <b id="ownedCount">0</b> arcade machines, even while away</span></div>
+      <div class="row"><span class="sub">Coins in hand</span><b id="scrip">0</b></div>
       <div class="row"><span class="sub">Bonus for how far you've played</span><b id="handMult">x1</b></div>
       <div class="knobrow">
         <button id="cash" title="Turn the balls you hold into coins for the arcade. That ends this game." type="button">Trade balls for coins</button>
@@ -698,6 +705,9 @@
     <h3>Parts in this machine <span id="slotCount"></span></h3>
     <div id="owned"></div>
     <h3>Bending the nails</h3>
+    <div class="knobrow" style="margin:0 0 6px">
+      <button id="autoBend" title="While this is on, the machine tries leans for itself and keeps only the ones that measurably send more balls into the slot. Dragging a nail yourself still overrides it." type="button">Leaning for you: on</button>
+    </div>
     <p class="lede" id="bendLede"></p>
     <p class="lede" id="bendChart"></p>
     <canvas id="bendBars" class="bars" hidden></canvas>
@@ -813,7 +823,7 @@
 </div>
 
 <script type="module">
-  import { boot } from './src/ui.js?v=69';
+  import { boot } from './src/ui.js?v=70';
   boot(document);
 </script>
 </body>

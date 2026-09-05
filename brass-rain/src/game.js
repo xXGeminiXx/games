@@ -11,24 +11,25 @@
 // one thing that cannot live anywhere else.
 // ---------------------------------------------------------------------------
 
-import { loadConfig } from '../config.js?v=69';
+import { loadConfig } from '../config.js?v=70';
 import { createRun, stepRun, createOut, startRound, pullHandle, quotaFor, quotaRate,
          matchChance, continueChance, ballsPerPull, logLine, launchesLeft,
          budgetFor, clearBonusFor, pullsLeft, pullsFor, useCabinet,
-         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=69';
+         PHASE_PLAY, PHASE_SETTLE, PHASE_SHOP, PHASE_OVER } from './run.js?v=70';
+import { makePlanner } from './bends.js?v=70';
 import { createFloor, tickFloor, cashOut, buyMachine, hireAttendant, quote, autoSpend, bestBuy,
          attendantPrice, floorIncome, machineIncome, milestoneMult, nextMilestone,
-         handMult, restoreFloor } from './floor.js?v=69';
-import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=69';
-import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=69';
-import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=69';
-import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=69';
-import { rng as makeRng } from './rng.js?v=69';
-import { offerCabinets, freshSeed } from './cabinets.js?v=69';
-import * as Save from './save.js?v=69';
-import { showState } from './render/reach.js?v=69';
-import { skinForCabinet } from './render/themes.js?v=69';
-import { chooseDoor as callDoor } from './events.js?v=69';
+         handMult, restoreFloor } from './floor.js?v=70';
+import { createQuality, observe, renderQuality, resetMeasurement, restoreQuality } from './quality.js?v=70';
+import { createBench, buildMods, partnersFor, fire as fireHook, hasHook } from './hooks.js?v=70';
+import { fitMachine, buildFittedBoard, runConfig } from './parts.js?v=70';
+import { nailNear, bendNail, bendCheck, straighten, nailPos } from './board.js?v=70';
+import { rng as makeRng } from './rng.js?v=70';
+import { offerCabinets, freshSeed } from './cabinets.js?v=70';
+import * as Save from './save.js?v=70';
+import { showState } from './render/reach.js?v=70';
+import { skinForCabinet } from './render/themes.js?v=70';
+import { chooseDoor as callDoor } from './events.js?v=70';
 
 // A gap between frames longer than this is time the player was away, not a
 // slow frame. The same number decides whether a reopened page was away at all.
@@ -53,8 +54,8 @@ export async function createGame(opts) {
   );
   const storage = safeStorage(options.storage);
 
-  const catalogue = await optional('./fittings.js?v=69');
-  const metaModule = await optional('./meta.js?v=69');
+  const catalogue = await optional('./fittings.js?v=70');
+  const metaModule = await optional('./meta.js?v=70');
   const bench = createBench(catalogue || {});
 
   const game = {
@@ -69,6 +70,23 @@ export async function createGame(opts) {
     meta: metaModule && metaModule.createMeta ? metaModule.createMeta() : { marks: 0, nodes: {} },
     run: null,
     runCfg: runConfig(cfg),
+    // The machine leans its own nails unless it has been told not to. The
+    // switch sits beside the save rather than inside it, so it survives
+    // starting a new game the way the first-run card's flag does.
+    //
+    // All of it under ONE name, because createGame returns
+    // `Object.assign(game, api(game))`: any field here sharing a name with a
+    // method on the page's side is replaced by that method. A boolean called
+    // `autoBend` became the function `autoBend()`, so the switch could never
+    // read as off, and a planner called `leaning` became `leaning()`, so the
+    // workbench asked a search object to be a function and threw.
+    lean: {
+      on: readFlag(storage, cfg.identity.storagePrefix + ':autobend'),
+      search: null,
+      leaned: 0,
+      key: '',
+      fault: '',
+    },
     out: createOut(),
     offer: null,
     rerolls: 0,
@@ -255,6 +273,12 @@ export function newRun(game, seed, withFittings) {
   return game.run;
 }
 
+/** A switch kept beside the save. Anything but a written "0" reads as on. */
+function readFlag(storage, key) {
+  if (!storage) return true;
+  try { return storage.getItem(key) !== '0'; } catch (e) { return true; }
+}
+
 function bendsPerRound(game) {
   const eff = metaEffects(game);
   const extra = Number.isFinite(eff.bendsPerRound) ? eff.bendsPerRound : 0;
@@ -268,6 +292,81 @@ function openBench(game) {
   run.bendsLeft = bendsPerRound(game);
   game.rerolls = 0;
   rollOffer(game);
+  startLeaning(game);
+}
+
+/**
+ * Starts the machine looking for its own leans, on a board of its own.
+ *
+ * A copy, because the search bends and unbends a nail hundreds of times and
+ * the board on screen would jitter through every one of them. The copy carries
+ * the leans already on the face, so it is looking for the NEXT one rather than
+ * for one that is already there.
+ */
+function startLeaning(game) {
+  const L = game.lean;
+  L.leaned = 0;
+  if (!L.on) { L.search = null; return; }
+  const run = game.run;
+  const left = Math.max(0, Math.floor(run.bendsLeft || 0));
+  if (left <= 0) { L.search = null; return; }
+  // A search that ran out of bench time rather than out of ideas is picked up
+  // where it stopped, as long as it is still looking at the same machine. A
+  // player who shuts the workbench after four seconds would otherwise start
+  // the same search from the top every round and never reach the end of it.
+  const key = (run.seed >>> 0) + ':' + run.fittings.join(',');
+  if (L.search && !L.search.done() && L.key === key) {
+    L.search.more(left);
+    return;
+  }
+  L.search = null;
+  L.key = key;
+  L.fault = '';
+  try {
+    // Built exactly the way the run's own board is built, parts and all, then
+    // given the leans already on the face. A copy off a different recipe would
+    // be searching a machine the player is not sitting at.
+    const fitted = refit(game, run.seed);
+    const copy = buildFittedBoard(fitted.cfg, run.seed, fitted.shape);
+    useCabinet(fitted.cfg, copy);
+    restoreBendState(copy, serializeBendState(run.board));
+    L.search = makePlanner(fitted.cfg, copy, {
+      budget: left, strength: run.strength, seed: run.seed >>> 0,
+    });
+  } catch (e) {
+    // A silent catch here would read on the workbench as "it tried and found
+    // nothing", which is a different sentence from "it could not start".
+    L.search = null;
+    L.fault = e && e.message ? e.message : String(e);
+    logLine(run, 'fault', 'The machine could not work on its own nails this round.');
+  }
+}
+
+/**
+ * Puts the leans the search has settled on onto the real face.
+ *
+ * It runs while the workbench is open and stops the moment the round starts,
+ * so a player who bolts a part in and leaves gets whatever it had found by
+ * then. A nail the player has already leaned themselves is left alone.
+ */
+function stepLeaning(game, ms) {
+  const L = game.lean;
+  const p = L.search;
+  if (!p || game.view !== VIEW_BENCH || !L.on) return;
+  const before = p.plan().length;
+  p.step(ms);
+  const plan = p.plan();
+  for (let k = before; k < plan.length; k++) {
+    const [i, x, y] = plan[k];
+    if (game.run.bendsLeft <= 0) break;
+    const nail = game.run.board.nails[i];
+    if (!nail || nail.bx !== 0 || nail.by !== 0) continue;
+    if (!bendNail(game.runCfg, game.run.board, i, x, y).ok) continue;
+    game.run.bendsLeft--;
+    L.leaned++;
+    changed(game);
+  }
+  if (p.done()) L.search = null;
 }
 
 export function rollOffer(game) {
@@ -478,6 +577,17 @@ function api(game) {
       changed(game);
     },
     bendsLeft() { return game.run.bendsLeft; },
+    /** Whether the machine leans its own nails, and the switch for it. */
+    autoBend() { return game.lean.on !== false; },
+    setAutoBend(on) {
+      game.lean.on = !!on;
+      if (game.storage) { try { game.storage.setItem(game.cfg.identity.storagePrefix + ':autobend', on ? '1' : '0'); } catch (e) { /* storage can be turned off */ } }
+      if (on && game.view === VIEW_BENCH) startLeaning(game);
+      else game.lean.search = null;
+      changed(game);
+    },
+    /** How many nails it has leaned this round, whether it is still looking, and why not. */
+    leaning() { return { done: !game.lean.search, leaned: game.lean.leaned || 0, fault: game.lean.fault || '' }; },
     /** How many nails this round may be leaned, the permanent upgrades counted. */
     bendsPerRound() { return bendsPerRound(game); },
 
@@ -859,6 +969,9 @@ export function frame(game, now) {
 
   tickFloor(game.cfg, game.floor, dt, metaEffects(game));
   spendIdle(game);
+  // Milliseconds a frame, and only while the workbench is open: no balls are
+  // falling there and the picture is cheap, so this is time nothing else wants.
+  stepLeaning(game, 8);
 
   if (wasPhase !== PHASE_SHOP && run.phase === PHASE_SHOP) openBench(game);
   if (wasPhase !== PHASE_OVER && run.phase === PHASE_OVER) {
