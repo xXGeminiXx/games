@@ -13,10 +13,10 @@
  * that a player reads more than once.
  */
 
-import * as R from './research.js?v=3';
-import * as Advice from './advice.js?v=3';
-import * as Stellar from './stellar.js?v=3';
-import * as Rebirth from './rebirth.js?v=3';
+import * as R from './research.js?v=4';
+import * as Advice from './advice.js?v=4';
+import * as Stellar from './stellar.js?v=4';
+import * as Rebirth from './rebirth.js?v=4';
 
 const SAVE_VERSION = 2;
 
@@ -59,6 +59,7 @@ export function createGame(o) {
   const fluxEl = el('flux'), rateEl = el('fluxrate'), eraEl = el('era'), nodesEl = el('nodes'), lawsEl = el('laws');
   const starRow = el('starrow'), starEl = el('star'), starLabel = el('starlabel');
   const endingEl = el('ending'), boardEl = el('board'), adviceEl = el('advice');
+  const hudEl = el('hud');
 
   // One formatter for every figure a player reads, shared with the line that
   // says what to do next, so a price on the board and the same price in a
@@ -395,9 +396,29 @@ export function createGame(o) {
     adviceEl.textContent = said ? Advice.fill(lines[said.key] || '', said.values) : '';
   }
 
+  /**
+   * WHERE THE RESEARCH WINDOW STARTS. Under the readout, always. The readout
+   * grows a line the moment the research that names the heaviest star is
+   * bought, and the window's own heading is painted on the ground colour so
+   * rows can scroll under it - so a window pinned to one number painted over
+   * the bottom half of that line, and a figure the run had paid for was gone.
+   * Read from the readout itself rather than added up from its parts, so a
+   * change to what it holds needs no change here.
+   */
+  function placeBoard() {
+    if (!boardEl || !boardEl.style || !hudEl || typeof hudEl.getBoundingClientRect !== 'function') return;
+    const r = hudEl.getBoundingClientRect();
+    // A readout that has not been laid out yet measures nothing, and moving the
+    // window to the top of the screen on the strength of that is worse than
+    // leaving it where the page opened it.
+    if (!r || !(r.bottom > 0)) return;
+    boardEl.style.top = Math.round(r.bottom + CONFIG.layout.boardGap) + 'px';
+  }
+
   function renderFlux() {
     if (fluxEl) fluxEl.textContent = fmt(research.flux);
     renderStar();
+    placeBoard();
     if (rateEl) rateEl.textContent = research.rate > 0.05 ? '+' + Advice.rateFigure(research.rate) + '/s' : '';
     // Affordability changes as flux climbs; re-render the board when a row
     // crosses its price rather than every frame.

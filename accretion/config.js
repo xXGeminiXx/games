@@ -601,6 +601,21 @@ export const CONFIG = {
     promptLeft: 30,     // the line that says what just happened
     promptBottom: 52,
     adviceBottom: 74,   // the line that says what to do next, above it
+
+    // THE RESEARCH WINDOW SITS UNDER THE READOUT, AND THE READOUT GROWS. The
+    // line naming the heaviest star appears the moment that research is bought
+    // and takes another 32 px, and the window's heading is painted on the
+    // ground colour so it can scroll under - so a window pinned to one number
+    // covered the bottom half of that line and the run lost a figure it had
+    // paid for. The top is measured from the readout every time the figures
+    // are refreshed; this is the space left between them.
+    boardGap: 23,
+
+    // And where the window stops, above the two lines along the bottom. The
+    // longest thing the line that says what to do next can say runs to three
+    // rows of 18 px from a floor of 74, so it reaches 128, and the window
+    // clears that.
+    boardBottom: 132,
   },
 
   // -------------------------------------------------------------------------
@@ -856,6 +871,11 @@ export function applyIdentity(doc) {
     advice.style.left = CONFIG.layout.promptLeft + 'px';
     advice.style.bottom = CONFIG.layout.adviceBottom + 'px';
   }
+
+  // Where the research window stops. Its top is set as the run goes, from the
+  // readout it sits under; its floor never moves.
+  const board = byId('board');
+  if (board) board.style.bottom = CONFIG.layout.boardBottom + 'px';
 
   // The tab icon is drawn from the palette rather than shipped as a file, so a
   // recolour needs no asset and the game still has no binary dependencies.

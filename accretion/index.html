@@ -60,15 +60,22 @@
      a contrast of 2.0 - present on screen and unreadable. A row now keeps its
      full weight and says what it is by which colour its name takes.
 
-     AND IT IS BOUNDED. The window is six rows plus every law the run has
-     collected, which by the fourth era is nine or ten blocks: measured at
-     578 px, against 412 px of room in a 700 px window. The last handle sat
+     AND IT IS BOUNDED AT BOTH ENDS. The window is six rows plus every law the
+     run has collected, which by the fourth era is nine or ten blocks: measured
+     at 641 px, against 400 px of room in a 700 px window. The last handle sat
      52 px below the bottom edge and no hand could reach it, and at 800 px it
      sat underneath all three lines along the bottom. It stops short of them
-     now and scrolls. */
+     now and scrolls.
+
+     The top is set from script as the run goes: the readout above grows by a
+     line when the research that names the heaviest star is bought, and this
+     window's heading paints on the ground colour, so a fixed top covered the
+     bottom half of a figure the run had paid for. The number here is what the
+     window opens at, before the first reading. */
   #board{
-    position:fixed; left:30px; top:178px; width:280px; font-size:11px; line-height:1.35;
-    max-height:calc(100vh - 300px); overflow-y:auto; overscroll-behavior:contain;
+    position:fixed; left:30px; top:178px; bottom:132px; width:280px;
+    font-size:11px; line-height:1.35;
+    overflow-y:auto; overscroll-behavior:contain;
     padding-right:6px; scrollbar-width:thin; scrollbar-color:var(--label) transparent;
   }
   /* The era's name holds the top of the column while the rest of it scrolls
@@ -241,7 +248,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="7e6ea64b7a7c">
+<meta name="build" content="1069fc2423a3">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -310,11 +317,11 @@
 // the view can draw, and names things the first time they happen.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=3';
-import { createSim, restoreSim, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=3';
-import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=3';
-import * as Stellar from './src/stellar.js?v=3';
-import { createGame } from './src/game.js?v=3';
+import { CONFIG, simOptions, applyIdentity, storageKey } from './config.js?v=4';
+import { createSim, restoreSim, EVENT, KIND, KIND_NAME, AGG_FIRST, FLAG_AGGREGATE, FLAG_GAS, STAGE, FATE } from './src/sim.js?v=4';
+import { createRenderer, createSimAdapter, setSpectrum, CONFIG as VIEW } from './src/render.js?v=4';
+import * as Stellar from './src/stellar.js?v=4';
+import { createGame } from './src/game.js?v=4';
 
 // Name, prompts and colours all arrive from config.js, so the markup above
 // never has to be edited to rename or recolour anything.
