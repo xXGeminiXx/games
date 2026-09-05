@@ -18,9 +18,14 @@
   /* the chart table: a column of glass cards down the right */
   /* The column runs past the window as soon as the market and the carrier
      arrive - 1,539 px of cards in an 800 px window on a real save. It takes
-     pointer events so its scrollbar can be dragged, and so a click meant for
-     a card never flies the carrier across the sea instead. */
-  #table{position:absolute;top:0;right:0;bottom:0;width:min(360px,100%);padding:16px 16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+     pointer events so the wheel scrolls it, and so a click meant for a card,
+     or for the gap between two cards, never flies the carrier across the sea
+     instead.
+     It is only as tall as the cards in it, never the whole window. Held to
+     the full height it swallowed every press on the world underneath it -
+     234 px of visible island in a 900 px window on a new run, where clicking
+     the land does nothing and dragging turns no view. */
+  #table{position:absolute;top:0;right:0;max-height:100%;width:min(360px,100%);padding:16px 16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
   /* Chrome draws its scrollbar as an overlay that shows up only once you are
      already scrolling, and styling it does not change that - measured, the
      column reserves no width for one at all. So the column gets an edge of
@@ -115,7 +120,7 @@
   #keyhelp .kclose{margin-top:12px}
   [hidden]{display:none!important}
   @media (max-width:640px){
-    #table{width:100%;top:auto;max-height:52%;padding:10px}
+    #table{width:100%;top:auto;bottom:0;max-height:52%;padding:10px}
     #funds{font-size:26px}
     #anchor-hint,body.folded #anchor-hint{bottom:auto;top:52px;max-width:calc(100% - 24px)}
     #fold,body.folded #fold{top:12px;right:12px}
@@ -262,7 +267,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="4e2cfa92ed64">
+<meta name="build" content="6cd15d799dbb">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -375,9 +380,9 @@
   </div>
 </div>
 <script type="module">
-  import { CONFIG } from './config.js?v=19';
-  import { CONTENT } from './content.js?v=19';
-  import { createGame } from './src/game.js?v=19';
+  import { CONFIG } from './config.js?v=20';
+  import { CONTENT } from './content.js?v=20';
+  import { createGame } from './src/game.js?v=20';
   window.game = createGame({ doc: document, canvas: document.getElementById('c'), cfg: CONFIG, content: CONTENT, storage: window.localStorage, search: location.search });
 </script>
 </body>

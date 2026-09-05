@@ -242,11 +242,21 @@ export function createEconomy(cfg, rngLike = Math.random) {
     const num = (v, d) => (Number.isFinite(v) ? v : d);
     state.funds = num(snap.funds, state.funds);
     state.drones = Math.max(cfg.drones.start, num(snap.drones, state.drones));
+    for (const k of K) { state.specialists[k] = num(snap.specialists && snap.specialists[k], 0); state.pressure[k] = num(snap.pressure && snap.pressure[k], 0); state.avail[k] = num(snap.avail && snap.avail[k], 0.5); }
+    for (const u in E.upgrades) state.upgrades[u] = Math.min(E.upgrades[u].max, num(snap.upgrades && snap.upgrades[u], 0));
     // A fleet bought while hangars made drones cheaper than the last one is
     // larger than the price curve can now explain, and its owner would find
     // the hire button dead for ever - the next drone priced at a number with
     // seventy digits. Bring such a fleet back to what the funds on hand could
     // actually reach, so the run carries on instead of ending in a wall.
+    //
+    // This runs after the fleet, the trained drones and the upgrades are all
+    // in place, because it needs every one of them: the hangar levels set the
+    // price it works against, and the specialists have to come down with the
+    // fleet. Run before them it read a hangar level of zero, cut far deeper
+    // than it had to, and scaled a set of specialists that was still empty -
+    // so a corrected fleet kept every specialist it ever trained and ended up
+    // with fewer untrained drones than none at all.
     if (state.drones > E.hireSaneFleet) {
       const ratio = 1 + (E.hireGrowth - 1) * Math.pow(E.hangarDiscount, state.upgrades.hangars || 0);
       const affordable = Math.log(1 + (Math.max(0, state.funds) * (ratio - 1)) / E.hireBase) / Math.log(ratio);
@@ -262,8 +272,17 @@ export function createEconomy(cfg, rngLike = Math.random) {
         state.drones = keep;
       }
     }
-    for (const k of K) { state.specialists[k] = num(snap.specialists && snap.specialists[k], 0); state.pressure[k] = num(snap.pressure && snap.pressure[k], 0); state.avail[k] = num(snap.avail && snap.avail[k], 0.5); }
-    for (const u in E.upgrades) state.upgrades[u] = Math.min(E.upgrades[u].max, num(snap.upgrades && snap.upgrades[u], 0));
+    // Whatever the fleet ended up as, nobody can be trained who is not aboard.
+    // A save written by hand or by an older build can carry more specialists
+    // than drones, and the untrained count is a subtraction: left alone it
+    // goes negative and every number downstream of it does too.
+    {
+      let trained = K.reduce((a, k) => a + state.specialists[k], 0);
+      if (trained > state.drones) {
+        const share = state.drones / trained;
+        for (const k of K) state.specialists[k] = Math.floor(state.specialists[k] * share);
+      }
+    }
     state.island = Math.max(1, num(snap.island, 1));
     // Saves written before this was named for what it counts still carry the
     // old field, so either spelling is accepted on the way in.

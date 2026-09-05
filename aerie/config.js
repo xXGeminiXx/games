@@ -7,7 +7,7 @@
 //   localStorage.setItem('cfg', '{"drones":{"speed":30}}')   sticks in that browser
 // Type is taken from the value already in place, so a number stays a number.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/palette.js?v=19';
+import { oklch } from './src/palette.js?v=20';
 
 export const CONFIG = {
   identity: {
@@ -17,7 +17,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 19,             // the ?v= tag every import carries; bump on every src change
+    build: 20,             // the ?v= tag every import carries; bump on every src change
     allowOverrides: true, // ?set= and the localStorage cfg patch
   },
 
@@ -75,6 +75,7 @@ export const CONFIG = {
       better: 1.4,        // how much richer the new ground has to be to bother
       afterHand: 45,      // seconds to leave the carrier alone after a player moves it
       every: 8,           // seconds between looks
+      arrived: 5,         // how near its chosen spot counts as having got there
     },
   },
 
@@ -144,7 +145,7 @@ export const CONFIG = {
     smallShare: 0.25,     // while saving for a voyage, only name a buy this small
     hangarWorth: 1.0,     // name hangars when they cost no more than this many drones
     every: 1,             // seconds between recalculations
-    words: { drone: 'another drone', specialist: 'a specialist', voyage: 'leaving for the next island', instant: 'under a second' },
+    words: { drone: 'another drone', specialist: 'a specialist', voyage: 'leaving for the next island', instant: 'under a second', never: 'never' },
   },
 
   camera: {

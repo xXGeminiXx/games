@@ -1,27 +1,27 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=19';
-import { fill } from '../content.js?v=19';
-import { makeShaders } from './shaders.js?v=19';
-import { createWorld } from './world.js?v=19';
-import { createDrones } from './drones.js?v=19';
-import { createView } from './view.js?v=19';
-import { createEconomy } from './economy.js?v=19';
-import { createAdvice } from './advice.js?v=19';
-import { createSave, createPrefs } from './save.js?v=19';
-import { createUI } from './ui.js?v=19';
-import { createControls } from './controls.js?v=19';
-import { createQuality } from './quality.js?v=19';
-import { createPerfLog } from './perflog.js?v=19';
-import { loop, createGL } from './gl.js?v=19';
-import { rng } from './rng.js?v=19';
-import { fmt, duration } from './numbers.js?v=19';
+import { withOverrides, applyIdentity } from '../config.js?v=20';
+import { fill } from '../content.js?v=20';
+import { makeShaders } from './shaders.js?v=20';
+import { createWorld } from './world.js?v=20';
+import { createDrones } from './drones.js?v=20';
+import { createView } from './view.js?v=20';
+import { createEconomy } from './economy.js?v=20';
+import { createAdvice } from './advice.js?v=20';
+import { createSave, createPrefs } from './save.js?v=20';
+import { createUI } from './ui.js?v=20';
+import { createControls } from './controls.js?v=20';
+import { createQuality } from './quality.js?v=20';
+import { createPerfLog } from './perflog.js?v=20';
+import { loop, createGL } from './gl.js?v=20';
+import { rng } from './rng.js?v=20';
+import { fmt, duration } from './numbers.js?v=20';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
   applyIdentity(cfg, doc);
   const S = makeShaders(cfg);
   const eco = createEconomy(cfg);
-  const advice = createAdvice(cfg, eco);
+  const advice = createAdvice(cfg, eco, { moving: () => selfMoving() });
   const save = createSave(cfg, storage);
   const prefs = createPrefs(cfg, storage);
   const perf = createPerfLog(cfg, storage);
@@ -105,6 +105,10 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       world.generate(eco.state.island);
       const p = world.landPoint(rng(cfg.world.seed + '/anchor-' + eco.state.island));
       view.placeCarrier(p[0], p[1]);
+      // A new island: whatever the carrier was crossing to belonged to the old
+      // one, and a spot left behind there would read as a crossing that never
+      // ends.
+      driftTarget = null;
       drones.reset(view.state.carrier);
       syncFleet();
       // The card stays. Hiding it here only made it blink: the test that
@@ -198,7 +202,17 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   // that for a while - being overruled by the game a second after choosing
   // where to sit would be worse than never being helped at all.
   let handAt = -1e9;
-  const tookTheWheel = () => { handAt = clock; };
+  const tookTheWheel = () => { handAt = clock; driftTarget = null; };
+  // Where the carrier chose to go, while it is still on its way there. The
+  // compass reads this so it does not spend its one sentence asking for a
+  // move that is already under way.
+  let driftTarget = null;
+  const selfMoving = () => {
+    if (!driftTarget) return false;
+    const c = view.state.carrier;
+    if (Math.hypot(c[0] - driftTarget[0], c[2] - driftTarget[1]) <= cfg.carrier.drift.arrived) { driftTarget = null; return false; }
+    return true;
+  };
   canvas.addEventListener('click', (e) => {
     const p = view.pick(e.clientX, e.clientY);
     if (!p) return;
@@ -251,6 +265,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
     const spot = world.bestSpot(eco.range(), [view.state.carrier[0], view.state.carrier[2]]);
     if (!spot.at || !(spot.best > spot.here * D.better)) return;
     view.state.anchor = spot.at;
+    driftTarget = spot.at;
     if (!saidDrift) { saidDrift = true; ui.log(content.log.drift); }
   };
 
@@ -264,7 +279,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   };
 
   // ---- the loop ----
-  let summaryT = 0, saveT = 0, uiT = 0, clock = 0;
+  let summaryT = 0, saveT = 0, uiT = 0, clock = 0, adviceT = 0;
   const speed = () => eco.droneSpeed();
   let qualityT = 0, perfT = 0;
   const stop = loop((dt, t) => {
@@ -288,8 +303,12 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       checkReveal();
       checkPrices();
       drift();
-      showAdvice();
     }
+    // The compass, on its own clock. It read the ledger once a second because
+    // that is where the call sat, not because anything said so, and the number
+    // in config that says how often was read by nothing at all.
+    adviceT += dt;
+    if (adviceT >= cfg.advice.every) { adviceT = 0; showAdvice(); }
     view.draw(t, eco.range(), 0.0009, h);
     // Watch the frames and let the guard move the resolution if it must.
     // A move is what this machine has just been shown to hold, so it is

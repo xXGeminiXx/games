@@ -7,14 +7,20 @@
 // stealing from a voyage the player is saving for.
 //
 // Pure. It reads the economy and formats numbers; it touches no page.
-import { fmt, pct, duration } from './numbers.js?v=19';
+import { fmt, pct, duration } from './numbers.js?v=20';
 
-export function createAdvice(cfg, eco) {
+export function createAdvice(cfg, eco, opts = {}) {
   const K = cfg.kindOrder;
   const E = cfg.economy;
   const A = cfg.advice;
 
   const say = (key, vars) => ({ key, vars });
+
+  // Whether the carrier is already on its way to better ground of its own
+  // accord. While it is, the two rungs that ask the player to move it are
+  // asking for something already happening, and they outrank every purchase -
+  // so the one sentence on screen spent the whole crossing saying nothing.
+  const moving = () => !!(opts.moving && opts.moving());
 
   // Everything a drone's haul is multiplied by before it reaches the price.
   const haulFactor = () => eco.islandRich() * eco.holdMult() * (0.6 + 0.4 * (eco.droneSpeed() / cfg.drones.speed));
@@ -51,7 +57,12 @@ export function createAdvice(cfg, eco) {
    * How long something takes, for a player to read. A payback under a second
    * printed as "0s", which reads as a bug rather than as a bargain.
    */
-  const howLong = (seconds) => (seconds < 1 ? labelOf('instant') : duration(seconds));
+  const howLong = (seconds) => {
+    // Nothing coming in makes every wait infinite, and the sentence carrying
+    // it printed the word Infinity followed by NaN at a player.
+    if (!Number.isFinite(seconds)) return labelOf('never');
+    return seconds < 1 ? labelOf('instant') : duration(seconds);
+  };
 
   /** Seconds of the current income needed to cover a price. */
   const waitFor = (cost) => {
@@ -71,14 +82,19 @@ export function createAdvice(cfg, eco) {
     // drones keep flying and bring back nothing, which is the one failure the
     // panel cannot show as a falling number - it shows as a number that was
     // never there.
-    if (flags.specialists) {
+    if (flags.specialists && !moving()) {
       const dry = K.filter((k) => s.specialists[k] > 0 && s.avail[k] <= A.dryLand);
       if (dry.length) return say('stranded', { kind: names(dry) });
     }
 
     // The ground under the carrier is worked down but the island is not. The
     // fix costs nothing, so it beats anything that costs funds.
-    if (s.avail[best] < A.thinLand && s.remaining > A.emptyIsland) {
+    //
+    // A fleet bringing back nothing at all is the same call however little of
+    // the island is left: moving is still the only move that costs nothing,
+    // and every "how long until" further down this list divides by what is
+    // coming in, which is zero.
+    if (!moving() && s.avail[best] < A.thinLand && (s.remaining > A.emptyIsland || income <= 0)) {
       return say('move', { kind: cfg.kinds[best].name, pct: pct(s.avail[best]) });
     }
 
@@ -109,8 +125,10 @@ export function createAdvice(cfg, eco) {
       if (s.funds >= castCost) {
         return say('castOff', { n: s.island + 1, cost: fmt(castCost), rich: E.islandRichness, pay: E.islandPrice, gone: pct(1 - s.remaining) });
       }
-      // Reach is the other answer when there is nowhere better to sit.
-      if (flags.carrier && eco.level('range') < E.upgrades.range.max && s.funds >= eco.upgradeCost('range')) {
+      // Reach is the other answer when there is nowhere better to sit - which
+      // is not something to say while the carrier is on its way to somewhere
+      // better.
+      if (!moving() && flags.carrier && eco.level('range') < E.upgrades.range.max && s.funds >= eco.upgradeCost('range')) {
         return say('range', { cost: fmt(eco.upgradeCost('range')), n: E.upgrades.range.effect, reach: fmt(eco.range()) });
       }
     }
