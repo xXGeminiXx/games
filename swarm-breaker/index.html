@@ -98,13 +98,24 @@
   /* The trading desk. It is taller than four buttons ever were, so it takes a
      bounded share of the window and scrolls inside itself: the field never
      gets pushed off the bottom and the page itself still never scrolls. */
+  /* THE FIELD IS THE GAME, SO THE PANEL TAKES A THIRD AND NOT A HALF.
+     At 42vh the desk grew to its cap the moment a second section arrived and
+     squeezed the playfield to 261x312 in a 1280x800 window - a third of the
+     window, shrinking as the run went on. At 34vh the field holds 343x409,
+     about a third more picture, and the cost is a scroll to reach the one-shot
+     outs below the hand. The panel scrolls inside itself either way and the
+     page itself still never scrolls. */
   #shop{
     width:100%; max-width:520px; display:none; padding:0 12px 8px;
     border-top:1px solid var(--line);
-    max-height:min(42vh, 400px); overflow-y:auto; overscroll-behavior:contain;
+    max-height:min(34vh, 320px); overflow-y:auto; overscroll-behavior:contain;
     scrollbar-width:thin;
   }
   #shop.on{display:block}
+  /* A row half off the bottom edge reads as the end of the list rather than as
+     something to scroll to, and its buttons cannot be pressed where they are.
+     The padding guarantees the last row clears the edge whole. */
+  #shop > *{padding-bottom:6px}
   /* On a narrow screen the desk gets more of the window, because reading a
      price is what a turn is spent on and the field is still legible smaller. */
   @media (max-width:480px){
@@ -380,7 +391,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="c0cfe3045b15">
+<meta name="build" content="d576c271b4d7">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -540,25 +551,25 @@
 //
 // A build step would do this automatically. There is no build step, on purpose.
 import { CONFIG, CELL0, CEIL, TOP, FLOOR, MIN_AIM_Y, LADDER, latticeAt, leftEdgeAt,
-         storageKey, applyIdentity } from './config.js?v=23';
-import { createJuice } from './src/juice.js?v=23';
-import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=23';
-import { createBlockKinds } from './src/blocks.js?v=23';
-import { safeRows } from './src/arrival.js?v=23';
-import { createAwards } from './src/awards.js?v=23';
-import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=23';
-import { createLeaderboard } from './src/leaderboard.js?v=23';
-import * as Tiers from './src/tiers.js?v=23';
-import { createOnboarding } from './src/onboarding.js?v=23';
-import { createVisual } from './src/visual.js?v=23';
-import * as Economy from './src/economy.js?v=23';
-import * as Powers from './src/powers.js?v=23';
-import * as Meta from './src/meta.js?v=23';
-import { createUI } from './src/ui.js?v=23';
-import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=23';
-import { seedForSync, today as utcToday } from './src/daily.js?v=23';
-import { advise } from './src/advice.js?v=23';
-import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=23';
+         storageKey, applyIdentity } from './config.js?v=24';
+import { createJuice } from './src/juice.js?v=24';
+import { createField, modeOf, MODE_IDS, normaliseMode, DEFAULT_MODE } from './src/modes.js?v=24';
+import { createBlockKinds } from './src/blocks.js?v=24';
+import { safeRows } from './src/arrival.js?v=24';
+import { createAwards } from './src/awards.js?v=24';
+import { createSave, fieldFingerprint, registerMigration, currentSchema } from './src/save.js?v=24';
+import { createLeaderboard } from './src/leaderboard.js?v=24';
+import * as Tiers from './src/tiers.js?v=24';
+import { createOnboarding } from './src/onboarding.js?v=24';
+import { createVisual } from './src/visual.js?v=24';
+import * as Economy from './src/economy.js?v=24';
+import * as Powers from './src/powers.js?v=24';
+import * as Meta from './src/meta.js?v=24';
+import { createUI } from './src/ui.js?v=24';
+import { createRunLog, canonicalRun, logHash as logHashOf, validateLog } from './src/verify.js?v=24';
+import { seedForSync, today as utcToday } from './src/daily.js?v=24';
+import { advise } from './src/advice.js?v=24';
+import { runHash as runHashOf, entryState, stateLabel, stateNote, STATE } from './src/verify.js?v=24';
 
 // Names, labels, colours and canvas size all arrive from config.js, so the
 // markup above never has to be edited to rename or resize anything.
@@ -1155,12 +1166,16 @@ function endTurn(){
 // purchase() every button press does, so a run log records it and a replay
 // makes the same purchases in the same order.
 //
-// It stays out of a trading run on purpose. There the cash has somewhere else
-// to be - ore, the refinery, a consignment - and a hand that emptied the purse
-// every turn would be making that call for somebody who chose to make it.
+// IT SPENDS IN A TRADING RUN TOO, and only ever cash. It was held back from
+// one on the theory that the money had somewhere better to be; a real run says
+// otherwise. Read off this machine: depth 42, forty three hands dealt, TWO
+// ranks taken, and 5,350 cash plus 625 units of ore sitting untouched. Holding
+// back is what that theory actually bought. So it buys powers with cash, and
+// it never sells ore, never crafts, never trades - those are still the
+// player's to make.
 let saidAutoBuy = false;
 function autoBuy(){
-  if (!AUTOBUY || S.dead || !S.pow || !S.econ || !S.econ.cashOnly) return;
+  if (!AUTOBUY || S.dead || !S.pow || !S.econ) return;
   // ONE HAND PER TURN. Rebuilding it after every purchase costs a full deal
   // each time and a turn only ever buys a card or two, so the hand is read
   // once and the purse is tracked here. A price that moves under a purchase
@@ -1180,7 +1195,9 @@ function autoBuy(){
   const purse = cash();
   for (const { sl, cost } of slots){
     if (cost > purse) continue;
+    const before = S.balls;
     if (!purchase('p_' + sl.id, 1)) continue;
+    swarmGrew(before);
     if (QUIET || saidAutoBuy) return;
     saidAutoBuy = true;
     const line = String(CONFIG.text.boughtNote || '')
@@ -2163,6 +2180,7 @@ function draw(){
   const ahead = S.field.preview ? S.field.preview(S.depth, 3) : null;
   look.horizon(X, ahead && ahead.rows, ahead && ahead.lo);
   drawLane(X);
+  markPay();
   look.blocks(X, S.rows);
   markSpecials(X);
   markArrivals(X);
@@ -2826,9 +2844,18 @@ let logBroken = false;
 const LOG_ID = /^[a-z][a-z0-9_-]{0,15}$/;
 
 function act(id, n){
+  const before = S && S.balls;
   const did = purchase(id, n);
-  if (did){ mark(); paintShop(); }
+  if (did){ swarmGrew(before); mark(); paintShop(); }
   return did;
+}
+
+/** A purchase that added to the swarm heaves the mass under the floor, so the
+ *  thing the money bought is something the player watches happen. */
+function swarmGrew(before){
+  if (!look || !look.grew || !(before > 0)) return;
+  const by = (S.balls | 0) - (before | 0);
+  if (by > 0) look.grew(by, before);
 }
 
 /**
@@ -3779,6 +3806,34 @@ function hud(){
 // the same string makes the line unselectable and the browser busy.
 let compassWorn = null;
 
+// WHAT EACH BLOCK IS ABOUT TO PAY, AS A SHARE OF THE BEST ONE ON THE BOARD.
+//
+// The field used to draw every block at the same weight, so a glance said
+// where the blocks were and nothing about where the money was. Each one now
+// carries `pay` between zero and one and the picture lights it by that: the
+// richest block on the board burns, the cheap ones sit dark, and "where do I
+// aim" has an answer you can see without reading a figure.
+//
+// Recomputed only when the board changes rather than every frame, because a
+// hundred blocks times sixty frames is a hundred thousand payout sums a second
+// to draw a light that only moves when something breaks.
+let payKey = null;
+function markPay(){
+  if (!S || !S.rows || !S.econ) return;
+  const key = S.rows.length + ':' + S.depth + ':' + S.shot;
+  if (key === payKey) return;
+  payKey = key;
+  let best = 0;
+  for (const bl of S.rows){
+    const w = Economy.worthOf(S.econ, { depth: bl.d || S.depth, col: bl.c, maxHp: bl.max });
+    bl.worth = w;
+    if (w > best) best = w;
+  }
+  // A board where everything pays the same lights evenly rather than picking a
+  // winner out of rounding noise.
+  for (const bl of S.rows) bl.pay = best > 0 ? bl.worth / best : 0;
+}
+
 /** Whole rows of clearance under the lowest block. Zero means the next step
  *  down ends the run, which is the same expression the loss check uses. */
 function roomLeft(){
@@ -3826,9 +3881,20 @@ function compassBag(){
     effect: String(s.line || ''),
     affordable: !!s.affordable && !s.maxed,
   }));
+  // What the ore in the hold would fetch, which is net worth less the cash
+  // already counted. A run that never mines answers zero and the rung that
+  // reads it never fires.
+  let hoard = 0;
+  if (S.econ && !S.econ.cashOnly){
+    try { hoard = Math.max(0, Math.round(Economy.toNum(Economy.netWorth(S.econ).value) - money)); }
+    catch (e) { hoard = 0; }
+  }
   return {
     phase: S.dead ? 'over' : (S.firing ? 'firing' : 'aim'),
     shots: S.shot | 0,
+    trading: !!(S.econ && !S.econ.cashOnly),
+    hoard,
+    hoardText: hoard > 0 ? Economy.fmt(Economy.L(hoard)) : '0',
     depth: S.depth | 0,
     swarm: S.balls | 0,
     damage: hitPower(),
@@ -3866,7 +3932,7 @@ function paintCompass(){
       const vals = { ...pick.vals };
       // Plural agreement is the caller's job, so the words stay one sentence
       // in the config instead of two spellings of the same sentence.
-      for (const k of ['n', 'cols', 'spare']){
+      for (const k of ['n', 'cols', 'spare', 'live']){
         if (vals[k] !== undefined) vals.s = (Number(vals[k]) === 1) ? '' : 's';
       }
       text = fillHoles(words, vals);

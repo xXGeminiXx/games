@@ -51,7 +51,7 @@
  * ---------------------------------------------------------------------------
  */
 
-import { CONFIG } from '../config.js?v=23';
+import { CONFIG } from '../config.js?v=24';
 
 // ===========================================================================
 // PALETTE
@@ -746,6 +746,15 @@ export function createVisual(opts) {
   let swLog = 0;              // log10 of the swarm count
   let swText = '1';
   let swRaw = 1;
+  // A PURCHASE HAS TO BE VISIBLE IN THE MASS.
+  //
+  // The band's depth is logarithmic, so buying seven more balls onto a swarm of
+  // forty moved it by about a pixel and the one thing the player had just spent
+  // their money on left no mark at all. This is a swell laid on top: the mass
+  // heaves up and burns brighter for about a second, sized by how much the
+  // swarm actually grew, and settles back onto the height the new count earns.
+  let swell = 0;      // 1 at the moment of a purchase, decaying to 0
+  let swellSize = 0;  // how much it heaves, from the share the swarm grew by
   let flight = 0;             // share of the swarm currently off the pool
   let resolveT = 0;           // milestone strobe: the mass briefly resolves
 
@@ -808,6 +817,10 @@ export function createVisual(opts) {
   const bw = new Float32Array(CAPB), bh = new Float32Array(CAPB);
   const bInt = new Float32Array(CAPB), bHit = new Float32Array(CAPB);
   const bAl = new Float32Array(CAPB), bThreat = new Float32Array(CAPB);
+  // What each block is about to pay, as a share of the richest one standing.
+  // Filled by the host; a board that never sets it lights evenly and nothing
+  // below has to know whether the game has an economy at all.
+  const bPay = new Float32Array(CAPB);
   const bMat = new Int32Array(CAPB), bGrade = new Int32Array(CAPB);
   const bFuse = new Int32Array(CAPB), bRole = new Int32Array(CAPB);
   const bSeed = new Int32Array(CAPB), bCol = new Int32Array(CAPB);
@@ -995,6 +1008,13 @@ export function createVisual(opts) {
 
     if (transitT > 0) transitT = Math.max(0, transitT - d / LOOK.transit);
     if (resolveT > 0) resolveT = Math.max(0, resolveT - d / 0.55);
+    // About a second, which is long enough to be seen and short enough that a
+    // run buying every turn is a mass that breathes rather than one that never
+    // settles.
+    if (swell > 0) {
+      swell = Math.max(0, swell - d / 0.95);
+      if (swell === 0) swellSize = 0;
+    }
 
     // Hue drifts rather than cutting, so a handover is felt before it is seen.
     if (hue !== hueTo) {
@@ -1064,6 +1084,21 @@ export function createVisual(opts) {
     swRaw = n;
     swLog = Math.max(0, log10Of(n));
     swText = format(n);
+  }
+
+  /**
+   * The swarm just grew by `by` on a count of `from`. Heaves the mass so the
+   * thing that was bought is something the player sees happen, rather than a
+   * figure that changed while they were reading somewhere else.
+   */
+  function grew(by, from) {
+    const n = Number(by), base = Math.max(1, Number(from) || 1);
+    if (!Number.isFinite(n) || n <= 0) return;
+    // A share, so a purchase reads the same at a swarm of ten and at ten
+    // thousand. Capped, or doubling the swarm would throw the pool off screen.
+    const share = clamp(n / base, 0, 1);
+    swellSize = Math.max(swellSize, 0.25 + 0.75 * share);
+    swell = 1;
   }
 
   /** Share of the swarm currently in flight, 0..1. Dips the pool while a turn runs. */
@@ -1560,6 +1595,9 @@ export function createVisual(opts) {
         ? clamp(1 - (rowsToFloor - 1 - rec.r) / LOOK.threatRows, 0, 1)
         : pressure;
 
+      const pay = Number(b.pay);
+      bPay[idx] = Number.isFinite(pay) ? clamp(pay, 0, 1) : 0;
+
       const sc = rec.c - LO;
       if (rec.r >= 0 && rec.r < OCC_ROWS && sc >= 0 && sc < OCC_W) {
         occ[rec.r * OCC_W + sc] = frameId;
@@ -1635,6 +1673,7 @@ export function createVisual(opts) {
     }
 
     drawThreat(ctx);
+    drawPayLight(ctx);
     drawNumerals(ctx);
 
     // --- sweep: anything not seen this frame died ------------------------
@@ -1937,6 +1976,45 @@ export function createVisual(opts) {
    * the swarm grows. A large swarm does not just read on a counter. It changes
    * how the world looks.
    */
+  /**
+   * WHAT THE BOARD IS WORTH, DRAWN.
+   *
+   * Light on each block in proportion to what breaking it pays, against the
+   * richest one standing. A player looking for where to aim gets the answer
+   * from the picture instead of from a table: the bright cluster is the money.
+   *
+   * It is light ON the block and never a ring around it - a hundred rings read
+   * as soap bubbles. Only the top half of the range lights at all, so a board
+   * where everything pays about the same stays quiet rather than glowing
+   * everywhere and meaning nothing, and it goes under the health numbers,
+   * which nothing is allowed to tint.
+   */
+  function drawPayLight(ctx) {
+    let any = false;
+    for (let i = 0; i < bN; i++) if (bPay[i] > 0.5) { any = true; break; }
+    if (!any) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < bN; i++) {
+      // Below halfway a block is not one of the ones worth aiming at, and a
+      // faint wash on everything is the same as no wash at all.
+      const lit = (bPay[i] - 0.5) * 2;
+      if (!(lit > 0.02)) continue;
+      const w = bw[i], h = bh[i];
+      if (!(w > 0 && h > 0)) continue;
+      const cx = bx[i] + w / 2, cy = by[i] + h / 2;
+      const r = Math.max(w, h) * 0.62;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      // Warm, and the same warm the payout figures print in, so the light and
+      // the number that lands when it breaks are plainly the same thing.
+      g.addColorStop(0, tone.a(PALETTE.essence, 0.16 * lit * bAl[i]));
+      g.addColorStop(1, tone.a(PALETTE.essence, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(bx[i], by[i], w, h);
+    }
+    ctx.restore();
+  }
+
   function drawRimLight(ctx) {
     if (!gradRim) return;
     ctx.beginPath();
@@ -2360,9 +2438,12 @@ export function createVisual(opts) {
     const q = quality;
 
     // How deep into the band the mass reaches. Saturates around ten thousand.
-    const fill = 0.16 + 0.84 * (1 - Math.exp(-lg / 2.4));
+    // The swell rides on top of the height the count earns, so the mass heaves
+    // and settles rather than stepping to a new level.
+    const heave = reduced ? 0 : swell * swell * swellSize;
+    const fill = clamp(0.16 + 0.84 * (1 - Math.exp(-lg / 2.4)) + 0.18 * heave, 0, 1);
     // How bright it burns. Keeps climbing long after the height has stopped.
-    const lum = clamp(lg / 11, 0, 1);
+    const lum = clamp(lg / 11 + 0.35 * (reduced ? 0 : swell * swellSize), 0, 1);
     // Turbulence is the one channel with headroom left after height and
     // brightness have both saturated. A swarm of ten thousand is a full band; a
     // swarm of ten to the seventeenth is a full band that will not hold still.
@@ -2473,14 +2554,17 @@ export function createVisual(opts) {
 
     // The count, printed. The band and the number are the same fact stated
     // twice, which is how a player learns to read the band.
+    //
+    // The word beside it is gone. The field is scaled to whatever height the
+    // window leaves it, so at 1280x800 this whole corner renders around six
+    // pixels tall - unreadable, and saying nothing the readout does not say at
+    // nineteen pixels three inches above it. The figure stays because it sits
+    // against the mass and teaches what the mass means.
     ctx.font = '600 10px ' + FONT;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = tone.a(PALETTE.swarm, 0.75);
     ctx.fillText(swText, W - 8, H - 8);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = tone.a(PALETTE.dim, 0.55);
-    ctx.fillText('swarm', 8, H - 8);
 
   }
 
@@ -2658,7 +2742,7 @@ export function createVisual(opts) {
     regimeKey = 'opening'; regimeName = 'drift'; regimeNext = '';
     prevSigs = null; curSigs = sigsFor('opening');
     hue = hueTo = REGIME_HUES.opening;
-    swLog = 0; swText = '1'; swRaw = 1;
+    swLog = 0; swText = '1'; swRaw = 1; swell = 0; swellSize = 0;
     occ.fill(0); frameId = 0;
     gradKey = '';
     layers.clear();
@@ -2849,7 +2933,7 @@ export function createVisual(opts) {
     // readout primitives
     readout, glyph, caption,
     // signals
-    setDepth, setSwarm, setRegime, setFlight, setPressure, splash, descend, resolve,
+    setDepth, setSwarm, setRegime, setFlight, setPressure, splash, descend, resolve, grew,
     // control
     clear, resize, setLattice, setSurface, setGrid, setQuality, setAutoQuality, setReducedMotion, stats,
     // helpers, exposed so a caller never has to reimplement them

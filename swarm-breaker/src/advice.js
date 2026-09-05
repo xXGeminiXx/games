@@ -23,7 +23,7 @@
  *  `say('...')` rather than reading this list, so the list cannot go stale
  *  without the scan noticing. */
 export const KEYS = [
-  'working', 'start', 'crowded', 'last', 'closing', 'buy', 'marker', 'lane', 'saving', 'aim',
+  'working', 'start', 'crowded', 'last', 'closing', 'buy', 'hoard', 'marker', 'lane', 'saving', 'aim',
 ];
 
 function say(key, vals) { return { key, vals: vals || {} }; }
@@ -54,6 +54,8 @@ function round(n) {
  *   fill:     0..1 of the board that is standing (fields that fill only)
  *   openCols: columns with nothing standing in them
  *   markers:  { swarm, essence } markers waiting on the field
+ *   trading:  true when the run mines ore and has a market to sell it on
+ *   hoard:    what the held material would fetch if it were sold now
  *   offers:   [{ name, cost, costText, effect, affordable }] the hand
  * }
  */
@@ -105,6 +107,22 @@ export function advise(bag) {
     });
   }
 
+  // ORE THAT HAS NEVER BEEN SOLD.
+  //
+  // A real run on this machine reached depth 42 holding six hundred and
+  // twenty five units of it while the hand went untaken, and nothing on the
+  // screen had ever mentioned it was there. It sits below buying, because
+  // spending money you already have beats a sale, and above saving, because
+  // selling beats waiting.
+  let cheapest = null;
+  for (const o of (b.offers || [])) if (!cheapest || price(o) < price(cheapest)) cheapest = o;
+  if (b.trading && (b.hoard | 0) > 0 && cheapest && Number.isFinite(price(cheapest))) {
+    return say('hoard', {
+      worth: b.hoardText || String(Math.round(b.hoard)),
+      name: cheapest.name, cost: cheapest.costText || String(price(cheapest)),
+    });
+  }
+
   // The swarm is the damage, and markers are the only thing that grows it.
   const mk = b.markers || {};
   if ((mk.swarm | 0) > 0) {
@@ -121,8 +139,6 @@ export function advise(bag) {
   }
 
   // Saving toward something, with the gap named so the wait has a length.
-  let cheapest = null;
-  for (const o of (b.offers || [])) if (!cheapest || price(o) < price(cheapest)) cheapest = o;
   if (cheapest && Number.isFinite(price(cheapest))) {
     const gap = Math.max(0, Math.round(price(cheapest) - (Number(b.essence) || 0)));
     return say('saving', {

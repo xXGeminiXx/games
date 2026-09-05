@@ -87,12 +87,13 @@ export const CONFIG = {
     // player can ignore all of it at no cost, which is what lets it sit on
     // screen for a whole run without becoming furniture to click away.
     compass: {
-      working: '{live} balls out, {broke} broken this turn',
+      working: '{live} ball{s} out, {broke} broken this turn',
       start:   'drag down from the swarm and let go. the balls do the rest',
       crowded: '{pct}% full. the run ends when it fills, so break the biggest clump',
       last:    'one more row down and the run ends. break the lowest blocks now',
       closing: '{spare} row{s} of room left. break the lowest blocks or the run ends',
       buy:     '{cash} cash in hand. {name} costs {cost}: {effect}',
+      hoard:   'you are holding {worth} in ore. sell it and {name} at {cost} is yours',
       marker:  '{n} cyan marker{s} out there. each one you hit joins the swarm',
       lane:    '{cols} clear column{s} to the ceiling. a ball up there rakes the top row',
       saving:  '{cash} cash. {name} costs {cost}, {short} to go. broken blocks pay',
@@ -933,15 +934,16 @@ export const CONFIG = {
   //
   // A player who only ever aims used to fall behind for a reason nothing on
   // screen explained: cash piles up and does nothing until somebody presses a
-  // button they were never told about. Two measured runs on the default
-  // difficulty died at depth 7 holding 204 and at depth 14 holding 610, each
-  // with two powers they could have paid for sitting in front of them.
+  // button they were never told about. Read off a real run on this machine:
+  // depth 42, forty three hands dealt, TWO ranks taken, and 5,350 cash plus
+  // 625 units of ore still sitting there. The hand was not a hard choice, it
+  // was a thing nobody knew to press.
   //
   // So the hand spends for you between turns, taking the dearest thing it can
-  // afford, and anybody who would rather choose turns it off on the menu and
-  // gets exactly what the game did before. Automatic never redeals, never
-  // touches the market, and never spends in a run that is trading, because
-  // that run's cash has somewhere else to be.
+  // afford, once a turn, and anybody who would rather choose turns it off on
+  // the menu and gets exactly what the game did before. It spends CASH and
+  // nothing else: it never redeals, never sells ore, never crafts and never
+  // touches the market, in a trading run or out of one.
   buying: {
     auto: true,
     autoLabel: 'for me - the hand spends between turns',
@@ -1090,7 +1092,7 @@ export const CONFIG = {
     // every release and every import carries the same one. This is that number
     // and nothing reads it - it is here so the value has one place to be
     // checked against.
-    build: 23,
+    build: 24,
 
     // Allows ?set= in the URL and a `cfg` entry in browser storage to patch
     // anything above. Turn off for a build you do not want poked at.

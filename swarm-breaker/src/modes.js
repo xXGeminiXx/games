@@ -43,13 +43,13 @@
 // layout and a name, and it gets everything else for free.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, leftEdgeAt } from '../config.js?v=23';
-import { createPatternSource } from './patterns.js?v=23';
-import { createFormationSource } from './formations.js?v=23';
-import { createFractalSource } from './fractal.js?v=23';
-import { createFractalSurface } from './fractal-surface.js?v=23';
-import { createBloomSource } from './bloom.js?v=23';
-import { arrivalOf } from './arrival.js?v=23';
+import { CONFIG, leftEdgeAt } from '../config.js?v=24';
+import { createPatternSource } from './patterns.js?v=24';
+import { createFormationSource } from './formations.js?v=24';
+import { createFractalSource } from './fractal.js?v=24';
+import { createFractalSurface } from './fractal-surface.js?v=24';
+import { createBloomSource } from './bloom.js?v=24';
+import { arrivalOf } from './arrival.js?v=24';
 
 /**
  * A field source.

@@ -807,6 +807,23 @@ export function harvest(state, block) {
   return { id, name: m.name, qty: units, text: fmt(units) };
 }
 
+/**
+ * What a block would pay if it broke right now, as a plain number, without
+ * paying it. The picture uses this to light each block by what it is worth,
+ * so a glance answers "where is the money on this board" without reading a
+ * single figure. It has to agree with harvest() above or the light is a lie:
+ * same material, same bulk, same gain, and the cash rail multiplies by the
+ * material's base the way the cash branch there does.
+ */
+export function worthOf(state, block) {
+  const depth = Math.max(1, Math.trunc((block && block.depth) ?? state.depth));
+  const m = matDef(materialOf(depth, (block && block.col) || 0));
+  const maxHp = (block && block.maxHp) ?? state.cfg.hpAt(depth);
+  const units = m.drop * bulkOf(maxHp) * (1 + state.mods.gain) * state.boost.mult;
+  const n = state.cashOnly ? units * m.base : units;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /** A field pickup that pays cash rather than material. Roughly six slag. */
 export function windfall(state, depth = state.depth) {
   // A pickup off the FIELD, not a price at the desk, so it scales with the
