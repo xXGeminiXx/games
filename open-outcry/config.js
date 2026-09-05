@@ -10,7 +10,7 @@
 // each other's tuning. Type is taken from the value already in place, so a
 // number stays a number and a typo in a path is reported rather than created.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/oklch.js?v=5';
+import { oklch } from './src/oklch.js?v=6';
 
 export const CONFIG = {
   identity: {
@@ -20,7 +20,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 5,              // the ?v= tag every import carries; bump on every src change
+    build: 6,              // the ?v= tag every import carries; bump on every src change
     allowOverrides: true,  // ?set= and the namespaced localStorage patch
   },
 
@@ -191,7 +191,11 @@ export const CONFIG = {
     spread: { fills: 5 },
     clerks: { funds: 420 },
     seat:   { volume: 6000 },
-    pits:   { clerks: 1 },
+    // EVERY MARKET IS ON THE SHELF FROM THE FIRST MINUTE. This used to wait for
+    // a clerk, so the whole ladder past grain was invisible until a player
+    // bought a 900 coin thing whose card meant nothing to somebody with one
+    // board. A run ended holding 376,755 coins having never bought it.
+    pits:   { clerks: 0 },
     runners: { pits: 2 },
     corner: { share: 0.12 },
     city:   { corners: 1 },

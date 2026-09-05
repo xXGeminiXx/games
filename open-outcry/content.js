@@ -70,6 +70,7 @@ export const CONTENT = {
     spendableHeld: 'You can spend {n}. Your board is holding {held}.',
     owned: 'you have {n}',
     buyFor: 'Buy {n} for {cost}',
+    buyMost: 'Buy {n} for {cost}, {pct} of what you can spend',
     needs: 'needs {n} more',
     openMarket: 'Open the {pit} market',
     marketCost: 'costs {n}',
@@ -77,8 +78,9 @@ export const CONTENT = {
 
     sizeName: 'More sacks at a time',
     sizeWhat: 'Handle {n} sacks at a time instead of {was}.',
+    sizeCapped: '{n} sacks at a time is all you can handle. Another {step} costs {cost}.',
     clerkName: 'Hire a clerk',
-    clerkWhat: "Watches a board while you're at another market. Hire one and the other markets open up.",
+    clerkWhat: 'Stands at one of your markets and keeps its board written while you are at another. A market with nobody on it takes its board down.',
     clerkSlots: '{used} of {n} clerks have a board.',
     clerkIdle: 'Waiting for a board to watch. Open another market.',
     
@@ -97,7 +99,8 @@ export const CONTENT = {
 
     cityGo: 'Take the road to {city}',
     cityNeed: 'Buy up {n} more markets here first.',
-    cityRep: 'Your name is worth {n} in the next town, and this is what it buys.',
+    cityRep: "Your name is worth {n} in the next town. That's enough for {what}.",
+    cityRepNone: "Your name is worth {n} in the next town, and nothing here costs that little yet.",
     citySpendRow: '{label}, costs {n}. You have {k}.',
 
     exportSave: 'Copy your game out',
@@ -121,8 +124,8 @@ export const CONTENT = {
     nextFirstFill: 'Somebody will take one of your prices in a moment. Watch the purse.',
     nextWipe: 'When the going rate walks away from your board, press space to wipe it and write it again.',
     nextWipeNow: 'The price has left your board. Press space to wipe it and write it again.',
-    nextBuySize: 'The next sack at a time costs {n}, and every trade you make pays more.',
-    nextBuyClerk: 'A clerk costs {n}. Hire one and the other markets open up.',
+    nextBuySize: 'Another {step} sacks at a time costs {n}, and every trade you make pays more.',
+    nextBuyClerk: 'One of your markets has nobody on it and its board is down. A clerk to stand there costs {n}.',
     nextOpenPit: 'The {pit} market costs {n} to open.',
     nextCorner: 'You hold {have} of the {pit} here. Get to half and you can buy it up.',
     nextCity: 'Buy up {n} more markets here and you can leave for the next town.',
@@ -243,7 +246,7 @@ export const CONTENT = {
     steps: [
       'Your board says you pay {bid} for a sack and you charge {ask} for one. You keep the {cut}.',
       'The crowd moves the price all day. Press space to put your board back on it. Leave it alone and the board catches up on its own, slower.',
-      'Your first {clerk} hires a clerk, and the other markets open up.',
+      'The {second} market costs {secondCost} to open, and its crowd behaves nothing like grain.',
     ],
     go: 'Take the board',
   },

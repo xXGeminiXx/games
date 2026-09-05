@@ -64,6 +64,9 @@ button{cursor:pointer}
   display:flex;align-items:center;gap:10px;font-size:15px;color:var(--chalkDim);
   min-height:22px;margin:0;
 }
+/* Why the dial has stopped. It is empty most of the time and its height is
+   reserved either way, so the desk never moves under a hand. */
+#dialnote{font-size:13px;color:var(--chalkDim);min-height:17px;margin:0;text-align:center}
 /* A control that wraps to two lines changes height and shoves the row about.
    The desk is a fixed band; nothing on it reflows. */
 .minor button,#wipe{white-space:nowrap}
@@ -229,6 +232,19 @@ textarea{
   border:1.5px solid var(--ghost);border-radius:2px;background:rgba(0,0,0,.45);color:var(--chalkDim);font-size:13px;
 }
 #hint{color:var(--chalkDim);font-size:13px}
+
+/* A SHORT WINDOW STILL HAS TO SHOW THE WHOLE DESK. The band the controls sit
+   in is a fixed share of the picture, so on a 700 pixel window the row of
+   minor buttons was 7 pixels past the bottom edge and a player could not reach
+   it. Everything on the desk tightens rather than anything leaving it. */
+@media (max-height:780px) and (min-width:821px){
+  #controls{gap:6px;padding:4px 16px}
+  .dial{padding:2px 8px 4px}
+  .dial .val{font-size:21px}
+  #wipe{min-height:48px}
+  #dialnote{min-height:15px;font-size:12.5px}
+  #fresh{min-height:18px}
+}
 
 @media (max-width:820px){
   :root{--panelW:0px}
@@ -402,7 +418,7 @@ textarea{
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="e62ca5028488">
+<meta name="build" content="658ce90fbf82">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -478,6 +494,7 @@ textarea{
         </div>
       </div>
     </div>
+    <p id="dialnote"></p>
     <div id="deskrow">
       <p id="fresh"><span id="fresh-text"></span><span class="bar"><i id="fresh-bar"></i></span></p>
       <div class="minor">
@@ -569,7 +586,7 @@ textarea{
 </div></div>
 
 <script type="module">
-import { boot } from './src/ui.js?v=5';
+import { boot } from './src/ui.js?v=6';
 boot();
 </script>
 </body>

@@ -28,8 +28,8 @@
 //   momentum   reads a print past its view as a reason to expect another
 // ---------------------------------------------------------------------------
 
-import { BELIEFS, SIZING, setBand } from './market-rules.js?v=5';
-import { BUY } from './orderbook.js?v=5';
+import { BELIEFS, SIZING, setBand } from './market-rules.js?v=6';
+import { BUY } from './orderbook.js?v=6';
 
 const centreOf = (m, k) => (m.bLo[k] + m.bHi[k]) / 2;
 const halfOf = (m, k) => (m.bHi[k] - m.bLo[k]) / 2;

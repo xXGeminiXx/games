@@ -22,15 +22,15 @@
 // the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=5';
-import { CONTENT, fill } from '../content.js?v=5';
-import { Game } from './game.js?v=5';
-import { Board } from './board.js?v=5';
-import { format, counter } from './format.js?v=5';
-import { toNumber, cmp } from './bignum.js?v=5';
-import { createSave } from './save.js?v=5';
-import { affordability } from './purchase.js?v=5';
-import { createComposer } from './rules-ui.js?v=5';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=6';
+import { CONTENT, fill } from '../content.js?v=6';
+import { Game } from './game.js?v=6';
+import { Board } from './board.js?v=6';
+import { format, counter } from './format.js?v=6';
+import { toNumber, cmp } from './bignum.js?v=6';
+import { createSave } from './save.js?v=6';
+import { affordability } from './purchase.js?v=6';
+import { createComposer } from './rules-ui.js?v=6';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -39,6 +39,8 @@ const fmt = (v) => format(v, { decimals: 2 });
 // penny, and a shelf that quotes 777.68 reads as a spreadsheet.
 const coins = (v) => format(typeof v === 'number' ? Math.round(v) : v, { decimals: 0 });
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+// Names in a row, the way a person reads them out.
+const listOf = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
 
 // What is on the shelf, in one place, so the panel is a list and not four
 // hand-written blocks that drift apart.
@@ -104,9 +106,11 @@ function fillIntro(content, pit, cfg) {
   const steps = $('intro-steps');
   if (!steps || steps.childElementCount) return;
   const v = pit ? { bid: pit.bid, ask: pit.ask, cut: pit.ask - pit.bid } : {};
-  // The first rung's price comes off the shop rather than being written into
-  // the sentence, so retuning it cannot leave the opening screen lying.
-  v.clerk = coins(cfg.ladder.clerk.base);
+  // The name and the price come off the shelf rather than being written into
+  // the sentence, so retuning either cannot leave the opening screen lying.
+  const second = cfg.pitOrder[1];
+  v.second = cfg.pits[second].name;
+  v.secondCost = coins(cfg.pits[second].cost);
   for (const line of content.intro.steps) steps.appendChild(el('li', null, fill(line, v)));
 }
 
@@ -153,8 +157,8 @@ class UI {
   // The sentences and the controls are laid out against the picture, so where
   // the rail lands has to reach the stylesheet. Two custom properties carry it.
   resize() {
-    const c = $('c');
-    const r = c.getBoundingClientRect();
+    const canvas = $('c');
+    const r = canvas.getBoundingClientRect();
     const narrow = innerWidth <= 820;
     this.board.setNarrow(narrow);
     this.board.setInset(narrow ? 0 : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--panelW')) || 0);
@@ -361,8 +365,12 @@ class UI {
     $('dump').disabled = p.position <= 0;
     this.say('stopq', down ? c.start : c.stop);
     $('cut-minus').disabled = p.spread <= this.cfg.pit.minSpread;
-    $('size-plus').disabled = p.size >= this.game.quoteSize();
+    const capped = p.size >= this.game.quoteSize();
+    $('size-plus').disabled = capped;
     $('size-minus').disabled = p.size <= 1;
+    this.say('dialnote', capped
+      ? fill(c.sizeCapped, { n: this.game.quoteSize(), step: this.cfg.ladder.size.step, cost: coins(this.priceOfNext('size')) })
+      : '');
   }
 
   // ONE LINE THAT SAYS WHAT TO DO NEXT, and only ever one. A player who has
@@ -377,10 +385,13 @@ class UI {
     // hand: past that the desk says when to wipe, and saying it twice in two
     // different sets of words is the noise this panel is meant to avoid.
     const stale = p && (!p.bidOn && !p.askOn ? 1 : p.staleness());
+    // A CLERK IS NAMED WHEN A CLERK PAYS, which is the moment you own a board
+    // nobody is standing at. You stand at one; every other one needs somebody.
+    const unmanned = g.order.length - 1 - g.bought.clerk;
     if (!g.fills) text = c.nextFirstFill;
     else if (!g.wipes) text = stale > 0.62 ? c.nextWipeNow : c.nextWipe;
     else if (!g.shown('clerks')) text = c.nextWipe;
-    else if (g.bought.clerk === 0) text = fill(c.nextBuyClerk, { n: coins(this.priceOfNext('clerk')) });
+    else if (unmanned > 0) text = fill(c.nextBuyClerk, { n: coins(this.priceOfNext('clerk')) });
     if (!text && g.shown('city') && !g.canLeave()) text = fill(c.nextCity, { n: g.cornersToLeave() - g.corners });
     if (!text && g.shown('corner') && p) text = fill(c.nextCorner, { pit: p.name, have: Math.round(p.share * 100) + '%' });
     if (!text && g.shown('pits')) {
@@ -389,7 +400,7 @@ class UI {
         text = fill(c.nextOpenPit, { n: coins(g.pitCost(next)), pit: this.cfg.pits[next].name });
       }
     }
-    if (!text && g.shown('ladder')) text = fill(c.nextBuySize, { n: coins(this.priceOfNext('size')) });
+    if (!text && g.shown('ladder')) text = fill(c.nextBuySize, { n: coins(this.priceOfNext('size')), step: this.cfg.ladder.size.step });
     this.say('next', text || c.nextNone);
   }
 
@@ -491,10 +502,19 @@ class UI {
           ? fill(c.buyFor, { n: 1, cost: coins(q1.total) })
           : `${fill(c.buyFor, { n: 1, cost: coins(q1.price) })}, ${fill(c.needs, { n: coins(q1.shortfall || q1.price) })}`;
         // A second button only when it would buy something the first does not.
+        // A BUY THAT TAKES MOST OF THE PURSE SAYS SO BEFORE IT IS PRESSED. It
+        // cannot be undone, and "Buy 51 for 464K" gave a player no way to know
+        // that 464K was everything they had without doing the division.
         const qm = g.quoteFor(spec.id, 'max');
         const worth = qm.count > 1;
         many.hidden = !worth;
-        if (worth) many.textContent = fill(c.buyFor, { n: qm.count, cost: coins(qm.total) });
+        if (worth) {
+          const purse = toNumber(g.wallet());
+          const share = purse > 0 ? toNumber(qm.total) / purse : 0;
+          many.textContent = share > 0.5
+            ? fill(c.buyMost, { n: qm.count, cost: coins(qm.total), pct: Math.round(clamp(share, 0, 1) * 100) + '%' })
+            : fill(c.buyFor, { n: qm.count, cost: coins(qm.total) });
+        }
       },
     };
   }
@@ -606,7 +626,13 @@ class UI {
 
   city() {
     const g = this.game, c = this.content.labels;
-    this.say('city-rep', fill(c.cityRep, { n: g.reputation }));
+    // A NUMBER WITH NO UNIT IS NOT A NUMBER. "Your name is worth 9" answered
+    // nothing on its own, so the line says what 9 actually reaches here.
+    const names = [];
+    for (const [id, r] of this.spendRows) if (g.spendQuote(id, 1).count > 0) names.push(r.spec.label);
+    this.say('city-rep', names.length
+      ? fill(c.cityRep, { n: g.reputation, what: listOf(names) })
+      : fill(c.cityRepNone, { n: g.reputation }));
     for (const [id, r] of this.spendRows) {
       const q = g.spendQuote(id, 1);
       const text = fill(c.citySpendRow, { label: r.spec.label, n: q.price, k: g.spent[id] });
