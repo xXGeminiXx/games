@@ -17,14 +17,16 @@
 // The order is a claim about the game: a caller who leaves beats a purchase
 // that will still be there in a minute, work the player is not doing beats
 // anything they could buy, and filling the barrow in - which ends the run -
-// is named only when it would more than treble what they have kept.
+// is named only when what it pays is what carries them over the cheapest
+// thing they can keep, which is to say only when ending the run buys
+// something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=18';
-import * as R from './rites.js?v=18';
-import * as Rb from './rebirth.js?v=18';
-import * as Lore from './lore.js?v=18';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=18';
+import * as H from './horde.js?v=19';
+import * as R from './rites.js?v=19';
+import * as Rb from './rebirth.js?v=19';
+import * as Lore from './lore.js?v=19';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=19';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;

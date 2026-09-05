@@ -11,15 +11,15 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=18';
-import * as Mk from './market.js?v=18';
-import * as H from './horde.js?v=18';
-import * as R from './rites.js?v=18';
-import * as Rb from './rebirth.js?v=18';
-import * as Lore from './lore.js?v=18';
-import * as Advice from './advice.js?v=18';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=18';
-import { fill } from '../config.js?v=18';
+import * as Mat from './materials.js?v=19';
+import * as Mk from './market.js?v=19';
+import * as H from './horde.js?v=19';
+import * as R from './rites.js?v=19';
+import * as Rb from './rebirth.js?v=19';
+import * as Lore from './lore.js?v=19';
+import * as Advice from './advice.js?v=19';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=19';
+import { fill } from '../config.js?v=19';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -136,7 +136,7 @@ export function createUI(doc, sim, cfg, actions) {
   const riteCount = (id) => (ritePick === 'max' ? Math.max(1, sim.riteMax(id)) : ritePick);
   const buildRiteBulk = () => {
     if (!nodes.riteBulk || riteButtons.length) return;
-    nodes.riteBulk.appendChild(el('span', { class: 'lbl', text: T.riteBulk || 'levels at a time' }));
+    nodes.riteBulk.appendChild(el('span', { class: 'lbl', text: T.panels.riteBulk }));
     for (const n of riteSteps) {
       const b = el('button', { onclick: () => { ritePick = n; paintRiteBulk(); } },
                    el('b', { text: n === 'max' ? 'max' : 'x' + n }));
