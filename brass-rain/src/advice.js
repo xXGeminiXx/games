@@ -32,7 +32,7 @@
 // plays from it.
 // ---------------------------------------------------------------------------
 
-import { num } from './format.js?v=70';
+import { num } from './format.js?v=71';
 
 /** How wide a slice of the handle counts as one setting. */
 export const BAND_STEP = 0.1;

@@ -91,7 +91,7 @@
 //   cashMult       mult   multiplies the scrip rate at cash out
 //   trayBonus      add    balls added to every round's tray grant
 //   bendsPerRound  add    added to the board's bends allowance
-//   bendReach      mult   multiplies how far a nail head will lean
+//   bendReach      add    added to how far a nail head will lean, in board units
 //   shopSlots      add    added to the number of fittings that bolt in
 //   shopOffers     add    added to the cards offered at the bench
 //   rerollDiscount frac   fraction off a reroll price
@@ -146,8 +146,8 @@
 // truncated or hand-edited save.
 // ---------------------------------------------------------------------------
 
-import { priceAt } from './economy.js?v=70';
-import { num as coins } from './format.js?v=70';
+import { priceAt } from './economy.js?v=71';
+import { num as coins } from './format.js?v=71';
 
 // ---------------------------------------------------------------------------
 // Tuning that belongs to the layer rather than to the formula. The formula is
@@ -312,7 +312,8 @@ export const NODES = [
     id: 'nail_gauge', name: 'Bend Nails Farther', tier: 3, cost: 15, needs: ['pin_hammer'], resets: 5,
     text: 'A nail head leans more than twice as far, 2.45 across instead of 0.95.',
     visible: 'The ring drawn around a picked nail is half again as wide, and covers nails it could not before.',
-    gives: { bendReach: 1.5 },
+    // Half a unit on top of the standing one, which is the 2.45 the card says.
+    gives: { bendReach: 0.5 },
   },
   {
     id: 'long_lamp', name: 'Longer Bonuses', tier: 3, cost: 16, needs: ['wider_gate'], resets: 5,
@@ -413,7 +414,14 @@ export const EFFECT_KINDS = Object.freeze({
   cashMult: 'mult',
   trayBonus: 'add',
   bendsPerRound: 'add',
-  bendReach: 'mult',
+  // ADDED, not multiplied, and the word was the bug rather than the number.
+  // This was declared a multiplier here and added in game.js, and the game
+  // every player has ever played is the additive one: 0.95 on the face plus a
+  // standing 1 gives the 1.95 a run really has. Reading the old word and
+  // "fixing" the arithmetic would halve what a bend does, which is a harder
+  // game than anybody has played. tests/suites/meta.js pins the two numbers a
+  // real run produces so that cannot happen quietly.
+  bendReach: 'add',
   shopSlots: 'add',
   shopOffers: 'add',
   rerollDiscount: 'frac',
@@ -714,6 +722,8 @@ function emptyEffects() {
     cashMult: 1,
     trayBonus: 0,
     bendsPerRound: 0,
+    // The standing bonus every machine gets. Added to the 0.95 in the config,
+    // which is where a run's real reach of 1.95 comes from.
     bendReach: 1,
     shopSlots: 0,
     shopOffers: 0,
@@ -771,9 +781,9 @@ export function effects(meta) {
     if (g.cashMult > 0) e.cashMult *= g.cashMult;
     if (g.floorMultPer > 0) e.floorMult *= Math.pow(g.floorMultPer, level);
     if (g.cashMultPer > 0) e.cashMult *= Math.pow(g.cashMultPer, level);
-    if (g.bendReach > 0) e.bendReach *= g.bendReach;
 
     if (g.trayBonus) e.trayBonus += g.trayBonus * level;
+    if (g.bendReach) e.bendReach += g.bendReach * level;
     if (g.bendsPerRound) e.bendsPerRound += g.bendsPerRound * level;
     if (g.shopSlots) e.shopSlots += g.shopSlots * level;
     if (g.shopOffers) e.shopOffers += g.shopOffers * level;

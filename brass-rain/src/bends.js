@@ -28,9 +28,9 @@
 // as candidates were tried and put back.
 // ---------------------------------------------------------------------------
 
-import { bendCheck, bendNail } from './board.js?v=70';
-import { createBalls, launch, stepPhysics } from './physics.js?v=70';
-import { rng } from './rng.js?v=70';
+import { bendCheck, bendNail } from './board.js?v=71';
+import { createBalls, launch, stepPhysics } from './physics.js?v=71';
+import { rng } from './rng.js?v=71';
 
 /** Nails nearest each slot that the screen will try. */
 export const NEAR_NAILS = 16;
