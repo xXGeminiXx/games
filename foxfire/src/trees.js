@@ -20,8 +20,8 @@
 // reads are the ones the simulation pays.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=17';
-import { unit } from './rng.js?v=17';
+import { scale } from './levels.js?v=18';
+import { unit } from './rng.js?v=18';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {
@@ -242,7 +242,7 @@ export function fellValue(cfg, species, size, mods) {
  * on the growth still to come, which is what the sugar is actually buying.
  * Both are integrated, and the answer is where they cross. Past the horizon it is called no payback at all.
  */
-export function feedPayback(cfg, species, pool, value, growthMult, k) {
+export function feedPayback(cfg, species, pool, value, growthMult) {
   const count = pool.count || 0;
   const size = pool.size || 0;
   const full = count * species.max;
@@ -250,7 +250,9 @@ export function feedPayback(cfg, species, pool, value, growthMult, k) {
   const a = species.growth * growthMult;
   const b = a * (1 + cfg.trees.nurture.boost);
   if (!(room > 0) || !(a > 0) || !(b > a) || !(value > 0)) return Infinity;
-  const cost = cfg.trees.nurture.sugarPerSize * k;
+  // Priced against what a unit of size earns, so the answer is the same shape
+  // at every level rather than turning into a permanent no above the second.
+  const cost = cfg.trees.nurture.sugarPerSize * value;
   const net = (t) => {
     const ea = Math.exp(-a * t), eb = Math.exp(-b * t);
     const gained = value * room * ((1 - ea) / a - (1 - eb) / b);

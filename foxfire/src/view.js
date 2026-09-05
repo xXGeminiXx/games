@@ -29,10 +29,10 @@
 // arrived, so a save restores the same picture.
 // ---------------------------------------------------------------------------
 
-import { seasonOf } from './season.js?v=17';
-import { noise } from './world.js?v=17';
-import { hash, unit } from './rng.js?v=17';
-import { angleGap, burntSet } from './events.js?v=17';
+import { seasonOf } from './season.js?v=18';
+import { noise } from './world.js?v=18';
+import { hash, unit } from './rng.js?v=18';
+import { angleGap, burntSet } from './events.js?v=18';
 
 const TAU = Math.PI * 2;
 const ok = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -898,14 +898,22 @@ export function createView(canvas, cfg, doc) {
    * more tips is the ground that is brightest. `pay` is 0 to 1 against the
    * busiest place on the floor.
    */
-  const sheath = (x, y, r, pay, colour) => {
+  const sheath = (x, y, r, pay, colour, beat) => {
     const Hd = V.held;
     if (!ok(x) || !ok(y) || !(r > num(Hd.minPixels, 3.5))) return;
     const dim = num(Hd.dim, 0);
     const lit = clamp01(dim + (1 - dim) * Math.pow(clamp01(pay), num(Hd.bias, 1.5)));
     if (!(lit > 0.02)) return;
-    blob(ctx, paint, colour, x, y, r,
-      clamp01(num(Hd.sheathAlpha, 0.34) * lit), 0, 0, num(Hd.sheathCore, 0.2));
+    // The beat. A place putting something in breathes where it stands, so a
+    // floor with one log on it and no front yet is still a floor with
+    // something alive on it. Before this the opening was a still picture:
+    // sampled half a second apart, nothing moved in it at all, because the
+    // motes need threads and the drift needs tips and the first minute has
+    // neither. It rides the light rather than adding a mark of its own.
+    const P = V.pulse || {};
+    const swing = r > num(P.minPixels, 4) ? num(P.alpha, 0.3) * lit * (beat || 0) : 0;
+    blob(ctx, paint, colour, x, y, r * (1 + num(P.radius, 0.55) * 0.12 * (beat || 0)),
+      clamp01(num(Hd.sheathAlpha, 0.34) * lit + swing), 0, 0, num(Hd.sheathCore, 0.2));
   };
 
   // -- the frame ------------------------------------------------------------
@@ -1093,8 +1101,15 @@ export function createView(canvas, cfg, doc) {
       const r = place(i, n, x, y, true);
       if (r > 0) rings.push(x, y, r, nodePay && nodePayPeak > 0 ? nodePay[i] / nodePayPeak : 0);
     }
+    // One beat per place, out of step with its neighbours so the floor breathes
+    // rather than blinking as one thing, and faster where the ground pays more.
+    const beatFor = (pay, salt) => {
+      const period = Math.max(0.2, num((V.pulse || {}).seconds, 1.6));
+      const phase = (state.t / period + salt * 0.618) % 1;
+      return 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
+    };
     for (let k = 0; k < rings.length; k += 4) {
-      sheath(rings[k], rings[k + 1], rings[k + 2], rings[k + 3], look.glow);
+      sheath(rings[k], rings[k + 1], rings[k + 2], rings[k + 3], look.glow, beatFor(rings[k + 3], k >> 2));
     }
     ctx.globalAlpha = 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

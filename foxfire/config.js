@@ -333,11 +333,18 @@ export const CONFIG = {
     // A felled tree becomes dead wood worth size * wood, and once that has
     // been eaten a seedling comes up in its place.
     regrowSeconds: 240,
-    // Feeding: sugar sent per second per unit of size, and the growth it buys.
-    // The ledger states when it pays for itself; past this many seconds it is
-    // stated as not paying at all rather than as a number nobody would wait
-    // out.
-    nurture: { sugarPerSize: 0.06, boost: 2.0, paybackHorizon: 3600 },
+    // Feeding: what it costs to push a kind's growth, and the growth it buys.
+    //
+    // sugarPerSize is charged per second per unit of size still to come, times
+    // what a unit of size earns there right now, so the price rides the trade
+    // instead of the level. Charged per level instead, it outran the trade
+    // after the second one and feeding could never be the right move again.
+    // At sugarPerSize equal to boost the sums never come out; below it they
+    // do, and how far below sets how long the wait is. At 0.8 a kind pays its
+    // feeding back inside a season in spring, takes most of two in autumn, and
+    // never does in winter, so when to feed is a decision the year makes for
+    // you. The ledger says which it is.
+    nurture: { sugarPerSize: 0.8, boost: 2.0, paybackHorizon: 3600 },
     // A weight is 0..this; the trade splits minerals by weight.
     weightMax: 5,
     weightNew: 1,
@@ -912,7 +919,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 17,
+    build: 18,
   },
 };
 

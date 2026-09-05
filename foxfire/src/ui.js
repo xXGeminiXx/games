@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=17';
-import * as Advice from './advice.js?v=17';
-import * as Tr from './traits.js?v=17';
-import * as Sp from './spores.js?v=17';
-import { fill } from '../config.js?v=17';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=17';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=17';
+import * as Lore from './lore.js?v=18';
+import * as Advice from './advice.js?v=18';
+import * as Tr from './traits.js?v=18';
+import * as Sp from './spores.js?v=18';
+import { fill } from '../config.js?v=18';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=18';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=18';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
@@ -308,6 +308,14 @@ export function createUI(doc, sim, cfg, actions) {
 
   const noteFigures = (row, m) => {
     const bits = [];
+    // A kind getting none of the flow. Every figure on the row is a zero and
+    // nothing else on the page says why, so the row says it: a kind earns
+    // nothing here because it pays less than the others do, and the moment it
+    // pays better the minerals come back to it. The sentence goes wherever the
+    // zero is, and leaves the moment the zero does.
+    if (row.count > 0 && !(row.sent > 0)) {
+      bits.push(Lore.ui(sim.shareAuto() ? 'sentNothingAuto' : 'sentNothing', { name: Lore.capital(row.name) }));
+    }
     // What the next tick on this kind is worth, so a share is a decision with
     // a figure on it rather than a guess.
     if (row.count > 0 && row.weight < cfg.trees.weightMax && Math.abs(row.shareGain || 0) > 0.005) {
@@ -321,9 +329,15 @@ export function createUI(doc, sim, cfg, actions) {
         : Lore.ui('treeFellIdle', { felled: fmt(row.felled) }));
     }
     if (m.nurture && row.count > 0) {
-      bits.push(row.feed > 0
-        ? Lore.ui('treeFeed', { time: fmtTime(row.feed) })
-        : Lore.ui('treeFeedNever'));
+      // Feeding buys growth, and in winter there is no growth to buy, so the
+      // answer is the season rather than anything about this kind. Saying only
+      // that it would not pay reads as a control that never works.
+      const grows = (cfg.season.growth || [])[sim.season().index];
+      bits.push(!(grows > 0)
+        ? Lore.ui('treeFeedWinter')
+        : row.feed > 0
+          ? Lore.ui('treeFeed', { time: fmtTime(row.feed) })
+          : Lore.ui('treeFeedNever'));
     }
     return bits.join(' ');
   };

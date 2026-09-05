@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=17';
-import { buildLevel, nearestOpen } from './world.js?v=17';
-import * as Tips from './tips.js?v=17';
-import * as Trees from './trees.js?v=17';
-import * as Tr from './traits.js?v=17';
-import * as Lv from './levels.js?v=17';
-import * as Sp from './spores.js?v=17';
-import * as Rv from './reveal.js?v=17';
-import * as Ev from './events.js?v=17';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=17';
-import { hash } from './rng.js?v=17';
-import * as Lore from './lore.js?v=17';
-import { fmtArea, fmtCoin } from './numbers.js?v=17';
+import { CONFIG as DEFAULT } from '../config.js?v=18';
+import { buildLevel, nearestOpen } from './world.js?v=18';
+import * as Tips from './tips.js?v=18';
+import * as Trees from './trees.js?v=18';
+import * as Tr from './traits.js?v=18';
+import * as Lv from './levels.js?v=18';
+import * as Sp from './spores.js?v=18';
+import * as Rv from './reveal.js?v=18';
+import * as Ev from './events.js?v=18';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=18';
+import { hash } from './rng.js?v=18';
+import * as Lore from './lore.js?v=18';
+import { fmtArea, fmtCoin } from './numbers.js?v=18';
 
 export const SAVE_VERSION = 1;
 
@@ -340,9 +340,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         row.kept = perSecond;
         row.keptBack = perSecond > 0 ? row.felled / perSecond : 0;
       }
+      row.sizeValue = S > 0 ? Trees.sizeValue(sp, S, ms, mult) : 0;
       if (m.nurture && S > 0) {
-        const value = Trees.sizeValue(sp, S, ms, mult);
-        const pay = Trees.feedPayback(cfg, sp, { count: counts[sp.key] || 0, size: S }, value, season.growth, k);
+        const pay = Trees.feedPayback(cfg, sp, { count: counts[sp.key] || 0, size: S }, row.sizeValue, season.growth);
         row.feed = Number.isFinite(pay) ? pay : 0;
       }
       market[sp.key] = row;
@@ -387,9 +387,17 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         // standing pool. Trees already at their full size cannot use it, so
         // feeding a grown kind costs nothing and does nothing, and the sugar
         // always buys size that is actually arriving.
+        //
+        // The price is set against what that size earns, never against the
+        // level. Charged per level it outran the trade after the second one
+        // and feeding was a control that could never be the right move again:
+        // measured, it paid on every kind at the floor and the stand and on
+        // none of them anywhere above.
         const room = Math.max(0, (counts[sp.key] || 0) * sp.max - S);
         if (!(room > 0)) continue;
-        const cost = cfg.trees.nurture.sugarPerSize * room * k * dt;
+        const worth = (market[sp.key] && market[sp.key].sizeValue) || 0;
+        if (!(worth > 0)) continue;
+        const cost = cfg.trees.nurture.sugarPerSize * room * worth * dt;
         if (state.sugar + sugar >= cost) {
           sugar -= cost;
           state.totals.fed += cost;
