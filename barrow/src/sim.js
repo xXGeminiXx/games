@@ -17,19 +17,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=19';
-import * as Mat from './materials.js?v=19';
-import * as Mk from './market.js?v=19';
-import * as H from './horde.js?v=19';
-import * as Crew from './crew.js?v=19';
-import * as R from './rites.js?v=19';
-import * as Rv from './reveal.js?v=19';
-import * as Ch from './chambers.js?v=19';
-import * as Vi from './visitors.js?v=19';
-import * as Rb from './rebirth.js?v=19';
-import * as Lore from './lore.js?v=19';
-import { createGround } from './ground.js?v=19';
-import { fill } from '../config.js?v=19';
+import { CONFIG as DEFAULT } from '../config.js?v=20';
+import * as Mat from './materials.js?v=20';
+import * as Mk from './market.js?v=20';
+import * as H from './horde.js?v=20';
+import * as Crew from './crew.js?v=20';
+import * as R from './rites.js?v=20';
+import * as Rv from './reveal.js?v=20';
+import * as Ch from './chambers.js?v=20';
+import * as Vi from './visitors.js?v=20';
+import * as Rb from './rebirth.js?v=20';
+import * as Lore from './lore.js?v=20';
+import { createGround } from './ground.js?v=20';
+import { fill } from '../config.js?v=20';
 
 export const SAVE_VERSION = 2;
 
@@ -746,8 +746,15 @@ export function restoreSim(cfg, snap) {
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.chamberQueue)) state.chamberQueue = [];
   // The game does the splitting for everybody, including runs that predate
-  // it. A save with rows the player had actually set by hand keeps them.
-  state.byHand = !!st.byHand || Object.keys((st.tuned && typeof st.tuned === 'object') ? st.tuned : {}).length > 0;
+  // it. Only a run from before there was a choice is read off its rows: a
+  // save that predates the choice and has rows somebody set by hand keeps
+  // them, and one that never had a row touched comes back automatic. Every
+  // save since carries the answer itself, and it is taken at its word - a
+  // player who set a row, then gave the splitting back, gave it back for
+  // good, and the rows they set are still there if they take it again.
+  state.byHand = Object.prototype.hasOwnProperty.call(st, 'byHand')
+    ? !!st.byHand
+    : Object.keys((st.tuned && typeof st.tuned === 'object') ? st.tuned : {}).length > 0;
   for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned']) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }
