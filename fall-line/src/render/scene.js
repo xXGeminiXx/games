@@ -14,8 +14,8 @@
 
 import {
   drawWork, addMoteMark, addMoteTail, drawEmber, addRadialTicks, addHexRing,
-} from './glyphs.js?v=11';
-import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=11';
+} from './glyphs.js?v=12';
+import { dominantTrait, TRAIT, TRAIT_IDS } from '../traits.js?v=12';
 
 const SQRT2 = Math.SQRT2;
 

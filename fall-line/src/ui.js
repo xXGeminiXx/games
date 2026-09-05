@@ -7,10 +7,11 @@
 // nothing.
 // ---------------------------------------------------------------------------
 
-import { fill } from '../config.js?v=11';
-import { format, clearBonus, raiseCost } from './economy.js?v=11';
-import { kindDef, costOf } from './works.js?v=11';
-import { idsOf } from './traits.js?v=11';
+import { fill } from '../config.js?v=12';
+import { format, clearBonus, raiseCost } from './economy.js?v=12';
+import { kindDef, costOf } from './works.js?v=12';
+import { coversRoad as workCoversRoad } from './run.js?v=12';
+import { idsOf } from './traits.js?v=12';
 
 const LOG_SHOWN = 8;
 
@@ -338,7 +339,11 @@ export function createUi(cfg, doc, win, api) {
     return roadSet;
   }
 
-  /** Whether anything standing can reach any cell of that road. */
+  /**
+   * Whether anything standing can reach any cell of that road. The same rule
+   * the Upgrade button picks its target with, so the line above the field and
+   * the button under it can never say opposite things about the same tower.
+   */
   let coverKey = '';
   let coverAns = true;
   function coversRoad(state) {
@@ -350,14 +355,7 @@ export function createUi(cfg, doc, win, api) {
     coverAns = false;
     const W = state.terrain.W;
     for (const w of list) {
-      const reach = api.workStats(w);
-      const r = (reach.range || reach.aura || 0);
-      if (r <= 0) continue;
-      for (const i of road) {
-        const dx = (i % W) + 0.5 - w.x;
-        const dy = Math.floor(i / W) + 0.5 - w.y;
-        if (dx * dx + dy * dy <= r * r) { coverAns = true; return coverAns; }
-      }
+      if (workCoversRoad(cfg, state.terrain, state.works, w, road, W)) { coverAns = true; return coverAns; }
     }
     return coverAns;
   }

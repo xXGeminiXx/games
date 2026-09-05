@@ -7,18 +7,18 @@
 // calls the actions.
 // ---------------------------------------------------------------------------
 
-import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=11';
-import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=11';
-import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=11';
-import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt, stats } from './works.js?v=11';
-import { stepWorks } from './works.js?v=11';
-import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=11';
-import { clearBonus, callBonus } from './economy.js?v=11';
-import { checkAwards, awardDef } from './awards.js?v=11';
-import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=11';
-import { stream, hash } from './rng.js?v=11';
-import { idsOf } from './traits.js?v=11';
-import { fill } from '../config.js?v=11';
+import { createTerrain, xy, canSculpt, sculptCost, sculpt } from './terrain.js?v=12';
+import { computeFlow, traceFallLine, bestSnowlineStart, pathCostFromSnowline, straightCells } from './flow.js?v=12';
+import { createPool, spawn, stepMotes, countAlive } from './motes.js?v=12';
+import { createWorks, kindDef, costOf, canBuild, build, upgrade, sell, workAt, stats, reachOf } from './works.js?v=12';
+import { stepWorks } from './works.js?v=12';
+import { surgePlan, ebbPlan, emptyTelemetry, evolve, forecast } from './melt.js?v=12';
+import { clearBonus, callBonus } from './economy.js?v=12';
+import { checkAwards, awardDef } from './awards.js?v=12';
+import { isUnlocked, newlyUnlocked, unlockedKinds } from './unlocks.js?v=12';
+import { stream, hash } from './rng.js?v=12';
+import { idsOf } from './traits.js?v=12';
+import { fill } from '../config.js?v=12';
 
 const LOG_KEEP = 40;
 
@@ -424,10 +424,14 @@ export function newRun(state, seed) {
  * know: that towers have levels at all, that a tower is picked by clicking it
  * on the field, and that the button in the corner then wakes up. A player who
  * never found that never upgraded anything, and a run of level one towers
- * falls behind whatever else they do. So the button always has a target: a
- * tower the water actually walks past comes first, because a level on a tower
- * nothing goes near buys nothing, and among those the cheapest next level.
- * Clicking a tower still overrides it for anyone who wants to choose.
+ * falls behind whatever else they do. So the button always has a target: the
+ * cheapest next level among the towers the water actually walks past.
+ *
+ * Only among those. A level bought on a tower nothing goes near buys nothing,
+ * and when no tower reaches the road at all the game is already saying to sell
+ * one and set it down on the dashes; offering to spend the ore on the tower it
+ * just said to sell would be the game arguing with itself. Clicking a tower
+ * still overrides all of this for anyone who wants to choose.
  */
 export function bestUpgrade(state) {
   const { cfg, terrain, works } = state;
@@ -439,21 +443,23 @@ export function bestUpgrade(state) {
     if (w.tier >= cfg.works.maxTier) continue;
     const def = kindDef(cfg, w.kind);
     if (!def) continue;
+    if (!coversRoad(cfg, terrain, works, w, road, W)) continue;
     const cost = costOf(cfg, def, w.tier + 1);
-    const st = stats(cfg, terrain, works, w);
-    const reach = st.range || st.aura || 0;
-    let onRoad = false;
-    for (const i of road) {
-      const dx = (i % W) + 0.5 - w.x;
-      const dy = Math.floor(i / W) + 0.5 - w.y;
-      if (dx * dx + dy * dy <= reach * reach) { onRoad = true; break; }
-    }
-    const rank = onRoad ? 0 : 1;
-    if (!best || rank < best.rank || (rank === best.rank && cost < best.cost)) {
-      best = { work: w, def, cost, rank, tier: w.tier + 1 };
-    }
+    if (!best || cost < best.cost) best = { work: w, def, cost, rank: 0, tier: w.tier + 1 };
   }
   return best;
+}
+
+/** Whether any cell of that road falls inside what this work reaches. */
+export function coversRoad(cfg, terrain, works, w, road, W) {
+  const reach = reachOf(stats(cfg, terrain, works, w));
+  if (reach <= 0) return false;
+  for (const i of road) {
+    const dx = (i % W) + 0.5 - w.x;
+    const dy = Math.floor(i / W) + 0.5 - w.y;
+    if (dx * dx + dy * dy <= reach * reach) return true;
+  }
+  return false;
 }
 
 export function summary(state) {

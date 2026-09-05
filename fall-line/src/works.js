@@ -12,7 +12,7 @@
 // applies a multiplier of its own.
 // ---------------------------------------------------------------------------
 
-import { fireWork, stepProjectiles } from './works-fire.js?v=11';
+import { fireWork, stepProjectiles } from './works-fire.js?v=12';
 
 // How much longer a status holds, and how much harder the drag pulls, for
 // each tier bought. Read from config when the keys exist; these are the
@@ -151,6 +151,22 @@ function bestLantern(cfg, works, work) {
     }
   }
   return found ? { dmg: bestDmg, range: bestRange } : null;
+}
+
+/**
+ * How far a work touches the ground around it, in cells.
+ *
+ * A shooting work carries a firing reach; a light carries a ring it shines
+ * over instead. A light also gains a little firing reach per level bought,
+ * which is smaller than its ring and belongs to nothing, so the larger of the
+ * two is the only honest answer. Anything asking which cells a work covers
+ * asks here, so the ground it is judged on is the ground it works on.
+ */
+export function reachOf(st) {
+  if (!st) return 0;
+  const a = st.range || 0;
+  const b = st.aura || 0;
+  return a > b ? a : b;
 }
 
 /**
