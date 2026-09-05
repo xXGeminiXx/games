@@ -36,7 +36,7 @@
 // the column is right-aligned.
 // ---------------------------------------------------------------------------
 
-import { isBig, log10 as bigLog10, toNumber as bigToNumber } from './bignum.js?v=6';
+import { isBig, log10 as bigLog10, toNumber as bigToNumber } from './bignum.js?v=7';
 
 const WORDS = ['', 'K', 'M', 'B', 'T'];
 const AZ = 'abcdefghijklmnopqrstuvwxyz';

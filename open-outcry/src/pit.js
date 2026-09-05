@@ -27,8 +27,8 @@
 // first thing the tests check.
 // ---------------------------------------------------------------------------
 
-import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=6';
-import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=6';
+import { Market, PLAYER_ID, PRODUCER, CONSUMER, BUY, SELL } from './market.js?v=7';
+import { PIT_BELIEFS as BELIEFS, PIT_SIZING as SIZING } from './pit-rules.js?v=7';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -50,9 +50,13 @@ export class Pit {
     this.size = cfg.pit.startSize;
     this.spread = cfg.pit.startSpread;
     this.lean = 0;              // ticks the whole quote is shifted, set by a clerk
-    this.offPrice = 0;              // ticks the board has stood right off the price
+    this.quietTicks = 0;            // ticks in a row nothing has traded on this board
     this.bidOn = true;
     this.askOn = true;
+    // A board is off the wall for one of two reasons: the player took it down,
+    // or nobody was standing here to keep it up. Only the first one should
+    // still be down when somebody walks back to this rail.
+    this.downByHand = false;
     this.bidIds = [];           // resting order ids, so a standing quote is left
     this.askIds = [];           // standing and keeps its place in the queue
 
@@ -214,8 +218,12 @@ export class Pit {
     return this.mid - centre;
   }
 
-  pull() { this.bidOn = false; this.askOn = false; this.cancel(); return this; }
-  push() { this.bidOn = true; this.askOn = true; return this; }
+  // A board comes off the wall for one of two reasons. byHand is the player or
+  // a clerk of theirs deciding to stop dealing, and it stays down until it is
+  // put back. Without it, the board is off because nobody was standing here,
+  // and it goes back up the moment somebody is.
+  pull(byHand = false) { this.bidOn = false; this.askOn = false; if (byHand) this.downByHand = true; this.cancel(); return this; }
+  push() { this.bidOn = true; this.askOn = true; this.downByHand = false; return this; }
 
   // Pull one side off the book and release whatever it was holding.
   cancelSide(side) {
@@ -590,6 +598,7 @@ export class Pit {
       key: this.key, seed: this.seed, crowd: this.crowd, seatBps: this.seatBps,
       priceMul: this.priceMul, bid: this.bid, ask: this.ask, size: this.size,
       spread: this.spread, lean: this.lean, bidOn: this.bidOn, askOn: this.askOn,
+      downByHand: this.downByHand,
       bidIds: this.bidIds.slice(), askIds: this.askIds.slice(), held: this.held,
       basis: this.basis, realized: this.realized, swept: this.swept,
       seatPaid: this.seatPaid, volumeAtGrow: this.volumeAtGrow, fillsSeen: this.fillsSeen,
@@ -603,7 +612,7 @@ export class Pit {
     const s = cfg.pits[j.key];
     p.m = Market.fromJSON(j.market, { rules: { belief: BELIEFS[s.belief], sizing: SIZING[s.sizing] } });
     p.world(p.m);
-    for (const k of ['bid', 'ask', 'size', 'spread', 'lean', 'bidOn', 'askOn', 'held', 'basis', 'realized', 'swept', 'seatPaid', 'volumeAtGrow', 'fillsSeen', 'closed']) {
+    for (const k of ['bid', 'ask', 'size', 'spread', 'lean', 'bidOn', 'askOn', 'downByHand', 'held', 'basis', 'realized', 'swept', 'seatPaid', 'volumeAtGrow', 'fillsSeen', 'closed']) {
       if (j[k] !== undefined) p[k] = j[k];
     }
     p.history = Array.isArray(j.history) ? j.history.slice() : [];

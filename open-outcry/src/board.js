@@ -27,9 +27,9 @@
 // the wall after a trade are the only two animations on the slate.
 // ---------------------------------------------------------------------------
 
-import { createHand } from './chalk.js?v=6';
-import { alpha as withAlpha } from './oklch.js?v=6';
-import { hash2f } from './rng.js?v=6';
+import { createHand } from './chalk.js?v=7';
+import { alpha as withAlpha } from './oklch.js?v=7';
+import { hash2f } from './rng.js?v=7';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);

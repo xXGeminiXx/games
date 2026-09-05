@@ -16,8 +16,8 @@
 // One engine per pit, so a card written for grain cannot fire on oil.
 // ---------------------------------------------------------------------------
 
-import { createRegistry } from './rules.js?v=6';
-import { PLAYER_ID, SELL } from './market.js?v=6';
+import { createRegistry } from './rules.js?v=7';
+import { PLAYER_ID, SELL } from './market.js?v=7';
 
 // Which reading and which action arrive with which clerk. A tier is a count of
 // clerks hired across the whole run.
@@ -68,7 +68,7 @@ const DO = {
   widen: (p, a) => { p.setSpread(p.spread + Math.max(1, Math.round(a.by))); p.recentre(); },
   narrow: (p, a) => { p.setSpread(p.spread - Math.max(1, Math.round(a.by))); p.recentre(); },
   lean: (p, a) => { p.lean = Math.round(a.ticks); p.recentre(); },
-  pull: (p) => { p.pull(); },
+  pull: (p) => { p.pull(true); },
   push: (p) => { p.push(); p.recentre(); },
 };
 

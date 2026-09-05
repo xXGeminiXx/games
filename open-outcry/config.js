@@ -10,7 +10,7 @@
 // each other's tuning. Type is taken from the value already in place, so a
 // number stays a number and a typo in a path is reported rather than created.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/oklch.js?v=6';
+import { oklch } from './src/oklch.js?v=7';
 
 export const CONFIG = {
   identity: {
@@ -20,7 +20,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 6,              // the ?v= tag every import carries; bump on every src change
+    build: 7,              // the ?v= tag every import carries; bump on every src change
     allowOverrides: true,  // ?set= and the namespaced localStorage patch
   },
 
@@ -50,9 +50,13 @@ export const CONFIG = {
     // anything used to watch the crowd walk off and the board sit there buying
     // at a price nobody would pay any more; an overnight run came back with a
     // board 27 over the going rate, nothing earned and a hundred sacks bought
-    // at a loss. After this many ticks fully off the price the board writes
-    // itself. Pressing the key still beats it, because a hand does it the
-    // moment the bar fills instead of two and a half seconds later.
+    // at a loss. After this many ticks in a row with nothing traded on it, the
+    // board writes itself again. It is counted in QUIET TICKS and not in how
+    // far the rate has walked: measured over 20,000 ticks of a saved run, the
+    // board sat three coins under a rate it never reached, traded nothing for
+    // forty minutes, and read as fresh the whole time, because the crowd's own
+    // two prices are a coin apart and a board standing half its own gap either
+    // side of them is never where a deal happens.
     selfWriteTicks: 12,
     minSpread: 2,          // ticks; a quote narrower than this is not a quote
     startSpread: 6,

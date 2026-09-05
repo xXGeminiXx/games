@@ -22,15 +22,15 @@
 // the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=6';
-import { CONTENT, fill } from '../content.js?v=6';
-import { Game } from './game.js?v=6';
-import { Board } from './board.js?v=6';
-import { format, counter } from './format.js?v=6';
-import { toNumber, cmp } from './bignum.js?v=6';
-import { createSave } from './save.js?v=6';
-import { affordability } from './purchase.js?v=6';
-import { createComposer } from './rules-ui.js?v=6';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=7';
+import { CONTENT, fill } from '../content.js?v=7';
+import { Game } from './game.js?v=7';
+import { Board } from './board.js?v=7';
+import { format, counter } from './format.js?v=7';
+import { toNumber, cmp } from './bignum.js?v=7';
+import { createSave } from './save.js?v=7';
+import { affordability } from './purchase.js?v=7';
+import { createComposer } from './rules-ui.js?v=7';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -431,7 +431,7 @@ class UI {
       keys.forEach((k, i) => {
         const b = el('button', 'tab', g.pit(k).name);
         b.type = 'button';
-        b.addEventListener('click', () => { g.active = k; this.rebuildComposer(); this.refresh(); });
+        b.addEventListener('click', () => { g.stand(k); this.rebuildComposer(); this.refresh(); });
         mount.appendChild(b);
       });
       mount.dataset.keys = keys.join(',');
@@ -760,7 +760,7 @@ class UI {
   toggleBoard() {
     const p = this.game.activePit();
     if (!p) return;
-    if (p.bidOn || p.askOn) { p.pull(); this.game.note(this.content.events.stopped); }
+    if (p.bidOn || p.askOn) { p.pull(true); this.game.note(this.content.events.stopped); }
     else { p.push(); p.recentre(); p.place(); this.game.note(this.content.events.started); }
     this.refresh();
   }
@@ -780,7 +780,7 @@ class UI {
     if (k === ' ' || k === 'r' || k === 'R') this.wipe();
     else if (k === 's' || k === 'S' || k === 'f' || k === 'F') this.dump();
     else if (k === 'x' || k === 'X' || k === 'q' || k === 'Q') this.toggleBoard();
-    else if (k >= '1' && k <= '6') { const key = g.order[Number(k) - 1]; if (key) { g.active = key; this.rebuildComposer(); this.refresh(); } }
+    else if (k >= '1' && k <= '6') { const key = g.order[Number(k) - 1]; if (key) { g.stand(key); this.rebuildComposer(); this.refresh(); } }
     else if (k === '[') this.step('cut', -1);
     else if (k === ']') this.step('cut', 1);
     else if (k === '-') this.step('size', -1);

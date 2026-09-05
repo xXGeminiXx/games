@@ -25,7 +25,7 @@
 // string is the previous cache entry, drawn again at a lower alpha.
 // ---------------------------------------------------------------------------
 
-import { xmur3 } from './rng.js?v=6';
+import { xmur3 } from './rng.js?v=7';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;

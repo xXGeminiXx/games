@@ -19,14 +19,14 @@
 // upward for the rest of the run.
 // ---------------------------------------------------------------------------
 
-import { Pit } from './pit.js?v=6';
-import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=6';
-import { quote } from './purchase.js?v=6';
-import { catchUp, summary } from './offline.js?v=6';
-import { createEngine } from './rules.js?v=6';
-import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=6';
-import { rng } from './rng.js?v=6';
-import { fill, pick } from '../content.js?v=6';
+import { Pit } from './pit.js?v=7';
+import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=7';
+import { quote } from './purchase.js?v=7';
+import { catchUp, summary } from './offline.js?v=7';
+import { createEngine } from './rules.js?v=7';
+import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=7';
+import { rng } from './rng.js?v=7';
+import { fill, pick } from '../content.js?v=7';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -254,7 +254,12 @@ export class Game {
   // they do, never to make them work in the first place.
   staffBoards() {
     let hired = false;
-    for (const p of this.openPits()) {
+    // A CLERK TAKES A BOARD NOBODY IS AT. Sending the first one to the board
+    // the player is already standing at buys them nothing and leaves the
+    // market they opened dark, which is the opposite of what they paid for.
+    const pits = this.openPits();
+    const order = [...pits.filter((p) => p.key !== this.active), ...pits.filter((p) => p.key === this.active)];
+    for (const p of order) {
       if (this.clerksFree() <= 0) break;
       const engine = this.engines.get(p.key);
       if (!engine || engine.getRules().length > 0) continue;
@@ -262,7 +267,33 @@ export class Game {
       this.note(fill(this.content.events.clerkHired, { name: this.clerkName(this.cardCount() - 1), pit: p.name }));
       hired = true;
     }
+    // AND ONE ALREADY STANDING WHERE THE PLAYER IS WALKS OVER. Hiring somebody
+    // and then opening a market is the order most runs do it in, and it left
+    // the new market dark with the clerk repeating a press the player was
+    // making anyway at the rail they were already at.
+    const empty = order.find((p) => {
+      const e = this.engines.get(p.key);
+      return p.key !== this.active && e && e.getRules().length === 0;
+    });
+    const here = this.engines.get(this.active);
+    if (empty && here && here.getRules().length > 0) {
+      const cards = here.getRules();
+      here.setRules(cards.slice(1));
+      this.engines.get(empty.key).setRules([cards[0]]);
+      hired = true;
+    }
     return hired;
+  }
+
+  // Walk to a market's rail. The clerks shuffle behind you, because the board
+  // you are standing at is the one that does not need anybody: looking at your
+  // second market used to take the clerk off your first one and stop half your
+  // income for as long as you looked.
+  stand(key) {
+    if (!this.pits.has(key) || this.active === key) return false;
+    this.active = key;
+    this.staffBoards();
+    return true;
   }
 
   // Clerks are people, so they have names. The name is the order they were
@@ -359,23 +390,34 @@ export class Game {
       p.attended = p.key === this.active || !!staffed;
       if (!p.attended) p.pull();
       else {
+        // AND IT GOES BACK UP WHEN SOMEBODY IS. Walking to your own rail and
+        // finding the board off, every time, is a chore with nothing behind
+        // it: the player never took it down, an empty rail did. A board they
+        // took down by hand stays down, because they are standing right at it.
+        if (!p.bidOn && !p.askOn && !p.downByHand) { p.push(); p.recentre(); }
         this.take(-p.fund(this.spare()));
         p.place();
         this.take(p.sweep());
       }
-      // The board writes itself once it has stood right off the price for a
-      // while. It is the floor under a player who never touches anything, and
-      // a hand beats it every time by not waiting.
+      // A BOARD NOBODY IS TRADING WITH WRITES ITSELF AGAIN. How far the going
+      // rate has walked from the middle of the board is the wrong reading to
+      // hang this on: the crowd's own two prices are usually a coin apart, so
+      // a board standing half its own gap either side of them is never the
+      // price anybody deals at, and it reads as fresh the whole time it is
+      // dead. Nothing trading is what a person at the rail actually notices,
+      // so it is what this watches. A hand still beats it, because a hand
+      // writes the board as the rate moves instead of after a couple of
+      // seconds of quiet.
       if (p.attended && p.bidOn) {
-        p.offPrice = p.staleness() >= 1 ? p.offPrice + 1 : 0;
-        if (p.offPrice >= this.cfg.pit.selfWriteTicks) {
-          p.offPrice = 0;
+        p.quietTicks = f ? 0 : p.quietTicks + 1;
+        if (p.quietTicks >= this.cfg.pit.selfWriteTicks) {
+          p.quietTicks = 0;
           p.recentre();
           this.take(-p.fund(this.spare()));
           p.place();
           this.take(p.sweep());
         }
-      } else p.offPrice = 0;
+      } else p.quietTicks = 0;
 
       p.record();
       this.stepRumour(p, quiet);
