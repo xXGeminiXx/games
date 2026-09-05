@@ -15,16 +15,16 @@
 // same fit, so a nail is exactly where it looks like it is.
 // ---------------------------------------------------------------------------
 
-import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=72';
-import { createScene } from './render/scene.js?v=72';
-import { fitBoard, pixelToBoard } from './render/layout.js?v=72';
-import { num, count, duration, mult, pct, fill } from './format.js?v=72';
-import { BULK_STEPS, bulkLabel } from './economy.js?v=72';
-import { nailPos } from './board.js?v=72';
-import { DOORS_ROW } from './render/board-geom.js?v=72';
-import { sketchCabinet } from './cabinets.js?v=72';
-import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=72';
-import { makeCompass, pick, write } from './advice.js?v=72';
+import { createGame, VIEW_MACHINE, VIEW_BENCH, VIEW_FLOOR } from './game.js?v=73';
+import { createScene } from './render/scene.js?v=73';
+import { fitBoard, pixelToBoard } from './render/layout.js?v=73';
+import { num, count, duration, mult, pct, fill } from './format.js?v=73';
+import { BULK_STEPS, bulkLabel } from './economy.js?v=73';
+import { nailPos } from './board.js?v=73';
+import { DOORS_ROW } from './render/board-geom.js?v=73';
+import { sketchCabinet } from './cabinets.js?v=73';
+import { recordNight, loadNights, withNight, rankOf, ordinal } from './nights.js?v=73';
+import { makeCompass, pick, write } from './advice.js?v=73';
 
 const SPEEDS = [1, 2, 4];
 

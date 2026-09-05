@@ -7,15 +7,36 @@
 // did for them. So the machine does it, and a drag of your own still overrides
 // it exactly the way it always did.
 //
-// WHAT IS MEASURED, and how (2026-09-04, twelve boards at the resting power):
-// every legal lean of the nails nearest a slot, eight directions at full
-// reach, the best kept, three deep. Judged on one stream of balls, then
-// CONFIRMED on a stream it was never chosen against - which is the only way to
-// tell a lean that works from a lean that happened to suit the balls it was
-// picked on. A first pass judged on 260 balls a candidate looked like a lift of
-// 1.15x and carried nothing: median 1.035x on held-out seeds with the money
-// going DOWN. At 1200 balls a candidate the same search confirmed at about
-// 1.3x on every board it was tried on, with the money going up too.
+// WHAT IS MEASURED, and how: every legal lean of the nails nearest a slot,
+// eight directions, walked in from full reach until the board accepts it, the
+// best kept, three deep. Judged on one stream of balls, then CONFIRMED on a
+// stream it was never chosen against - which is the only way to tell a lean
+// that works from a lean that happened to suit the balls it was picked on.
+//
+// WHAT IT IS WORTH, over 47 faces (2026-09-05, the fitted board at the
+// resting power, every face judged on 2500 balls of a stream the search never
+// saw): the slot rate goes to a MEDIAN 1.121x, mean 1.134x, better on 36 of
+// the 47 and WORSE ON 8, worst 0.900x, best 1.444x; what the pockets pay is a
+// wash at median 1.003x. So it is worth having and it is not free: roughly one
+// face in six comes out a little worse, and no honest reading of it says
+// otherwise.
+//
+// That last sentence is here because the number it replaced said the opposite.
+// An earlier note recorded "about 1.3x on every board it was tried on" from
+// ten faces measured in one sitting, and at 47 faces that is simply not what
+// the search does. Anything quoted here from fewer than about forty faces is a
+// reading of one afternoon, not a property of the module.
+//
+// WHAT DOES NOT HELP, so nobody spends another evening on it: a SECOND
+// held-out confirmation. The reasoning for it is sound - the first
+// confirmation takes the first of up to SHORTLIST candidates to clear
+// CONFIRM_EDGE against one reading, so it is still choosing on the balls it is
+// scoring on - and on ten faces it looked like it removed every loss. Over the
+// same 47 faces it does nothing: median 1.076x against 1.121x, better on 14
+// faces and worse on 17, the SAME eight losses, worst 0.906x against 0.900x,
+// paired difference -0.013 (t = -0.65 on 46 df). It also rejects fifteen leans
+// that were fine and more than doubles the dearest slice, 325 ms to 754 ms.
+// The idea is reasonable and the evidence says no.
 //
 // So the sample size is the whole thing, and this module keeps the same
 // discipline the measurement used: a candidate is SCREENED cheaply, and the
@@ -27,18 +48,19 @@
 // the one being drawn, or the nails would jitter as candidates were tried and
 // put back. A slice is a handful of readings and one reading is indivisible,
 // so a slice is a fraction of a second rather than a frame: measured across
-// seven faces, the dearest single slice was 471 ms and a whole search 7 to 10
-// seconds. Nothing is animating at the workbench, which is why the search
-// lives there and nowhere else.
+// 47 faces, the dearest single slice was 325 ms and the median whole search
+// 4.0 seconds on a quiet machine; the same slice measured 471 ms across seven
+// faces while the machine was busy. Nothing is animating at the workbench,
+// which is why the search lives there and nowhere else.
 //
 // What it keeps depends on the face and on nothing else. It used to depend on
 // how busy the machine was, because a reading was bounded by a wall clock;
 // see WORK_PER_BALL.
 // ---------------------------------------------------------------------------
 
-import { bendCheck, bendNail } from './board.js?v=72';
-import { createBalls, launch, stepPhysics } from './physics.js?v=72';
-import { rng } from './rng.js?v=72';
+import { bendCheck, bendNail } from './board.js?v=73';
+import { createBalls, launch, stepPhysics } from './physics.js?v=73';
+import { rng } from './rng.js?v=73';
 
 /** Nails nearest each slot that the screen will try. */
 export const NEAR_NAILS = 16;
