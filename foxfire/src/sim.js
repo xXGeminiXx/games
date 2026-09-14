@@ -19,19 +19,19 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=19';
-import { buildLevel, nearestOpen } from './world.js?v=19';
-import * as Tips from './tips.js?v=19';
-import * as Trees from './trees.js?v=19';
-import * as Tr from './traits.js?v=19';
-import * as Lv from './levels.js?v=19';
-import * as Sp from './spores.js?v=19';
-import * as Rv from './reveal.js?v=19';
-import * as Ev from './events.js?v=19';
-import { seasonOf, AUTUMN, WINTER } from './season.js?v=19';
-import { hash } from './rng.js?v=19';
-import * as Lore from './lore.js?v=19';
-import { fmtArea, fmtCoin } from './numbers.js?v=19';
+import { CONFIG as DEFAULT } from '../config.js?v=20';
+import { buildLevel, nearestOpen } from './world.js?v=20';
+import * as Tips from './tips.js?v=20';
+import * as Trees from './trees.js?v=20';
+import * as Tr from './traits.js?v=20';
+import * as Lv from './levels.js?v=20';
+import * as Sp from './spores.js?v=20';
+import * as Rv from './reveal.js?v=20';
+import * as Ev from './events.js?v=20';
+import { seasonOf, AUTUMN, WINTER } from './season.js?v=20';
+import { hash } from './rng.js?v=20';
+import * as Lore from './lore.js?v=20';
+import { fmtArea, fmtCoin } from './numbers.js?v=20';
 
 export const SAVE_VERSION = 1;
 

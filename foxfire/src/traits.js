@@ -6,7 +6,7 @@
 // through the simulation.
 // ---------------------------------------------------------------------------
 
-import { costScale } from './levels.js?v=19';
+import { costScale } from './levels.js?v=20';
 
 export function levelOf(state, id) {
   return (state.traits && state.traits[id]) || 0;
