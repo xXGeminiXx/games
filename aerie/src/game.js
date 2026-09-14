@@ -1,20 +1,20 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=20';
-import { fill } from '../content.js?v=20';
-import { makeShaders } from './shaders.js?v=20';
-import { createWorld } from './world.js?v=20';
-import { createDrones } from './drones.js?v=20';
-import { createView } from './view.js?v=20';
-import { createEconomy } from './economy.js?v=20';
-import { createAdvice } from './advice.js?v=20';
-import { createSave, createPrefs } from './save.js?v=20';
-import { createUI } from './ui.js?v=20';
-import { createControls } from './controls.js?v=20';
-import { createQuality } from './quality.js?v=20';
-import { createPerfLog } from './perflog.js?v=20';
-import { loop, createGL } from './gl.js?v=20';
-import { rng } from './rng.js?v=20';
-import { fmt, duration } from './numbers.js?v=20';
+import { withOverrides, applyIdentity } from '../config.js?v=21';
+import { fill } from '../content.js?v=21';
+import { makeShaders } from './shaders.js?v=21';
+import { createWorld } from './world.js?v=21';
+import { createDrones } from './drones.js?v=21';
+import { createView } from './view.js?v=21';
+import { createEconomy } from './economy.js?v=21';
+import { createAdvice } from './advice.js?v=21';
+import { createSave, createPrefs } from './save.js?v=21';
+import { createUI } from './ui.js?v=21';
+import { createControls } from './controls.js?v=21';
+import { createQuality } from './quality.js?v=21';
+import { createPerfLog } from './perflog.js?v=21';
+import { loop, createGL } from './gl.js?v=21';
+import { rng } from './rng.js?v=21';
+import { fmt, duration } from './numbers.js?v=21';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -68,11 +68,23 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   drones.reset(view.state.carrier);
   const syncFleet = () => drones.setFleet(eco.state.drones, eco.state.specialists, K);
   syncFleet();
-  // the land the fleet worked while the tab was closed
-  if (offline && offline.worked > 60) {
-    const strip = Math.min(0.85, offline.worked / 3600 * 0.08 * Math.log10(10 + eco.state.drones));
+
+  // An absence is an absence: the page was closed, or it sat behind another
+  // tab where the browser hands it no frames. Both arrive here, so the fleet
+  // works the time the same way and the player is told the same thing.
+  const groundWorked = (r) => {
+    if (!r || r.worked <= 60) return;
+    const strip = Math.min(0.85, r.worked / 3600 * 0.08 * Math.log10(10 + eco.state.drones));
     world.step(0, view.state.carrier, eco.range(), strip);
-  }
+  };
+  const sayWorked = (r) => {
+    if (!r || r.worked <= 30) return;
+    ui.log(fill(content.labels.offline, { time: duration(r.away), funds: fmt(r.earned) }));
+    if (r.capped) ui.log(fill(content.labels.offlineCapped, { worked: duration(r.worked) }));
+  };
+
+  // the land the fleet worked while the tab was closed
+  groundWorked(offline);
 
   // ---- the interface ----
   const actions = {
@@ -179,10 +191,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   ui.showFold(prefs.get('folded', false));
   ui.reveal(flags);
   ui.log(snap ? fill(content.log.resume, { n: eco.state.island }) : fill(content.log.start, { n: cfg.drones.start }));
-  if (offline && offline.worked > 30) {
-    ui.log(fill(content.labels.offline, { time: duration(offline.away), funds: fmt(offline.earned) }));
-    if (offline.capped) ui.log(fill(content.labels.offlineCapped, { worked: duration(offline.worked) }));
-  }
+  sayWorked(offline);
 
   const controls = createControls(cfg, {
     fly: (dx, dz) => { view.fly(dx, dz); tookTheWheel(); },
@@ -329,7 +338,22 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
     if (saveT >= 10) { saveT = 0; persist(); }
     window.__frame = (window.__frame || 0) + 1;
   });
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden) persist(); });
+  // A tab behind another tab is handed no frames at all, so the fleet stops
+  // where it stood and the clock in the loop stops with it. The time of day is
+  // the only thing that keeps counting, so it is what the absence is measured
+  // with, and the fleet works it on the way back in.
+  let hiddenAt = 0;
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.hidden) { hiddenAt = Date.now(); persist(); return; }
+    const away = hiddenAt ? (Date.now() - hiddenAt) / 1000 : 0;
+    hiddenAt = 0;
+    if (away <= 30) return;
+    const r = eco.catchUp(away);
+    groundWorked(r);
+    sayWorked(r);
+    ui.update({ active: drones.active });
+    persist();
+  });
   window.addEventListener('beforeunload', persist);
 
   // If the graphics context is taken away, everything on the GPU goes with it
