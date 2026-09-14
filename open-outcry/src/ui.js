@@ -22,15 +22,15 @@
 // the layout never jumps as the game opens up.
 // ---------------------------------------------------------------------------
 
-import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=7';
-import { CONTENT, fill } from '../content.js?v=7';
-import { Game } from './game.js?v=7';
-import { Board } from './board.js?v=7';
-import { format, counter } from './format.js?v=7';
-import { toNumber, cmp } from './bignum.js?v=7';
-import { createSave } from './save.js?v=7';
-import { affordability } from './purchase.js?v=7';
-import { createComposer } from './rules-ui.js?v=7';
+import { CONFIG, withOverrides, applyIdentity } from '../config.js?v=8';
+import { CONTENT, fill } from '../content.js?v=8';
+import { Game } from './game.js?v=8';
+import { Board } from './board.js?v=8';
+import { format, counter } from './format.js?v=8';
+import { toNumber, cmp } from './bignum.js?v=8';
+import { createSave } from './save.js?v=8';
+import { affordability } from './purchase.js?v=8';
+import { createComposer } from './rules-ui.js?v=8';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -65,7 +65,14 @@ export function boot() {
     // fills again immediately, so it is dropped rather than translated.
     migrations: [(j) => { if (j && Array.isArray(j.log)) j.log = []; return j; }],
     interval: cfg.save.intervalSeconds,
-    serialize: () => { game.lastSeen = Date.now(); return game.toJSON(); },
+    // The moment the floor was last actually running. A hidden tab is handed
+    // no frames, so nothing runs in it, and an autosave that fires in the
+    // background would otherwise keep moving this forward over a stretch the
+    // player was paid nothing for.
+    serialize: () => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') game.lastSeen = Date.now();
+      return game.toJSON();
+    },
   });
 
   let game;
@@ -124,6 +131,9 @@ class UI {
     this.purse = purse;
     this.acc = 0;
     this.last = 0;
+    this.hiddenAt = 0;       // when the tab went behind another one
+    this.ticksRun = 0;       // pit ticks the frame loop has actually run
+    this.ticksAtHide = 0;
     this.panelAt = 0;
     this.tickVolume = 0;
     this.shop = new Map();
@@ -187,6 +197,7 @@ class UI {
     const was = g.activePit();
     while (this.acc >= 1 && ran < cap) { g.tick(); this.acc -= 1; ran++; }
     if (this.acc > cap) this.acc = 0;
+    this.ticksRun += ran;
 
     const p = g.activePit();
     if (p) {
@@ -725,7 +736,28 @@ class UI {
     });
 
     addEventListener('keydown', (e) => this.key(e));
-    addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.game.lastSeen = Date.now(); });
+    // A tab behind another tab gets no frames, so the floor stands still in it
+    // while the day goes on. Coming back to it is the same event as opening
+    // the page again: the time is counted, the till is paid, and the summary
+    // says how long it was, on the same terms.
+    addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.hiddenAt = Date.now();
+        this.ticksAtHide = this.ticksRun;
+        this.game.lastSeen = this.hiddenAt;
+        return;
+      }
+      if (this.hiddenAt) {
+        // Only the stretch nobody ran. Some browsers keep handing a tab in the
+        // background the odd frame instead of stopping it dead, and the floor
+        // was already paid for those, so the time of day alone would pay twice.
+        const ranSec = (this.ticksRun - this.ticksAtHide) / Math.max(1e-9, this.game.tickHz());
+        this.game.lastSeen = this.hiddenAt + ranSec * 1000;
+        this.hiddenAt = 0;
+      }
+      this.last = performance.now();
+      this.showAway();
+    });
   }
 
   step(what, delta) {

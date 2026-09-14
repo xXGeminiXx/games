@@ -10,7 +10,7 @@
 // each other's tuning. Type is taken from the value already in place, so a
 // number stays a number and a typo in a path is reported rather than created.
 // ---------------------------------------------------------------------------
-import { oklch } from './src/oklch.js?v=7';
+import { oklch } from './src/oklch.js?v=8';
 
 export const CONFIG = {
   identity: {
@@ -20,7 +20,7 @@ export const CONFIG = {
   },
 
   dev: {
-    build: 7,              // the ?v= tag every import carries; bump on every src change
+    build: 8,              // the ?v= tag every import carries; bump on every src change
     allowOverrides: true,  // ?set= and the namespaced localStorage patch
   },
 

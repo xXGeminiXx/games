@@ -19,14 +19,14 @@
 // upward for the rest of the run.
 // ---------------------------------------------------------------------------
 
-import { Pit } from './pit.js?v=7';
-import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=7';
-import { quote } from './purchase.js?v=7';
-import { catchUp, summary } from './offline.js?v=7';
-import { createEngine } from './rules.js?v=7';
-import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=7';
-import { rng } from './rng.js?v=7';
-import { fill, pick } from '../content.js?v=7';
+import { Pit } from './pit.js?v=8';
+import { big, add, sub, mul, cmp, gte, toNumber, ZERO } from './bignum.js?v=8';
+import { quote } from './purchase.js?v=8';
+import { catchUp, summary } from './offline.js?v=8';
+import { createEngine } from './rules.js?v=8';
+import { buildRegistry, firstCard, SENSOR_TIERS, ACTION_TIERS } from './clerks.js?v=8';
+import { rng } from './rng.js?v=8';
+import { fill, pick } from '../content.js?v=8';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
