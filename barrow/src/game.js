@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=20';
-import { createSim, restoreSim, openedState } from './sim.js?v=20';
-import * as Save from './save.js?v=20';
-import * as Rb from './rebirth.js?v=20';
-import * as Lore from './lore.js?v=20';
-import { hash } from './rng.js?v=20';
-import { createUI } from './ui.js?v=20';
-import { createView } from './view.js?v=20';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=20';
-import * as Mat from './materials.js?v=20';
+import { storageKey, fill } from '../config.js?v=21';
+import { createSim, restoreSim, openedState } from './sim.js?v=21';
+import * as Save from './save.js?v=21';
+import * as Rb from './rebirth.js?v=21';
+import * as Lore from './lore.js?v=21';
+import { hash } from './rng.js?v=21';
+import { createUI } from './ui.js?v=21';
+import { createView } from './view.js?v=21';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=21';
+import * as Mat from './materials.js?v=21';
 
 /**
  * @param {object} o
@@ -122,9 +122,13 @@ export function createGame(o) {
     return r;
   };
 
-  const frame = (ms) => {
+  const frame = () => {
     if (!running) return;
-    const t = typeof ms === 'number' ? ms : now();
+    // The wall clock, not the frame clock. A tab in the background is handed
+    // no frames at all and a sleeping machine stops counting frame time, so
+    // the only reading that survives either one is the time of day. It also
+    // means every gap is measured once, by the same clock the save carries.
+    const t = now();
     if (last === null) last = t;
     let dt = (t - last) / 1000;
     last = t;
@@ -231,9 +235,12 @@ export function createGame(o) {
     win.addEventListener('pagehide', save);
     win.addEventListener('beforeunload', save);
     if (doc && doc.addEventListener) {
+      // Going out of sight writes the save, in case the tab never comes back.
+      // Coming back does nothing on purpose: the next frame reads the time of
+      // day and the whole stretch in the background arrives as its gap, the
+      // same as any other, and is caught up there.
       doc.addEventListener('visibilitychange', () => {
         if (doc.visibilityState === 'hidden') save();
-        else last = null; // the next frame measures from now, so the gap counts once
       });
     }
   }
