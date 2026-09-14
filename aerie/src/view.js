@@ -1,11 +1,11 @@
 // The picture: the island raymarched, the carrier as a few lit parts, the
 // fleet as instances, all sharing one depth buffer, resolved to the screen.
 // The camera orbits the carrier; clicking the land moves the anchor.
-import { fullscreen, target, bindScreen, program, buffer, vao } from './gl.js?v=21';
-import { orbitCamera } from './camera.js?v=21';
-import { m4, clamp } from './mat.js?v=21';
-import { hexToRgb } from './palette.js?v=21';
-import { carrierMesh } from './carrier.js?v=21';
+import { fullscreen, target, bindScreen, program, buffer, vao } from './gl.js?v=22';
+import { orbitCamera } from './camera.js?v=22';
+import { m4, clamp } from './mat.js?v=22';
+import { hexToRgb } from './palette.js?v=22';
+import { carrierMesh } from './carrier.js?v=22';
 
 export function createView(G, canvas, cfg, S, world, drones) {
   const gl = G.gl;

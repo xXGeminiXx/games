@@ -1,20 +1,20 @@
 // Aerie: the carrier, the island, the fleet and the ledger, wired together.
-import { withOverrides, applyIdentity } from '../config.js?v=21';
-import { fill } from '../content.js?v=21';
-import { makeShaders } from './shaders.js?v=21';
-import { createWorld } from './world.js?v=21';
-import { createDrones } from './drones.js?v=21';
-import { createView } from './view.js?v=21';
-import { createEconomy } from './economy.js?v=21';
-import { createAdvice } from './advice.js?v=21';
-import { createSave, createPrefs } from './save.js?v=21';
-import { createUI } from './ui.js?v=21';
-import { createControls } from './controls.js?v=21';
-import { createQuality } from './quality.js?v=21';
-import { createPerfLog } from './perflog.js?v=21';
-import { loop, createGL } from './gl.js?v=21';
-import { rng } from './rng.js?v=21';
-import { fmt, duration } from './numbers.js?v=21';
+import { withOverrides, applyIdentity } from '../config.js?v=22';
+import { fill } from '../content.js?v=22';
+import { makeShaders } from './shaders.js?v=22';
+import { createWorld } from './world.js?v=22';
+import { createDrones } from './drones.js?v=22';
+import { createView } from './view.js?v=22';
+import { createEconomy } from './economy.js?v=22';
+import { createAdvice } from './advice.js?v=22';
+import { createSave, createPrefs } from './save.js?v=22';
+import { createUI } from './ui.js?v=22';
+import { createControls } from './controls.js?v=22';
+import { createQuality } from './quality.js?v=22';
+import { createPerfLog } from './perflog.js?v=22';
+import { loop, createGL } from './gl.js?v=22';
+import { rng } from './rng.js?v=22';
+import { fmt, duration } from './numbers.js?v=22';
 
 export function createGame({ doc, canvas, cfg, content, storage, search }) {
   cfg = withOverrides(cfg, search, storage);
@@ -289,6 +289,10 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
 
   // ---- the loop ----
   let summaryT = 0, saveT = 0, uiT = 0, clock = 0, adviceT = 0;
+  // Seconds of economy the loop has actually run. Not the same as the time of
+  // day: a tab in the background is handed no frames on one machine and a
+  // handful on another, and this counts what really happened either way.
+  let ran = 0;
   const speed = () => eco.droneSpeed();
   let qualityT = 0, perfT = 0;
   const stop = loop((dt, t) => {
@@ -309,6 +313,7 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
       const sum = world.summary(view.state.carrier, eco.range());
       eco.state.remaining = sum.remaining;
       eco.tick(1, sum.avail);
+      ran += 1;
       checkReveal();
       checkPrices();
       drift();
@@ -343,12 +348,17 @@ export function createGame({ doc, canvas, cfg, content, storage, search }) {
   // the only thing that keeps counting, so it is what the absence is measured
   // with, and the fleet works it on the way back in.
   let hiddenAt = 0;
+  let ranAtHide = 0;
   doc.addEventListener('visibilitychange', () => {
-    if (doc.hidden) { hiddenAt = Date.now(); persist(); return; }
-    const away = hiddenAt ? (Date.now() - hiddenAt) / 1000 : 0;
+    if (doc.hidden) { hiddenAt = Date.now(); ranAtHide = ran; persist(); return; }
+    const gone = hiddenAt ? (Date.now() - hiddenAt) / 1000 : 0;
     hiddenAt = 0;
-    if (away <= 30) return;
-    const r = eco.catchUp(away);
+    // Only the part nobody ran. Some browsers hand a background tab a frame
+    // now and then instead of stopping it dead, and that time is already
+    // paid for; working it a second time would print money.
+    const owed = gone - (ran - ranAtHide);
+    if (owed <= 30) return;
+    const r = eco.catchUp(owed);
     groundWorked(r);
     sayWorked(r);
     ui.update({ active: drones.active });

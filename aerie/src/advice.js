@@ -7,7 +7,7 @@
 // stealing from a voyage the player is saving for.
 //
 // Pure. It reads the economy and formats numbers; it touches no page.
-import { fmt, pct, duration } from './numbers.js?v=21';
+import { fmt, pct, duration } from './numbers.js?v=22';
 
 export function createAdvice(cfg, eco, opts = {}) {
   const K = cfg.kindOrder;
