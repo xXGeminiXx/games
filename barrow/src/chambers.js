@@ -10,8 +10,8 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=38';
-import * as Lore from './lore.js?v=38';
+import { hash } from './rng.js?v=39';
+import * as Lore from './lore.js?v=39';
 
 /** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {

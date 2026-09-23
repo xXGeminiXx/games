@@ -529,6 +529,7 @@ export const CONTENT = {
         { name: 'His bronze', line: 'Bronze tools from his grave. Everyone digs 2x faster.' },
       ],
       trophy: { name: 'Rex Mortis\'s crown', line: 'Every barrow starts 3 layers down.' },
+      power: { name: 'Rex Mortis\'s banner', line: 'Every layer you break into brings up new diggers, as many as 5 minutes of bones would raise.' },
     },
     pater: {
       his: 'his',
@@ -545,6 +546,7 @@ export const CONTENT = {
         { name: 'His blessing', line: 'Every bone raises 2x as many diggers.' },
       ],
       trophy: { name: 'Pater Ossium\'s throne', line: 'A cart of bones every time you break a layer.' },
+      power: { name: 'Pater Ossium\'s charnel', line: 'The ground gives up 2x the bones.' },
     },
     rey: {
       his: 'his',
@@ -561,6 +563,7 @@ export const CONTENT = {
         { name: 'His old buyers', line: 'Every market takes 3x more before the price drops.' },
       ],
       trophy: { name: 'Rey Muerto\'s lamp', line: 'Every layer down to the next door is named.' },
+      power: { name: 'Rey Muerto\'s mint', line: 'Everything sells for 2x.' },
     },
     dona: {
       his: 'her',
@@ -577,6 +580,7 @@ export const CONTENT = {
         { name: 'Her guests', line: 'They follow you up the shaft and start digging.' },
       ],
       trophy: { name: 'Doña Calavera\'s candle', line: 'Callers wait at the gate until you answer them.' },
+      power: { name: 'Doña Calavera\'s guest list', line: 'Callers come 2x as often and pay 2x.' },
     },
     sepulturero: {
       his: 'his',
@@ -593,6 +597,7 @@ export const CONTENT = {
         { name: 'His crew', line: 'They join yours. Everyone digs 2x faster.' },
       ],
       trophy: { name: 'El Sepulturero\'s shovel', line: 'Every lord\'s door breaks 2x faster.' },
+      power: { name: 'El Sepulturero\'s night crew', line: 'Digging down is 2x faster.' },
     },
     neb: {
       his: 'his',
@@ -609,6 +614,7 @@ export const CONTENT = {
         { name: 'His scales', line: 'Markets take 2.5x more and pay 50% more.' },
       ],
       trophy: { name: 'Neb-Amenti\'s scales', line: 'Your seller takes no cut.' },
+      power: { name: 'Neb-Amenti\'s measure', line: 'Every market takes 2x more before its price drops.' },
     },
     natron: {
       his: 'her',
@@ -625,6 +631,7 @@ export const CONTENT = {
         { name: 'Her salts', line: '2x the bones for the rest of this barrow.' },
       ],
       trophy: { name: 'Mother Natron\'s jar', line: '1 in 100 of your diggers comes with you to the next barrow.' },
+      power: { name: 'Mother Natron\'s salt', line: 'While you\'re away the dead dig at 90% of full speed instead of 75%.' },
     },
     mortifer: {
       his: 'his',
@@ -643,6 +650,7 @@ export const CONTENT = {
         { name: 'His hoard', line: 'Everything sells for 3x, and 2x the bones.' },
       ],
       trophy: { name: 'Mortifer\'s ring', line: 'Every lord\'s hoard is 2x bigger.' },
+      power: { name: 'Mortifer\'s call', line: 'The dead raise themselves: every spare bone stands up as a digger. Auto-raise, by the raise buttons, turns it off.' },
     },
   },
 
@@ -663,7 +671,6 @@ export const CONTENT = {
     doorTag: '\'s door',
     broke: 'BROKE THROUGH: {Name}\'s door. {His} hoard: {coin} coin and {n} relics.',
     trophy: 'You keep {Name} for good: {line}',
-    upgrade: 'New upgrade in every barrow from now on: {name} ({line}).',
     newDepth: 'Deepest yet: +{relics} relics.',
     crew: 'Biggest crew yet: +{relics} relics.',
     rankUp: 'RANK UP: you\'re {name} now.',
@@ -839,23 +846,6 @@ export const CONTENT = {
                  long: 'Every level: filling this barrow in pays 3 more relics.' },
     pits:      { name: 'Dig Up the Burials', line: '+40% bones found',
                  long: 'Every level: the ground gives up 40% more bones. Stops at 12 levels.' },
-    // One from each lord, on the panel for good once his door has been broken.
-    muster:    { name: 'Rex\'s Muster',     line: 'New layers bring diggers',
-                 long: 'From Rex Mortis. Every level: each layer you break into brings up as many new diggers as 1 minute of bones would raise.' },
-    ossuary:   { name: 'Pater\'s Bone Pit', line: '+50% bones found',
-                 long: 'From Pater Ossium. Every level: the ground gives up 50% more bones.' },
-    mint:      { name: 'Rey\'s Mint',       line: 'Everything sells for 50% more',
-                 long: 'From Rey Muerto. Every level: everything sells for 50% more.' },
-    invites:   { name: 'Doña\'s Invitations', line: 'Callers come sooner, pay 50% more',
-                 long: 'From Doña Calavera. Every level: callers come up the track 50% more often and pay 50% more.' },
-    spades:    { name: 'Sepulturero\'s Spades', line: '+50% dig-down speed',
-                 long: 'From El Sepulturero. Every level: breaking through floors is 50% faster.' },
-    balance:   { name: 'Neb-Amenti\'s Balance', line: '+50% market size',
-                 long: 'From Neb-Amenti. Every level: every market takes 50% more before its price drops.' },
-    jars:      { name: 'Mother Natron\'s Jars', line: '+1 in 100 diggers kept',
-                 long: 'From Mother Natron. Every level: 1 more in 100 of your diggers comes with you to the next barrow.' },
-    raising:   { name: 'Mortifer\'s Call',  line: 'The dead raise themselves',
-                 long: 'From Mortifer. Every spare bone raises diggers, every second. The Auto-raise switch by the raise buttons turns it off.' },
   },
 
   // -------------------------------------------------------------------------

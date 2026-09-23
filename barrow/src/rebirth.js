@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=38';
-import { pick, hash } from './rng.js?v=38';
-import { fill } from '../config.js?v=38';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=38';
+import * as Lore from './lore.js?v=39';
+import { pick, hash } from './rng.js?v=39';
+import { fill } from '../config.js?v=39';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=39';
 
 export const LEGACY_VERSION = 1;
 
@@ -226,9 +226,7 @@ export function seal(state, cfg, legacy) {
   // the dead across to the next one.
   if (cfg.ranks) legacy.renown = (legacy.renown || 0) + cfg.ranks.points.sealPer;
   if (legacy.trophies && legacy.trophies.natron && cfg.lords) {
-    // Her jars, bought this barrow, carry more of them.
-    const jars = ((state.rites && state.rites.jars) || 0) * (cfg.rites.jarsShare || 0);
-    legacy.carry = Math.floor(state.horde * (cfg.lords.trophy.carryShare + jars));
+    legacy.carry = Math.floor(state.horde * cfg.lords.trophy.carryShare);
   }
   const lordsBroken = Object.keys(state.doors || {}).length;
   if (!Array.isArray(legacy.barrows)) legacy.barrows = [];

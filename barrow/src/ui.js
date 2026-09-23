@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=38';
-import * as Mk from './market.js?v=38';
-import * as H from './horde.js?v=38';
-import * as R from './rites.js?v=38';
-import * as Rb from './rebirth.js?v=38';
-import * as Lore from './lore.js?v=38';
-import * as Advice from './advice.js?v=38';
-import * as Lords from './lords.js?v=38';
-import * as Ranks from './ranks.js?v=38';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=38';
-import { fill } from '../config.js?v=38';
+import * as Mat from './materials.js?v=39';
+import * as Mk from './market.js?v=39';
+import * as H from './horde.js?v=39';
+import * as R from './rites.js?v=39';
+import * as Rb from './rebirth.js?v=39';
+import * as Lore from './lore.js?v=39';
+import * as Advice from './advice.js?v=39';
+import * as Lords from './lords.js?v=39';
+import * as Ranks from './ranks.js?v=39';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=39';
+import { fill } from '../config.js?v=39';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -174,7 +174,7 @@ export function createUI(doc, sim, cfg, actions) {
     autoBuyButton.setAttribute('aria-pressed', String(!!sim.legacy.autoBuy));
   };
 
-  // Mortifer's upgrade hands over a third: the dead raising themselves, beside
+  // Mortifer's power hands over a third: the dead raising themselves, beside
   // the raise buttons it stands in for.
   let autoRaiseButton = null;
   const paintAutoRaise = () => {
@@ -530,7 +530,7 @@ export function createUI(doc, sim, cfg, actions) {
   const riteRows = new Map();
   const buildRites = () => {
     const s = sim.state;
-    const vis = R.visible(s, cfg, sim.legacy);
+    const vis = R.visible(s, cfg);
     for (const def of vis) {
       if (riteRows.has(def.id)) continue;
       const words = R.wordsOf(def.id);
@@ -539,11 +539,8 @@ export function createUI(doc, sim, cfg, actions) {
       const button = el('button', { class: 'rite', onclick: () => actions.buyRite(def.id, riteCount(def.id)) }, el('b', { text: words.name }), cost);
       // The row shows the short line and says the whole of it on hover, so a
       // narrow column never hides something the player needed.
-      const row = el('div', { class: 'rrow' + (def.lord ? ' lordrite' : ''), title: words.name + ': ' + (words.long || words.line) },
+      const row = el('div', { class: 'rrow', title: words.name + ': ' + (words.long || words.line) },
         button, el('span', { class: 'line', text: words.line, title: words.long || words.line }), level);
-      // A lord's upgrade wears his colour, the way his door and his room do.
-      const lordDef = def.lord && cfg.lords ? cfg.lords.list[def.lord] : null;
-      if (lordDef && button.style) button.style.borderLeftColor = lordDef.color;
       nodes.rites.appendChild(row);
       riteRows.set(def.id, { def, row, button, cost, level });
     }
@@ -876,9 +873,13 @@ export function createUI(doc, sim, cfg, actions) {
       const words = Lore.lord(id);
       const have = !!(legacy.trophies && legacy.trophies[id]);
       const met = have || ((legacy.lordsMet || {})[id] > 0);
-      grid.appendChild(have
-        ? el('div', { title: words.trophy.line }, el('b', { text: words.trophy.name }), ' - ' + words.trophy.line)
-        : el('div', { class: 'off' }, el('b', { text: met ? words.trophy.name : W.unknown }), ' - ' + W.unmet));
+      // One cell a lord: his trophy, and what he hands over beside it, so the
+      // two stay together however many columns the tab has room for.
+      const cell = have
+        ? el('div', { class: 'lordcell' }, el('div', { title: words.trophy.line }, el('b', { text: words.trophy.name }), ' - ' + words.trophy.line))
+        : el('div', { class: 'off' }, el('b', { text: met ? words.trophy.name : W.unknown }), ' - ' + W.unmet);
+      if (have && words.power) cell.appendChild(el('div', { title: words.power.line }, el('b', { text: words.power.name }), ' - ' + words.power.line));
+      grid.appendChild(cell);
     }
     nodes.standing.appendChild(grid);
     nodes.standing.appendChild(el('h3', { text: W.keys }));

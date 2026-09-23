@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=38';
-import * as Mat from './materials.js?v=38';
-import * as Mk from './market.js?v=38';
-import * as H from './horde.js?v=38';
-import * as Crew from './crew.js?v=38';
-import * as R from './rites.js?v=38';
-import * as Rv from './reveal.js?v=38';
-import * as Ch from './chambers.js?v=38';
-import * as Vi from './visitors.js?v=38';
-import * as Rb from './rebirth.js?v=38';
-import * as Lore from './lore.js?v=38';
-import * as Lords from './lords.js?v=38';
-import * as Ranks from './ranks.js?v=38';
-import { createGround } from './ground.js?v=38';
-import { fill } from '../config.js?v=38';
-import { fmt, fmtCoin } from './numbers.js?v=38';
+import { CONFIG as DEFAULT } from '../config.js?v=39';
+import * as Mat from './materials.js?v=39';
+import * as Mk from './market.js?v=39';
+import * as H from './horde.js?v=39';
+import * as Crew from './crew.js?v=39';
+import * as R from './rites.js?v=39';
+import * as Rv from './reveal.js?v=39';
+import * as Ch from './chambers.js?v=39';
+import * as Vi from './visitors.js?v=39';
+import * as Rb from './rebirth.js?v=39';
+import * as Lore from './lore.js?v=39';
+import * as Lords from './lords.js?v=39';
+import * as Ranks from './ranks.js?v=39';
+import { createGround } from './ground.js?v=39';
+import { fill } from '../config.js?v=39';
+import { fmt, fmtCoin } from './numbers.js?v=39';
 
 export const SAVE_VERSION = 2;
 
@@ -84,9 +84,10 @@ export function freshState(cfg, seed) {
  * minute counts in full, so a look at another tab costs nothing; the rest is
  * dug at the away pace.
  */
-export function awayWork(seconds, time) {
+export function awayWork(seconds, time, awayPace) {
   if (!(seconds > 0)) return 0;
-  const pace = time.awayPace > 0 ? Math.min(1, time.awayPace) : 1;
+  const p = awayPace === undefined ? time.awayPace : awayPace;
+  const pace = p > 0 ? Math.min(1, p) : 1;
   const grace = Math.min(seconds, time.awayGrace > 0 ? time.awayGrace : 0);
   return grace + (seconds - grace) * pace;
 }
@@ -415,11 +416,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (first && words.trophy) {
       events.push({ type: 'log', key: 'trophy', text: fill(D.trophy, { name: words.trophy.name, line: words.trophy.line }) });
     }
-    // His upgrade goes on the panel for good the first time.
-    const his = first && R.defs(cfg).find(d => d.lord === lord.id);
-    if (his && D.upgrade) {
-      const rw = R.wordsOf(his.id);
-      if (rw) events.push({ type: 'log', key: 'lordUpgrade', text: fill(D.upgrade, { name: rw.name, line: Lore.inline(rw.line) }) });
+    // And what he hands over beside it, never for sale.
+    if (first && words.power) {
+      events.push({ type: 'log', key: 'power', text: fill(D.trophy, { name: words.power.name, line: words.power.line }) });
     }
     present(events, hallFor(door, first));
     addRenown(events, first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
@@ -683,7 +682,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // that coin will cover, one a step, while the player has it switched on.
     if (md.autoBuy && legacy.autoBuy) {
       let best = null;
-      for (const def of R.visible(state, cfg, legacy)) {
+      for (const def of R.visible(state, cfg)) {
         if (!R.canBuy(state, def)) continue;
         const price = R.cost(def, R.levelOf(state, def.id));
         if (!best || price < best.price) best = { def, price };
@@ -730,7 +729,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const max = mods().offlineHours * 3600;
     const capped = away && seconds > max;
     const total = capped ? max : seconds;
-    const worked = away && opts && opts.unwatched ? awayWork(total, cfg.time) : total;
+    const worked = away && opts && opts.unwatched ? awayWork(total, cfg.time, mods().awayPace) : total;
     const chunk = away ? cfg.time.offlineStep : cfg.time.tick;
     const startCoin = state.coin, startBones = state.bones;
     const startDepth = state.depth, startHorde = state.horde;
@@ -917,9 +916,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   const buyRite = (id, count) => {
     const events = [];
-    // A lord's upgrade is his to hand over: nothing buys it before his door.
-    const def = R.defOf(cfg, id);
-    if (def && !R.unlocked(def, legacy)) return { events, level: 0 };
     const level = R.buy(state, id, cfg, count);
     if (level > 0) {
       events.push({ type: 'rite', id, level });
