@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=32';
-import { pick, hash } from './rng.js?v=32';
-import { fill } from '../config.js?v=32';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=32';
+import * as Lore from './lore.js?v=33';
+import { pick, hash } from './rng.js?v=33';
+import { fill } from '../config.js?v=33';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=33';
 
 export const LEGACY_VERSION = 1;
 
@@ -45,6 +45,9 @@ export function freshLegacy() {
     autoSealAt: 0,
     // How many levels one press of an upgrade buys: 1, 5, 25 or 'max'.
     ritePick: 1,
+    // The rest of what the player last set on the page: the open tab and
+    // whether the worked-out layers are shown.
+    ui: {},
   };
 }
 
@@ -60,6 +63,10 @@ export function restoreLegacy(raw) {
   if (Number.isFinite(raw.carry) && raw.carry > 0) l.carry = raw.carry;
   l.autoBuy = !!raw.autoBuy;
   if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
+  if (raw.ui && typeof raw.ui === 'object') {
+    if (typeof raw.ui.showSpent === 'boolean') l.ui.showSpent = raw.ui.showSpent;
+    if (raw.ui.tab === 'oaths' || raw.ui.tab === 'rites') l.ui.tab = raw.ui.tab;
+  }
   if (Number.isFinite(raw.autoSealAt) && raw.autoSealAt > 0) l.autoSealAt = Math.round(raw.autoSealAt);
   for (const key of ['trophies', 'lordsMet']) {
     if (raw[key] && typeof raw[key] === 'object') {

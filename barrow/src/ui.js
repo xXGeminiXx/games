@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=32';
-import * as Mk from './market.js?v=32';
-import * as H from './horde.js?v=32';
-import * as R from './rites.js?v=32';
-import * as Rb from './rebirth.js?v=32';
-import * as Lore from './lore.js?v=32';
-import * as Advice from './advice.js?v=32';
-import * as Lords from './lords.js?v=32';
-import * as Ranks from './ranks.js?v=32';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=32';
-import { fill } from '../config.js?v=32';
+import * as Mat from './materials.js?v=33';
+import * as Mk from './market.js?v=33';
+import * as H from './horde.js?v=33';
+import * as R from './rites.js?v=33';
+import * as Rb from './rebirth.js?v=33';
+import * as Lore from './lore.js?v=33';
+import * as Advice from './advice.js?v=33';
+import * as Lords from './lords.js?v=33';
+import * as Ranks from './ranks.js?v=33';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=33';
+import { fill } from '../config.js?v=33';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -216,7 +216,9 @@ export function createUI(doc, sim, cfg, actions) {
   // every layer above the deepest is finished for good and nine rows reading
   // nothing are nine rows of scenery. They fold into one line that says how
   // many and what they left, and anybody who wants the list can open it.
-  let showSpent = false;
+  // Kept with the save like the other things a player sets (David, B16).
+  const prefs = () => { if (!sim.legacy.ui || typeof sim.legacy.ui !== 'object') sim.legacy.ui = {}; return sim.legacy.ui; };
+  let showSpent = !!prefs().showSpent;
 
   const weightRows = new Map(); // key -> { node, bar, meta }
   const buildWeights = (split) => {
@@ -293,7 +295,7 @@ export function createUI(doc, sim, cfg, actions) {
   const buildSpent = () => {
     if (spentLine || !nodes.spent) return;
     spentLine = el('span', { class: 'lbl' });
-    spentButton = el('button', { onclick: () => { showSpent = !showSpent; render(); } });
+    spentButton = el('button', { onclick: () => { showSpent = !showSpent; prefs().showSpent = showSpent; if (actions.savePrefs) actions.savePrefs(); render(); } });
     nodes.spent.appendChild(spentLine);
     nodes.spent.appendChild(spentButton);
   };
@@ -622,7 +624,7 @@ export function createUI(doc, sim, cfg, actions) {
   // Which of the two lists the right-hand panel is showing. Relics buy things
   // nobody buys unless they can see them, and the list used to sit at the
   // bottom of a column three screens tall.
-  let panelTab = 'rites';
+  let panelTab = prefs().tab === 'oaths' ? 'oaths' : 'rites';
   const paintTabs = () => {
     const on = (node, yes) => { if (node) node.setAttribute('aria-pressed', String(yes)); };
     on(nodes.tabRites, panelTab === 'rites');
@@ -633,8 +635,9 @@ export function createUI(doc, sim, cfg, actions) {
     show(nodes.oathsNote, panelTab === 'oaths');
     show(nodes.standing, panelTab === 'oaths');
   };
-  if (nodes.tabRites) nodes.tabRites.addEventListener('click', () => { panelTab = 'rites'; paintTabs(); });
-  if (nodes.tabOaths) nodes.tabOaths.addEventListener('click', () => { panelTab = 'oaths'; paintTabs(); });
+  const pickTab = (t) => { panelTab = t; prefs().tab = t; paintTabs(); if (actions.savePrefs) actions.savePrefs(); };
+  if (nodes.tabRites) nodes.tabRites.addEventListener('click', () => pickTab('rites'));
+  if (nodes.tabOaths) nodes.tabOaths.addEventListener('click', () => pickTab('oaths'));
 
   // With the rank for it, the second press does not fill the barrow in: it
   // offers the hills the next one can be dug in, and picking one does.

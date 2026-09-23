@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=32';
-import * as Mat from './materials.js?v=32';
-import * as Mk from './market.js?v=32';
-import * as H from './horde.js?v=32';
-import * as Crew from './crew.js?v=32';
-import * as R from './rites.js?v=32';
-import * as Rv from './reveal.js?v=32';
-import * as Ch from './chambers.js?v=32';
-import * as Vi from './visitors.js?v=32';
-import * as Rb from './rebirth.js?v=32';
-import * as Lore from './lore.js?v=32';
-import * as Lords from './lords.js?v=32';
-import * as Ranks from './ranks.js?v=32';
-import { createGround } from './ground.js?v=32';
-import { fill } from '../config.js?v=32';
-import { fmt, fmtCoin } from './numbers.js?v=32';
+import { CONFIG as DEFAULT } from '../config.js?v=33';
+import * as Mat from './materials.js?v=33';
+import * as Mk from './market.js?v=33';
+import * as H from './horde.js?v=33';
+import * as Crew from './crew.js?v=33';
+import * as R from './rites.js?v=33';
+import * as Rv from './reveal.js?v=33';
+import * as Ch from './chambers.js?v=33';
+import * as Vi from './visitors.js?v=33';
+import * as Rb from './rebirth.js?v=33';
+import * as Lore from './lore.js?v=33';
+import * as Lords from './lords.js?v=33';
+import * as Ranks from './ranks.js?v=33';
+import { createGround } from './ground.js?v=33';
+import { fill } from '../config.js?v=33';
+import { fmt, fmtCoin } from './numbers.js?v=33';
 
 export const SAVE_VERSION = 2;
 
