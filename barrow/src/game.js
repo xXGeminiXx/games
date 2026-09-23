@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=40';
-import { createSim, restoreSim, openedState } from './sim.js?v=40';
-import * as Save from './save.js?v=40';
-import * as Rb from './rebirth.js?v=40';
-import * as Lore from './lore.js?v=40';
-import { hash } from './rng.js?v=40';
-import { createUI } from './ui.js?v=40';
-import { createView } from './view.js?v=40';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=40';
-import * as Mat from './materials.js?v=40';
+import { storageKey, fill } from '../config.js?v=41';
+import { createSim, restoreSim, openedState } from './sim.js?v=41';
+import * as Save from './save.js?v=41';
+import * as Rb from './rebirth.js?v=41';
+import * as Lore from './lore.js?v=41';
+import { hash } from './rng.js?v=41';
+import { createUI } from './ui.js?v=41';
+import { createView } from './view.js?v=41';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=41';
+import * as Mat from './materials.js?v=41';
 
 /**
  * @param {object} o
@@ -162,7 +162,7 @@ export function createGame(o) {
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
     const md = sim.mods();
-    view.draw(sim.state, sim.state.effort, dt, md.activeStrata, sim.split(), md);
+    view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md);
 
     // A barrow the player asked to fill itself in, once it is deep enough.
     if (sim.autoSealDue()) { seal(); return; }

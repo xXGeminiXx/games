@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=40';
-import * as Mat from './materials.js?v=40';
-import * as Mk from './market.js?v=40';
-import * as H from './horde.js?v=40';
-import * as Crew from './crew.js?v=40';
-import * as R from './rites.js?v=40';
-import * as Rv from './reveal.js?v=40';
-import * as Ch from './chambers.js?v=40';
-import * as Vi from './visitors.js?v=40';
-import * as Rb from './rebirth.js?v=40';
-import * as Lore from './lore.js?v=40';
-import * as Lords from './lords.js?v=40';
-import * as Ranks from './ranks.js?v=40';
-import { createGround } from './ground.js?v=40';
-import { fill } from '../config.js?v=40';
-import { fmt, fmtCoin } from './numbers.js?v=40';
+import { CONFIG as DEFAULT } from '../config.js?v=41';
+import * as Mat from './materials.js?v=41';
+import * as Mk from './market.js?v=41';
+import * as H from './horde.js?v=41';
+import * as Crew from './crew.js?v=41';
+import * as R from './rites.js?v=41';
+import * as Rv from './reveal.js?v=41';
+import * as Ch from './chambers.js?v=41';
+import * as Vi from './visitors.js?v=41';
+import * as Rb from './rebirth.js?v=41';
+import * as Lore from './lore.js?v=41';
+import * as Lords from './lords.js?v=41';
+import * as Ranks from './ranks.js?v=41';
+import { createGround } from './ground.js?v=41';
+import { fill } from '../config.js?v=41';
+import { fmt, fmtCoin } from './numbers.js?v=41';
 
 export const SAVE_VERSION = 2;
 
@@ -72,6 +72,7 @@ export function freshState(cfg, seed) {
     remBonus: 0,          // remembrance promised by chambers
     hand: { digs: 0 },
     effort: [],           // digger-seconds spent per layer, for the drawing
+    worked: [],           // seconds of the whole crew spent on each layer, for the hollow
     flags: {},            // reveal flags, monotonic
     fired: {},            // log lines that have gone out, once each
     milestones: { horde: 0, depth: 0 },
@@ -1070,6 +1071,16 @@ export function restoreSim(cfg, snap) {
   while (state.weights.length <= state.depth) state.weights.push(0);
   if (!Array.isArray(state.income)) state.income = [];
   if (!Array.isArray(state.effort)) state.effort = [];
+  // A save from before the hollow was measured in crew time carries over at
+  // whatever its old drawing showed, so a layer that looked dug out still does.
+  if (!Array.isArray(st.worked)) {
+    const v = cfg.view || {};
+    state.worked = state.effort.map((e, k) => {
+      if (!(e > 0) || !(v.clearSeconds > 0)) return 0;
+      const scale = (v.carveScale || 60) * Math.pow(1.35, k);
+      return Math.min(1, Math.log10(1 + e / scale) / 3) * v.clearSeconds;
+    });
+  }
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.chamberQueue)) state.chamberQueue = [];
   // The game does the splitting for everybody, including runs that predate
@@ -1130,6 +1141,8 @@ export function openedState(cfg, legacy, seed, lines, hill) {
     state.stock['s' + k] = ground.at(k).absorb * 0.05;
     state.seen['s' + k] = true;
     state.effort[k] = ground.at(k).cap * ground.at(k).hardness;
+    if (!Array.isArray(state.worked)) state.worked = [];
+    state.worked[k] = (cfg.view && cfg.view.clearSeconds ? cfg.view.clearSeconds : 0) * 0.5;
   }
   // The jar's share of the last barrow's dead comes along, once.
   const carried = legacy.carry > 0 ? legacy.carry : 0;

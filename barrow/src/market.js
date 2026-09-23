@@ -23,7 +23,7 @@
 //     across many goods.
 // ---------------------------------------------------------------------------
 
-import { hash, stream } from './rng.js?v=40';
+import { hash, stream } from './rng.js?v=41';
 
 const TAU = Math.PI * 2;
 

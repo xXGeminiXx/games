@@ -70,13 +70,14 @@ export const CONFIG = {
     shareMoreTip: 'Send more of them to this layer',
     shareLessTip: 'Send fewer of them to this layer',
     shareBarTip:   'How many of them are digging here',
-    // The one control nobody has to touch.
-    autoOff:    'Let me place them',
-    autoOn:     'Go back to placing them for me',
-    autoOffTip: 'Place the diggers yourself. You never have to',
-    autoOnTip:  'Hand it back and the game keeps them where they earn most',
-    autoNoteGame: 'They move themselves as the ground changes.',
-    autoNoteHand: 'You are placing them. They stay where you put them.',
+    // The one control nobody has to touch: who places the crew.
+    placeLabel: 'Who places them',
+    placeGame:  'The game',
+    placeHand:  'Me',
+    autoOffTip: 'Place the diggers yourself with the + and - on each row. You never have to',
+    autoOnTip:  'The game keeps them where they earn most, and moves them as the ground changes',
+    autoNoteGame: 'The game places them where they earn most, and moves them as the ground changes.',
+    autoNoteHand: 'You place them with + and -. They stay where you put them.',
     // Layers nobody is digging any more, folded into one line.
     spent:      '{N} older layers, worked out.',
     spentWorth: '{N} older layers, worked out. What they left is worth {coin}.',
@@ -883,7 +884,12 @@ export const CONFIG = {
                            // field, so a phone's strip does not fill with bone
     particleSize: 1.6,
     tunnelSegments: 260,   // carve segments per stratum, revealed as it is dug
-    carveScale: 60,        // units dug for the first ~63% of a stratum's carve
+    // How long the whole crew takes to hollow a layer out wall to wall. A
+    // layer never runs out; the hollow is how long the crew has worked it, so
+    // it fills at a pace the eye can follow however big the crew is. Half the
+    // crew takes twice as long.
+    clearSeconds: 600,
+    carveScale: 60,        // the old measure, read once to carry old saves over
     shaftWidth: 3,
     glintCount: 14,        // mineral glints per band, in the good's color
   },
@@ -918,7 +924,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 40,
+    build: 41,
   },
 };
 

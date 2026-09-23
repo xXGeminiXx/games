@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=40';
-import { pick, hash } from './rng.js?v=40';
-import { fill } from '../config.js?v=40';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=40';
+import * as Lore from './lore.js?v=41';
+import { pick, hash } from './rng.js?v=41';
+import { fill } from '../config.js?v=41';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=41';
 
 export const LEGACY_VERSION = 1;
 

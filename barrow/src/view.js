@@ -2,8 +2,8 @@
 // The one drawing: a cross-section of the hill.
 //
 // Sky, a low mound, then the strata as bands that darken with depth. The
-// horde has carved each band into a network of tunnels that grows with the
-// effort spent there, and the dead are drawn as dots moving through what they
+// horde hollows each band out from the shaft as it works there, wall to wall
+// once it has worked it long enough, and the dead are drawn as dots moving through what they
 // have dug. Below the deepest open band is unbroken ground with the face bitten
 // into it. Ten diggers are ten dots; a million is a mass. Nothing here is an
 // asset, and nothing here is the game: the view reads the simulation and
@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=40';
-import { activeFrom } from './horde.js?v=40';
-import * as Lore from './lore.js?v=40';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=41';
+import { activeFrom } from './horde.js?v=41';
+import * as Lore from './lore.js?v=41';
 
 /** mulberry32 */
 function rng(seed) {
@@ -31,13 +31,30 @@ function rng(seed) {
 }
 
 /**
- * How much of a band's carve is revealed after `effort` digger-seconds.
- * Logarithmic, so the first digger's first minute shows and the ten-thousandth
- * digger's still adds something.
+ * How much of a band is hollowed out after `worked` seconds of the whole
+ * crew, when `seconds` of them hollow it wall to wall. Straight in time, so a
+ * layer the crew leans on visibly fills at a steady pace, and a layer nobody
+ * works stays as it was.
  */
-export function carveFraction(effort, scale) {
-  if (!(effort > 0)) return 0;
-  return Math.min(1, Math.log10(1 + effort / scale) / 3);
+export function carveFraction(worked, seconds) {
+  if (!(worked > 0) || !(seconds > 0)) return 0;
+  return Math.min(1, worked / seconds);
+}
+
+/**
+ * Whether the point `u` across a band (0 to 1, the shaft at 0.5) is dug out
+ * when the band is `frac` done. `stand` is a slow wave in 0..1 that decides
+ * where rock is left standing. The hollow spreads out from the shaft with a
+ * ragged edge and pillars left in it, and both go as the layer is worked: at
+ * the end it is open wall to wall, so a layer that is done never looks like
+ * it has something left in it to dig.
+ */
+export function hollowAt(u, frac, stand) {
+  if (!(frac > 0)) return false;
+  const reach = frac * 1.15;
+  const rag = 0.24 * (1 - frac);
+  const pillar = 0.84 + 0.2 * Math.pow(frac, 3);
+  return Math.abs(u - 0.5) * 2 <= reach + (stand - 0.5) * rag && stand <= pillar;
 }
 
 /**
@@ -223,12 +240,12 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /** Bands and the carve, drawn into the offscreen canvas when they change. */
-  const drawGround = (L, s, effort) => {
+  const drawGround = (L, s, worked) => {
     ensureCarve();
     const c = carve.ctx || ctx;
     const revealed = [];
     for (let k = 0; k <= s.depth; k++) {
-      const frac = carveFraction(effort[k] || 0, cfg.carveScale * Math.pow(1.35, k));
+      const frac = carveFraction(worked[k] || 0, cfg.clearSeconds);
       revealed.push(Math.round(frac * cfg.tunnelSegments));
     }
     const dug = Math.max(0, Math.log10(1 + (s.totals ? s.totals.dug || 0 : 0)));
@@ -470,7 +487,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       // control point every seventy pixels reads as a worked-out seam.
       const roof = wave(r, width, 70), floor = wave(r, width, 70), stand = wave(r, width, 90);
       const inset = Math.min(row.h * 0.34, Math.max(1, row.h * 0.20));
-      const open = (u) => Math.abs(u - 0.5) * 2 <= frac + (stand(u) - 0.5) * 0.24 && stand(u) <= 0.84;
+      const open = (u) => hollowAt(u, frac, stand(u));
       // Each run of open ground is one closed shape, drawn along its roof and
       // back along its floor. Filling it column by column left a staircase of
       // flat steps, which at thirty pixels a band is masonry, not a cavern.
@@ -740,15 +757,16 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /**
-   * Draw one frame. `effort` is digger-seconds spent per layer; `md` is the
+   * Draw one frame. `worked` is seconds of the whole crew spent on each
+   * layer (state.worked); `md` is the
    * run's multipliers, read only for what the player can see ahead.
    */
-  const draw = (s, effort, dt, active, split, md) => {
+  const draw = (s, worked, dt, active, split, md) => {
     if (!split) split = { strata: [], face: 0 };
     seed = s.seed;
     hillTint = (md && md.hillTint) || null;
     const L = layout(width, height, s.depth, cfg, focusOf(s, cfg));
-    drawGround(L, s, effort);
+    drawGround(L, s, worked);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
     if (carve.canvas && carve.canvas !== canvas) {

@@ -168,10 +168,16 @@
   .wrow .rate.hot{color:var(--hot)}
   /* The one control that is never needed: the game splits the diggers and
      this hands that over to somebody who would rather do it. */
-  #handover{display:flex;gap:10px;align-items:baseline;margin:0 0 8px;flex-wrap:wrap}
-  #handover button{font-size:11px;padding:1px 8px;color:var(--dim)}
-  #handover button:hover:not(:disabled){color:var(--ink)}
-  #handover .lbl{margin:0}
+  /* Who places the crew: a two-way switch in the panel's heading row, the
+     side that is on lit the way the x1/x5/x25/max switch lights its choice. */
+  .phead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 6px}
+  .phead h2{margin:0}
+  #handover{display:flex;gap:4px;align-items:center}
+  #handover .lbl{margin:0 4px 0 0;color:var(--faded)}
+  #handover button{font:inherit;font-size:11px;padding:1px 9px;cursor:pointer;background:transparent;color:var(--faded);border:1px solid var(--rule)}
+  #handover button:hover:not([aria-pressed="true"]){color:var(--ink)}
+  #handover button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink);cursor:default}
+  #handnote{margin:0 0 8px;color:var(--dim);font-size:11px}
   /* Every layer nobody is digging any more, on one line. */
   #spent{display:flex;gap:10px;align-items:baseline;margin:0 0 8px;flex-wrap:wrap}
   #spent button{font-size:11px;padding:1px 8px;color:var(--dim)}
@@ -473,7 +479,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="fbeb003b2fef">
+<meta name="build" content="617123a14ed9">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -549,7 +555,7 @@
       <p id="visitor-after" hidden></p>
     </div>
     <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
-    <div id="horde-panel" class="panel" hidden><h2 id="p-horde">Where they dig</h2><div id="raise"></div><div id="handover"></div><div id="spent" hidden></div><div id="weights"></div></div>
+    <div id="horde-panel" class="panel" hidden><div class="phead"><h2 id="p-horde">Where they dig</h2><div id="handover"></div></div><p id="handnote"></p><div id="raise"></div><div id="spent" hidden></div><div id="weights"></div></div>
     <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
       <h2 id="p-seal">Fill it in</h2>
@@ -587,8 +593,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=40';
-import { createGame } from './src/game.js?v=40';
+import { CONFIG, applyIdentity } from './config.js?v=41';
+import { createGame } from './src/game.js?v=41';
 
 applyIdentity(document);
 

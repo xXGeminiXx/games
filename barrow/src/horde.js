@@ -130,6 +130,10 @@ export function dig(s, dt, cfg, mods, ground, given) {
     // Bones are counted per digger-second, not per unit, so faster hands
     // never find more of them: only deeper ground does.
     s.bones += diggerSeconds * share * layer.bones * boneMult;
+    // How long the crew has worked this layer, counted as the whole crew's
+    // seconds: a quarter of them for a minute is fifteen. The drawing hollows
+    // the layer out by this.
+    if (s.worked) s.worked[k] = (s.worked[k] || 0) + share * dt;
   }
 
   if (split.face > 0) {

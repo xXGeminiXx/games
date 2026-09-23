@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=40';
-import * as Mk from './market.js?v=40';
-import * as H from './horde.js?v=40';
-import * as R from './rites.js?v=40';
-import * as Rb from './rebirth.js?v=40';
-import * as Lore from './lore.js?v=40';
-import * as Advice from './advice.js?v=40';
-import * as Lords from './lords.js?v=40';
-import * as Ranks from './ranks.js?v=40';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=40';
-import { fill } from '../config.js?v=40';
+import * as Mat from './materials.js?v=41';
+import * as Mk from './market.js?v=41';
+import * as H from './horde.js?v=41';
+import * as R from './rites.js?v=41';
+import * as Rb from './rebirth.js?v=41';
+import * as Lore from './lore.js?v=41';
+import * as Advice from './advice.js?v=41';
+import * as Lords from './lords.js?v=41';
+import * as Ranks from './ranks.js?v=41';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=41';
+import { fill } from '../config.js?v=41';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -51,7 +51,7 @@ export function createUI(doc, sim, cfg, actions) {
     log: byId('log'),
     hand: byId('hand'), dig: byId('dig'), sell: byId('sell'), handline: byId('handline'),
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
-    handOver: byId('handover'), spent: byId('spent'),
+    handOver: byId('handover'), handNote: byId('handnote'), spent: byId('spent'),
     marketPanel: byId('market-panel'), market: byId('market'),
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
@@ -292,21 +292,29 @@ export function createUI(doc, sim, cfg, actions) {
 
   // One control, and it is optional in both directions: the game splits the
   // diggers on its own and this hands that over to somebody who wants to.
+  //
+  // Two buttons side by side, the one that is on lit, so which way it is set
+  // reads at a glance and the other way is one press. A single button naming
+  // the state it would switch TO had to be read twice to know the state it
+  // was in, and sat under the raise row where nobody looked for it.
   let handOver = null;
+  let handNoteSaid = '';
   const buildHandOver = () => {
     if (handOver || !nodes.handOver) return;
-    const note = el('span', { class: 'lbl' });
-    handOver = el('button', { onclick: () => actions.setByHand(!sim.state.byHand) });
-    nodes.handOver.appendChild(note);
-    nodes.handOver.appendChild(handOver);
-    handOver._note = note;
+    const game = el('button', { text: T.placeGame, title: T.autoOnTip, onclick: () => actions.setByHand(false) });
+    const hand = el('button', { text: T.placeHand, title: T.autoOffTip, onclick: () => actions.setByHand(true) });
+    nodes.handOver.appendChild(el('span', { class: 'lbl', text: T.placeLabel }));
+    nodes.handOver.appendChild(game);
+    nodes.handOver.appendChild(hand);
+    handOver = { game, hand };
   };
   const paintHandOver = () => {
     if (!handOver) return;
     const byHand = !!sim.state.byHand;
-    handOver.textContent = byHand ? T.autoOn : T.autoOff;
-    handOver.title = byHand ? T.autoOnTip : T.autoOffTip;
-    handOver._note.textContent = byHand ? T.autoNoteHand : T.autoNoteGame;
+    handOver.game.setAttribute('aria-pressed', String(!byHand));
+    handOver.hand.setAttribute('aria-pressed', String(byHand));
+    const note = byHand ? T.autoNoteHand : T.autoNoteGame;
+    if (nodes.handNote && note !== handNoteSaid) { handNoteSaid = note; nodes.handNote.textContent = note; }
   };
 
   // The one line that stands for every layer nobody is digging any more.
@@ -1098,6 +1106,7 @@ export function createUI(doc, sim, cfg, actions) {
       paintHandOver();
       paintSpent(split);
       show(nodes.handOver, f.face || s.depth > 0);
+      show(nodes.handNote, f.face || s.depth > 0);
       show(nodes.weights, f.face || s.depth > 0);
     }
 
