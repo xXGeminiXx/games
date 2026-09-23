@@ -30,8 +30,8 @@
 // most of that is standing on the deepest ground, not the ceiling.
 // ---------------------------------------------------------------------------
 
-import * as Mk from './market.js?v=24';
-import * as H from './horde.js?v=24';
+import * as Mk from './market.js?v=25';
+import * as H from './horde.js?v=25';
 
 /**
  * The share of the diggers that layer k can take before its buyers stop

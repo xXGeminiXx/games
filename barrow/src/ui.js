@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=24';
-import * as Mk from './market.js?v=24';
-import * as H from './horde.js?v=24';
-import * as R from './rites.js?v=24';
-import * as Rb from './rebirth.js?v=24';
-import * as Lore from './lore.js?v=24';
-import * as Advice from './advice.js?v=24';
-import * as Lords from './lords.js?v=24';
-import * as Ranks from './ranks.js?v=24';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=24';
-import { fill } from '../config.js?v=24';
+import * as Mat from './materials.js?v=25';
+import * as Mk from './market.js?v=25';
+import * as H from './horde.js?v=25';
+import * as R from './rites.js?v=25';
+import * as Rb from './rebirth.js?v=25';
+import * as Lore from './lore.js?v=25';
+import * as Advice from './advice.js?v=25';
+import * as Lords from './lords.js?v=25';
+import * as Ranks from './ranks.js?v=25';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=25';
+import { fill } from '../config.js?v=25';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -632,14 +632,50 @@ export function createUI(doc, sim, cfg, actions) {
   if (nodes.tabRites) nodes.tabRites.addEventListener('click', () => { panelTab = 'rites'; paintTabs(); });
   if (nodes.tabOaths) nodes.tabOaths.addEventListener('click', () => { panelTab = 'oaths'; paintTabs(); });
 
+  // With the rank for it, the second press does not fill the barrow in: it
+  // offers the hills the next one can be dug in, and picking one does.
+  let hillRow = null;
+  const buildHills = () => {
+    const choices = sim.hillChoices();
+    dropHills();
+    if (!choices.length) return false;
+    hillRow = el('div', { class: 'hills' }, el('p', { class: 'lbl', text: Lore.hills().pick }));
+    for (const id of choices) {
+      const w = Lore.hill(id);
+      hillRow.appendChild(el('div', { class: 'offer' },
+        el('button', { class: 'seal', text: w.name, title: w.line, onclick: () => actions.seal(id) }),
+        el('span', { class: 'line', text: w.line })));
+    }
+    nodes.sealActs.appendChild(hillRow);
+    return true;
+  };
+
+  const dropHills = () => {
+    if (hillRow && hillRow.parentNode) hillRow.parentNode.removeChild(hillRow);
+    hillRow = null;
+  };
+
   const buildSeal = () => {
     if (sealButton || !nodes.sealActs) return;
     const words = Lore.seal();
     sealButton = el('button', { class: 'seal', text: words.button, onclick: () => {
-      if (!sealArmed) { sealArmed = true; sealButton.textContent = words.confirm; return; }
+      if (!sealArmed) {
+        sealArmed = true;
+        // With hills on offer, picking one is the confirmation and this
+        // button becomes the way back out.
+        sealButton.textContent = buildHills() ? words.notYet : words.confirm;
+        return;
+      }
+      if (hillRow) { sealArmed = false; sealButton.textContent = words.button; dropHills(); return; }
       actions.seal();
     } });
     nodes.sealActs.appendChild(sealButton);
+  };
+
+  // What relics buy. It lives on its own tab and arrives with the first
+  // relic, which a first barrow now earns long before it can be filled in.
+  const buildOaths = () => {
+    if (oathRows.size || !nodes.oaths) return;
     for (const def of Rb.oathDefs(cfg)) {
       const words2 = Lore.oath(def.id);
       const cost = el('i');
@@ -665,8 +701,17 @@ export function createUI(doc, sim, cfg, actions) {
     }
     if (sealButton) {
       sealButton.disabled = !ready;
-      if (!ready && sealArmed) { sealArmed = false; sealButton.textContent = words.button; }
+      if (!ready && sealArmed) {
+        sealArmed = false; sealButton.textContent = words.button;
+        dropHills();
+      }
     }
+  };
+
+  const renderOaths = () => {
+    const legacy = sim.legacy;
+    const words = Lore.seal();
+    buildOaths();
     let affordable = 0;
     for (const r of oathRows.values()) {
       const lv = Rb.oathLevel(legacy, r.def.id);
@@ -734,6 +779,12 @@ export function createUI(doc, sim, cfg, actions) {
       const words = here ? Lore.lord(here.id) : null;
       const rule = words ? fill(G.rule, { name: Lords.shortName(here), line: words.rule }) : '';
       if (nodes.goalRule.textContent !== rule) nodes.goalRule.textContent = rule;
+      // The hill this barrow is dug in, when it has a twist.
+      if (!nodes.goalHill) { nodes.goalHill = el('small', { class: 'hill' }); nodes.goal.appendChild(nodes.goalHill); }
+      const hw = s.hill ? Lore.hill(s.hill) : null;
+      const hillLine = hw ? fill(Lore.hills().here, { name: hw.name, line: hw.line }) : '';
+      if (nodes.goalHill.textContent !== hillLine) nodes.goalHill.textContent = hillLine;
+      show(nodes.goalHill, !!hw);
     }
   };
 
@@ -1015,6 +1066,7 @@ export function createUI(doc, sim, cfg, actions) {
     // The seal.
     show(nodes.sealPanel, f.seal);
     if (f.seal) { renderSeal(); paintAutoSeal(); }
+    if (f.rites) renderOaths();
     renderStanding();
 
     if (nodes.fieldhint) show(nodes.fieldhint, !f.field);

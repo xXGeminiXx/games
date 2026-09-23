@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=24';
-import * as Mat from './materials.js?v=24';
-import * as Mk from './market.js?v=24';
-import * as H from './horde.js?v=24';
-import * as Crew from './crew.js?v=24';
-import * as R from './rites.js?v=24';
-import * as Rv from './reveal.js?v=24';
-import * as Ch from './chambers.js?v=24';
-import * as Vi from './visitors.js?v=24';
-import * as Rb from './rebirth.js?v=24';
-import * as Lore from './lore.js?v=24';
-import * as Lords from './lords.js?v=24';
-import * as Ranks from './ranks.js?v=24';
-import { createGround } from './ground.js?v=24';
-import { fill } from '../config.js?v=24';
-import { fmt, fmtCoin } from './numbers.js?v=24';
+import { CONFIG as DEFAULT } from '../config.js?v=25';
+import * as Mat from './materials.js?v=25';
+import * as Mk from './market.js?v=25';
+import * as H from './horde.js?v=25';
+import * as Crew from './crew.js?v=25';
+import * as R from './rites.js?v=25';
+import * as Rv from './reveal.js?v=25';
+import * as Ch from './chambers.js?v=25';
+import * as Vi from './visitors.js?v=25';
+import * as Rb from './rebirth.js?v=25';
+import * as Lore from './lore.js?v=25';
+import * as Lords from './lords.js?v=25';
+import * as Ranks from './ranks.js?v=25';
+import { createGround } from './ground.js?v=25';
+import { fill } from '../config.js?v=25';
+import { fmt, fmtCoin } from './numbers.js?v=25';
 
 export const SAVE_VERSION = 2;
 
@@ -59,6 +59,7 @@ export function freshState(cfg, seed) {
     chambersDone: {},     // layer -> the offer taken there
     chamberQueue: [],     // rooms found while an earlier one was unanswered
     doors: {},            // layer -> true once the lord's door into it is broken
+    hill: null,           // which hill this barrow is dug in; null is a plain one
     doorsV: 1,            // set on every run that has had doors from its start
     visitor: null,        // who is at the gate
     visitNext: null,      // when the next one comes
@@ -82,7 +83,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const seed = (opts.seed === undefined ? (Math.random() * 4294967296) : opts.seed) >>> 0;
   const state = opts.state || freshState(cfg, seed);
   const legacy = opts.legacy || Rb.freshLegacy();
-  const ground = createGround(cfg, state.seed);
+  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill));
   const markets = new Map();
 
   const marketFor = (id) => {
@@ -816,6 +817,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   /** The switches rank hands over, kept with the things that carry between barrows. */
   const setAutoBuy = (on) => { legacy.autoBuy = !!on; return legacy.autoBuy; };
   const dismissEnding = () => { state.ending = false; };
+  /** The hills on offer for the next barrow, if rank offers any. */
+  const hillChoices = () => Rb.hillChoices(legacy, cfg, state.seed, (id) => Ranks.has(legacy, cfg, id));
   const setAutoSeal = (layer) => {
     const n = Math.max(0, Math.round(layer) || 0);
     legacy.autoSealAt = n > 0 ? Math.max(cfg.seal.unlockDepth + 1, n) : 0;
@@ -850,7 +853,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding,
+    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding, hillChoices,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -937,6 +940,7 @@ export function restoreSim(cfg, snap) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }
   if (state.visitor && typeof state.visitor !== 'object') state.visitor = null;
+  if (typeof state.hill !== 'string') state.hill = null;
   const legacy = Rb.restoreLegacy(snap.legacy);
   return createSim(cfg, { state, legacy, snapshot: snap });
 }
@@ -946,12 +950,13 @@ export function restoreSim(cfg, snap) {
  * horde already standing, layers already open, coin in the purse and the
  * rites the books remember already held.
  */
-export function openedState(cfg, legacy, seed, lines) {
+export function openedState(cfg, legacy, seed, lines, hill) {
   const state = freshState(cfg, seed);
+  if (hill) state.hill = hill;
   const o = Rb.oathMods(legacy, cfg);
   // The barrow just filled in gets a card at the top of the next one.
   state.ending = Array.isArray(legacy.barrows) && legacy.barrows.length > 0;
-  const ground = createGround(cfg, state.seed);
+  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill));
   if (lines) state.log = lines.slice(0, 14);
 
   for (const id of o.startRites) state.rites[id] = 1;

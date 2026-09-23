@@ -98,6 +98,11 @@
   #goal-bar{height:3px;background:var(--rule);margin:5px 0 4px;max-width:340px}
   #goal-bar span{display:block;height:3px;background:var(--deepink);width:0}
   #goal-rule{color:var(--dim);font-size:11px;display:block}
+  #goal small.hill{color:var(--coin);font-size:11px;display:block;margin-top:2px}
+  #seal-acts .hills{margin-top:10px}
+  #seal-acts .hills .lbl{color:var(--dim);font-size:11px;margin:0 0 5px}
+  #seal-acts .hills .offer{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center;margin:0 0 4px}
+  #seal-acts .hills .offer .line{color:var(--dim);font-size:11px}
   /* The card a barrow opens with after the last one was filled in. */
   #ending-panel{border:1px solid var(--deepink);border-radius:2px;padding:12px 14px;margin:0 0 12px}
   #ending-panel h2{color:var(--deepink);font-size:12px;letter-spacing:.14em}
@@ -464,7 +469,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="4c4253abb7d6">
+<meta name="build" content="1bc44c0eb323">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -577,8 +582,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=24';
-import { createGame } from './src/game.js?v=24';
+import { CONFIG, applyIdentity } from './config.js?v=25';
+import { createGame } from './src/game.js?v=25';
 
 applyIdentity(document);
 

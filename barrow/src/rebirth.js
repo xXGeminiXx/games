@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=24';
-import { pick } from './rng.js?v=24';
-import { fill } from '../config.js?v=24';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=24';
+import * as Lore from './lore.js?v=25';
+import { pick, hash } from './rng.js?v=25';
+import { fill } from '../config.js?v=25';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=25';
 
 export const LEGACY_VERSION = 1;
 
@@ -99,6 +99,36 @@ export function yieldOf(state, cfg) {
 /** Whether the shaft has gone deep enough for the seal to be offered at all. */
 export function canSeal(state, cfg) {
   return state.depth >= cfg.seal.unlockDepth;
+}
+
+// ---------------------------------------------------------------------------
+// Hills
+// ---------------------------------------------------------------------------
+
+/** A hill's twist, from its id: the rule that holds in every layer of it. */
+export function hillRule(cfg, id) {
+  if (!cfg.hills || !id) return {};
+  const h = cfg.hills.list.find(x => x.id === id);
+  return h ? h.rule : {};
+}
+
+/**
+ * The hills offered for the next barrow: two or three dealt from the ones
+ * with a twist, once the rank for it is there, or none.
+ */
+export function hillChoices(legacy, cfg, seed, has) {
+  if (!cfg.hills) return [];
+  const n = has('hillThree') ? 3 : has('hillTwo') ? 2 : 0;
+  if (!n) return [];
+  const pool = cfg.hills.list.filter(h => h.id !== cfg.hills.plain).map(h => h.id);
+  const out = [];
+  let i = 0;
+  while (out.length < Math.min(n, pool.length) && i < 64) {
+    const id = pool[hash(seed, 'hill:' + (legacy.seals || 0) + ':' + i) % pool.length];
+    if (!out.includes(id)) out.push(id);
+    i++;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

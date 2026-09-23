@@ -509,6 +509,29 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
+  // HILLS - where the next barrow is dug
+  //
+  // Filling a barrow in opens the next one on a new hill. With the rank for
+  // it, the player picks that hill from two or three, each with a twist that
+  // holds in every layer of it: the same keys a lord's rule bends (value,
+  // hardness, absorb, bones, cap), plus visitGap for callers and soft for how
+  // far a bone goes. Without the rank it is a plain hill.
+  // -------------------------------------------------------------------------
+  hills: {
+    plain: 'plain',
+    list: [
+      { id: 'plain',   rule: {} },
+      { id: 'drowned', rule: { bones: 2, cap: 1.3 } },
+      { id: 'kings',   rule: { value: 1.6, cap: 1.25 } },
+      { id: 'plague',  rule: { soft: 2, value: 0.8 } },
+      { id: 'burned',  rule: { absorb: 2, visitGap: 2 } },
+      { id: 'road',    rule: { visitGap: 0.5, value: 0.85 } },
+      { id: 'stony',   rule: { value: 2, hardness: 1.5 } },
+      { id: 'soft',    rule: { hardness: 0.7, value: 0.75 } },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
   // RANKS - what the player is, and it never goes back down
   //
   // Points come from breaking doors (more the first time a lord is met),
@@ -526,9 +549,11 @@ export const CONFIG = {
     keys: [
       { rank: 3,  id: 'ledger' },
       { rank: 5,  id: 'broker' },
+      { rank: 6,  id: 'hillTwo' },
       { rank: 7,  id: 'readTwo' },
       { rank: 9,  id: 'foresight' },
       { rank: 11, id: 'autoBuy' },
+      { rank: 13, id: 'hillThree' },
       { rank: 14, id: 'assay' },
       { rank: 17, id: 'broker2' },
       { rank: 20, id: 'autoSeal' },
@@ -833,7 +858,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 24,
+    build: 25,
   },
 };
 

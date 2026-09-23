@@ -12,9 +12,9 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=24';
-import * as Lords from './lords.js?v=24';
-import { pickWeighted, unit } from './rng.js?v=24';
+import * as Mat from './materials.js?v=25';
+import * as Lords from './lords.js?v=25';
+import { pickWeighted, unit } from './rng.js?v=25';
 
 const ONE = { value: 1, hardness: 1, absorb: 1, bones: 1, swell: 1, cap: 1 };
 
@@ -22,7 +22,8 @@ const ONE = { value: 1, hardness: 1, absorb: 1, bones: 1, swell: 1, cap: 1 };
  * @param {object} cfg   the whole config
  * @param {number} seed  the run seed
  */
-export function createGround(cfg, seed) {
+export function createGround(cfg, seed, hillRule) {
+  const hill = hillRule || {};
   const cache = new Map();
   const sc = cfg.seams;
 
@@ -49,7 +50,8 @@ export function createGround(cfg, seed) {
     const s = seam || ONE;
     // His rule bends every layer in his ten the way a seam bends one.
     const rule = (lorded && lorded.lord.rule) || {};
-    const f = (key) => (s[key] === undefined ? 1 : s[key]) * (rule[key] === undefined ? 1 : rule[key]);
+    const f = (key) => (s[key] === undefined ? 1 : s[key]) * (rule[key] === undefined ? 1 : rule[key])
+      * (hill[key] === undefined ? 1 : hill[key]);
     const door = cfg.lords ? Lords.doorAt(cfg, seed, k) : null;
     return {
       k,

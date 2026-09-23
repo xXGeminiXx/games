@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=24';
-import * as Rb from './rebirth.js?v=24';
-import * as Lore from './lore.js?v=24';
-import * as Lords from './lords.js?v=24';
-import * as Ranks from './ranks.js?v=24';
+import * as Ch from './chambers.js?v=25';
+import * as Rb from './rebirth.js?v=25';
+import * as Lore from './lore.js?v=25';
+import * as Lords from './lords.js?v=25';
+import * as Ranks from './ranks.js?v=25';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -103,6 +103,10 @@ export function modsOf(s, cfg, legacy) {
   // shaft is in his ten.
   const here = cfg.lords ? Lords.lordAt(cfg, s.seed, Lords.realmOf(s.depth, cfg)) : null;
   const hereGap = here && here.rule.visitGap !== undefined ? here.rule.visitGap : 1;
+  // The hill's twist on callers and on how far a bone goes.
+  const hill = Rb.hillRule(cfg, s.hill);
+  const hillGap = hill.visitGap !== undefined ? hill.visitGap : 1;
+  const hillSoft = hill.soft !== undefined ? hill.soft : 1;
   let broker = brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null;
   if (broker && trophy('neb')) broker = Object.assign({}, broker, { fee: 0 });
   const T = cfg.lords ? cfg.lords.trophy : {};
@@ -110,7 +114,7 @@ export function modsOf(s, cfg, legacy) {
     // Production.
     digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1),
     boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones,
-    softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1),
+    softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1) * hillSoft,
     faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1),
     valueMult: b.value,
     activeStrata: cfg.horde.activeStrata + lv('workings'),
@@ -130,7 +134,7 @@ export function modsOf(s, cfg, legacy) {
     // and its earnings are worth on their own.
     records: r.recordsRelics * lv('records'),
     // The world outside the field.
-    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1) * hereGap,
+    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1) * hereGap * hillGap,
     visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1),
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
     // What the lords' trophies do.

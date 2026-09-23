@@ -8,7 +8,7 @@
 // announced by one line in the log.
 // ---------------------------------------------------------------------------
 
-import { BONES } from './materials.js?v=24';
+import { BONES } from './materials.js?v=25';
 
 /** Flag -> the pool in the writing that announces it. */
 export const ANNOUNCE = {
@@ -41,8 +41,10 @@ export function update(s, cfg, legacy) {
   const set = (flag, cond) => {
     if (!s.flags[flag] && cond) { s.flags[flag] = true; fresh.push(flag); }
   };
+  // Filling in shows itself once a barrow has been filled in before. Relics
+  // alone do not count: the first barrow earns them from its first layers.
   const seals = (legacy && legacy.seals) || 0;
-  const remembered = seals > 0 || ((legacy && legacy.remembrance) || 0) > 0;
+  const remembered = seals > 0;
 
   set('sell', (s.stock.s0 || 0) >= cfg.reveal.sellAtUnits || s.totals.sold > 0);
   set('raise', s.bones >= 1 || s.horde > 0);

@@ -10,8 +10,8 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=24';
-import * as Lore from './lore.js?v=24';
+import { hash } from './rng.js?v=25';
+import * as Lore from './lore.js?v=25';
 
 /** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {
@@ -35,8 +35,9 @@ export function poolOf(k, cfg, ground) {
   const rooms = [];
   // A lord's own rooms first, then the shared ones his pool draws on.
   for (const r of Lore.lordRooms(id)) rooms.push(r);
+  const own = rooms.length;
   for (const b of bands) for (const r of Lore.chamberBand(b)) rooms.push(r);
-  return { key: id && Lore.lordRooms(id).length ? id : key, rooms };
+  return { key: own ? id : key, rooms, own };
 }
 
 /**
@@ -45,14 +46,19 @@ export function poolOf(k, cfg, ground) {
  */
 export function chamberAt(seed, k, cfg, ground) {
   if (!isChamberDepth(k, cfg)) return null;
-  const { key, rooms } = poolOf(k, cfg, ground);
+  const { key, rooms, own } = poolOf(k, cfg, ground);
   if (!rooms.length) return null;
-  // Where the seed starts in the pool is the run's business; from there the
-  // rooms are taken in order, so a pool never shows the same room twice
-  // before it has shown the rest.
+  // A lord's own rooms come first, the first time the dig is in his ground;
+  // the shared ones fill in after. Where the seed starts within each is the
+  // run's business, and from there they are taken in order, so a pool never
+  // shows the same room twice before it has shown the rest.
   let ordinal = 0;
   for (let j = 1; j < k; j++) if (isChamberDepth(j, cfg) && poolOf(j, cfg, ground).key === key) ordinal++;
-  const template = rooms[(hash(seed, 'chamber-pool:' + key) + ordinal) % rooms.length];
+  const start = hash(seed, 'chamber-pool:' + key);
+  const shared = rooms.slice(own);
+  const template = ordinal < own
+    ? rooms[(start + ordinal) % own]
+    : (shared.length ? shared[(start + ordinal - own) % shared.length] : rooms[(start + ordinal) % rooms.length]);
   if (!template) return null;
   const offers = template.offers.slice();
   if (hash(seed, 'chamber-order:' + k) % 2 === 1) offers.reverse();

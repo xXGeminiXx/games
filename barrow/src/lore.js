@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=24';
-import { pick } from './rng.js?v=24';
-import { fill } from '../config.js?v=24';
+import { CONTENT } from '../content.js?v=25';
+import { pick } from './rng.js?v=25';
+import { fill } from '../config.js?v=25';
 
 /**
  * One line from a log pool.
@@ -122,5 +122,15 @@ export function rankKey(id) {
 /** The rooms written for one lord's ten, or none. */
 export function lordRooms(id) {
   return (id && CONTENT.lordRooms && CONTENT.lordRooms[id]) || [];
+}
+
+/** The words for a hill. */
+export function hill(id) {
+  return (CONTENT.hills && CONTENT.hills[id]) || { name: id, line: '' };
+}
+
+/** The hill words as a whole, for the lines that are not one hill's. */
+export function hills() {
+  return CONTENT.hills || {};
 }
 

@@ -148,8 +148,8 @@ export const CONTENT = {
         {
           title: 'The builder',
           lines: [
-            'The spades stop. There\'s a stone box in the middle of the mound with a man laid out in it, tools beside him.',
-            'He built this hill over somebody else, and he\'s been lying on top of the work a long time.',
+            'A stone box in the middle of the mound, and in it a man laid out with his tools.',
+            'He built this hill. He never left it.',
           ],
           offers: [
             { name: 'Take the tools', line: 'Bronze shoes for every spade.', boon: { dig: 1.35 } },
@@ -159,23 +159,23 @@ export const CONTENT = {
         {
           title: 'The grain pit',
           lines: [
-            'A pit lined with clay, packed to the top with grain that went black a thousand years ago.',
-            'They buried a winter here in case the world ended. It didn\'t.',
+            'A clay-lined pit packed with grain that went black a thousand years ago.',
+            'Somebody stored a whole winter down here and never came back for it.',
           ],
           offers: [
-            { name: 'Sell the lot', line: 'The pottery alone is worth a season.', boon: { windfall: 900 } },
-            { name: 'Line the tunnels with it', line: 'Clay walls hold. The cut goes down without shoring.', boon: { face: 1.5 } },
+            { name: 'Sell the lot', line: 'The old pottery sells for a fortune.', boon: { windfall: 900 } },
+            { name: 'Line the tunnels with it', line: 'Clay walls hold, so they can dig down faster.', boon: { face: 1.5 } },
           ],
         },
         {
           title: 'The boundary dead',
           lines: [
-            'A ring of them stood upright in the clay, facing out, a pace apart.',
-            'They were put here to keep something in, or to keep the neighbors out.',
+            'A ring of skeletons standing upright in the clay, facing out, a pace apart.',
+            'Guards. Whatever they were guarding is still in the middle.',
           ],
           offers: [
             { name: 'Break the ring', line: 'They fall in and join the work, all at once.', boon: { diggers: 0.6 } },
-            { name: 'Leave them standing', line: 'The ones inside dig harder with the ring watching.', boon: { bones: 1.4 } },
+            { name: 'Leave them standing', line: 'With the ring watching, the ground gives up more bones.', boon: { bones: 1.4 } },
           ],
         },
       ],
@@ -184,8 +184,8 @@ export const CONTENT = {
         {
           title: 'The long house',
           lines: [
-            'The tunnel opens into a room longer than the field above it, roofed with beams that never rotted.',
-            'The dead are laid head to foot down both walls in their hundreds, every one holding a tool.',
+            'A hall longer than the field above it, roofed with beams that never rotted.',
+            'The dead lie head to foot down both walls, hundreds of them, every one holding a tool.',
           ],
           offers: [
             { name: 'Wake the room', line: 'Hundreds of them stand up and reach for the wall.', boon: { diggers: 1.1 } },
@@ -196,7 +196,7 @@ export const CONTENT = {
           title: 'The smith',
           lines: [
             'A floor of slag and charcoal, and a hearth still holding its shape.',
-            'Somebody worked metal down here when the hill above was flat ground.',
+            'Somebody worked metal down here before the hill was built.',
           ],
           offers: [
             { name: 'Relight the hearth', line: 'Everything comes up clean instead of raw.', boon: { value: 1.4 } },
@@ -207,7 +207,7 @@ export const CONTENT = {
           title: 'The drowned',
           lines: [
             'Black water fills the cut to the waist and won\'t drain.',
-            'There are shapes standing in it up to their chins, waiting to be asked.',
+            'There are shapes standing in it up to their chins, waiting.',
           ],
           offers: [
             { name: 'Ask them up', line: 'They come out dripping and go straight to work.', boon: { diggers: 0.8, bones: 1.25 } },
@@ -220,8 +220,8 @@ export const CONTENT = {
         {
           title: 'The first shaft',
           lines: [
-            'The cut runs into a shaft that isn\'t yours. Square, plumb, tool marks still sharp on the walls.',
-            'Somebody sank this from a long way above and stopped at exactly this depth.',
+            'Your cut runs into a shaft that isn\'t yours. Square, straight, tool marks still sharp.',
+            'Somebody sank this from a long way up and stopped right here.',
           ],
           offers: [
             { name: 'Follow it down', line: 'Their shaft is better than yours. Use it.', boon: { face: 2.0 } },
@@ -231,8 +231,8 @@ export const CONTENT = {
         {
           title: 'The tally wall',
           lines: [
-            'One wall is covered end to end in marks. Hundreds of thousands of them, cut small and even.',
-            'They\'re counting something. The count isn\'t finished and the marks go into the floor.',
+            'One wall is covered in tally marks. Hundreds of thousands of them.',
+            'They\'re counting the dead. The count keeps going, down into the floor.',
           ],
           offers: [
             { name: 'Read the wall', line: 'Whatever they counted, it teaches you the price of everything.', boon: { value: 1.5, absorb: 1.3 } },
@@ -242,8 +242,8 @@ export const CONTENT = {
         {
           title: 'The bone room',
           lines: [
-            'Stacked floor to ceiling with bone, sorted by kind. Skulls in one bay, long bones in another.',
-            'Somebody spent a lifetime tidying the dead into order down here.',
+            'Bones stacked floor to ceiling, sorted by kind. Skulls in one bay, long bones in the next.',
+            'Somebody spent a lifetime tidying up down here.',
           ],
           offers: [
             { name: 'Empty the bays', line: 'A lifetime of sorting, raised in an afternoon.', boon: { diggers: 1.5 } },
@@ -256,8 +256,8 @@ export const CONTENT = {
         {
           title: 'The plug',
           lines: [
-            'The shaft ends in one stone the width of the cut, dropped in from above and mortared at the edge.',
-            'It was set from the far side. Whoever placed it went down first and stayed.',
+            'The shaft ends at one huge stone, dropped in and mortared at the edges.',
+            'It was set from below. Whoever placed it went down first and stayed.',
           ],
           offers: [
             { name: 'Break it', line: 'A week of work and half of them. Then it\'s open.', boon: { face: 2.6 } },
@@ -267,8 +267,8 @@ export const CONTENT = {
         {
           title: 'The register',
           lines: [
-            'A room of shelves, and on the shelves, tablets. Every one is a name and a depth.',
-            'The last entries are in a hand you recognize. It\'s yours, and you haven\'t written them yet.',
+            'Shelves of clay tablets. Every one is a name and a depth.',
+            'The last few are in your handwriting. You haven\'t written them yet.',
           ],
           offers: [
             { name: 'Read to the end', line: 'You learn what the ground is worth before you dig it.', boon: { value: 1.8 } },
@@ -278,8 +278,8 @@ export const CONTENT = {
         {
           title: 'The ones who dug down',
           lines: [
-            'A work gang, still in a line, still facing the floor, tools in their hands.',
-            'They were digging the same direction you are. They didn\'t stop either.',
+            'A work gang, still in a line, still facing the floor, tools in hand.',
+            'They were digging the same way you are. They never stopped either.',
           ],
           offers: [
             { name: 'Put them back to work', line: 'They take up where they left off.', boon: { diggers: 2.0, dig: 1.2 } },
@@ -292,8 +292,8 @@ export const CONTENT = {
         {
           title: 'The floor that isn\'t stone',
           lines: [
-            'The floor rings wrong. What\'s under the last layer is warm, it gives a little, and it goes on in every direction.',
-            'The dead won\'t stand on it. They dig it holding the walls.',
+            'The floor rings wrong. It\'s warm, it gives a little, and it goes on in every direction.',
+            'The dead won\'t stand on it. They dig it holding on to the walls.',
           ],
           offers: [
             { name: 'Cut into it', line: 'It closes behind them and doesn\'t seem to mind.', boon: { face: 3.0, bones: 1.5 } },
@@ -303,8 +303,8 @@ export const CONTENT = {
         {
           title: 'The count',
           lines: [
-            'These walls are marked too. Same hand as the tally wall, a mile up and a thousand years earlier.',
-            'The count is nearly finished here. It\'s counting the dead in your hill, and it\'s nearly caught up.',
+            'More tally marks, in the same hand as the wall far above.',
+            'The count is nearly done. It\'s counting the dead you\'ve raised, and it\'s nearly caught up.',
           ],
           offers: [
             { name: 'Finish the count', line: 'You write the last figure yourself. The books have never been cleaner.', boon: { value: 2.2, rem: 12 } },
@@ -314,8 +314,8 @@ export const CONTENT = {
         {
           title: 'The older barrow',
           lines: [
-            'Below the shaft, below the sealed floor, there\'s a hill. A mound, buried, with a ditch cut round it.',
-            'Somebody piled this up down here, in the dark, where nothing ever needed a landmark.',
+            'Under everything, there\'s another hill: a burial mound, buried, with a ditch around it.',
+            'Somebody built a barrow down here in the dark, where nobody would ever see it.',
           ],
           offers: [
             { name: 'Dig it out', line: 'A whole hill of them, and every one comes up standing.', boon: { diggers: 3.0 } },
@@ -631,6 +631,7 @@ export const CONTENT = {
         '"You thought you were raising the dead. They were coming home. You just handed them shovels."',
         '"I am Mortifer. Every lord you broke answers to me. Now, so do you."',
         '"Go back up. Fill your hill in. Dig another. I\'ll be here, a little deeper every time."',
+        'That was the bottom of the first round. From here every lord comes back, harder, and pays more.',
       ],
       again: ['"Back again? Good. The dead missed you."'],
       rule: 'His layers are worth 2x and hold 2x the bones, but the ground is 40% harder.',
@@ -663,10 +664,26 @@ export const CONTENT = {
     rankUp: 'RANK UP: you\'re {name} now.',
   },
 
+  // The hills a barrow can be dug in. Numbers in config.hills.
+  hills: {
+    plain:   { name: 'A plain hill',      line: 'Nothing strange about it.' },
+    drowned: { name: 'A drowned hill',    line: '2x the bones, but floors are 1.3x as thick.' },
+    kings:   { name: 'A king\'s hill',    line: 'Everything is worth 1.6x, but floors are 1.25x as thick.' },
+    plague:  { name: 'A plague hill',     line: 'Every bone raises 2x as many diggers, but prices are 0.8x.' },
+    burned:  { name: 'A burned hill',     line: 'Markets take 2x more, but callers come half as often.' },
+    road:    { name: 'A hill by the road', line: 'Callers come 2x as often, but prices are 0.85x.' },
+    stony:   { name: 'A stony hill',      line: 'Everything is worth 2x, but digging is 1.5x as hard.' },
+    soft:    { name: 'A soft hill',       line: 'Digging goes 1.4x as fast, but prices are 0.75x.' },
+    pick:    'Fill in, then dig next at:',
+    here:    'This hill: {name}. {line}',
+  },
+
   // What each rank hands over, in the order config.ranks.keys lists them.
   rankKeys: {
     ledger:    'Every barrow starts with Show the Numbers.',
     broker:    'Every barrow starts with Hire a Seller.',
+    hillTwo:   'When you fill in, pick your next hill from 2.',
+    hillThree: 'When you fill in, pick your next hill from 3.',
     readTwo:   'You always see 2 layers down.',
     foresight: 'Every barrow starts with Prices Ahead.',
     autoBuy:   'Coin upgrades can buy themselves.',
@@ -824,6 +841,7 @@ export const CONTENT = {
     title: 'Fill it in',
     button: 'Fill In This Barrow',
     confirm: 'Sure? Relics, rank and trophies carry on. Everything else is buried.',
+    notYet: 'Not yet',
     locked: 'Reach layer {depth} to fill this barrow in for relics.',
     ready: 'Filling in ends this barrow. Coin, diggers, layers and coin upgrades are buried with it. Relics, rank and trophies carry on to the next hill.',
     yieldNow: 'Fill in now for {n} relics.',
