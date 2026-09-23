@@ -400,7 +400,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="4a29aa354100">
+<meta name="build" content="3fc545b5d59a">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -537,8 +537,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=20';
-import { createGame } from './src/game.js?v=20';
+import { CONFIG, applyIdentity } from './config.js?v=21';
+import { createGame } from './src/game.js?v=21';
 
 applyIdentity(document);
 
@@ -551,20 +551,35 @@ const game = createGame({
 });
 
 // The drawer: a save that can leave, a save that can arrive, and a clean slate.
+// Each answers on its own button for a few seconds. The note at the far end of
+// the drawer was a screen away from the button on a wide window, and a press
+// nothing near it answered looked like it had done nothing.
+const answer = (id, text, ms) => {
+  const b = document.getElementById(id);
+  const was = CONFIG.text[id];
+  b.textContent = text;
+  clearTimeout(b._answer);
+  b._answer = setTimeout(() => { b.textContent = was; }, ms || 2500);
+};
 document.getElementById('export').addEventListener('click', () => {
   const str = game.exportSave();
-  const done = (ok) => game.ui.savedNote(ok ? CONFIG.text.saveCopied : CONFIG.text.saveCopyThis + str.slice(0, 24) + '...');
+  const box = () => { window.prompt(CONFIG.text.savePrompt, str); answer('export', CONFIG.text.saveCopyThis); };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(str).then(() => done(true), () => { window.prompt(CONFIG.text.savePrompt, str); done(false); });
+    navigator.clipboard.writeText(str).then(() => answer('export', CONFIG.text.saveCopied), box);
   } else {
-    window.prompt(CONFIG.text.savePrompt, str);
-    done(false);
+    box();
   }
 });
 document.getElementById('import').addEventListener('click', () => {
   const str = window.prompt(CONFIG.text.savePaste);
   if (!str) return;
-  try { game.importSave(str); } catch (e) { game.ui.savedNote(String(e.message || e)); }
+  // The page reloads on a good save, so the word that it worked is left for
+  // the page that comes back up.
+  try { sessionStorage.setItem('foxfire.imported', '1'); } catch (e) { /* no session storage: no note */ }
+  try { game.importSave(str); } catch (e) {
+    try { sessionStorage.removeItem('foxfire.imported'); } catch (x) { /* ignore */ }
+    answer('import', String(e.message || e).replace(/\.$/, ''), 4000);
+  }
 });
 
 // Two presses to do anything that cannot be undone.
@@ -581,6 +596,13 @@ armed('fruit', CONFIG.text.fruitSure, CONFIG.text.fruit, () => game.fruit());
 
 game.start();
 window.foxfire = game;
+try {
+  if (sessionStorage.getItem('foxfire.imported')) {
+    sessionStorage.removeItem('foxfire.imported');
+    game.ui.log(CONFIG.text.saveLoaded);
+    answer('import', CONFIG.text.saveLoaded.replace(/\.$/, ''), 3000);
+  }
+} catch (e) { /* no session storage: no note */ }
 </script>
 </body>
 </html>

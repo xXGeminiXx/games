@@ -13,9 +13,9 @@
 // is playing the same game.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=20';
-import * as Tr from './traits.js?v=20';
-import { fmt, fmtCoin } from './numbers.js?v=20';
+import * as Lore from './lore.js?v=21';
+import * as Tr from './traits.js?v=21';
+import { fmt, fmtCoin } from './numbers.js?v=21';
 
 /** The share of the mineral flow going to waste before it is worth saying. */
 const WASTE = 0.08;

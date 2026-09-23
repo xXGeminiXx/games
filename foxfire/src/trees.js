@@ -20,8 +20,8 @@
 // reads are the ones the simulation pays.
 // ---------------------------------------------------------------------------
 
-import { scale } from './levels.js?v=20';
-import { unit } from './rng.js?v=20';
+import { scale } from './levels.js?v=21';
+import { unit } from './rng.js?v=21';
 
 /** The kinds of tree at a level, scaled. */
 export function rosterFor(cfg, level) {

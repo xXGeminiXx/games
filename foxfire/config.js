@@ -117,8 +117,9 @@ export const CONFIG = {
     // Moving a save between browsers.
     savePrompt:   'Copy this save',
     savePaste:    'Paste a save',
-    saveCopied:   'Save copied',
-    saveCopyThis: 'Copy this: ',
+    saveCopied:   'Copied to clipboard',
+    saveCopyThis: 'Copy it from the box',
+    saveLoaded:   'Save loaded.',
 
     panels: {
       entries: 'Field notes',
@@ -920,7 +921,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 20,
+    build: 21,
   },
 };
 

@@ -10,13 +10,13 @@
 // journal grows as the organism does.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=20';
-import * as Advice from './advice.js?v=20';
-import * as Tr from './traits.js?v=20';
-import * as Sp from './spores.js?v=20';
-import { fill } from '../config.js?v=20';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=20';
-import { LARGEST_ORGANISM_M2 } from './levels.js?v=20';
+import * as Lore from './lore.js?v=21';
+import * as Advice from './advice.js?v=21';
+import * as Tr from './traits.js?v=21';
+import * as Sp from './spores.js?v=21';
+import { fill } from '../config.js?v=21';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtArea, fmtPct } from './numbers.js?v=21';
+import { LARGEST_ORGANISM_M2 } from './levels.js?v=21';
 
 const LOG_KEEP = 40;
 const SEASONS = 4;
