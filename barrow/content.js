@@ -660,6 +660,7 @@ export const CONTENT = {
     broke: 'BROKE THROUGH: {Name}\'s door. {His} hoard: {coin} coin and {n} relics.',
     trophy: 'You keep {Name} for good: {line}',
     newDepth: 'Deepest yet: +{relics} relics.',
+    rankUp: 'RANK UP: you\'re {name} now.',
   },
 
   // What each rank hands over, in the order config.ranks.keys lists them.

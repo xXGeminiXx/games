@@ -426,6 +426,7 @@ export const CONFIG = {
     ],
     list: {
       rex: {
+        color: '#c9a05a',    // his mark: his door, his name, his scene
         rule: {},
         materials: [
           ['soil', '#6b4f3a'], ['clay', '#9a6a4a'], ['flint', '#7d7a72'], ['peat', '#5a4f35'],
@@ -435,6 +436,7 @@ export const CONFIG = {
         gifts: [{ diggers: 2.0 }, { dig: 2 }],
       },
       pater: {
+        color: '#e6dcc4',    // his mark: his door, his name, his scene
         rule: { bones: 3, value: 0.6 },
         materials: [
           ['chalk', '#e8e4d8'], ['lime', '#d6d2b8'], ['bone', '#d9cdb4'], ['horn', '#8a6f4e'],
@@ -444,6 +446,7 @@ export const CONFIG = {
         gifts: [{ bones: 2 }, { soft: 2 }],
       },
       rey: {
+        color: '#c9433a',    // his mark: his door, his name, his scene
         rule: { value: 2.2 },
         materials: [
           ['lead', '#5f6670'], ['zinc', '#9ea7ad'], ['pyrite', '#c9b04a'], ['galena', '#7b8190'],
@@ -453,6 +456,7 @@ export const CONFIG = {
         gifts: [{ value: 2 }, { absorb: 3 }],
       },
       dona: {
+        color: '#f0a030',    // his mark: his door, his name, his scene
         rule: { visitGap: 0.5 },
         materials: [
           ['obsidian', '#3a3340'], ['agate', '#b0634a'], ['jasper', '#9c3b2e'], ['jade', '#4f9a6a'],
@@ -462,6 +466,7 @@ export const CONFIG = {
         gifts: [{ windfall: 3600, value: 1.5 }, { diggers: 3 }],
       },
       sepulturero: {
+        color: '#8fa0b0',    // his mark: his door, his name, his scene
         rule: { cap: 0.5 },
         materials: [
           ['slate', '#4d5560'], ['sandstone', '#c29a6b'], ['granite', '#8a8480'], ['basalt', '#3d3f44'],
@@ -471,6 +476,7 @@ export const CONFIG = {
         gifts: [{ face: 2.5 }, { dig: 2 }],
       },
       neb: {
+        color: '#4a78d8',    // his mark: his door, his name, his scene
         rule: { value: 3, absorb: 0.35 },
         materials: [
           ['sand', '#d8bf8a'], ['ochre', '#c7862f'], ['gypsum', '#ece6d6'], ['malachite', '#2f8f62'],
@@ -480,6 +486,7 @@ export const CONFIG = {
         gifts: [{ value: 2.5 }, { absorb: 2.5, value: 1.5 }],
       },
       natron: {
+        color: '#d8d0b0',    // his mark: his door, his name, his scene
         rule: { hardness: 0.6 },
         materials: [
           ['salt', '#eeeeea'], ['natron', '#e2dcc6'], ['alum', '#dfe6e8'], ['sulfur', '#d8cc3a'],
@@ -489,6 +496,7 @@ export const CONFIG = {
         gifts: [{ soft: 2.5 }, { bones: 2 }],
       },
       mortifer: {
+        color: '#e0552e',    // his mark: his door, his name, his scene
         rule: { value: 2, bones: 2, hardness: 1.4 },
         materials: [
           ['ash', '#8a8680'], ['cinder', '#6a3326'], ['soot', '#2c2828'], ['pumice', '#b8b2a8'],
@@ -825,7 +833,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 23,
+    build: 24,
   },
 };
 

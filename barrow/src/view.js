@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=23';
-import { activeFrom } from './horde.js?v=23';
-import * as Lore from './lore.js?v=23';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=24';
+import { activeFrom } from './horde.js?v=24';
+import * as Lore from './lore.js?v=24';
 
 /** mulberry32 */
 function rng(seed) {
@@ -180,6 +180,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   const d = doc || (typeof document !== 'undefined' ? document : null);
   // The view is happy without a run's ground: it falls back to the plain
   // ladder, which is what the drawing looked like before seams existed.
+  /** A lord's own colour, falling back to the page's for a lord without one. */
+  const lordColor = (lord) => (lord && lord.def && lord.def.color) || palette.deepink;
   const layerAt = ground ? (k) => ground.at(k) : (k) => {
     const g = goodAt(k, strataCfg);
     return { name: g.name, hue: g.hue, seam: null, cap: capUnits(Math.max(0, k - 1), strataCfg) };
@@ -191,6 +193,10 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   const particles = [];
   let seed = 1;
   let lastDepth = -1;
+  // A door that has just given way lights the layer it opened, and fades.
+  let doorsSeen = -1;
+  const flash = { k: -1, t: 0, hue: null };
+  const FLASH_SECONDS = 1.8;
 
   const segs = (k) => {
     let s = segCache.get(k);
@@ -339,25 +345,56 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     const doorBand = (row) => {
       const g = layerAt(row.k);
       if (!g.door || row.h < 3) return;
+      const hue = lordColor(g.door.lord);
       c.fillStyle = mix(palette.deep, palette.void, 0.35);
       c.fillRect(0, row.y, width, row.h);
-      c.fillStyle = withAlpha(palette.deepink, 0.16);
+      // Dressed stone: a wash of his colour, courses of blocks, and the
+      // joints between them staggered course to course.
+      c.fillStyle = withAlpha(hue, 0.13);
       c.fillRect(0, row.y, width, row.h);
-      const bands = Math.max(1, Math.min(4, Math.floor(row.h / 7)));
-      c.fillStyle = withAlpha(palette.deepink, 0.35);
-      for (let i = 1; i <= bands; i++) c.fillRect(0, row.y + (row.h * i) / (bands + 1), width, 1);
-      const r = Math.max(2, Math.min(row.h * 0.36, 11));
+      const courses = Math.max(1, Math.min(4, Math.floor(row.h / 8)));
+      const ch = row.h / courses;
+      const blockW = Math.max(18, Math.min(60, ch * 2.6));
+      c.fillStyle = withAlpha(palette.void, 0.55);
+      for (let i = 0; i < courses; i++) {
+        const y0 = row.y + i * ch;
+        if (i > 0) c.fillRect(0, y0, width, 1);
+        const off = (i % 2) * blockW / 2;
+        for (let x = off; x < width; x += blockW) c.fillRect(x, y0 + 1, 1, ch - 1);
+      }
+      // His mark, big enough to read on the stone.
+      const r = Math.max(3, Math.min(row.h * 0.4, 14));
       const cx = width * 0.5, cy = row.y + row.h / 2;
-      c.strokeStyle = withAlpha(palette.deepink, 0.8);
+      c.fillStyle = mix(palette.deep, palette.void, 0.5);
+      c.beginPath();
+      c.moveTo(cx, cy - r - 2); c.lineTo(cx + r + 2, cy); c.lineTo(cx, cy + r + 2); c.lineTo(cx - r - 2, cy); c.closePath();
+      c.fill();
+      c.strokeStyle = withAlpha(hue, 0.9);
       c.lineWidth = 1.5;
       c.beginPath();
       c.moveTo(cx, cy - r); c.lineTo(cx + r, cy); c.lineTo(cx, cy + r); c.lineTo(cx - r, cy); c.closePath();
       c.stroke();
-      c.fillStyle = withAlpha(palette.deepink, 0.9);
-      c.fillRect(cx - 1, cy - 1, 2, 2);
+      c.fillStyle = withAlpha(hue, 0.95);
+      c.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+      // A lit edge along the top and bottom, so a door reads as a door even
+      // when the band is only a few pixels tall.
+      c.fillStyle = withAlpha(hue, 0.5);
+      c.fillRect(0, row.y, width, 1);
+      c.fillRect(0, row.y + row.h - 1, width, 1);
     };
     doorBand(L.rows[s.depth + 1]);
     for (const row of L.ahead) doorBand(row);
+
+    // Where each lord's ground begins: a line in his colour across the top of
+    // his first layer, so the stack of worked-out layers reads as the lords it
+    // went through rather than as one long smear.
+    for (let k = 1; k <= s.depth; k++) {
+      const row = L.rows[k];
+      if (!row || !layerAt(k).door) continue;
+      const lord = layerAt(k).lord;
+      c.fillStyle = withAlpha(lordColor(lord), row.h >= 6 ? 0.55 : 0.8);
+      c.fillRect(0, row.y, width, 1);
+    }
 
     // Glints of each band's good, so a rich layer sparkles and the one under
     // the cut only hints.
@@ -527,6 +564,59 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /**
+   * The door the dig is breaking, cracking as it goes: a crack for every
+   * fourteenth of the way through, running out from his mark. And the layer
+   * a door has just opened onto, lit in the lord's colour for a moment.
+   */
+  const drawDoorWork = (L, s, dt) => {
+    const face = L.rows[s.depth + 1];
+    const target = layerAt(s.depth + 1);
+    if (target.door && face && face.h >= 3) {
+      const pct = target.cap > 0 ? Math.max(0, Math.min(1, s.capProgress / target.cap)) : 0;
+      const n = Math.ceil(pct * 14);
+      const hue = lordColor(target.door.lord);
+      const cx = width * 0.5, cy = face.y + face.h / 2;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < n; i++) {
+        const r = rng((seed ^ Math.imul(s.depth + 1, 0x27d4eb2d) ^ Math.imul(i + 1, 0x165667b1)) >>> 0);
+        const dir = i % 2 === 0 ? 1 : -1;
+        const reach = width * (0.08 + 0.4 * pct) * (0.5 + r() * 0.5);
+        let x = cx + dir * 8, y = cy + (r() - 0.5) * face.h * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        const steps = 4 + Math.floor(r() * 4);
+        for (let j = 0; j < steps; j++) {
+          x += dir * reach / steps;
+          y = Math.max(face.y + 1, Math.min(face.y + face.h - 1, y + (r() - 0.5) * face.h * 0.6));
+          ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = withAlpha(hue, 0.35 + 0.4 * pct);
+        ctx.stroke();
+      }
+    }
+    // A door broken since the last frame lights the layer it opened.
+    const broken = s.doors ? Object.keys(s.doors).length : 0;
+    if (doorsSeen >= 0 && broken > doorsSeen) {
+      let k = -1;
+      for (const key of Object.keys(s.doors)) k = Math.max(k, Number(key));
+      if (k >= 0 && k <= s.depth + 1) {
+        flash.k = k; flash.t = FLASH_SECONDS;
+        flash.hue = lordColor(layerAt(k).door ? layerAt(k).door.lord : null);
+      }
+    }
+    doorsSeen = broken;
+    if (flash.t > 0 && L.rows[flash.k]) {
+      const row = L.rows[flash.k];
+      const a = flash.t / FLASH_SECONDS;
+      ctx.fillStyle = withAlpha(flash.hue, 0.28 * a);
+      ctx.fillRect(0, row.y, width, row.h);
+      ctx.fillStyle = withAlpha(flash.hue, 0.9 * a);
+      ctx.fillRect(0, row.y, width, 2);
+      flash.t -= dt;
+    }
+  };
+
+  /**
    * Draw one frame. `effort` is digger-seconds spent per layer; `md` is the
    * run's multipliers, read only for what the player can see ahead.
    */
@@ -544,6 +634,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     }
     populate(L, s, active, split);
     drawDots(L, s, Math.min(0.1, dt || 0.016));
+    drawDoorWork(L, s, Math.min(0.1, dt || 0.016));
 
     // Band names on the left, and on the right a bar for the share of the
     // horde standing in that band, so the panel and the picture say the same
@@ -578,6 +669,25 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       }
     }
 
+    // Whose ground each stretch was, down the right-hand edge, wherever the
+    // stretch is tall enough to carry a name. The worked-out stack at the top
+    // becomes a list of the lords the dig went through.
+    ctx.textAlign = 'right';
+    for (let k0 = 0; k0 <= s.depth; k0 += 10) {
+      const first = L.rows[k0];
+      const lastK = Math.min(k0 + 9, s.depth);
+      const last = L.rows[lastK];
+      if (!first || !last) continue;
+      const tall = last.y + last.h - first.y;
+      if (tall < 12) continue;
+      const lord = layerAt(k0).lord;
+      const words = lord ? Lore.lord(lord.id) : null;
+      if (!words) continue;
+      ctx.fillStyle = withAlpha(lordColor(lord), 0.55);
+      ctx.fillText(words.name, width - 12 - barMax, first.y + Math.min(tall / 2, 9));
+    }
+    ctx.textAlign = 'left';
+
     // Ground below the cut that has been read ahead of the dead reaching it:
     // named, faintly, where it lies. This is what a player gets for buying
     // the reading, and it is the only place in the game that shows the shape
@@ -596,7 +706,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const door = layerAt(row.k).door;
       const words = door && door.lord ? Lore.lord(door.lord.id) : null;
       if (!words) continue;
-      ctx.fillStyle = withAlpha(palette.deepink, 0.95);
+      ctx.fillStyle = withAlpha(lordColor(door.lord), 0.95);
       ctx.fillText(words.name + (Lore.doors().doorTag || ''), 8, mid);
     }
     for (const row of known) {

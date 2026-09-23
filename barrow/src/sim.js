@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=23';
-import * as Mat from './materials.js?v=23';
-import * as Mk from './market.js?v=23';
-import * as H from './horde.js?v=23';
-import * as Crew from './crew.js?v=23';
-import * as R from './rites.js?v=23';
-import * as Rv from './reveal.js?v=23';
-import * as Ch from './chambers.js?v=23';
-import * as Vi from './visitors.js?v=23';
-import * as Rb from './rebirth.js?v=23';
-import * as Lore from './lore.js?v=23';
-import * as Lords from './lords.js?v=23';
-import * as Ranks from './ranks.js?v=23';
-import { createGround } from './ground.js?v=23';
-import { fill } from '../config.js?v=23';
-import { fmt, fmtCoin } from './numbers.js?v=23';
+import { CONFIG as DEFAULT } from '../config.js?v=24';
+import * as Mat from './materials.js?v=24';
+import * as Mk from './market.js?v=24';
+import * as H from './horde.js?v=24';
+import * as Crew from './crew.js?v=24';
+import * as R from './rites.js?v=24';
+import * as Rv from './reveal.js?v=24';
+import * as Ch from './chambers.js?v=24';
+import * as Vi from './visitors.js?v=24';
+import * as Rb from './rebirth.js?v=24';
+import * as Lore from './lore.js?v=24';
+import * as Lords from './lords.js?v=24';
+import * as Ranks from './ranks.js?v=24';
+import { createGround } from './ground.js?v=24';
+import { fill } from '../config.js?v=24';
+import { fmt, fmtCoin } from './numbers.js?v=24';
 
 export const SAVE_VERSION = 2;
 
@@ -316,6 +316,21 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   // -- the lords ------------------------------------------------------------
 
+  /**
+   * Rank points, and the line that says so when they carry the player up a
+   * rank, with whatever that rank hands over.
+   */
+  const addRenown = (events, pts) => {
+    const before = Ranks.rankOf(legacy.renown || 0, cfg);
+    legacy.renown = (legacy.renown || 0) + pts;
+    const after = Ranks.rankOf(legacy.renown, cfg);
+    if (after <= before) return;
+    const D = Lore.doors();
+    const key = cfg.ranks.keys.find(k => k.rank > before && k.rank <= after);
+    events.push({ type: 'log', key: 'rankUp', text: fill(D.rankUp, { name: Ranks.nameOf(after, cfg) })
+      + (key ? ' ' + Lore.rankKey(key.id) : '') });
+  };
+
   /** A lord in front of the player: what he says, and his two gifts. */
   const hallFor = (door, first) => {
     const lord = door.lord;
@@ -360,7 +375,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const first = !legacy.trophies[lord.id];
     legacy.trophies[lord.id] = true;
     legacy.lordsMet[lord.id] = (legacy.lordsMet[lord.id] || 0) + 1;
-    legacy.renown = (legacy.renown || 0) + (first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
     const D = Lore.doors();
     const words = Lore.lord(lord.id);
     events.push({ type: 'door', k, lord: lord.id, first, coin, relics });
@@ -369,6 +383,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       events.push({ type: 'log', key: 'trophy', text: fill(D.trophy, { name: words.trophy.name, line: words.trophy.line }) });
     }
     present(events, hallFor(door, first));
+    addRenown(events, first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
   };
 
   /**
@@ -384,15 +399,16 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       legacy.remembrance = (legacy.remembrance || 0) + relics;
       legacy.earned = (legacy.earned || 0) + relics;
     }
-    legacy.renown = (legacy.renown || 0) + cfg.ranks.points.newDepth;
     // Said on the end of the line that announces the layer, so a first run
     // - where every layer is the deepest yet - does not say two lines a layer.
     const note = fill(Lore.doors().newDepth, { n: k + 1, relics });
-    for (let i = events.length - 1; i >= 0; i--) {
+    let said = false;
+    for (let i = events.length - 1; i >= 0 && !said; i--) {
       const e = events[i];
-      if (e.type === 'log' && e.once === 'break:' + k) { e.text += ' ' + note; return; }
+      if (e.type === 'log' && e.once === 'break:' + k) { e.text += ' ' + note; said = true; }
     }
-    events.push({ type: 'log', key: 'newDepth', text: note });
+    if (!said) events.push({ type: 'log', key: 'newDepth', text: note });
+    addRenown(events, cfg.ranks.points.newDepth);
   };
 
   /**

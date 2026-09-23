@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=23';
-import * as Mk from './market.js?v=23';
-import * as H from './horde.js?v=23';
-import * as R from './rites.js?v=23';
-import * as Rb from './rebirth.js?v=23';
-import * as Lore from './lore.js?v=23';
-import * as Advice from './advice.js?v=23';
-import * as Lords from './lords.js?v=23';
-import * as Ranks from './ranks.js?v=23';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=23';
-import { fill } from '../config.js?v=23';
+import * as Mat from './materials.js?v=24';
+import * as Mk from './market.js?v=24';
+import * as H from './horde.js?v=24';
+import * as R from './rites.js?v=24';
+import * as Rb from './rebirth.js?v=24';
+import * as Lore from './lore.js?v=24';
+import * as Advice from './advice.js?v=24';
+import * as Lords from './lords.js?v=24';
+import * as Ranks from './ranks.js?v=24';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=24';
+import { fill } from '../config.js?v=24';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -590,7 +590,13 @@ export function createUI(doc, sim, cfg, actions) {
     const key = 'k' + c.k + ':' + (c.kind || 'room');
     if (key === chamberKey) return;
     chamberKey = key;
-    if (nodes.chamberPanel) nodes.chamberPanel.className = 'panel' + (c.kind === 'lord' ? ' lord' : '');
+    if (nodes.chamberPanel) {
+      nodes.chamberPanel.className = 'panel' + (c.kind === 'lord' ? ' lord' : '');
+      // A lord's scene wears his colour.
+      const def = c.kind === 'lord' && cfg.lords ? cfg.lords.list[c.lord] : null;
+      if (nodes.chamberPanel.style) nodes.chamberPanel.style.borderLeftColor = def ? def.color : '';
+      if (nodes.chamberTitle && nodes.chamberTitle.style) nodes.chamberTitle.style.color = def ? def.color : '';
+    }
     if (nodes.chamberTitle) nodes.chamberTitle.textContent = c.title;
     clear(nodes.chamberText);
     for (const l of c.lines) nodes.chamberText.appendChild(el('p', { text: l }));
@@ -714,10 +720,14 @@ export function createUI(doc, sim, cfg, actions) {
       text = fill(G.ahead, { name, n: doorK, m: left });
     }
     if (text !== goalSaid) { goalSaid = text; nodes.goalSay.textContent = text; }
+    // The goal wears the colour of the lord it names.
+    const hue = door.lord.def.color || '';
+    if (nodes.goal.style && nodes.goal.style.borderLeftColor !== hue) nodes.goal.style.borderLeftColor = hue;
     if (nodes.goalBar) {
       if (!nodes.goalFill) { clear(nodes.goalBar); nodes.goalFill = el('span'); nodes.goalBar.appendChild(nodes.goalFill); }
       show(nodes.goalBar, left <= 0);
       nodes.goalFill.style.width = Math.round(pct * 100) + '%';
+      nodes.goalFill.style.background = hue;
     }
     if (nodes.goalRule) {
       const here = sim.ground.at(s.depth).lord;
