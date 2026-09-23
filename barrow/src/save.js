@@ -9,7 +9,7 @@
 // browsers by paste.
 // ---------------------------------------------------------------------------
 
-import { SAVE_VERSION } from './sim.js?v=42';
+import { SAVE_VERSION } from './sim.js?v=43';
 
 const migrations = new Map();
 
@@ -90,8 +90,10 @@ export function exportString(snap, wallMs) {
 
 /** The reverse. Throws on anything that is not a save. */
 export function importString(str) {
-  const json = fromBase64(String(str).trim());
-  const parsed = JSON.parse(json);
+  // Anything that does not decode and parse is simply not a save; the
+  // parser's own words ("Unexpected token...") are not for a player.
+  let parsed = null;
+  try { parsed = JSON.parse(fromBase64(String(str).trim())); } catch (e) { parsed = null; }
   if (!parsed || typeof parsed !== 'object' || !parsed.snap) throw new Error('That isn\'t a save');
   const snap = migrate(parsed.snap);
   if (!snap) throw new Error('That save came from a version this one can\'t read');

@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=42';
-import * as Mk from './market.js?v=42';
-import * as H from './horde.js?v=42';
-import * as R from './rites.js?v=42';
-import * as Rb from './rebirth.js?v=42';
-import * as Lore from './lore.js?v=42';
-import * as Advice from './advice.js?v=42';
-import * as Lords from './lords.js?v=42';
-import * as Ranks from './ranks.js?v=42';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=42';
-import { fill } from '../config.js?v=42';
+import * as Mat from './materials.js?v=43';
+import * as Mk from './market.js?v=43';
+import * as H from './horde.js?v=43';
+import * as R from './rites.js?v=43';
+import * as Rb from './rebirth.js?v=43';
+import * as Lore from './lore.js?v=43';
+import * as Advice from './advice.js?v=43';
+import * as Lords from './lords.js?v=43';
+import * as Ranks from './ranks.js?v=43';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=43';
+import { fill } from '../config.js?v=43';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -57,7 +57,7 @@ export function createUI(doc, sim, cfg, actions) {
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
     tabOathsCount: byId('tab-oaths-n'), oathsNote: byId('oaths-note'),
     visitorPanel: byId('visitor-panel'), visitorText: byId('visitor-text'), visitorActs: byId('visitor-acts'),
-    visitorAfter: byId('visitor-after'),
+    visitorAfter: byId('visitor-after'), visitorHead: byId('p-visitor'),
     chamberPanel: byId('chamber-panel'), chamberTitle: byId('chamber-title'),
     chamberText: byId('chamber-text'), chamberOffers: byId('chamber-offers'),
     sealPanel: byId('seal-panel'), sealNote: byId('seal-note'), sealActs: byId('seal-acts'),
@@ -429,7 +429,8 @@ export function createUI(doc, sim, cfg, actions) {
       hot, wanted);
     nameCell.firstChild.style.background = good.hue;
     const tr = el('tr', null, nameCell, held, price, el('td', { class: 'chart' }, spark.svg, demand, takes), buttons);
-    return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark, buy: buttons.lastChild, base, takes, hot, wanted, sampled: -1 };
+    return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark,
+      some: buttons.childNodes[0], all: buttons.childNodes[1], buy: buttons.lastChild, base, takes, hot, wanted, sampled: -1 };
   };
 
   const buildMarket = () => {
@@ -507,6 +508,12 @@ export function createUI(doc, sim, cfg, actions) {
       row.demandBar.style.width = Math.round(d * 100) + '%';
       row.demandBar.className = d < cfg.market.buckleBelow ? 'low' : '';
       if (row.sampled !== m.history.length) { row.sampled = m.history.length; drawSpark(row, m, t, md); }
+      // A button that can do nothing right now says so by going grey: Some and
+      // All with none on hand, Buy with no coin. Lit and silent read as broken.
+      const none = !(units > 1e-9);
+      if (row.some.disabled !== none) { row.some.disabled = none; row.all.disabled = none; }
+      const broke = !(s.coin > 0) || s.coin < p * 1e-6;
+      if (row.buy.disabled !== broke) row.buy.disabled = broke;
       show(row.buy, md.ledger);
       const v = s.visitor;
       const want = !!(v && v.kind === 'buyer' && v.data && v.data.id === id);
@@ -542,6 +549,8 @@ export function createUI(doc, sim, cfg, actions) {
       lesserRow.name.title = T.lesserTip;
       // Nothing left on hand is nothing to say, not "worth about 0".
       lesserRow.meta.textContent = value > 0.005 ? fill(T.lesserWorth, { coin: fmtCoin(value) }) : '';
+      const all = lesserRow.tr.lastChild && lesserRow.tr.lastChild.firstChild;
+      if (all) all.disabled = !(value > 0.005);
     }
   };
 
@@ -594,9 +603,17 @@ export function createUI(doc, sim, cfg, actions) {
     // When he asks more than is on hand, say how far off it is, so a greyed
     // button is never a puzzle.
     if (v && v.cost > 0 && s.coin < v.cost) lasting.unshift(fill(T.gateShort, { have: fmtCoin(s.coin), cost: fmtCoin(v.cost) }));
-    const said = lasting.join(' ');
-    if (nodes.visitorAfter && said !== lastingSaid) { lastingSaid = said; nodes.visitorAfter.textContent = said; }
+    // One line each: two sharing a line read as one having replaced the other.
+    const said = lasting.join('\n');
+    if (nodes.visitorAfter && said !== lastingSaid) {
+      lastingSaid = said;
+      clear(nodes.visitorAfter);
+      for (const line of lasting) nodes.visitorAfter.appendChild(el('span', { text: line }));
+    }
     show(nodes.visitorAfter, lasting.length > 0);
+    // With nobody at the gate the box is only the boosts, and says so.
+    const head = v ? T.panels.visitor : T.panels.boosts;
+    if (nodes.visitorHead && nodes.visitorHead.textContent !== head) nodes.visitorHead.textContent = head;
     show(nodes.visitorPanel, !!v || lasting.length > 0);
     show(nodes.visitorText, !!v);
     show(nodes.visitorActs, !!v);

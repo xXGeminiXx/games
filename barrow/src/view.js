@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=42';
-import { activeFrom } from './horde.js?v=42';
-import * as Lore from './lore.js?v=42';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=43';
+import { activeFrom } from './horde.js?v=43';
+import * as Lore from './lore.js?v=43';
 
 /** mulberry32 */
 function rng(seed) {
@@ -582,6 +582,9 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     ctx.fillStyle = withAlpha(palette.bone, over ? 0.95 : 0.85);
     for (const p of particles) {
       p.life -= dt;
+      // A dot sent to a band the layout no longer has (the run was put back
+      // to a shallower depth under it) is sent somewhere else next frame.
+      if (p.band >= 0 && !L.rows[p.band]) { p.band = null; continue; }
       let x, y;
       if (p.shaft) {
         // Carriers: up and down the shaft between the mound and their band.

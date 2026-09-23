@@ -111,6 +111,11 @@ export const CONFIG = {
     export:     'Export',
     import:     'Import',
     reset:      'Start over',
+    // What Export and Import say on the button itself, for a few seconds, so
+    // the press is answered where the eye already is.
+    exportDone: 'Copied to clipboard',
+    exportBox:  'Copy it from the box',
+    importDone: 'Save loaded.',
     resetSure:  'Sure? You lose the relics too',
     bought:     'Owned',
     take:       'Take it',
@@ -123,6 +128,7 @@ export const CONFIG = {
       rites:   'Upgrades',
       riteBulk: 'Buy',
       visitor: 'At the gate',
+      boosts:  'Boosts',       // the same box when nobody is at the gate and a boost is running
       chamber: 'A room',
       lord:    'A lord of the dead',
       seal:    'Fill it in',
@@ -932,7 +938,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 42,
+    build: 43,
   },
 };
 
