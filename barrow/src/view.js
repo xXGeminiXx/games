@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=26';
-import { activeFrom } from './horde.js?v=26';
-import * as Lore from './lore.js?v=26';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=27';
+import { activeFrom } from './horde.js?v=27';
+import * as Lore from './lore.js?v=27';
 
 /** mulberry32 */
 function rng(seed) {
@@ -193,6 +193,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   const particles = [];
   let seed = 1;
   let lastDepth = -1;
+  // Embers rising through Mortifer's ground while the dig is in it.
+  const embers = [];
   // A door that has just given way lights the layer it opened, and fades.
   let doorsSeen = -1;
   const flash = { k: -1, t: 0, hue: null };
@@ -643,6 +645,34 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /**
+   * Mortifer's layers are warm. While the dig is in them, sparks drift up
+   * out of the worked ground and fade; anywhere else there are none.
+   */
+  const drawEmbers = (L, s, dt) => {
+    const here = layerAt(s.depth).lord;
+    const hot = here && here.id === 'mortifer';
+    if (!hot) { embers.length = 0; return; }
+    const hue = lordColor(here);
+    const top = L.rows[Math.max(L.from, s.depth - 5)] || L.rows[0];
+    const face = L.rows[s.depth + 1];
+    const y0 = top.y, y1 = face.y + face.h;
+    const want = Math.round(Math.min(90, width / 14));
+    while (embers.length < want) {
+      embers.push({ x: Math.random() * width, y: y0 + Math.random() * (y1 - y0), v: 6 + Math.random() * 14, life: 1 + Math.random() * 3 });
+    }
+    for (const e of embers) {
+      e.y -= e.v * dt;
+      e.x += Math.sin(e.y * 0.05 + e.life) * 0.3;
+      e.life -= dt;
+      if (e.life <= 0 || e.y < y0) {
+        e.x = Math.random() * width; e.y = y1 - Math.random() * (y1 - y0) * 0.3; e.life = 1 + Math.random() * 3;
+      }
+      ctx.fillStyle = withAlpha(hue, Math.max(0, Math.min(0.85, e.life / 2)));
+      ctx.fillRect(e.x, e.y, 1.5, 1.5);
+    }
+  };
+
+  /**
    * Draw one frame. `effort` is digger-seconds spent per layer; `md` is the
    * run's multipliers, read only for what the player can see ahead.
    */
@@ -661,6 +691,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     populate(L, s, active, split);
     drawDots(L, s, Math.min(0.1, dt || 0.016));
     drawDoorWork(L, s, Math.min(0.1, dt || 0.016));
+    drawEmbers(L, s, Math.min(0.1, dt || 0.016));
 
     // Band names on the left, and on the right a bar for the share of the
     // horde standing in that band, so the panel and the picture say the same

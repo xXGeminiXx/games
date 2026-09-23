@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=26';
-import * as Mat from './materials.js?v=26';
-import * as Mk from './market.js?v=26';
-import * as H from './horde.js?v=26';
-import * as Crew from './crew.js?v=26';
-import * as R from './rites.js?v=26';
-import * as Rv from './reveal.js?v=26';
-import * as Ch from './chambers.js?v=26';
-import * as Vi from './visitors.js?v=26';
-import * as Rb from './rebirth.js?v=26';
-import * as Lore from './lore.js?v=26';
-import * as Lords from './lords.js?v=26';
-import * as Ranks from './ranks.js?v=26';
-import { createGround } from './ground.js?v=26';
-import { fill } from '../config.js?v=26';
-import { fmt, fmtCoin } from './numbers.js?v=26';
+import { CONFIG as DEFAULT } from '../config.js?v=27';
+import * as Mat from './materials.js?v=27';
+import * as Mk from './market.js?v=27';
+import * as H from './horde.js?v=27';
+import * as Crew from './crew.js?v=27';
+import * as R from './rites.js?v=27';
+import * as Rv from './reveal.js?v=27';
+import * as Ch from './chambers.js?v=27';
+import * as Vi from './visitors.js?v=27';
+import * as Rb from './rebirth.js?v=27';
+import * as Lore from './lore.js?v=27';
+import * as Lords from './lords.js?v=27';
+import * as Ranks from './ranks.js?v=27';
+import { createGround } from './ground.js?v=27';
+import { fill } from '../config.js?v=27';
+import { fmt, fmtCoin } from './numbers.js?v=27';
 
 export const SAVE_VERSION = 2;
 
@@ -226,7 +226,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const words = Lore.seam(layer.seam.id);
     if (!words) return;
     if (state.fired['seam:' + k]) return;
-    fire(events, 'seam:' + k, 'seamFound', { name: layer.name, seam: words.tag, line: words.line }, String(k));
+    fire(events, 'seam:' + k, 'seamFound', { name: layer.name, seam: words.here || words.tag, line: words.line }, String(k));
   };
 
   const trimIncome = () => {

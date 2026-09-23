@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=26';
-import * as Mk from './market.js?v=26';
-import * as H from './horde.js?v=26';
-import * as R from './rites.js?v=26';
-import * as Rb from './rebirth.js?v=26';
-import * as Lore from './lore.js?v=26';
-import * as Advice from './advice.js?v=26';
-import * as Lords from './lords.js?v=26';
-import * as Ranks from './ranks.js?v=26';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=26';
-import { fill } from '../config.js?v=26';
+import * as Mat from './materials.js?v=27';
+import * as Mk from './market.js?v=27';
+import * as H from './horde.js?v=27';
+import * as R from './rites.js?v=27';
+import * as Rb from './rebirth.js?v=27';
+import * as Lore from './lore.js?v=27';
+import * as Advice from './advice.js?v=27';
+import * as Lords from './lords.js?v=27';
+import * as Ranks from './ranks.js?v=27';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=27';
+import { fill } from '../config.js?v=27';
 
 const SVG = 'http://www.w3.org/2000/svg';
 

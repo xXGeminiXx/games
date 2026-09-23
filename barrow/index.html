@@ -121,7 +121,7 @@
   #standing small{color:var(--dim);font-size:11px;display:block}
   #standing h3{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--dim);margin:10px 0 4px}
   #standing .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2px 22px}
-  #standing .grid div{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #standing .grid div{font-size:11px;color:var(--dim);white-space:normal;line-height:1.35;margin-bottom:2px}
   #standing .grid div b{color:var(--ink);font-weight:500}
   #standing .grid div.off{color:var(--quiet)}
   #standing .grid div.off b{color:var(--quiet)}
@@ -469,7 +469,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="b34f5b259892">
+<meta name="build" content="d2b003cf418c">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -582,8 +582,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=26';
-import { createGame } from './src/game.js?v=26';
+import { CONFIG, applyIdentity } from './config.js?v=27';
+import { createGame } from './src/game.js?v=27';
 
 applyIdentity(document);
 
