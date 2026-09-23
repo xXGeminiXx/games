@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=34';
-import * as Mat from './materials.js?v=34';
-import * as Mk from './market.js?v=34';
-import * as H from './horde.js?v=34';
-import * as Crew from './crew.js?v=34';
-import * as R from './rites.js?v=34';
-import * as Rv from './reveal.js?v=34';
-import * as Ch from './chambers.js?v=34';
-import * as Vi from './visitors.js?v=34';
-import * as Rb from './rebirth.js?v=34';
-import * as Lore from './lore.js?v=34';
-import * as Lords from './lords.js?v=34';
-import * as Ranks from './ranks.js?v=34';
-import { createGround } from './ground.js?v=34';
-import { fill } from '../config.js?v=34';
-import { fmt, fmtCoin } from './numbers.js?v=34';
+import { CONFIG as DEFAULT } from '../config.js?v=35';
+import * as Mat from './materials.js?v=35';
+import * as Mk from './market.js?v=35';
+import * as H from './horde.js?v=35';
+import * as Crew from './crew.js?v=35';
+import * as R from './rites.js?v=35';
+import * as Rv from './reveal.js?v=35';
+import * as Ch from './chambers.js?v=35';
+import * as Vi from './visitors.js?v=35';
+import * as Rb from './rebirth.js?v=35';
+import * as Lore from './lore.js?v=35';
+import * as Lords from './lords.js?v=35';
+import * as Ranks from './ranks.js?v=35';
+import { createGround } from './ground.js?v=35';
+import { fill } from '../config.js?v=35';
+import { fmt, fmtCoin } from './numbers.js?v=35';
 
 export const SAVE_VERSION = 2;
 
@@ -189,7 +189,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       // The first time ever a crew this size stands up, it pays relics: the
       // biggest crew a player has had is a record like the deepest layer.
       const pay = cfg.lords ? cfg.lords.crewRelics * (i + 1) : 0;
-      if (pay > 0 && i >= (legacy.crewMark || 0)) {
+      if (pay > 0 && i >= (legacy.crewMark || 0) && opened()) {
         legacy.crewMark = i + 1;
         legacy.remembrance = (legacy.remembrance || 0) + pay;
         legacy.earned = (legacy.earned || 0) + pay;
@@ -388,7 +388,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const lord = door.lord;
     const md = mods();
     const L = cfg.lords;
-    const coin = Math.max(0, state.rate) * L.hoardSeconds * lord.hoard * md.hoardMult;
+    const coin = steadyIncome() * L.hoardSeconds * lord.hoard * md.hoardMult;
     earn(coin);
     const relics = Math.round(L.hoardRelics * Lords.doorNumber(door.r, cfg) * lord.hoard * md.hoardMult);
     legacy.remembrance = (legacy.remembrance || 0) + relics;
@@ -408,6 +408,14 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   /**
+   * Whether the lords' part of the game has opened for this player: their
+   * first door broken, or a barrow filled in before there were lords. Until
+   * then the opening is the old one - dig, sell, raise, one thing at a time -
+   * and relics, rank and the new-best rewards wait for Rex Mortis.
+   */
+  const opened = () => (legacy.seals || 0) > 0 || Object.keys(legacy.trophies || {}).length > 0;
+
+  /**
    * Every layer deeper than the player has ever been pays relics and a point
    * of rank the moment it opens. Beating a best is always worth something.
    */
@@ -415,6 +423,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (!legacy.best) legacy.best = { depth: 0, earned: 0, horde: 0 };
     if (!(k > (legacy.best.depth || 0))) return;
     legacy.best.depth = k;
+    if (!opened()) return;
     const relics = cfg.lords ? cfg.lords.newDepthRelics : 0;
     if (relics > 0) {
       legacy.remembrance = (legacy.remembrance || 0) + relics;
@@ -441,12 +450,27 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * with itself until the numbers stop meaning anything.
    */
   const payBoon = (out) => {
-    if (out.windfall > 0) earn(state.rate * Math.min(out.windfall, cfg.chambers.windfallCap));
+    if (out.windfall > 0) earn(steadyIncome() * Math.min(out.windfall, cfg.chambers.windfallCap));
     if (out.diggers > 0) {
       const n = growthOver(out.diggers * cfg.chambers.diggerSeconds);
       H.raiseFree(state, Math.max(1, Math.floor(n)));
     }
     if (out.rem > 0) state.remBonus = (state.remBonus || 0) + out.rem;
+  };
+
+  /**
+   * What a second of this barrow is worth, for anything paid in seconds of
+   * income. The coin/s figure counts sales over the last ten seconds, and a
+   * seller who only sells above the usual price can go quiet for longer than
+   * that - a hoard priced off it once paid nothing. So it is the larger of
+   * that figure and what the diggers are turning up per second at the price
+   * their own flow holds each market to.
+   */
+  const steadyIncome = () => {
+    let made = 0;
+    try { for (const r of layerRates().values()) made += r.coin || 0; } catch (e) { made = 0; }
+    const rate = Number.isFinite(state.rate) ? state.rate : 0;
+    return Math.max(0, rate, Number.isFinite(made) ? made : 0);
   };
 
   /** How many the horde would raise, unaided, in `seconds` at its present rate. */
@@ -882,7 +906,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding, hillChoices,
+    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),

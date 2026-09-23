@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=34';
-import * as Mk from './market.js?v=34';
-import * as H from './horde.js?v=34';
-import * as R from './rites.js?v=34';
-import * as Rb from './rebirth.js?v=34';
-import * as Lore from './lore.js?v=34';
-import * as Advice from './advice.js?v=34';
-import * as Lords from './lords.js?v=34';
-import * as Ranks from './ranks.js?v=34';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=34';
-import { fill } from '../config.js?v=34';
+import * as Mat from './materials.js?v=35';
+import * as Mk from './market.js?v=35';
+import * as H from './horde.js?v=35';
+import * as R from './rites.js?v=35';
+import * as Rb from './rebirth.js?v=35';
+import * as Lore from './lore.js?v=35';
+import * as Advice from './advice.js?v=35';
+import * as Lords from './lords.js?v=35';
+import * as Ranks from './ranks.js?v=35';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=35';
+import { fill } from '../config.js?v=35';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -574,7 +574,7 @@ export function createUI(doc, sim, cfg, actions) {
     for (const key of Object.keys(boon)) {
       const v = boon[key];
       if (key === 'windfall') {
-        const coin = sim.state.rate * Math.min(v, cfg.chambers.windfallCap);
+        const coin = sim.steadyIncome() * Math.min(v, cfg.chambers.windfallCap);
         if (coin > 0) parts.push(fill(E.windfall, { coin: fmtCoin(coin) }));
       } else if (key === 'diggers') {
         const n = Math.max(1, Math.floor(sim.growthOver(v * cfg.chambers.diggerSeconds)));
