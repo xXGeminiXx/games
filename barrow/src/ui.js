@@ -11,15 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=21';
-import * as Mk from './market.js?v=21';
-import * as H from './horde.js?v=21';
-import * as R from './rites.js?v=21';
-import * as Rb from './rebirth.js?v=21';
-import * as Lore from './lore.js?v=21';
-import * as Advice from './advice.js?v=21';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=21';
-import { fill } from '../config.js?v=21';
+import * as Mat from './materials.js?v=22';
+import * as Mk from './market.js?v=22';
+import * as H from './horde.js?v=22';
+import * as R from './rites.js?v=22';
+import * as Rb from './rebirth.js?v=22';
+import * as Lore from './lore.js?v=22';
+import * as Advice from './advice.js?v=22';
+import * as Lords from './lords.js?v=22';
+import * as Ranks from './ranks.js?v=22';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=22';
+import { fill } from '../config.js?v=22';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -61,10 +63,12 @@ export function createUI(doc, sim, cfg, actions) {
     oaths: byId('oaths'),
     stats: {
       coin: byId('coin'), income: byId('income'), bones: byId('bones'), horde: byId('horde'),
-      depth: byId('depth'), rem: byId('rem'),
+      depth: byId('depth'), rem: byId('rem'), rank: byId('rank'), rankLabel: byId('lbl-rank'),
       coinBox: byId('st-coin'), incomeBox: byId('st-income'), bonesBox: byId('st-bones'),
-      hordeBox: byId('st-horde'), depthBox: byId('st-depth'), remBox: byId('st-rem'),
+      hordeBox: byId('st-horde'), depthBox: byId('st-depth'), remBox: byId('st-rem'), rankBox: byId('st-rank'),
     },
+    goal: byId('goal'), goalSay: byId('goal-say'), goalBar: byId('goal-bar'), goalRule: byId('goal-rule'),
+    standing: byId('standing'),
     fieldhint: byId('fieldhint'),
     compass: byId('compass'), compassSay: byId('compass-say'), compassGo: byId('compass-go'),
     saved: byId('saved'),
@@ -149,6 +153,48 @@ export function createUI(doc, sim, cfg, actions) {
     for (const { n, node } of riteButtons) node.setAttribute('aria-pressed', String(n === ritePick));
   };
 
+  // Rank hands over two switches. They sit where the thing they drive is:
+  // auto-buy beside the upgrades, filling in by itself beside filling in.
+  let autoBuyButton = null;
+  const paintAutoBuy = () => {
+    const on = !!sim.mods().autoBuy;
+    if (!on && !autoBuyButton) return;
+    if (!autoBuyButton && nodes.riteBulk) {
+      autoBuyButton = el('button', { class: 'auto', title: T.autoBuyTip, onclick: () => actions.setAutoBuy(!sim.legacy.autoBuy) });
+      nodes.riteBulk.appendChild(autoBuyButton);
+    }
+    if (!autoBuyButton) return;
+    show(autoBuyButton, on);
+    const text = sim.legacy.autoBuy ? T.autoBuyOn : T.autoBuyOff;
+    if (autoBuyButton.textContent !== text) autoBuyButton.textContent = text;
+    autoBuyButton.setAttribute('aria-pressed', String(!!sim.legacy.autoBuy));
+  };
+
+  let autoSealRow = null;
+  const paintAutoSeal = () => {
+    const on = !!sim.mods().autoSeal;
+    if (!on && !autoSealRow) return;
+    if (!autoSealRow && nodes.sealActs) {
+      const label = el('button', { class: 'auto', title: T.autoSealTip, onclick: () => {
+        const at = sim.legacy.autoSealAt;
+        actions.setAutoSeal(at > 0 ? 0 : Math.max(sim.state.depth + 6, cfg.seal.unlockDepth + 1));
+      } });
+      const less = el('button', { class: 'w', text: '-5', onclick: () => actions.setAutoSeal(Math.max(0, (sim.legacy.autoSealAt || 0) - 5)) });
+      const more = el('button', { class: 'w', text: '+5', onclick: () => actions.setAutoSeal((sim.legacy.autoSealAt || (sim.state.depth + 1)) + 5) });
+      autoSealRow = el('div', { class: 'autoseal' }, label, less, more);
+      autoSealRow._label = label; autoSealRow._less = less; autoSealRow._more = more;
+      nodes.sealActs.appendChild(autoSealRow);
+    }
+    if (!autoSealRow) return;
+    show(autoSealRow, on);
+    const at = sim.legacy.autoSealAt || 0;
+    const text = at > 0 ? fill(T.autoSeal, { n: at }) : T.autoSealOff;
+    if (autoSealRow._label.textContent !== text) autoSealRow._label.textContent = text;
+    autoSealRow._label.setAttribute('aria-pressed', String(at > 0));
+    show(autoSealRow._less, at > 0);
+    show(autoSealRow._more, at > 0);
+  };
+
   const raiseButtons = [];
   const buildRaise = () => {
     clear(nodes.raise);
@@ -210,9 +256,12 @@ export function createUI(doc, sim, cfg, actions) {
         el('span', { class: 'name', text: name, title: isFace ? T.faceLine : seamLine(key) }),
         tag, less, bar, more, meta);
       head.firstChild.style.background = hue;
-      const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') }, head, rate);
+      // Under the way down: every layer below it the player can already see,
+      // so buying the reading five layers ahead shows five layers here.
+      const ahead = isFace ? el('small', { class: 'ahead' }) : null;
+      const row = el('div', { class: 'wrow' + (isFace ? ' face' : '') }, head, rate, ahead);
       nodes.weights.appendChild(row);
-      weightRows.set(key, { node: row, bar, notches, meta, tag, rate, less, more });
+      weightRows.set(key, { node: row, bar, notches, meta, tag, rate, less, more, ahead, nameEl: head.childNodes[1] });
     }
   };
 
@@ -537,9 +586,10 @@ export function createUI(doc, sim, cfg, actions) {
     const c = sim.state.chamber;
     show(nodes.chamberPanel, !!c);
     if (!c) { chamberKey = ''; return; }
-    const key = 'k' + c.k;
+    const key = 'k' + c.k + ':' + (c.kind || 'room');
     if (key === chamberKey) return;
     chamberKey = key;
+    if (nodes.chamberPanel) nodes.chamberPanel.className = 'panel' + (c.kind === 'lord' ? ' lord' : '');
     if (nodes.chamberTitle) nodes.chamberTitle.textContent = c.title;
     clear(nodes.chamberText);
     for (const l of c.lines) nodes.chamberText.appendChild(el('p', { text: l }));
@@ -570,6 +620,7 @@ export function createUI(doc, sim, cfg, actions) {
     show(nodes.rites, panelTab === 'rites');
     show(nodes.oaths, panelTab === 'oaths');
     show(nodes.oathsNote, panelTab === 'oaths');
+    show(nodes.standing, panelTab === 'oaths');
   };
   if (nodes.tabRites) nodes.tabRites.addEventListener('click', () => { panelTab = 'rites'; paintTabs(); });
   if (nodes.tabOaths) nodes.tabOaths.addEventListener('click', () => { panelTab = 'oaths'; paintTabs(); });
@@ -621,7 +672,7 @@ export function createUI(doc, sim, cfg, actions) {
     }
     // Nothing carries over until a barrow has been closed, so the list and
     // its tab arrive together with the first one.
-    const carried = legacy.seals > 0 || legacy.remembrance > 0;
+    const carried = legacy.seals > 0 || legacy.remembrance > 0 || (legacy.renown || 0) > 0;
     show(nodes.tabOaths, carried);
     if (!carried && panelTab === 'oaths') { panelTab = 'rites'; paintTabs(); }
     if (nodes.oathsNote) nodes.oathsNote.textContent = words.oathsNote;
@@ -630,6 +681,95 @@ export function createUI(doc, sim, cfg, actions) {
     if (nodes.tabOathsCount) {
       nodes.tabOathsCount.textContent = affordable > 0 ? fmt(legacy.remembrance) : '';
     }
+  };
+
+  // -- the goal ------------------------------------------------------------
+
+  /**
+   * The next lord's door, always named: how many layers are left to it, and
+   * once the dig is on it, how far through. Under it, what the lord whose
+   * layers the dig is in does to them.
+   */
+  let goalSaid = '';
+  const renderGoal = () => {
+    if (!nodes.goal || !cfg.lords) return;
+    const s = sim.state;
+    const on = s.flags.face || s.depth > 0;
+    show(nodes.goal, on);
+    if (!on) return;
+    const G = T.goal;
+    const doorK = Lords.doorLayer(Lords.realmOf(s.depth, cfg), cfg);
+    const door = sim.ground.at(doorK).door;
+    const name = Lords.shortName(door.lord);
+    const left = doorK - 1 - s.depth;
+    let text, pct = 0;
+    if (left <= 0) {
+      const cap = sim.ground.at(doorK).cap;
+      pct = cap > 0 ? Math.max(0, Math.min(1, s.capProgress / cap)) : 0;
+      text = fill(G.at, { name, pct: fmtPct(pct) });
+    } else if (left === 1) {
+      text = fill(G.one, { name });
+    } else {
+      text = fill(G.ahead, { name, n: doorK, m: left });
+    }
+    if (text !== goalSaid) { goalSaid = text; nodes.goalSay.textContent = text; }
+    if (nodes.goalBar) {
+      if (!nodes.goalFill) { clear(nodes.goalBar); nodes.goalFill = el('span'); nodes.goalBar.appendChild(nodes.goalFill); }
+      show(nodes.goalBar, left <= 0);
+      nodes.goalFill.style.width = Math.round(pct * 100) + '%';
+    }
+    if (nodes.goalRule) {
+      const here = sim.ground.at(s.depth).lord;
+      const words = here ? Lore.lord(here.id) : null;
+      const rule = words ? fill(G.rule, { name: Lords.shortName(here), line: words.rule }) : '';
+      if (nodes.goalRule.textContent !== rule) nodes.goalRule.textContent = rule;
+    }
+  };
+
+  // -- rank and trophies ------------------------------------------------------
+
+  /**
+   * The top of the Kept forever tab: the rank and how far to the next, every
+   * lord's trophy (a lord never met is a question mark), and what each rank
+   * hands over. Rebuilt only when something in it changes.
+   */
+  let standingKey = '';
+  const renderStanding = () => {
+    if (!nodes.standing || !cfg.ranks) return;
+    const legacy = sim.legacy;
+    const st = Ranks.standing(legacy, cfg);
+    const W = T.standing;
+    const owned = Object.keys(legacy.trophies || {}).sort().join(',');
+    const key = st.points + '|' + owned + '|' + panelTab;
+    if (key === standingKey) return;
+    standingKey = key;
+    clear(nodes.standing);
+    nodes.standing.appendChild(el('div', { class: 'rankline' }, el('b', { text: fill(W.rank, { n: st.n, name: st.name }) })));
+    const bar = el('div', { class: 'rankbar' }, el('span'));
+    bar.firstChild.style.width = Math.round(st.progress * 100) + '%';
+    nodes.standing.appendChild(bar);
+    nodes.standing.appendChild(el('small', { text: fill(W.next, { into: fmt(st.into), span: fmt(st.span), next: st.nextName }) }));
+    if (st.nextKey) nodes.standing.appendChild(el('small', { text: fill(W.nextKey, { n: st.nextKey.rank, line: Lore.rankKey(st.nextKey.id) }) }));
+    nodes.standing.appendChild(el('small', { text: W.how }));
+    nodes.standing.appendChild(el('h3', { text: W.trophies }));
+    const grid = el('div', { class: 'grid' });
+    const ids = [cfg.lords.first].concat(cfg.lords.rotating, [cfg.lords.last]);
+    for (const id of ids) {
+      const words = Lore.lord(id);
+      const have = !!(legacy.trophies && legacy.trophies[id]);
+      const met = have || ((legacy.lordsMet || {})[id] > 0);
+      grid.appendChild(have
+        ? el('div', { title: words.trophy.line }, el('b', { text: words.trophy.name }), ' - ' + words.trophy.line)
+        : el('div', { class: 'off' }, el('b', { text: met ? words.trophy.name : W.unknown }), ' - ' + W.unmet));
+    }
+    nodes.standing.appendChild(grid);
+    nodes.standing.appendChild(el('h3', { text: W.keys }));
+    const keys = el('div', { class: 'grid' });
+    for (const k of cfg.ranks.keys) {
+      const got = st.n >= k.rank;
+      keys.appendChild(el('div', { class: got ? '' : 'off' }, el('b', { text: fill(W.atRank, { n: k.rank }) }), ' - ' + Lore.rankKey(k.id)));
+    }
+    nodes.standing.appendChild(keys);
   };
 
   // -- the line at the top -------------------------------------------------
@@ -709,6 +849,13 @@ export function createUI(doc, sim, cfg, actions) {
     show(st.hordeBox, s.horde > 0);
     show(st.depthBox, f.face);
     show(st.remBox, sim.legacy.seals > 0 || sim.legacy.remembrance > 0);
+    if (st.rank && cfg.ranks) {
+      const rk = Ranks.standing(sim.legacy, cfg);
+      if (st.rank.textContent !== rk.name) st.rank.textContent = rk.name;
+      const lbl = fill(T.stats.rank, { n: rk.n });
+      if (st.rankLabel && st.rankLabel.textContent !== lbl) st.rankLabel.textContent = lbl;
+      show(st.rankBox, rk.points > 0);
+    }
 
     // The hand.
     show(nodes.hand, !f.handHidden);
@@ -721,6 +868,7 @@ export function createUI(doc, sim, cfg, actions) {
     renderChamber();
     renderVisitor();
     renderCompass();
+    renderGoal();
 
     // The horde.
     show(nodes.hordePanel, f.raise);
@@ -770,16 +918,29 @@ export function createUI(doc, sim, cfg, actions) {
         }
         let meta = fmtPct(share);
         let hot = false;
+        if (key === 'face' && r.nameEl) {
+          // Breaking a lord's door is the row's whole meaning while it lasts.
+          const door = sim.ground.at(s.depth + 1).door;
+          const want = door ? fill(T.doorRow, { name: Lords.shortName(door.lord) }) : T.face;
+          if (r.nameEl.textContent !== want) r.nameEl.textContent = want;
+        }
         if (key === 'face') {
-          // What is under the face, once the ground below has been read. The
-          // name goes where the share is and the seam goes in the column the
-          // face row does not otherwise use, so neither is cut off.
+          // What is under the face, once the ground below has been read: the
+          // seam of the floor being broken in the column the face row does not
+          // otherwise use, and a line under the row naming every layer below
+          // it that anything has read, as far down as that goes.
           const k = s.depth + 1;
-          if (md.assay || s.read[k]) {
-            meta += ' - ' + fill(T.seamAhead, { seam: sim.ground.at(k).name });
-            r.tag.textContent = seamTag(k);
-          } else {
-            r.tag.textContent = '';
+          const known = [];
+          if (md.assay || s.read[k]) known.push(k);
+          for (let j = k + 1; known.length && j <= k + (cfg.view.aheadMax || 10) && s.read[j]; j++) known.push(j);
+          r.tag.textContent = known.length ? seamTag(k) : '';
+          if (r.ahead) {
+            const names = known.map((j) => {
+              const tag = seamTag(j);
+              return Lore.label(sim.ground.at(j).name) + (tag ? ' (' + tag + ')' : '');
+            });
+            r.ahead.textContent = names.length ? fill(T.aheadLine, { list: names.join(', ') }) : '';
+            show(r.ahead, names.length > 0);
           }
         } else if (md.ledger) {
           const sat = Mk.saturation(sim.marketFor('s' + key), sim.flowOf('s' + key), md);
@@ -801,11 +962,12 @@ export function createUI(doc, sim, cfg, actions) {
 
     // Rites, and beside them what relics buy.
     show(nodes.ritesPanel, f.rites);
-    if (f.rites) { buildRiteBulk(); buildRites(); renderRites(); paintTabs(); }
+    if (f.rites) { buildRiteBulk(); buildRites(); renderRites(); paintTabs(); paintAutoBuy(); }
 
     // The seal.
     show(nodes.sealPanel, f.seal);
-    if (f.seal) renderSeal();
+    if (f.seal) { renderSeal(); paintAutoSeal(); }
+    renderStanding();
 
     if (nodes.fieldhint) show(nodes.fieldhint, !f.field);
   };

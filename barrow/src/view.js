@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=21';
-import { activeFrom } from './horde.js?v=21';
-import * as Lore from './lore.js?v=21';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=22';
+import { activeFrom } from './horde.js?v=22';
+import * as Lore from './lore.js?v=22';
 
 /** mulberry32 */
 function rng(seed) {
@@ -73,27 +73,72 @@ export function segmentsFor(k, seed, count) {
 
 /**
  * Where everything goes for a field of `width` x `height` css pixels and a
- * given depth. Bands shrink to fit so the whole dig is always on screen.
+ * given depth.
+ *
+ * The picture follows the dig. Every layer above `focus.from` is worked out,
+ * and giving each of them a full band put twenty-five bands of history on
+ * the screen and the live dig in one strip at the bottom. They are pressed
+ * into a thin stack at the top instead, and the room goes to the layers
+ * being worked, the floor being broken, and `focus.ahead` layers below it
+ * that the player has paid to see. Those last ones are `L.ahead`, drawn
+ * under the face with their names.
+ *
+ * Without a focus every layer shares the frame equally, which is what a
+ * shallow dig looks like anyway.
  */
-export function layout(width, height, depth, cfg) {
+export function layout(width, height, depth, cfg, focus) {
   const surface = cfg.surfaceHeight;
-  const bands = depth + 2; // open strata, plus the unbroken one the face is in
   const avail = Math.max(0, height - surface);
+  const from = Math.max(0, Math.min(depth, (focus && focus.from) | 0));
+  const aheadN = Math.max(0, (focus && focus.ahead) | 0);
+  // The worked-out layers, stacked thin: a few pixels each, never more than
+  // a share of the frame however deep the run goes.
+  const oldTotal = from > 0
+    ? Math.min(avail * (cfg.historyShare || 0.2), from * (cfg.historyBand || 3))
+    : 0;
+  const oldH = from > 0 ? oldTotal / from : 0;
+  const live = (depth + 2 - from) + aheadN; // worked layers, the face, and what is read below it
   // Bands shrink to fit, and fitting wins: minBandHeight is two pixels, not a
   // readability floor. Held at twelve it pushed the deepest six layers and
   // the face off the bottom of a phone's two hundred pixel field, and the
   // face is the part worth looking at. What a thin band loses is its writing,
   // and that is what labelBandHeight decides.
-  const bandH = Math.max(cfg.minBandHeight, Math.min(cfg.bandHeight, avail / bands));
+  const bandH = Math.max(cfg.minBandHeight, Math.min(cfg.bandHeight, (avail - oldTotal) / live));
   const rows = [];
-  for (let k = 0; k <= depth + 1; k++) rows.push({ k, y: surface + k * bandH, h: bandH });
-  const bottom = surface + bands * bandH;
+  let y = surface;
+  for (let k = 0; k <= depth + 1; k++) {
+    const h = k < from ? oldH : bandH;
+    rows.push({ k, y, h });
+    y += h;
+  }
+  const ahead = [];
+  for (let i = 0; i < aheadN; i++) {
+    ahead.push({ k: depth + 2 + i, y, h: bandH });
+    y += bandH;
+  }
+  const bottom = y;
   // Whatever room is left under the cut is ground too, and drawing it as one
   // flat rectangle made a shallow dig look like a hole in an empty page. It
   // is bedded out in the same bands, unlit and unnamed, so the picture is
   // always a section through a hill rather than a diagram floating in a box.
   const ghosts = Math.max(0, Math.ceil((height - bottom) / bandH));
-  return { width, height, surface, bandH, rows, bottom, ghosts };
+  return { width, height, surface, bandH, oldH, from, rows, ahead, bottom, ghosts };
+}
+
+/**
+ * Which layers the picture gives room to: the deepest few being worked, and
+ * every layer below the face whose ground is already known.
+ */
+export function focusOf(s, cfg) {
+  const from = Math.max(0, s.depth - (cfg.focusLayers || 6) + 1);
+  let ahead = 0;
+  if (s.read) {
+    for (let k = s.depth + 2; k <= s.depth + 1 + (cfg.aheadMax || 10); k++) {
+      if (!s.read[k]) break;
+      ahead++;
+    }
+  }
+  return { from, ahead };
 }
 
 function mix(a, b, t) {
@@ -178,7 +223,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       revealed.push(Math.round(frac * cfg.tunnelSegments));
     }
     const dug = Math.max(0, Math.log10(1 + (s.totals ? s.totals.dug || 0 : 0)));
-    const key = [width, height, s.depth, Math.round(dug * 4), revealed.join(',')].join('|');
+    const key = [width, height, s.depth, L.from, L.ahead.length, Math.round(dug * 4), revealed.join(',')].join('|');
     if (key === carve.key) return;
     carve.key = key;
     carve.revealed = revealed;
@@ -247,6 +292,27 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       c.fillRect(0, row.y, width, 1);
     }
 
+    // Ground below the face that the player has paid to see: unbroken, but
+    // washed faintly with what is in it, so the next few layers read as
+    // somewhere the dig is going rather than as the dark.
+    for (const row of L.ahead) {
+      const t = 1 - Math.exp(-row.k / 9);
+      c.fillStyle = mix(palette.face, palette.deep, Math.min(1, t + 0.3));
+      c.fillRect(0, row.y, width, row.h);
+      c.fillStyle = withAlpha(layerAt(row.k).hue, 0.09);
+      c.fillRect(0, row.y, width, row.h);
+      if (row.h >= 6) {
+        const bed = c.createLinearGradient(0, row.y, 0, row.y + row.h);
+        bed.addColorStop(0, withAlpha(palette.bone, 0.02));
+        bed.addColorStop(0.6, 'rgba(0,0,0,0)');
+        bed.addColorStop(1, 'rgba(0,0,0,0.26)');
+        c.fillStyle = bed;
+        c.fillRect(0, row.y, width, row.h);
+      }
+      c.fillStyle = withAlpha(palette.tunnel, 0.5);
+      c.fillRect(0, row.y, width, 1);
+    }
+
     // Ground below the cut, bedded out in the same bands and going black, so
     // the picture always ends in rock rather than in an empty rectangle.
     for (let i = 0; i < L.ghosts; i++) {
@@ -266,6 +332,32 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       c.fillStyle = withAlpha(palette.tunnel, 0.5);
       c.fillRect(0, y, width, 1);
     }
+
+    // A lord's door: the floor under his ten, drawn as what it is - banded
+    // stone with his mark in the middle - wherever it shows, whether the dig
+    // is on it or it is only known from below.
+    const doorBand = (row) => {
+      const g = layerAt(row.k);
+      if (!g.door || row.h < 3) return;
+      c.fillStyle = mix(palette.deep, palette.void, 0.35);
+      c.fillRect(0, row.y, width, row.h);
+      c.fillStyle = withAlpha(palette.deepink, 0.16);
+      c.fillRect(0, row.y, width, row.h);
+      const bands = Math.max(1, Math.min(4, Math.floor(row.h / 7)));
+      c.fillStyle = withAlpha(palette.deepink, 0.35);
+      for (let i = 1; i <= bands; i++) c.fillRect(0, row.y + (row.h * i) / (bands + 1), width, 1);
+      const r = Math.max(2, Math.min(row.h * 0.36, 11));
+      const cx = width * 0.5, cy = row.y + row.h / 2;
+      c.strokeStyle = withAlpha(palette.deepink, 0.8);
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(cx, cy - r); c.lineTo(cx + r, cy); c.lineTo(cx, cy + r); c.lineTo(cx - r, cy); c.closePath();
+      c.stroke();
+      c.fillStyle = withAlpha(palette.deepink, 0.9);
+      c.fillRect(cx - 1, cy - 1, 2, 2);
+    };
+    doorBand(L.rows[s.depth + 1]);
+    for (const row of L.ahead) doorBand(row);
 
     // Glints of each band's good, so a rich layer sparkles and the one under
     // the cut only hints.
@@ -434,11 +526,14 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     }
   };
 
-  /** Draw one frame. `effort` is digger-seconds spent per layer. */
-  const draw = (s, effort, dt, active, split) => {
+  /**
+   * Draw one frame. `effort` is digger-seconds spent per layer; `md` is the
+   * run's multipliers, read only for what the player can see ahead.
+   */
+  const draw = (s, effort, dt, active, split, md) => {
     if (!split) split = { strata: [], face: 0 };
     seed = s.seed;
-    const L = layout(width, height, s.depth, cfg);
+    const L = layout(width, height, s.depth, cfg, focusOf(s, cfg));
     drawGround(L, s, effort);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -455,24 +550,20 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // thing and a layer nobody is working looks empty from here too. Deep in
     // a run the bands are a few pixels tall and a label on every one is
     // noise, so the writing stops and the bars carry on.
-    const from = activeFrom(s.depth, hordeCfg, active);
-    const named = L.bandH >= cfg.labelBandHeight;
-    if (named) {
-      ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-      ctx.textBaseline = 'middle';
-    }
+    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    ctx.textBaseline = 'middle';
     const barMax = Math.min(70, width * 0.09);
     for (const row of L.rows) {
       if (row.k > s.depth) break;
       const layer = layerAt(row.k);
       const mid = row.y + row.h / 2;
-      if (named) {
+      if (row.h >= cfg.labelBandHeight) {
         ctx.fillStyle = withAlpha(palette.ink, 0.62);
         ctx.fillText(Lore.label(layer.name), 8, mid);
         // The seam, quieter, so a layer's character reads off the hill as
         // well as off the panel.
         const words = layer.seam ? Lore.seam(layer.seam.id) : null;
-        if (words && L.bandH >= cfg.seamBandHeight) {
+        if (words && row.h >= cfg.seamBandHeight) {
           const w = ctx.measureText(Lore.label(layer.name)).width;
           ctx.fillStyle = withAlpha(layer.hue, 0.72);
           ctx.fillText(words.tag, 14 + w, mid);
@@ -490,22 +581,37 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // Ground below the cut that has been read ahead of the dead reaching it:
     // named, faintly, where it lies. This is what a player gets for buying
     // the reading, and it is the only place in the game that shows the shape
-    // of a barrow before it is dug.
-    if (named && s.read) {
-      for (let k = s.depth + 1; k < s.depth + 40; k++) {
-        if (!s.read[k]) continue;
-        const y = k <= s.depth + 1 ? L.rows[k].y : L.bottom + (k - s.depth - 2) * L.bandH;
-        const mid = y + L.bandH / 2;
-        if (mid > height - 4) break;
-        const layer = layerAt(k);
-        ctx.fillStyle = withAlpha(palette.ink, 0.34);
-        ctx.fillText(Lore.label(layer.name), 8, mid);
-        const words = layer.seam ? Lore.seam(layer.seam.id) : null;
-        if (words && L.bandH >= cfg.seamBandHeight) {
-          const w = ctx.measureText(Lore.label(layer.name)).width;
-          ctx.fillStyle = withAlpha(layer.hue, 0.42);
-          ctx.fillText(words.tag, 14 + w, mid);
-        }
+    // of a barrow before it is dug. The floor being broken is named too once
+    // anything has read it.
+    const known = [];
+    const face = L.rows[s.depth + 1];
+    if ((md && md.assay) || (s.read && s.read[s.depth + 1])) known.push(face);
+    for (const row of L.ahead) known.push(row);
+    // A door is always named, read or not: it is the thing the dig is for.
+    const doors = [face].concat(L.ahead).filter(row => layerAt(row.k).door);
+    for (const row of doors) {
+      if (row.h < cfg.labelBandHeight - 6) continue;
+      const mid = row.y + row.h / 2;
+      if (mid > height - 4) continue;
+      const door = layerAt(row.k).door;
+      const words = door && door.lord ? Lore.lord(door.lord.id) : null;
+      if (!words) continue;
+      ctx.fillStyle = withAlpha(palette.deepink, 0.95);
+      ctx.fillText(words.name + (Lore.doors().doorTag || ''), 8, mid);
+    }
+    for (const row of known) {
+      if (row.h < cfg.labelBandHeight) continue;
+      if (layerAt(row.k).door) continue;
+      const mid = row.y + row.h / 2;
+      if (mid > height - 4) break;
+      const layer = layerAt(row.k);
+      ctx.fillStyle = withAlpha(palette.ink, 0.4);
+      ctx.fillText(Lore.label(layer.name), 8, mid);
+      const words = layer.seam ? Lore.seam(layer.seam.id) : null;
+      if (words && row.h >= cfg.seamBandHeight) {
+        const w = ctx.measureText(Lore.label(layer.name)).width;
+        ctx.fillStyle = withAlpha(layer.hue, 0.5);
+        ctx.fillText(words.tag, 14 + w, mid);
       }
     }
     return L;

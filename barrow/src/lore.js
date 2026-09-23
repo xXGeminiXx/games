@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=21';
-import { pick } from './rng.js?v=21';
-import { fill } from '../config.js?v=21';
+import { CONTENT } from '../content.js?v=22';
+import { pick } from './rng.js?v=22';
+import { fill } from '../config.js?v=22';
 
 /**
  * One line from a log pool.
@@ -91,3 +91,31 @@ export function chamberBand(band) {
 }
 
 export { CONTENT };
+
+/** The words for a lord of the dead. */
+export function lord(id) {
+  return (CONTENT.lords && CONTENT.lords[id]) || null;
+}
+
+/** The words for an affix a pass puts on a lord. */
+export function affix(id) {
+  return (CONTENT.affixes && CONTENT.affixes[id]) || { name: id, line: '' };
+}
+
+/** What a lord is called on his nth pass: nothing on the first. */
+export function passTitle(n) {
+  const d = CONTENT.doors;
+  if (!d || !(n > 1)) return '';
+  return d.passTitles[n - 1] || fill(d.passMany, { n });
+}
+
+/** The door, hoard and goal lines. */
+export function doors() {
+  return CONTENT.doors;
+}
+
+/** What a rank hands over. */
+export function rankKey(id) {
+  return (CONTENT.rankKeys && CONTENT.rankKeys[id]) || id;
+}
+

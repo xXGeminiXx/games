@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=21';
-import * as Mk from './market.js?v=21';
-import * as Lore from './lore.js?v=21';
-import { fill } from '../config.js?v=21';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=21';
+import { hash, unit, range, pick } from './rng.js?v=22';
+import * as Mk from './market.js?v=22';
+import * as Lore from './lore.js?v=22';
+import { fill } from '../config.js?v=22';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=22';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -233,7 +233,7 @@ export function tick(api, events, waiting) {
   if (state.visitNext === undefined || state.visitNext === null) begin(state, cfg, md);
 
   if (state.visitor) {
-    if (!waiting && state.t >= state.visitor.expires) {
+    if (!waiting && !md.callersWait && state.t >= state.visitor.expires) {
       state.visitorsMissed = (state.visitorsMissed || 0) + 1;
       state.visitor = null;
       state.visitNext = state.t + gapFor(state, cfg, md, state.visitCount);
@@ -343,21 +343,21 @@ export function decline(api) {
   return words.passed || '';
 }
 
-/** A boon in the fewest words that still say what it does. */
+/** A boon in the fewest words that still say what it does, the way the upgrades say it. */
 export function describeBoon(boon) {
   const names = {
-    dig: 'they dig faster',
-    bones: 'the ground gives up more of them',
-    value: 'everything is worth more',
-    face: 'they dig down faster',
-    absorb: 'every market takes more',
-    soft: 'bones go further',
+    dig: 'dig speed',
+    bones: 'bones found',
+    value: 'prices',
+    face: 'dig-down speed',
+    absorb: 'market size',
+    soft: 'diggers per bone',
   };
   const parts = [];
   for (const key of Object.keys(boon)) {
     const pct = Math.round((boon[key] - 1) * 100);
     if (key === 'windfall' || key === 'diggers' || key === 'rem') continue;
-    parts.push((names[key] || key) + ', by ' + pct + '%');
+    parts.push('+' + pct + '% ' + (names[key] || key));
   }
-  return parts.join(' and ') + '.';
+  return parts.join(', ') + '.';
 }

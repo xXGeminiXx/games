@@ -12,8 +12,9 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=21';
-import { pickWeighted, unit } from './rng.js?v=21';
+import * as Mat from './materials.js?v=22';
+import * as Lords from './lords.js?v=22';
+import { pickWeighted, unit } from './rng.js?v=22';
 
 const ONE = { value: 1, hardness: 1, absorb: 1, bones: 1, swell: 1, cap: 1 };
 
@@ -40,16 +41,24 @@ export function createGround(cfg, seed) {
   };
 
   const build = (k) => {
-    const good = Mat.goodAt(k, cfg.strata);
+    // The name and the colour are the owning lord's; the worth still climbs
+    // with the depth, so a stretch reads right wherever the deal put it.
+    const lorded = cfg.lords ? Lords.materialAt(cfg, seed, k) : null;
+    const good = lorded ? { id: 's' + k, name: lorded.name, hue: lorded.hue } : Mat.goodAt(k, cfg.strata);
     const seam = seamAt(k);
     const s = seam || ONE;
-    const f = (key) => (s[key] === undefined ? 1 : s[key]);
+    // His rule bends every layer in his ten the way a seam bends one.
+    const rule = (lorded && lorded.lord.rule) || {};
+    const f = (key) => (s[key] === undefined ? 1 : s[key]) * (rule[key] === undefined ? 1 : rule[key]);
+    const door = cfg.lords ? Lords.doorAt(cfg, seed, k) : null;
     return {
       k,
       id: good.id,
       name: good.name,
       hue: good.hue,
       seam,
+      lord: lorded ? lorded.lord : null,
+      door,
       band: bandOf(k),
       // The four numbers that decide how a layer is worked, and the two that
       // decide how its market behaves.
@@ -63,7 +72,8 @@ export function createGround(cfg, seed) {
       swell:    cfg.market.cycle.amplitude * f('swell'),
       // The floor between the layer above and this one, in units dug at this
       // layer's hardness. A sealed layer is the one that is hard to break into.
-      cap:      Mat.capUnits(Math.max(0, k - 1), cfg.strata) * f('cap'),
+      // A lord's door is that many floors deep on top of whatever the ground is.
+      cap:      Mat.capUnits(Math.max(0, k - 1), cfg.strata) * f('cap') * (door ? door.thickness : 1),
     };
   };
 

@@ -10,32 +10,31 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=21';
-import * as Lore from './lore.js?v=21';
+import { hash } from './rng.js?v=22';
+import * as Lore from './lore.js?v=22';
 
-/** Whether a chamber waits under layer k. */
+/** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {
-  const c = cfg.chambers;
-  return k >= c.first && (k - c.first) % c.every === 0;
+  const every = cfg.lords ? cfg.lords.every : 10;
+  return k > 0 && cfg.chambers.at.includes(k % every);
 }
 
-/** How many chambers lie at or above layer k, for numbering them. */
+/** How many chambers lie above layer k, for numbering them. */
 export function chamberIndex(k, cfg) {
-  const c = cfg.chambers;
-  if (k < c.first) return -1;
-  return Math.floor((k - c.first) / c.every);
+  let n = 0;
+  for (let j = 1; j < k; j++) if (isChamberDepth(j, cfg)) n++;
+  return isChamberDepth(k, cfg) ? n : -1;
 }
 
-
-/** How many chambers at or above k fall in the same band as k does. */
-function bandOrdinal(k, cfg, ground) {
-  if (!ground) return 0;
-  const band = ground.at(k).band;
-  let n = 0;
-  for (let j = cfg.chambers.first; j < k; j += cfg.chambers.every) {
-    if (ground.at(j).band === band) n++;
-  }
-  return n;
+/** The pool of rooms the lord who owns layer k draws from. */
+export function poolOf(k, cfg, ground) {
+  const pools = cfg.chambers.pools || {};
+  const id = ground && ground.at(k).lord ? ground.at(k).lord.id : null;
+  const key = id && pools[id] ? id : 'other';
+  const bands = pools[key] || [0];
+  const rooms = [];
+  for (const b of bands) for (const r of Lore.chamberBand(b)) rooms.push(r);
+  return { key, rooms };
 }
 
 /**
@@ -44,21 +43,21 @@ function bandOrdinal(k, cfg, ground) {
  */
 export function chamberAt(seed, k, cfg, ground) {
   if (!isChamberDepth(k, cfg)) return null;
-  const band = ground ? ground.at(k).band : 0;
-  const pool = Lore.chamberBand(band);
-  if (!pool || !pool.length) return null;
-  // Where the seed starts in the band's pool is the run's business; from
-  // there the rooms are taken in order, so a band never shows the same room
-  // twice before it has shown the rest.
-  const ordinal = bandOrdinal(k, cfg, ground);
-  const template = pool[(hash(seed, 'chamber-band:' + band) + ordinal) % pool.length];
+  const { key, rooms } = poolOf(k, cfg, ground);
+  if (!rooms.length) return null;
+  // Where the seed starts in the pool is the run's business; from there the
+  // rooms are taken in order, so a pool never shows the same room twice
+  // before it has shown the rest.
+  let ordinal = 0;
+  for (let j = 1; j < k; j++) if (isChamberDepth(j, cfg) && poolOf(j, cfg, ground).key === key) ordinal++;
+  const template = rooms[(hash(seed, 'chamber-pool:' + key) + ordinal) % rooms.length];
   if (!template) return null;
   const offers = template.offers.slice();
   if (hash(seed, 'chamber-order:' + k) % 2 === 1) offers.reverse();
   return {
     k,
     index: chamberIndex(k, cfg),
-    band,
+    pool: key,
     title: template.title,
     lines: template.lines.slice(),
     offers: offers.map((o, i) => ({ i, name: o.name, line: o.line, boon: o.boon })),

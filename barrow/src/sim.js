@@ -17,19 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=21';
-import * as Mat from './materials.js?v=21';
-import * as Mk from './market.js?v=21';
-import * as H from './horde.js?v=21';
-import * as Crew from './crew.js?v=21';
-import * as R from './rites.js?v=21';
-import * as Rv from './reveal.js?v=21';
-import * as Ch from './chambers.js?v=21';
-import * as Vi from './visitors.js?v=21';
-import * as Rb from './rebirth.js?v=21';
-import * as Lore from './lore.js?v=21';
-import { createGround } from './ground.js?v=21';
-import { fill } from '../config.js?v=21';
+import { CONFIG as DEFAULT } from '../config.js?v=22';
+import * as Mat from './materials.js?v=22';
+import * as Mk from './market.js?v=22';
+import * as H from './horde.js?v=22';
+import * as Crew from './crew.js?v=22';
+import * as R from './rites.js?v=22';
+import * as Rv from './reveal.js?v=22';
+import * as Ch from './chambers.js?v=22';
+import * as Vi from './visitors.js?v=22';
+import * as Rb from './rebirth.js?v=22';
+import * as Lore from './lore.js?v=22';
+import * as Lords from './lords.js?v=22';
+import * as Ranks from './ranks.js?v=22';
+import { createGround } from './ground.js?v=22';
+import { fill } from '../config.js?v=22';
+import { fmt, fmtCoin } from './numbers.js?v=22';
 
 export const SAVE_VERSION = 2;
 
@@ -55,6 +58,8 @@ export function freshState(cfg, seed) {
     chamber: null,        // the room waiting to be answered
     chambersDone: {},     // layer -> the offer taken there
     chamberQueue: [],     // rooms found while an earlier one was unanswered
+    doors: {},            // layer -> true once the lord's door into it is broken
+    doorsV: 1,            // set on every run that has had doors from its start
     visitor: null,        // who is at the gate
     visitNext: null,      // when the next one comes
     visitCount: 0,
@@ -102,6 +107,10 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   const mods = () => R.modsOf(state, cfg, legacy);
+  // A save from before ranks gets credit for what it had already done.
+  if (legacy.renown === null || legacy.renown === undefined) legacy.renown = Ranks.fromHistory(legacy, cfg);
+  if (!legacy.trophies) legacy.trophies = {};
+  if (!legacy.lordsMet) legacy.lordsMet = {};
 
   /** A market's base price, after any boon that lifted what everything fetches. */
   const baseOf = (id) => {
@@ -181,7 +190,10 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         state.seen[id] = true;
         marketFor(id);
         const k = Mat.strataOf(id);
-        if (k > 0) fire(events, 'market:' + id, 'newMarket', { name: ground.at(k).name }, String(k));
+        // Said for the first couple of markets, while a new player is still
+        // learning that every layer sells. After that every layer would say
+        // it, and a line said every layer is a line nobody reads.
+        if (k > 0 && k <= 2) fire(events, 'market:' + id, 'newMarket', { name: ground.at(k).name }, String(k));
       }
     }
     if (!state.seen[Mat.BONES] && state.bones > 1e-9) {
@@ -197,7 +209,10 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * screen.
    */
   const readAhead = () => {
-    const n = mods().readAhead;
+    const md = mods();
+    let n = md.readAhead;
+    // The lamp names everything down to the next lord's door.
+    if (md.readToDoor && cfg.lords) n = Math.max(n, Lords.nextDoor(state.depth + 1, cfg) - state.depth);
     if (!(n > 0)) return;
     if (!state.read) state.read = {};
     for (let i = 1; i <= n; i++) state.read[state.depth + i] = true;
@@ -210,8 +225,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const words = Lore.seam(layer.seam.id);
     if (!words) return;
     if (state.fired['seam:' + k]) return;
-    fire(events, 'seam:' + k, 'seamFound', { name: layer.name, seam: words.tag }, String(k));
-    events.push({ type: 'log', key: 'seamLine', text: words.line });
+    fire(events, 'seam:' + k, 'seamFound', { name: layer.name, seam: words.tag, line: words.line }, String(k));
   };
 
   const trimIncome = () => {
@@ -265,27 +279,120 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   // -- chambers -------------------------------------------------------------
 
+  /** Put a room or a lord in front of the player, or behind whoever is already there. */
+  const present = (events, room) => {
+    // Only one waits at a time; a second one found while the first is
+    // unanswered is simply the one that comes after it. A room is queued by
+    // its layer and rebuilt; a lord is queued whole, because what he says
+    // depends on whether this was the first time.
+    if (state.chamber) state.chamberQueue = (state.chamberQueue || []).concat(room.kind === 'lord' ? [room] : [room.k]);
+    else state.chamber = room;
+    events.push({ type: 'chamber', k: room.k, kind: room.kind || 'room' });
+  };
+
   const openChamber = (events, k) => {
     if (state.chambersDone[k]) return;
     const room = Ch.chamberAt(state.seed, k, cfg, ground);
     if (!room) return;
-    // Only one room waits at a time; a second one found while the first is
-    // unanswered is simply the one that comes after it.
-    if (state.chamber) state.chamberQueue = (state.chamberQueue || []).concat(k);
-    else state.chamber = room;
-    events.push({ type: 'chamber', k });
+    present(events, room);
     for (const l of room.lines) events.push({ type: 'log', text: l });
   };
 
   const nextChamber = () => {
     const queue = state.chamberQueue || [];
     while (queue.length) {
-      const k = queue.shift();
-      if (state.chambersDone[k]) continue;
-      const room = Ch.chamberAt(state.seed, k, cfg, ground);
+      const q = queue.shift();
+      if (q && typeof q === 'object') {
+        if (state.chambersDone[q.k]) continue;
+        state.chamber = q;
+        return;
+      }
+      if (state.chambersDone[q]) continue;
+      const room = Ch.chamberAt(state.seed, q, cfg, ground);
       if (room) { state.chamber = room; return; }
     }
     state.chamber = null;
+  };
+
+  // -- the lords ------------------------------------------------------------
+
+  /** A lord in front of the player: what he says, and his two gifts. */
+  const hallFor = (door, first) => {
+    const lord = door.lord;
+    const words = Lore.lord(lord.id);
+    const lines = (first ? words.meet : words.again).slice();
+    for (const a of lord.affixes) {
+      const aw = Lore.affix(a.id);
+      if (aw.line) lines.push(aw.name + ': ' + aw.line);
+    }
+    return {
+      k: door.k,
+      kind: 'lord',
+      lord: lord.id,
+      first: !!first,
+      title: Lords.nameOf(lord),
+      lines,
+      offers: lord.def.gifts.map((boon, i) => ({
+        i, name: words.gifts[i].name, line: words.gifts[i].line, boon,
+      })),
+    };
+  };
+
+  /**
+   * A lord's door has given way. His hoard is paid on the spot - coin priced
+   * in seconds of income, never a share of anything, and relics that go
+   * straight into what carries over - and the first time a player ever breaks
+   * a given lord, his trophy is theirs for good.
+   */
+  const breakDoor = (events, k) => {
+    const door = ground.at(k).door;
+    if (!door || (state.doors && state.doors[k])) return;
+    if (!state.doors) state.doors = {};
+    state.doors[k] = true;
+    const lord = door.lord;
+    const md = mods();
+    const L = cfg.lords;
+    const coin = Math.max(0, state.rate) * L.hoardSeconds * lord.hoard * md.hoardMult;
+    earn(coin);
+    const relics = Math.round(L.hoardRelics * Lords.doorNumber(door.r, cfg) * lord.hoard * md.hoardMult);
+    legacy.remembrance = (legacy.remembrance || 0) + relics;
+    legacy.earned = (legacy.earned || 0) + relics;
+    const first = !legacy.trophies[lord.id];
+    legacy.trophies[lord.id] = true;
+    legacy.lordsMet[lord.id] = (legacy.lordsMet[lord.id] || 0) + 1;
+    legacy.renown = (legacy.renown || 0) + (first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
+    const D = Lore.doors();
+    const words = Lore.lord(lord.id);
+    events.push({ type: 'door', k, lord: lord.id, first, coin, relics });
+    events.push({ type: 'log', key: 'door', text: fill(D.broke, { name: Lords.shortName(lord), his: words.his || 'his', coin: fmtCoin(coin), n: fmt(relics) }) });
+    if (first && words.trophy) {
+      events.push({ type: 'log', key: 'trophy', text: fill(D.trophy, { name: words.trophy.name, line: words.trophy.line }) });
+    }
+    present(events, hallFor(door, first));
+  };
+
+  /**
+   * Every layer deeper than the player has ever been pays relics and a point
+   * of rank the moment it opens. Beating a best is always worth something.
+   */
+  const newDepth = (events, k) => {
+    if (!legacy.best) legacy.best = { depth: 0, earned: 0, horde: 0 };
+    if (!(k > (legacy.best.depth || 0))) return;
+    legacy.best.depth = k;
+    const relics = cfg.lords ? cfg.lords.newDepthRelics : 0;
+    if (relics > 0) {
+      legacy.remembrance = (legacy.remembrance || 0) + relics;
+      legacy.earned = (legacy.earned || 0) + relics;
+    }
+    legacy.renown = (legacy.renown || 0) + cfg.ranks.points.newDepth;
+    // Said on the end of the line that announces the layer, so a first run
+    // - where every layer is the deepest yet - does not say two lines a layer.
+    const note = fill(Lore.doors().newDepth, { n: k + 1, relics });
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e.type === 'log' && e.once === 'break:' + k) { e.text += ' ' + note; return; }
+    }
+    events.push({ type: 'log', key: 'newDepth', text: note });
   };
 
   /**
@@ -400,7 +507,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (!offer) return { events };
     payBoon(Ch.applyBoon(state, offer.boon));
     state.chambersDone[room.k] = offer.name;
-    events.push({ type: 'log', text: offer.line });
+    events.push({ type: 'log', text: (room.kind === 'lord' ? offer.name + ': ' : '') + offer.line });
     nextChamber();
     announce(events, Rv.update(state, cfg, legacy));
     milestones(events);
@@ -459,17 +566,43 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const md = mods();
     const before = Math.floor(state.t / cfg.market.sampleSeconds);
 
-    const opened = H.dig(state, dt, cfg, md, ground, split());
+    const sp = split();
+    // A hungry lord eats some of the crew working his door, every minute it
+    // stands.
+    const target = ground.at(state.depth + 1);
+    if (target.door && sp.face > 0 && state.horde > 0) {
+      let eats = 0;
+      for (const a of target.door.lord.affixes) eats += a.eats || 0;
+      if (eats > 0) {
+        const lost = Math.min(state.horde - 1, state.horde * sp.face * eats * dt / 60);
+        if (lost > 0) state.horde -= lost;
+      }
+    }
+    const opened = H.dig(state, dt, cfg, md, ground, sp);
     for (const k of opened) {
       events.push({ type: 'opened', k });
       fire(events, 'break:' + k, 'breakthrough', { name: ground.at(k).name }, String(k));
       seamLine(events, k);
-      openChamber(events, k);
+      newDepth(events, k);
+      if (md.boneCart > 0) state.bones += boneRate() * md.boneCart;
+      if (ground.at(k).door) breakDoor(events, k);
+      else openChamber(events, k);
     }
     if (opened.length) readAhead();
 
     for (const m of markets.values()) Mk.relax(m, dt, md);
     brokerStep(dt, md);
+    // A rank that lets upgrades buy themselves: the cheapest one on the panel
+    // that coin will cover, one a step, while the player has it switched on.
+    if (md.autoBuy && legacy.autoBuy) {
+      let best = null;
+      for (const def of R.visible(state, cfg)) {
+        if (!R.canBuy(state, def)) continue;
+        const price = R.cost(def, R.levelOf(state, def.id));
+        if (!best || price < best.price) best = { def, price };
+      }
+      if (best) { R.buy(state, best.def.id, cfg, 1); readAhead(); }
+    }
 
     state.t += dt;
     trimIncome();
@@ -664,6 +797,20 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return w;
   };
 
+  /** The switches rank hands over, kept with the things that carry between barrows. */
+  const setAutoBuy = (on) => { legacy.autoBuy = !!on; return legacy.autoBuy; };
+  const setAutoSeal = (layer) => {
+    const n = Math.max(0, Math.round(layer) || 0);
+    legacy.autoSealAt = n > 0 ? Math.max(cfg.seal.unlockDepth + 1, n) : 0;
+    return legacy.autoSealAt;
+  };
+  /** Whether the barrow has reached the layer the player asked it to fill itself in at. */
+  const autoSealDue = () => {
+    const md = mods();
+    return !!(md.autoSeal && legacy.autoSealAt > 0 && state.depth + 1 >= legacy.autoSealAt
+      && Rb.canSeal(state, cfg) && !state.chamber);
+  };
+
   const buyRite = (id, count) => {
     const events = [];
     const level = R.buy(state, id, cfg, count);
@@ -686,7 +833,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand,
+    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -718,6 +865,17 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       try { Mk.restoreMarket(marketFor(ms.id), ms); } catch (e) { /* an unknown good is dropped */ }
     }
   }
+
+  // A run from before there were lords has already dug past some of their
+  // doors. They come up to meet the player now: each one pays, talks and
+  // offers his gifts as if the door had just broken, newest line on top.
+  if (opts.state && state.doorsV !== 1 && cfg.lords) {
+    state.doorsV = 1;
+    const events = [];
+    for (let k = cfg.lords.every; k <= state.depth; k += cfg.lords.every) breakDoor(events, k);
+    for (const e of events) if (e.type === 'log' && e.text) state.log.unshift(e.text);
+    if (state.log.length > 14) state.log.length = 14;
+  }
   return sim;
 }
 
@@ -732,6 +890,9 @@ export function restoreSim(cfg, snap) {
   // predates a field still has that field's default, and a field that is not
   // a number any more goes back to its default rather than poisoning the run.
   const state = Object.assign(fresh, st);
+  // A run saved before there were lords says nothing about doors; the fresh
+  // state underneath says it has had them all along, which is not true of it.
+  if (!Object.prototype.hasOwnProperty.call(st, 'doorsV')) state.doorsV = 0;
   state.totals = Object.assign(defaults.totals, st.totals || {});
   state.milestones = Object.assign(defaults.milestones, st.milestones || {});
   state.hand = Object.assign(defaults.hand, st.hand || {});
@@ -755,7 +916,7 @@ export function restoreSim(cfg, snap) {
   state.byHand = Object.prototype.hasOwnProperty.call(st, 'byHand')
     ? !!st.byHand
     : Object.keys((st.tuned && typeof st.tuned === 'object') ? st.tuned : {}).length > 0;
-  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned']) {
+  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned', 'doors']) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }
   if (state.visitor && typeof state.visitor !== 'object') state.visitor = null;
@@ -775,9 +936,17 @@ export function openedState(cfg, legacy, seed, lines) {
   if (lines) state.log = lines.slice(0, 14);
 
   for (const id of o.startRites) state.rites[id] = 1;
+  // What rank hands over at the start of every barrow.
+  const rankRites = { ledger: 'ledger', broker: 'broker', foresight: 'foresight', assay: 'assay' };
+  for (const key of Object.keys(rankRites)) {
+    if (cfg.ranks && Ranks.has(legacy, cfg, key)) state.rites[rankRites[key]] = Math.max(state.rites[rankRites[key]] || 0, 1);
+  }
+  if (cfg.ranks && Ranks.has(legacy, cfg, 'broker2')) state.rites.broker = Math.max(state.rites.broker || 0, 2);
   if (o.startCoin > 0) state.coin = o.startCoin;
 
-  const depth = Math.max(0, Math.min(o.startDepth, 40));
+  // A barrow never starts past the first lord's door: he is always met.
+  const firstDoor = cfg.lords ? cfg.lords.every - 1 : 40;
+  const depth = Math.max(0, Math.min(o.startDepth, 40, firstDoor));
   for (let k = 0; k <= depth; k++) {
     if (k > state.depth) state.depth = k;
     while (state.weights.length <= k) state.weights.push(0);
@@ -790,8 +959,11 @@ export function openedState(cfg, legacy, seed, lines) {
     state.seen['s' + k] = true;
     state.effort[k] = ground.at(k).cap * ground.at(k).hardness;
   }
-  if (o.startHorde > 0) {
-    state.horde = o.startHorde;
+  // The jar's share of the last barrow's dead comes along, once.
+  const carried = legacy.carry > 0 ? legacy.carry : 0;
+  legacy.carry = 0;
+  if (o.startHorde > 0 || carried > 0) {
+    state.horde = o.startHorde + carried;
     state.bones = 0;
     state.faceWeight = cfg.horde.weightFace;
   }

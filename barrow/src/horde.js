@@ -127,7 +127,8 @@ export function dig(s, dt, cfg, mods, ground, given) {
     // The dead on the face are still in the ground of the layer they are
     // breaking into, so they turn up its bones as they go.
     s.bones += diggerSeconds * split.face * target.bones * boneMult;
-    let progress = s.capProgress + rate * split.face * faceMult / target.hardness;
+    const ease = (t) => (t.door && mods && mods.doorEase ? mods.doorEase : 1);
+    let progress = s.capProgress + rate * split.face * faceMult * ease(target) / target.hardness;
     while (progress >= target.cap) {
       progress -= target.cap;
       s.depth += 1;
@@ -135,7 +136,7 @@ export function dig(s, dt, cfg, mods, ground, given) {
       const next = ground.at(s.depth + 1);
       // Effort left over was spent against the old floor; the next one is a
       // different hardness, so it does not carry across one for one.
-      progress *= target.hardness / next.hardness;
+      progress *= (target.hardness / ease(target)) / (next.hardness / ease(next));
       target = next;
       while (s.weights.length <= s.depth) s.weights.push(0);
       settle(s, cfg.horde);

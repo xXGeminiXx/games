@@ -9,9 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=21';
-import * as Rb from './rebirth.js?v=21';
-import * as Lore from './lore.js?v=21';
+import * as Ch from './chambers.js?v=22';
+import * as Rb from './rebirth.js?v=22';
+import * as Lore from './lore.js?v=22';
+import * as Lords from './lords.js?v=22';
+import * as Ranks from './ranks.js?v=22';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -95,6 +97,15 @@ export function modsOf(s, cfg, legacy) {
   const oath = (key, fallback) => (o ? o[key] : fallback);
   const brokerLv = lv('broker');
   const table = r.broker;
+  const trophy = (id) => !!(legacy && legacy.trophies && legacy.trophies[id]);
+  const rank = (id) => !!(legacy && cfg.ranks && Ranks.has(legacy, cfg, id));
+  // The lord whose layers the dig is in: his rule on callers holds while the
+  // shaft is in his ten.
+  const here = cfg.lords ? Lords.lordAt(cfg, s.seed, Lords.realmOf(s.depth, cfg)) : null;
+  const hereGap = here && here.rule.visitGap !== undefined ? here.rule.visitGap : 1;
+  let broker = brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null;
+  if (broker && trophy('neb')) broker = Object.assign({}, broker, { fee: 0 });
+  const T = cfg.lords ? cfg.lords.trophy : {};
   return {
     // Production.
     digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1),
@@ -106,20 +117,30 @@ export function modsOf(s, cfg, legacy) {
     // Markets.
     absorbMult: Math.pow(r.routesFactor, lv('routes')) * b.absorb * oath('absorb', 1),
     recoveryMult: Math.pow(r.hasteFactor, lv('haste')),
-    broker: brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null,
+    broker,
     // Information.
     ledger: lv('ledger') > 0,
     foresight: lv('foresight') > 0,
     assay: lv('assay') > 0,
     // Layers below the cut whose ground is known before the dead reach it.
-    readAhead: lv('survey') > 0 ? r.surveyReads : 0,
+    readAhead: Math.max(lv('survey') > 0 ? r.surveyReads : 0, rank('readTwo') ? 2 : 0),
+    // Rey Muerto's lamp names every layer down to the next door.
+    readToDoor: trophy('rey'),
     // Relics this barrow will pay for being filled in, over what its depth
     // and its earnings are worth on their own.
     records: r.recordsRelics * lv('records'),
     // The world outside the field.
-    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1),
+    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1) * hereGap,
     visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1),
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
+    // What the lords' trophies do.
+    doorEase: trophy('sepulturero') ? (T.doorEase || 1) : 1,
+    hoardMult: trophy('mortifer') ? (T.hoardMult || 1) : 1,
+    boneCart: trophy('pater') ? (T.boneCartSeconds || 0) : 0,
+    callersWait: trophy('dona'),
+    // What rank has handed over that the run has to know about.
+    autoBuy: rank('autoBuy'),
+    autoSeal: rank('autoSeal'),
   };
 }
 

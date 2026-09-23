@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=21';
-import { createSim, restoreSim, openedState } from './sim.js?v=21';
-import * as Save from './save.js?v=21';
-import * as Rb from './rebirth.js?v=21';
-import * as Lore from './lore.js?v=21';
-import { hash } from './rng.js?v=21';
-import { createUI } from './ui.js?v=21';
-import { createView } from './view.js?v=21';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=21';
-import * as Mat from './materials.js?v=21';
+import { storageKey, fill } from '../config.js?v=22';
+import { createSim, restoreSim, openedState } from './sim.js?v=22';
+import * as Save from './save.js?v=22';
+import * as Rb from './rebirth.js?v=22';
+import * as Lore from './lore.js?v=22';
+import { hash } from './rng.js?v=22';
+import { createUI } from './ui.js?v=22';
+import { createView } from './view.js?v=22';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=22';
+import * as Mat from './materials.js?v=22';
 
 /**
  * @param {object} o
@@ -87,6 +87,8 @@ export function createGame(o) {
     return [];
   });
   actions.seal = () => seal();
+  actions.setAutoBuy = wrap((on) => { sim.setAutoBuy(on); save(); return []; });
+  actions.setAutoSeal = wrap((n) => { sim.setAutoSeal(n); save(); return []; });
 
   // -- the clock -------------------------------------------------------------
 
@@ -105,7 +107,7 @@ export function createGame(o) {
       // down to lower case before going into a sentence.
       const parts = [];
       if (r.gained.coin > 0.005) parts.push(fmtCoin(r.gained.coin) + ' ' + Lore.inline(cfg.text.stats.coin));
-      if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more of them');
+      if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more diggers');
       if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + Lore.inline(cfg.text.stats.bones));
       if (r.gained.strata > 0) parts.push(r.gained.strata + (r.gained.strata === 1 ? ' layer' : ' layers'));
       // How long the player was gone, not how long the dead lasted: when the
@@ -116,7 +118,7 @@ export function createGame(o) {
       // These are whole sentences after a full stop, so they take capitals
       // like every other sentence the game writes.
       if (r.gained.waiting) line += ' ' + Lore.line(sim.state.seed, 'waiting', null, String(sim.state.visitCount));
-      if (r.capped) line += ' They stopped after ' + fmtTime(r.elapsed) + '.';
+      if (r.capped) line += ' They stopped digging after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }
     return r;
@@ -146,7 +148,11 @@ export function createGame(o) {
 
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
-    view.draw(sim.state, sim.state.effort, dt, sim.mods().activeStrata, sim.split());
+    const md = sim.mods();
+    view.draw(sim.state, sim.state.effort, dt, md.activeStrata, sim.split(), md);
+
+    // A barrow the player asked to fill itself in, once it is deep enough.
+    if (sim.autoSealDue()) { seal(); return; }
 
     sinceSave += dt;
     if (sinceSave >= cfg.time.autosaveSeconds) { save(); sinceSave = 0; }

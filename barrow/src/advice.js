@@ -22,11 +22,11 @@
 // something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=21';
-import * as R from './rites.js?v=21';
-import * as Rb from './rebirth.js?v=21';
-import * as Lore from './lore.js?v=21';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=21';
+import * as H from './horde.js?v=22';
+import * as R from './rites.js?v=22';
+import * as Rb from './rebirth.js?v=22';
+import * as Lore from './lore.js?v=22';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=22';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -92,17 +92,20 @@ export function next(sim, cfg) {
 
   // A room stops nothing but it is the only choice on the page that is gone
   // once it is answered.
-  if (s.chamber) return say('room', {}, 'chamber-panel');
+  if (s.chamber) {
+    if (s.chamber.kind === 'lord') {
+      const words = Lore.lord(s.chamber.lord);
+      return say('lord', { name: words ? words.name : s.chamber.title, his: (words && words.his) || 'his' }, 'chamber-panel');
+    }
+    return say('room', {}, 'chamber-panel');
+  }
 
-  // Somebody at the gate leaves on a clock; everything else waits.
+  // Somebody at the gate leaves on a clock; everything else waits. A caller
+  // the player cannot answer - one asking more coin than there is, or a buyer
+  // for something none of is on hand - is not the most useful thing on the
+  // page, so the line goes on to whatever is.
   const v = s.visitor;
-  if (v) {
-    if (v.kind === 'buyer' && !(sim.held(v.data.id) > 1e-9)) {
-      return say('gateEmpty', { name: name(v.data.k) }, 'visitor-panel');
-    }
-    if (v.cost > 0 && s.coin < v.cost) {
-      return say('gateCoin', { cost: fmtCoin(v.cost), coin: fmtCoin(s.coin) }, 'visitor-panel');
-    }
+  if (v && sim.visitorReady()) {
     return say('gate', { t: fmtTime(Math.max(0, v.expires - s.t)) }, 'visitor-panel');
   }
 
@@ -212,7 +215,7 @@ export function next(sim, cfg) {
 
 /** Every key `next` can return, for the suite and for nothing else. */
 export const KEYS = [
-  'room', 'gateEmpty', 'gateCoin', 'gate', 'dig', 'raise', 'sell', 'face',
+  'room', 'lord', 'gate', 'dig', 'raise', 'sell', 'face',
   'move', 'raiseMore', 'oath', 'sealBeats', 'seal', 'rite', 'wait', 'work', 'bones', 'idle',
 ];
 

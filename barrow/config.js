@@ -52,6 +52,7 @@ export const CONFIG = {
       depth:  'Depth',
       income: 'Coin/s',
       rem:    'Relics',
+      rank:   'Rank {n}',
     },
 
     dig:        'Dig',
@@ -90,12 +91,20 @@ export const CONFIG = {
     rowNothing:  'Nothing yet',
     rowRateTip:  'What this layer pays and how many of the dead it turns up, every second',
     face:       'Digging down',
+    doorRow:    '{Name}\'s door',
+    // The switches rank hands over.
+    autoBuyOn:  'Auto-buy: on',
+    autoBuyOff: 'Auto-buy: off',
+    autoBuyTip: 'Buys the cheapest upgrade you can afford, as soon as you can afford it',
+    autoSeal:   'Fill in by itself at layer {n}',
+    autoSealOff: 'Fill in by itself: off',
+    autoSealTip: 'The barrow fills itself in once it reaches this layer, and the next one starts',
     faceLine:   'Put some of them here and they break through to the layer below.',
     export:     'Export',
     import:     'Import',
     reset:      'Start over',
     resetSure:  'Sure? You lose the relics too',
-    bought:     'Held',
+    bought:     'Owned',
     take:       'Take it',
     pass:       'Pass',
     unknownSeam:'Unread',
@@ -103,10 +112,11 @@ export const CONFIG = {
     panels: {
       horde:   'Where they dig',
       market:  'Markets',
-      rites:   'What coin buys',
-      riteBulk: 'Levels at a time',
+      rites:   'Upgrades',
+      riteBulk: 'Buy',
       visitor: 'At the gate',
       chamber: 'A room',
+      lord:    'A lord of the dead',
       seal:    'Fill it in',
       oaths:   'Kept forever',
     },
@@ -131,7 +141,7 @@ export const CONFIG = {
       absorb:   'Markets take',
       soft:     'Bones raise more',
       windfall: '{Coin} coin now',
-      diggers:  '{N} of the dead now',
+      diggers:  '{N} diggers now',
       rem:      '{N} relics when you fill it in',
     },
 
@@ -154,29 +164,48 @@ export const CONFIG = {
     lesserTip:   'Everything still on hand from layers the dead have left behind',
     lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
-    seamAhead:   'next is {seam}',
+    aheadLine:   'Next down: {list}',
+
+    // THE GOAL: the next lord's door, under the line at the top.
+    goal: {
+      ahead: '{Name}\'s door is under layer {n}. {m} layers to go.',
+      one:   '{Name}\'s door is under the next layer.',
+      at:    'Breaking {Name}\'s door: {pct} through.',
+      rule:  'In {Name}\'s layers: {line}',
+    },
+    // The Kept forever tab: rank, trophies, and what rank hands over.
+    standing: {
+      rank:     'Rank {n}: {name}',
+      next:     'Next rank, {next}: {into} of {span}.',
+      nextKey:  'Rank {n} gives you: {line}',
+      how:      'Rank comes from breaking lords\' doors, digging deeper than ever, and filling barrows in. It never goes down.',
+      trophies: 'Trophies',
+      keys:     'What rank gives you',
+      unknown:  '???',
+      unmet:    'Break the door to keep it.',
+      atRank:   'Rank {n}',
+    },
 
     // THE LINE AT THE TOP. One rung of the ordered list in src/advice.js,
     // filled with figures read off the run as it stands. Every key here is
     // reachable and every key that file can return has a line here; the
     // suite checks both ways. Keep them short enough to read at a glance.
     compass: {
-      room:      'A room is open. Take one of the two and this barrow keeps it.',
+      room:      'A room is open. Pick one; it lasts the rest of this barrow.',
+      lord:      '{Name} is waiting. Pick one of {his} gifts.',
       gate:      "Somebody's at the gate. They go in {t}.",
-      gateCoin:  'The caller at the gate wants {cost} coin and you have {coin}.',
-      gateEmpty: "The caller at the gate buys {name} and you're holding none. Send them off.",
-      dig:       'Press Dig. One press in {n} turns up a bone, and bones raise the dead.',
+      dig:       'Press Dig. Every {n} presses turns up a bone, and bones raise the dead.',
       sell:      "You're holding {n} {name}, worth {coin}. Press Sell.",
       raise:     '{Bones} bones in hand and a digger costs {cost}. Press Raise.',
-      raiseMore: '{Bones} bones raises {n} more of them. Nothing else spends bones.',
+      raiseMore: '{Bones} bones will raise {n} more diggers. Nothing else uses bones.',
       face:      "Nothing's digging down. Send some of them to {name} and they break into {next}.",
       move:      '{From} pays {low} coin/s and {name} pays {high}. Send more of them down.',
-      seal:      'Filling in pays {n} relics now. That is {Name} at {cost}, and you keep it for good.',
-      sealBeats: 'Filling in pays {n} relics: {Name} at {cost}, yours for good. {Buy} at {coin} goes back in the hole with everything else.',
-      oath:      '{N} relics banked. {Name} costs {cost} and you keep it.',
-      rite:      '{Name} costs {cost}. {line}',
-      wait:      "{Name} costs {cost}. At {rate} that's {t} away.",
-      work:      '{Name} pays {coin} coin/s, the most of any layer open.',
+      seal:      'Fill in now for {n} relics: enough for {Name} ({cost}), kept forever.',
+      sealBeats: 'Fill in now for {n} relics: enough for {Name} ({cost}), kept forever. {Buy} ({coin}) would be buried with this barrow.',
+      oath:      '{N} relics banked. {Name} costs {cost}, kept forever.',
+      rite:      '{Name}: {cost}. {line}.',
+      wait:      "{Name} costs {cost}. At {rate}, that's {t}.",
+      work:      '{Name} pays the most: {coin} coin/s.',
       bones:     '{Name} is turning up {bones} bones a second.',
       idle:      'Nothing is digging yet.',
       go:        'Show me',
@@ -249,7 +278,7 @@ export const CONFIG = {
     hardnessGrowth: 2.5,
     valueGrowth: 3.5,
     capBase: 12,
-    capGrowth: 2.0,
+    capGrowth: 1.7,      // ordinary floors thicken this much a layer; the doors carry the weight (lords.doorThickness)
     // The ladder stops climbing here. Every layer past it is worth, costs and
     // holds what the horizon layer does, so the numbers stay inside a double
     // forever. It sits hundreds of layers below anything reachable: each layer
@@ -336,14 +365,166 @@ export const CONFIG = {
   // The choice is a permanent multiplier for the rest of that run.
   // -------------------------------------------------------------------------
   chambers: {
-    first: 3,       // the first chamber is under this layer
-    every: 4,       // and one under every this many after it
+    at: [3, 7],     // rooms sit this many layers into every lord's ten
+    // Which of the writing's room pools each lord's layers draw from. A pool
+    // is dealt in order across a barrow, so no room repeats before the rest
+    // of its pool has been shown.
+    pools: { rex: [0, 1], mortifer: [4], other: [2, 3] },
     windfallCap: 3600,   // a windfall pays at most this many seconds of income
     // A room that hands over the dead hands over this many seconds of the
     // horde's own growth, not a share of the horde. A share would multiply the
     // horde every few layers, which is an exponential in depth, and every
     // exponential in depth eventually eats the game.
     diggerSeconds: 3600,
+  },
+
+  // -------------------------------------------------------------------------
+  // THE LORDS - who is under the hill, ten layers at a time
+  //
+  // The ground is cut into stretches of `every` layers. Each stretch belongs
+  // to one lord of the dead: its materials are his, its one rule holds in all
+  // of it, and the floor under its last layer is his DOOR - `doorThickness`
+  // ordinary floors deep. Breaking it pays his hoard on the spot, puts him in
+  // front of the player with two gifts to choose from, and the first time a
+  // player ever breaks a given lord's door his trophy is theirs for good.
+  //
+  // The first door is always Rex Mortis and every fifth is Mortifer. The three
+  // between are dealt from `rotating` by the barrow's seed, so every barrow
+  // meets different lords. Past Mortifer the round starts again with every
+  // lord in the deal, one pass harder: each pass adds one affix, and an affix
+  // makes a door thicker and a hoard richer together.
+  //
+  // `rule` bends every layer in the stretch the way a seam bends one layer
+  // (value, hardness, absorb, bones, swell, cap), plus visitGap, which moves
+  // how often callers come while the dig is in that stretch.
+  // -------------------------------------------------------------------------
+  lords: {
+    every: 10,
+    first: 'rex',
+    last: 'mortifer',
+    round: 5,               // doors in a round: the first, three dealt, the last
+    rotating: ['pater', 'rey', 'dona', 'sepulturero', 'neb', 'natron'],
+    doorThickness: 24,      // a door is this many ordinary floors deep
+    hoardSeconds: 1800,     // coin a broken door pays: this much of the income
+    hoardRelics: 10,        // relics it pays, times which door of the round it is
+    newDepthRelics: 3,      // relics for every layer deeper than the player has ever been
+    // What the trophies do, where a number is involved.
+    trophy: {
+      startLayers: 3,       // Rex Mortis's: barrows start this many layers down
+      boneCartSeconds: 90,  // Pater Ossium's: a cart of this many seconds of bones per layer
+      doorEase: 2,          // El Sepulturero's: doors give way this many times faster
+      carryShare: 0.01,     // Mother Natron's: this share of the dead come to the next barrow
+      hoardMult: 2,         // Mortifer's: every hoard is this many times bigger
+    },
+    affixes: [
+      { id: 'elder',     door: 2,   hoard: 2 },
+      { id: 'crowned',   door: 3,   hoard: 3 },
+      { id: 'hungry',    door: 1.5, hoard: 2, eats: 0.01 },   // share of the way-down crew he takes a minute
+      { id: 'ironbound', door: 2.5, hoard: 2.5 },
+      { id: 'jealous',   door: 1.5, hoard: 2, value: 0.5 },
+      { id: 'wrathful',  door: 1.5, hoard: 2, visitGap: 4 },
+    ],
+    list: {
+      rex: {
+        rule: {},
+        materials: [
+          ['soil', '#6b4f3a'], ['clay', '#9a6a4a'], ['flint', '#7d7a72'], ['peat', '#5a4f35'],
+          ['coal', '#56565e'], ['tin', '#9aa3a8'], ['copper', '#b87333'], ['bronze', '#b08d57'],
+          ['iron', '#8c8c90'], ['silver', '#c0c6cc'],
+        ],
+        gifts: [{ diggers: 2.0 }, { dig: 2 }],
+      },
+      pater: {
+        rule: { bones: 3, value: 0.6 },
+        materials: [
+          ['chalk', '#e8e4d8'], ['lime', '#d6d2b8'], ['bone', '#d9cdb4'], ['horn', '#8a6f4e'],
+          ['fossil', '#a89878'], ['ivory', '#f1e6cf'], ['jet', '#3a3a42'], ['amber', '#d08a2a'],
+          ['opal', '#cfe3e0'], ['pearl', '#efe9df'],
+        ],
+        gifts: [{ bones: 2 }, { soft: 2 }],
+      },
+      rey: {
+        rule: { value: 2.2 },
+        materials: [
+          ['lead', '#5f6670'], ['zinc', '#9ea7ad'], ['pyrite', '#c9b04a'], ['galena', '#7b8190'],
+          ['nickel', '#a3a08f'], ['cinnabar', '#b3302a'], ['quicksilver', '#d0d4d8'], ['cobalt', '#3f6fb8'],
+          ['platinum', '#d8dde3'], ['palladium', '#bfc3c8'],
+        ],
+        gifts: [{ value: 2 }, { absorb: 3 }],
+      },
+      dona: {
+        rule: { visitGap: 0.5 },
+        materials: [
+          ['obsidian', '#3a3340'], ['agate', '#b0634a'], ['jasper', '#9c3b2e'], ['jade', '#4f9a6a'],
+          ['turquoise', '#3fb5b0'], ['fire opal', '#e0662a'], ['garnet', '#a3283a'], ['topaz', '#e3a33a'],
+          ['gold', '#d9b23f'], ['emerald', '#2e9e5b'],
+        ],
+        gifts: [{ windfall: 3600, value: 1.5 }, { diggers: 3 }],
+      },
+      sepulturero: {
+        rule: { cap: 0.5 },
+        materials: [
+          ['slate', '#4d5560'], ['sandstone', '#c29a6b'], ['granite', '#8a8480'], ['basalt', '#3d3f44'],
+          ['marble', '#e6e2dc'], ['alabaster', '#efe8dc'], ['travertine', '#d8c9a8'], ['onyx', '#2b2b2e'],
+          ['porphyry', '#7a2e4a'], ['diorite', '#9a9a96'],
+        ],
+        gifts: [{ face: 2.5 }, { dig: 2 }],
+      },
+      neb: {
+        rule: { value: 3, absorb: 0.35 },
+        materials: [
+          ['sand', '#d8bf8a'], ['ochre', '#c7862f'], ['gypsum', '#ece6d6'], ['malachite', '#2f8f62'],
+          ['carnelian', '#c24a2a'], ['amethyst', '#8e5bb5'], ['lapis', '#2c4f9e'], ['feldspar', '#d4b8a0'],
+          ['electrum', '#d8c070'], ['meteor iron', '#6a6e78'],
+        ],
+        gifts: [{ value: 2.5 }, { absorb: 2.5, value: 1.5 }],
+      },
+      natron: {
+        rule: { hardness: 0.6 },
+        materials: [
+          ['salt', '#eeeeea'], ['natron', '#e2dcc6'], ['alum', '#dfe6e8'], ['sulfur', '#d8cc3a'],
+          ['resin', '#b5712a'], ['myrrh', '#8a4a2a'], ['frankincense', '#d8b878'], ['bitumen', '#2a2624'],
+          ['naphtha', '#5a4a2a'], ['pitch', '#1e1b1a'],
+        ],
+        gifts: [{ soft: 2.5 }, { bones: 2 }],
+      },
+      mortifer: {
+        rule: { value: 2, bones: 2, hardness: 1.4 },
+        materials: [
+          ['ash', '#8a8680'], ['cinder', '#6a3326'], ['soot', '#2c2828'], ['pumice', '#b8b2a8'],
+          ['slag', '#4a4040'], ['brimstone', '#d8b02a'], ['bloodstone', '#3a5a3a'], ['star ruby', '#c81f3a'],
+          ['black diamond', '#34343f'], ['adamant', '#a8b8d0'],
+        ],
+        gifts: [{ dig: 3, face: 2 }, { value: 3, bones: 2 }],
+      },
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // RANKS - what the player is, and it never goes back down
+  //
+  // Points come from breaking doors (more the first time a lord is met),
+  // from every layer deeper than the player has ever been, and from filling a
+  // barrow in. A rank is a grade and a title: four grades to a title, ten
+  // titles, and past the last one the Rex title counts deeps forever.
+  // `need(n)` is the points rank n takes: step * (n - 1) + (n - 1) squared.
+  // Each rank in `keys` hands over one thing.
+  // -------------------------------------------------------------------------
+  ranks: {
+    step: 4,
+    points: { newDepth: 1, door: 3, firstLord: 10, sealPer: 5 },
+    grades: ['Under-', '', 'High ', 'Grand '],
+    titles: ['Fossor', 'Sexton', 'Capataz', 'Custos', 'Mortenant', 'Nomarch', 'Psychopomp', 'Tumularch', 'Virrey', 'Rex'],
+    keys: [
+      { rank: 3,  id: 'ledger' },
+      { rank: 5,  id: 'broker' },
+      { rank: 7,  id: 'readTwo' },
+      { rank: 9,  id: 'foresight' },
+      { rank: 11, id: 'autoBuy' },
+      { rank: 14, id: 'assay' },
+      { rank: 17, id: 'broker2' },
+      { rank: 20, id: 'autoSeal' },
+    ],
   },
 
   // -------------------------------------------------------------------------
@@ -524,8 +705,6 @@ export const CONFIG = {
     perStratum: 3,
     earnFloor: 1e7,      // coin earned past this pays by the decade
     perDecade: 2,
-    finaleSeals: 4,      // the shaft finds its bottom on this seal
-    finaleDepth: 24,     // and only this deep
   },
 
   // -------------------------------------------------------------------------
@@ -595,6 +774,14 @@ export const CONFIG = {
     // layers pushed the deepest six and the face off the bottom of a two
     // hundred pixel field, which is the part worth looking at.
     minBandHeight: 2,
+    // The picture follows the dig: this many of the deepest layers get full
+    // bands, everything above them is pressed into a thin stack at the top
+    // (historyBand pixels a layer, never more than historyShare of the frame),
+    // and up to aheadMax known layers below the floor are drawn and named.
+    focusLayers: 6,
+    historyBand: 3,
+    historyShare: 0.2,
+    aheadMax: 10,
     labelBandHeight: 17,   // below this a band is too thin to write its name in
     seamBandHeight: 24,    // and below this there is no room for its seam too
     surfaceHeight: 46,     // the sky, the mound and the spoil heap
@@ -638,7 +825,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 21,
+    build: 22,
   },
 };
 

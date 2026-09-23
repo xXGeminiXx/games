@@ -90,6 +90,32 @@
   #compass-go{flex:0 0 auto;padding:1px 8px;font-size:11px;color:var(--coin);border-color:var(--rule)}
   #compass-go:hover:not(:disabled){border-color:var(--coin)}
 
+  /* The goal: the next lord's door, always named, and how far through it
+     the dig is once it is being broken. */
+  #goal{margin:0 0 10px;padding:0 0 8px 12px;border-left:2px solid var(--deepink);border-bottom:1px solid var(--rule)}
+  #goal-say{color:var(--ink)}
+  #goal-say b{color:var(--deepink);font-weight:600}
+  #goal-bar{height:3px;background:var(--rule);margin:5px 0 4px;max-width:340px}
+  #goal-bar span{display:block;height:3px;background:var(--deepink);width:0}
+  #goal-rule{color:var(--dim);font-size:11px;display:block}
+  /* A lord in front of the player reads differently from a room. */
+  #chamber-panel.lord{border-left:2px solid var(--deepink);padding-left:12px}
+  #chamber-panel.lord h2{color:var(--deepink)}
+  #chamber-panel.lord #chamber-text p{color:var(--ink)}
+  /* Rank, trophies and what rank gives, above what relics buy. */
+  #standing{margin:0 0 10px}
+  #standing .rankline b{color:var(--deepink);font-weight:600}
+  #standing .rankbar{height:3px;background:var(--rule);margin:4px 0 3px;max-width:340px}
+  #standing .rankbar span{display:block;height:3px;background:var(--deepink)}
+  #standing small{color:var(--dim);font-size:11px;display:block}
+  #standing h3{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--dim);margin:10px 0 4px}
+  #standing .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2px 22px}
+  #standing .grid div{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #standing .grid div b{color:var(--ink);font-weight:500}
+  #standing .grid div.off{color:var(--quiet)}
+  #standing .grid div.off b{color:var(--quiet)}
+  #stats #rank{color:var(--deepink)}
+
   /* The log: newest on top, fading down, five lines on screen. */
   #log{margin:0 0 12px;min-height:44px}
   #log p{margin:0 0 2px;color:var(--ink)}
@@ -201,6 +227,10 @@
   #seal-note{margin:0 0 8px;color:var(--dim)}
   #seal-acts{margin-bottom:2px}
   #seal-acts button.seal{border-color:var(--deepink);color:var(--deepink);padding:4px 12px}
+  #seal-acts .autoseal{margin-top:8px;display:flex;gap:4px;flex-wrap:wrap}
+  button.auto{font-size:11px;padding:1px 8px}
+  button.auto[aria-pressed="true"]{color:var(--deepink);border-color:var(--deepink)}
+  #rite-bulk button.auto{margin-left:10px}
   #oaths{display:grid;gap:1px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));column-gap:22px}
   #oaths .rrow button.rite{border-color:var(--rule)}
   #oaths .rrow i{color:var(--deepink)}
@@ -255,6 +285,8 @@
     .wrow i{white-space:normal;overflow:visible}
     .wrow .rate{white-space:normal}
     #oaths{grid-template-columns:1fr}
+    #standing .grid{grid-template-columns:1fr}
+    #standing .grid div{white-space:normal}
     #panel-tabs{gap:14px;flex-wrap:wrap}
     /* The market's columns are pinned wide enough for a chart and a base
        price beside it. On a phone that pushed the sell buttons a good sixty
@@ -426,7 +458,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="2df54a62f927">
+<meta name="build" content="7e07dd7048e6">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -481,11 +513,13 @@
     <div class="stat" id="st-horde" hidden><b id="horde">0</b><span id="lbl-horde">diggers</span></div>
     <div class="stat" id="st-depth" hidden><b id="depth">0</b><span id="lbl-depth">depth</span></div>
     <div class="stat" id="st-rem" hidden><b id="rem">0</b><span id="lbl-rem">relics</span></div>
+    <div class="stat" id="st-rank" hidden><b id="rank">0</b><span id="lbl-rank">rank</span></div>
   </div>
 </header>
 <main>
   <section id="books">
     <p id="compass"><span id="compass-say"></span><button id="compass-go" hidden></button></p>
+    <div id="goal" hidden><div id="goal-say"></div><div id="goal-bar"></div><small id="goal-rule"></small></div>
     <div id="log"></div>
     <div id="chamber-panel" class="panel" hidden>
       <h2 id="chamber-title">A room</h2>
@@ -515,6 +549,7 @@
       </div>
       <div id="rite-bulk"></div>
       <div id="rites"></div>
+      <div id="standing" hidden></div>
       <p id="oaths-note" hidden></p>
       <div id="oaths" hidden></div>
     </div>
@@ -535,8 +570,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=21';
-import { createGame } from './src/game.js?v=21';
+import { CONFIG, applyIdentity } from './config.js?v=22';
+import { createGame } from './src/game.js?v=22';
 
 applyIdentity(document);
 

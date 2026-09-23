@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=21';
-import { pick } from './rng.js?v=21';
-import { fill } from '../config.js?v=21';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=21';
+import * as Lore from './lore.js?v=22';
+import { pick } from './rng.js?v=22';
+import { fill } from '../config.js?v=22';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=22';
 
 export const LEGACY_VERSION = 1;
 
@@ -28,6 +28,21 @@ export function freshLegacy() {
     seals: 0,
     finale: false,
     best: { depth: 0, earned: 0, horde: 0 },
+    // What the lords leave: a trophy per lord ever broken, and how many times
+    // each has been met.
+    trophies: {},
+    lordsMet: {},
+    // Rank points. Null on a save from before ranks, which the simulation
+    // fills in from what that save had already done.
+    renown: 0,
+    // The dead Mother Natron's jar carries to the next barrow.
+    carry: 0,
+    // One line per barrow filled in, newest first.
+    barrows: [],
+    // The switches rank hands over: upgrades buying themselves, and the layer
+    // a barrow fills itself in at (0 is off).
+    autoBuy: false,
+    autoSealAt: 0,
   };
 }
 
@@ -39,6 +54,16 @@ export function restoreLegacy(raw) {
     if (Number.isFinite(raw[key])) l[key] = raw[key];
   }
   l.finale = !!raw.finale;
+  l.renown = Number.isFinite(raw.renown) ? raw.renown : null;
+  if (Number.isFinite(raw.carry) && raw.carry > 0) l.carry = raw.carry;
+  l.autoBuy = !!raw.autoBuy;
+  if (Number.isFinite(raw.autoSealAt) && raw.autoSealAt > 0) l.autoSealAt = Math.round(raw.autoSealAt);
+  for (const key of ['trophies', 'lordsMet']) {
+    if (raw[key] && typeof raw[key] === 'object') {
+      for (const id of Object.keys(raw[key])) if (raw[key][id]) l[key][id] = raw[key][id];
+    }
+  }
+  if (Array.isArray(raw.barrows)) l.barrows = raw.barrows.filter(b => b && typeof b === 'object').slice(0, 50);
   if (raw.oaths && typeof raw.oaths === 'object') {
     for (const id of Object.keys(raw.oaths)) {
       const lv = raw.oaths[id];
@@ -74,11 +99,6 @@ export function yieldOf(state, cfg) {
 /** Whether the shaft has gone deep enough for the seal to be offered at all. */
 export function canSeal(state, cfg) {
   return state.depth >= cfg.seal.unlockDepth;
-}
-
-/** Whether this seal is the one that finds the bottom. */
-export function isFinale(state, cfg, legacy) {
-  return !legacy.finale && legacy.seals + 1 >= cfg.seal.finaleSeals && state.depth >= cfg.seal.finaleDepth;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +151,7 @@ export function oathMods(legacy, cfg) {
     visitPay: Math.pow(o.callingPay, lv('calling')),
     offlineHours: o.nightHours * lv('night'),
     startHorde: lv('dead') > 0 ? Math.round(o.deadBase * Math.pow(o.deadGrowth, lv('dead') - 1)) : 0,
-    startDepth: lv('ground'),
+    startDepth: lv('ground') + (legacy.trophies && legacy.trophies.rex ? ((cfg.lords && cfg.lords.trophy.startLayers) || 0) : 0),
     startCoin: lv('purse') > 0 ? o.purseBase * Math.pow(o.purseGrowth, lv('purse') - 1) : 0,
     startRites: o.booksRites.slice(0, lv('books')),
   };
@@ -149,19 +169,29 @@ export function oathMods(legacy, cfg) {
  */
 export function seal(state, cfg, legacy) {
   const rem = yieldOf(state, cfg);
-  const finale = isFinale(state, cfg, legacy);
   legacy.remembrance += rem;
   legacy.earned += rem;
   legacy.seals += 1;
   legacy.best.depth = Math.max(legacy.best.depth, state.depth);
   legacy.best.earned = Math.max(legacy.best.earned, state.totals.earned);
   legacy.best.horde = Math.max(legacy.best.horde, state.horde);
-  if (finale) legacy.finale = true;
+  // Filling a barrow in is worth rank on its own, and the jar carries some of
+  // the dead across to the next one.
+  if (cfg.ranks) legacy.renown = (legacy.renown || 0) + cfg.ranks.points.sealPer;
+  if (legacy.trophies && legacy.trophies.natron && cfg.lords) {
+    legacy.carry = Math.floor(state.horde * cfg.lords.trophy.carryShare);
+  }
+  const lordsBroken = Object.keys(state.doors || {}).length;
+  if (!Array.isArray(legacy.barrows)) legacy.barrows = [];
+  legacy.barrows.unshift({
+    n: legacy.seals, depth: state.depth + 1, coin: state.totals.earned, horde: state.horde,
+    lords: lordsBroken, relics: rem,
+  });
+  if (legacy.barrows.length > 50) legacy.barrows.length = 50;
 
   const words = Lore.seal();
   const salt = 'seal:' + legacy.seals;
   const lines = [];
-  if (finale) for (const l of words.finaleLines) lines.push(l);
   lines.push(pick(words.doneLines, state.seed, salt) || '');
   lines.push(fill(words.statLine, {
     n: legacy.seals,
@@ -171,5 +201,5 @@ export function seal(state, cfg, legacy) {
   }));
   lines.push(fill(words.yieldPaid, { n: fmt(rem) }));
   lines.push(pick(words.openLines, state.seed, salt) || '');
-  return { rem, finale, lines: lines.filter(Boolean) };
+  return { rem, lines: lines.filter(Boolean) };
 }
