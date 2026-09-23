@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=25';
-import { activeFrom } from './horde.js?v=25';
-import * as Lore from './lore.js?v=25';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=26';
+import { activeFrom } from './horde.js?v=26';
+import * as Lore from './lore.js?v=26';
 
 /** mulberry32 */
 function rng(seed) {
@@ -243,6 +243,15 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     sky.addColorStop(1, palette.sky);
     c.fillStyle = sky;
     c.fillRect(0, 0, width, L.surface);
+    // A few stars over the field, fixed by the seed and faint enough that it
+    // stays night rather than turning into a sky anybody looks at.
+    const sr = rng((seed ^ 0x5eed5eed) >>> 0);
+    const stars = Math.round(width / 26);
+    for (let i = 0; i < stars; i++) {
+      const x = sr() * width, y = sr() * Math.max(4, L.surface - 16);
+      c.fillStyle = withAlpha(palette.bone, 0.1 + sr() * 0.24);
+      c.fillRect(x, y, 1, 1);
+    }
 
     // The mound, and the spoil heap beside it, which grows with everything
     // that has come out of the hole. The mound is a hill, so it is drawn as
@@ -256,6 +265,23 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     c.quadraticCurveTo(width * 0.5, L.surface - crest * 1.6, width * 0.5 + half, L.surface);
     c.closePath();
     c.fill();
+    // A standing stone on the mound, off to one side of the shaft: whoever
+    // raised the barrow marked it.
+    {
+      const sx0 = width * 0.5 - half * 0.42;
+      const u = (sx0 - (width * 0.5 - half)) / (2 * half);
+      const ground0 = L.surface - crest * 1.6 * 2 * u * (1 - u);
+      const sh0 = Math.min(L.surface - 4, 9 + crest * 0.25);
+      c.fillStyle = mix(palette.mound, palette.bone, 0.22);
+      c.beginPath();
+      c.moveTo(sx0 - 3.5, ground0 + 1);
+      c.lineTo(sx0 - 2.5, ground0 - sh0 + 2);
+      c.lineTo(sx0 + 0.5, ground0 - sh0);
+      c.lineTo(sx0 + 3, ground0 - sh0 + 3);
+      c.lineTo(sx0 + 3.5, ground0 + 1);
+      c.closePath();
+      c.fill();
+    }
     const heap = Math.min(L.surface - 6, dug * 1.3);
     if (heap > 1) {
       c.fillStyle = withAlpha(palette.bone, 0.16);

@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=25';
-import { pick, hash } from './rng.js?v=25';
-import { fill } from '../config.js?v=25';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=25';
+import * as Lore from './lore.js?v=26';
+import { pick, hash } from './rng.js?v=26';
+import { fill } from '../config.js?v=26';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=26';
 
 export const LEGACY_VERSION = 1;
 
@@ -43,6 +43,8 @@ export function freshLegacy() {
     // a barrow fills itself in at (0 is off).
     autoBuy: false,
     autoSealAt: 0,
+    // How many levels one press of an upgrade buys: 1, 5, 25 or 'max'.
+    ritePick: 1,
   };
 }
 
@@ -57,6 +59,7 @@ export function restoreLegacy(raw) {
   l.renown = Number.isFinite(raw.renown) ? raw.renown : null;
   if (Number.isFinite(raw.carry) && raw.carry > 0) l.carry = raw.carry;
   l.autoBuy = !!raw.autoBuy;
+  if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
   if (Number.isFinite(raw.autoSealAt) && raw.autoSealAt > 0) l.autoSealAt = Math.round(raw.autoSealAt);
   for (const key of ['trophies', 'lordsMet']) {
     if (raw[key] && typeof raw[key] === 'object') {

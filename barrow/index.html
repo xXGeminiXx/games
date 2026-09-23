@@ -229,7 +229,7 @@
   #market tr.lesserrow td{color:var(--dim)}
 
   /* Rites and oaths: one line each. */
-  .rrow{display:grid;grid-template-columns:216px 1fr auto;align-items:center;gap:8px;margin:0 0 2px;min-width:0}
+  .rrow{display:grid;grid-template-columns:246px 1fr auto;align-items:center;gap:8px;margin:0 0 2px;min-width:0}
   .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rrow .line{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rrow .lv{color:var(--quiet);font-size:10px}
@@ -255,7 +255,7 @@
   footer #saved{margin-left:auto}
 
   @media (max-width:1200px){
-    .rrow{grid-template-columns:196px 1fr auto}
+    .rrow{grid-template-columns:220px 1fr auto}
     .offer{grid-template-columns:130px 1fr}
   }
   @media (max-height:700px){
@@ -469,7 +469,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="1bc44c0eb323">
+<meta name="build" content="b34f5b259892">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -582,8 +582,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=25';
-import { createGame } from './src/game.js?v=25';
+import { CONFIG, applyIdentity } from './config.js?v=26';
+import { createGame } from './src/game.js?v=26';
 
 applyIdentity(document);
 

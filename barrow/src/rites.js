@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=25';
-import * as Rb from './rebirth.js?v=25';
-import * as Lore from './lore.js?v=25';
-import * as Lords from './lords.js?v=25';
-import * as Ranks from './ranks.js?v=25';
+import * as Ch from './chambers.js?v=26';
+import * as Rb from './rebirth.js?v=26';
+import * as Lore from './lore.js?v=26';
+import * as Lords from './lords.js?v=26';
+import * as Ranks from './ranks.js?v=26';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -139,12 +139,13 @@ export function modsOf(s, cfg, legacy) {
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
     // What the lords' trophies do.
     doorEase: trophy('sepulturero') ? (T.doorEase || 1) : 1,
-    hoardMult: trophy('mortifer') ? (T.hoardMult || 1) : 1,
+    hoardMult: (trophy('mortifer') ? (T.hoardMult || 1) : 1) * (rank('hoardPlus') ? 1.5 : 1) * (rank('lordHoard') ? 2 : 1),
     boneCart: trophy('pater') ? (T.boneCartSeconds || 0) : 0,
     callersWait: trophy('dona'),
     // What rank has handed over that the run has to know about.
     autoBuy: rank('autoBuy'),
     autoSeal: rank('autoSeal'),
+    bothGifts: rank('bothGifts'),
   };
 }
 

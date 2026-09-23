@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=25';
-import * as Mk from './market.js?v=25';
-import * as H from './horde.js?v=25';
-import * as R from './rites.js?v=25';
-import * as Rb from './rebirth.js?v=25';
-import * as Lore from './lore.js?v=25';
-import * as Advice from './advice.js?v=25';
-import * as Lords from './lords.js?v=25';
-import * as Ranks from './ranks.js?v=25';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=25';
-import { fill } from '../config.js?v=25';
+import * as Mat from './materials.js?v=26';
+import * as Mk from './market.js?v=26';
+import * as H from './horde.js?v=26';
+import * as R from './rites.js?v=26';
+import * as Rb from './rebirth.js?v=26';
+import * as Lore from './lore.js?v=26';
+import * as Advice from './advice.js?v=26';
+import * as Lords from './lords.js?v=26';
+import * as Ranks from './ranks.js?v=26';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=26';
+import { fill } from '../config.js?v=26';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -135,7 +135,10 @@ export function createUI(doc, sim, cfg, actions) {
   // and more, and buying it there one press at a time is the game asking a
   // player to do arithmetic with their hand. One choice serves every rite in
   // the list rather than three more buttons on each row.
-  let ritePick = 1;
+  // The choice is the player's and it is kept with the save, so a reload or a
+  // new barrow comes back on whatever they last set.
+  const riteSteps0 = [1, 5, 25, 'max'];
+  let ritePick = riteSteps0.includes(sim.legacy.ritePick) ? sim.legacy.ritePick : 1;
   const riteSteps = [1, 5, 25, 'max'];
   const riteButtons = [];
   const riteCount = (id) => (ritePick === 'max' ? Math.max(1, sim.riteMax(id)) : ritePick);
@@ -143,7 +146,7 @@ export function createUI(doc, sim, cfg, actions) {
     if (!nodes.riteBulk || riteButtons.length) return;
     nodes.riteBulk.appendChild(el('span', { class: 'lbl', text: T.panels.riteBulk }));
     for (const n of riteSteps) {
-      const b = el('button', { onclick: () => { ritePick = n; paintRiteBulk(); } },
+      const b = el('button', { onclick: () => { ritePick = n; paintRiteBulk(); actions.setRitePick(n); } },
                    el('b', { text: n === 'max' ? 'max' : 'x' + n }));
       riteButtons.push({ n, node: b });
       nodes.riteBulk.appendChild(b);

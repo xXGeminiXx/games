@@ -522,7 +522,7 @@ export const CONTENT = {
       again: ['"You again. Take them. They like you better anyway."'],
       rule: 'The first ten layers. Nothing strange yet.',
       gifts: [
-        { name: 'His war band', line: 'His old war band climbs out of the floor and picks up spades.' },
+        { name: 'His war band', line: 'They climb out of the floor and pick up spades.' },
         { name: 'His bronze', line: 'Bronze tools from his grave. Everyone digs 2x faster.' },
       ],
       trophy: { name: 'Rex Mortis\'s crown', line: 'Every barrow starts 3 layers down.' },
@@ -571,7 +571,7 @@ export const CONTENT = {
       rule: 'Callers come up the track 2x as often while you dig her layers.',
       gifts: [
         { name: 'Her table', line: 'An hour of income right now, and everything sells for 50% more.' },
-        { name: 'Her guests', line: 'Her guests follow you up the shaft and start digging.' },
+        { name: 'Her guests', line: 'They follow you up the shaft and start digging.' },
       ],
       trophy: { name: 'Doña Calavera\'s candle', line: 'Callers wait at the gate until you answer them.' },
     },
@@ -586,8 +586,8 @@ export const CONTENT = {
       again: ['"Middle of the tunnel again. We have to stop meeting like this."'],
       rule: 'He dug half of it already: floors in his layers are half as thick.',
       gifts: [
-        { name: 'His tunnels', line: 'His tunnels go down. Digging down is 2.5x faster.' },
-        { name: 'His crew', line: 'His crew joins yours. Everyone digs 2x faster.' },
+        { name: 'His tunnels', line: 'They run deep. Digging down is 2.5x faster.' },
+        { name: 'His crew', line: 'They join yours. Everyone digs 2x faster.' },
       ],
       trophy: { name: 'El Sepulturero\'s shovel', line: 'Every lord\'s door breaks 2x faster.' },
     },
@@ -690,6 +690,9 @@ export const CONTENT = {
     assay:     'Every barrow starts with See One Layer Down.',
     broker2:   'Your seller starts every barrow at level 2.',
     autoSeal:  'A barrow can fill itself in at a layer you pick.',
+    hoardPlus: 'Every lord\'s hoard is 50% bigger.',
+    bothGifts: 'Lords give you both of their gifts.',
+    lordHoard: 'You\'re a lord of the dead yourself: every hoard is 2x bigger.',
   },
 
   // -------------------------------------------------------------------------

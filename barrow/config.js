@@ -555,8 +555,11 @@ export const CONFIG = {
       { rank: 11, id: 'autoBuy' },
       { rank: 13, id: 'hillThree' },
       { rank: 14, id: 'assay' },
+      { rank: 16, id: 'hoardPlus' },
       { rank: 17, id: 'broker2' },
       { rank: 20, id: 'autoSeal' },
+      { rank: 25, id: 'bothGifts' },
+      { rank: 40, id: 'lordHoard' },
     ],
   },
 
@@ -858,7 +861,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 25,
+    build: 26,
   },
 };
 
