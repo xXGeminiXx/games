@@ -39,11 +39,8 @@ export const CONTENT = {
       'Soil. It comes up easy. Too easy.',
       'First spadeful. Soft as a garden.',
     ],
-    sellShown: [
-      'The builders in town will buy that soil.',
-    ],
     firstSale: [
-      'Your first coin.',
+      'The builders in town pay for soil. Your first coin.',
     ],
     firstBone: [
       'Spadeful six comes up holding a hand. The fingers close around yours.',
@@ -62,17 +59,18 @@ export const CONTENT = {
       'Broke through to {name}.',
     ],
     newMarket: [
-      'Buyers in town want {name}.',
-    ],
-    marketShown: [
-      'Every sale pushes a price down. It climbs back in about a minute.',
-    ],
-    buckled: [
-      'Too much {name} at once. The price is on the floor until the buyers get hungry again.',
+      '{Name} sells for more than anything above it. The deeper, the richer.',
     ],
     ritesShown: [
-      'Coin buys better spades, faster picks and someone to sell for you.',
+      'Coin buys better spades and faster picks.',
     ],
+    // Said once, the first time a save from before the market came out is
+    // opened. Only the parts that came to something are said.
+    marketGone: {
+      head: 'The market is gone: whatever the dead dig sells the moment it comes up.',
+      sold: 'What you had on hand sold for {coin} coin.',
+      back: 'The market\'s upgrades paid back {coin} coin.',
+    },
     handsDone: [
       'Your hands are done. The dead dig. You keep the books.',
     ],
@@ -121,14 +119,14 @@ export const CONTENT = {
     dense:    { tag: 'dense',     line: 'worth 2.8x, and 1.8x as hard to dig' },
     brittle:  { tag: 'brittle',   line: 'digs 2x as fast, worth 0.6x' },
     bonefield:{ tag: 'bonefield', here: 'a bonefield', line: '3.2x the bones, worth 0.7x' },
-    thin:     { tag: 'thin',      here: 'a thin seam', line: 'worth 1.8x, but its market takes 0.4x' },
-    wide:     { tag: 'wide',      here: 'a wide seam', line: 'its market takes 2.8x more' },
-    salted:   { tag: 'salted',    line: 'its price swings 2.8x wider' },
-    still:    { tag: 'still',     line: 'worth 1.2x, and the price barely moves' },
+    thin:     { tag: 'thin',      here: 'a thin seam', line: 'worth 1.8x, but 1.3x as hard to dig' },
+    wide:     { tag: 'wide',      here: 'a wide seam', line: 'digs out 1.8x as fast' },
+    salted:   { tag: 'salted',    line: 'worth 1.5x, and the floor under it is 1.3x as thick' },
+    still:    { tag: 'still',     line: 'worth 1.3x the plain ground' },
     hollow:   { tag: 'hollow',    line: 'the floor under it is 0.35x as thick' },
     sealed:   { tag: 'sealed',    here: 'sealed off', line: 'worth 1.7x, behind a floor 2.6x as thick' },
     flooded:  { tag: 'flooded',   line: '2.2x the bones, worth 1.4x, 2x as hard to dig' },
-    burnt:    { tag: 'burnt',     line: 'worth 1.9x, but its market takes 0.7x' },
+    burnt:    { tag: 'burnt',     line: 'worth 1.9x, but 1.4x as hard to dig' },
   },
 
 
@@ -140,7 +138,7 @@ export const CONTENT = {
   // for the rest of the run. Chambers are grouped by band, which is how deep
   // the shaft has gone and therefore what kind of place it is passing through.
   //
-  // A boon is one of: dig, bones, absorb, value, face, soft (raise cost),
+  // A boon is one of: dig, bones, value, face, soft (raise cost),
   // windfall (seconds of the current income, paid at once), diggers (a share
   // of the diggers, raised free), rem (relics paid when the barrow is filled in).
   // -------------------------------------------------------------------------
@@ -228,7 +226,7 @@ export const CONTENT = {
           ],
           offers: [
             { name: 'Follow it down', line: 'Their shaft is better than yours. Use it.', boon: { face: 2.0 } },
-            { name: 'Follow it up', line: 'It surfaces two counties over, in a quiet yard that pays.', boon: { absorb: 1.6 } },
+            { name: 'Follow it up', line: 'It comes out two counties over, where they pay more for what you dig.', boon: { value: 1.4 } },
           ],
         },
         {
@@ -238,7 +236,7 @@ export const CONTENT = {
             'They\'re counting the dead. The count keeps going, down into the floor.',
           ],
           offers: [
-            { name: 'Read the wall', line: 'Whatever they counted, it teaches you the price of everything.', boon: { value: 1.5, absorb: 1.3 } },
+            { name: 'Read the wall', line: 'Whatever they counted, it teaches you the price of everything.', boon: { value: 1.6 } },
             { name: 'Add your own mark', line: 'The hill notices. More of them come up unasked.', boon: { bones: 1.7 } },
           ],
         },
@@ -264,7 +262,7 @@ export const CONTENT = {
           ],
           offers: [
             { name: 'Break it', line: 'A week of work and half of them. Then it\'s open.', boon: { face: 2.6 } },
-            { name: 'Work around it', line: 'The flanking cuts open four layers at once.', boon: { value: 1.6, absorb: 1.5 } },
+            { name: 'Work around it', line: 'The flanking cuts open four layers at once.', boon: { value: 1.8 } },
           ],
         },
         {
@@ -300,7 +298,7 @@ export const CONTENT = {
           ],
           offers: [
             { name: 'Cut into it', line: 'It closes behind them and doesn\'t seem to mind.', boon: { face: 3.0, bones: 1.5 } },
-            { name: 'Go around', line: 'The long way round opens more ground than the short way did.', boon: { value: 2.0, absorb: 1.8 } },
+            { name: 'Go around', line: 'The long way round opens more ground than the short way did.', boon: { value: 2.3 } },
           ],
         },
         {
@@ -391,7 +389,7 @@ export const CONTENT = {
         ],
         offers: [
           { name: 'Pull up a chair', line: 'Her guests lend a hand.', boon: { diggers: 2 } },
-          { name: 'Take the silverware', line: 'Solid gold forks. Everything sells higher.', boon: { value: 1.5, absorb: 1.3 } },
+          { name: 'Take the silverware', line: 'Solid gold forks. Everything sells higher.', boon: { value: 1.6 } },
         ],
       },
       {
@@ -425,7 +423,7 @@ export const CONTENT = {
           'One of them already has your name on it. The date is blank.',
         ],
         offers: [
-          { name: 'Sell the stone', line: 'Fine marble. The markets want it.', boon: { value: 1.4, absorb: 1.4 } },
+          { name: 'Sell the stone', line: 'Fine marble. Everyone wants it.', boon: { value: 1.7 } },
           { name: 'Break yours', line: 'You feel better. So do the diggers.', boon: { dig: 1.3, face: 1.4 } },
         ],
       },
@@ -463,7 +461,7 @@ export const CONTENT = {
         ],
         offers: [
           { name: 'Wake them early', line: 'Salted dead dig all day.', boon: { diggers: 1.5, dig: 1.2 } },
-          { name: 'Take the salt', line: 'Salt sells anywhere.', boon: { value: 1.3, absorb: 1.6 } },
+          { name: 'Take the salt', line: 'Salt sells anywhere.', boon: { value: 1.6 } },
         ],
       },
       {
@@ -560,7 +558,7 @@ export const CONTENT = {
       rule: 'Everything in his layers is worth 2.2x.',
       gifts: [
         { name: 'His silver', line: 'Everything sells for 2x.' },
-        { name: 'His old buyers', line: 'Every market takes 3x more before the price drops.' },
+        { name: 'His miners', line: 'His miners never stopped. Everyone digs 2x faster.' },
       ],
       trophy: { name: 'Rey Muerto\'s lamp', line: 'Every layer down to the next door is named.' },
       power: { name: 'Rey Muerto\'s mint', line: 'Everything sells for 2x.' },
@@ -608,13 +606,13 @@ export const CONTENT = {
         '"Your dead passed. Barely. Take your reward."',
       ],
       again: ['"On the scale. Same as last time."'],
-      rule: 'Everything in his layers sells for 3x, but the markets fill up fast.',
+      rule: 'Everything in his layers sells for 3x, but the ground is 1.5x as hard.',
       gifts: [
         { name: 'His gold', line: 'Everything sells for 2.5x.' },
-        { name: 'His scales', line: 'Markets take 2.5x more and pay 50% more.' },
+        { name: 'His scales', line: 'Everything sells for 50% more, and everyone digs 2x faster.' },
       ],
-      trophy: { name: 'Neb-Amenti\'s scales', line: 'Your seller takes no cut.' },
-      power: { name: 'Neb-Amenti\'s measure', line: 'Every market takes 2x more before its price drops.' },
+      trophy: { name: 'Neb-Amenti\'s scales', line: 'Filling in pays 50% more relics.' },
+      power: { name: 'Neb-Amenti\'s measure', line: 'Everyone digs 2x faster.' },
     },
     natron: {
       his: 'her',
@@ -682,7 +680,7 @@ export const CONTENT = {
     drowned: { name: 'A drowned hill',    line: '2x the bones, but floors are 1.3x as thick.' },
     kings:   { name: 'A king\'s hill',    line: 'Everything is worth 1.6x, but floors are 1.25x as thick.' },
     plague:  { name: 'A plague hill',     line: 'Every bone raises 2x as many diggers, but prices are 0.8x.' },
-    burned:  { name: 'A burned hill',     line: 'Markets take 2x more, but callers come half as often.' },
+    burned:  { name: 'A burned hill',     line: 'Everything sells for 1.4x, but callers come half as often.' },
     road:    { name: 'A hill by the road', line: 'Callers come 2x as often, but prices are 0.85x.' },
     stony:   { name: 'A stony hill',      line: 'Everything is worth 2x, but digging is 1.5x as hard.' },
     soft:    { name: 'A soft hill',       line: 'Digging goes 1.4x as fast, but prices are 0.75x.' },
@@ -692,19 +690,47 @@ export const CONTENT = {
 
   // What each rank hands over, in the order config.ranks.keys lists them.
   rankKeys: {
-    ledger:    'Every barrow starts with Show the Numbers.',
-    broker:    'Every barrow starts with Hire a Seller.',
+    startDeeper: 'Every barrow starts 1 layer deeper.',
+    clearFinds: 'Clearing a layer turns up 2x the finds.',
     hillTwo:   'When you fill in, pick your next hill from 2.',
     hillThree: 'When you fill in, pick your next hill from 3.',
     readTwo:   'You always see 2 layers down.',
-    foresight: 'Every barrow starts with Prices Ahead.',
+    openMore:  'Every barrow keeps 1 more old layer open.',
     autoBuy:   'Coin upgrades can buy themselves.',
     assay:     'Every barrow starts with See One Layer Down.',
-    broker2:   'Your seller starts every barrow at level 2.',
+    doorsEasy: 'Every lord\'s door breaks 25% faster.',
     autoSeal:  'A barrow can fill itself in at a layer you pick.',
     hoardPlus: 'Every lord\'s hoard is 50% bigger.',
     bothGifts: 'Lords give you both of their gifts.',
     lordHoard: 'You\'re a lord of the dead yourself: every hoard is 2x bigger.',
+  },
+
+  // -------------------------------------------------------------------------
+  // FINDS - what the crew turns up as it digs a layer out
+  //
+  // One is picked for each find from the seed, the layer and the mark.
+  // -------------------------------------------------------------------------
+  finds: {
+    items: [
+      'a pot of old coins',
+      'a bronze brooch',
+      'a jar of teeth',
+      'a rusted sword',
+      'a gold ring still on the finger',
+      'a lead coffin nobody paid for',
+      'a purse of silver',
+      'a carved bone comb',
+      'a helmet with a hole in it',
+      'a sack of burial gifts',
+      'a silver cup',
+      'a string of amber beads',
+      'a chest of pay that never reached the soldiers',
+      'a bishop\'s ring',
+      'a pocket watch, still ticking',
+      'a pile of old spades, still sharp',
+    ],
+    found:   'The crew turns up {item} in the {name}. +{coin} coin.',
+    cleared: 'The {name} layer is dug out. In the last of it, {item}: +{coin} coin and +{bones} bones.',
   },
 
   // -------------------------------------------------------------------------
@@ -717,28 +743,19 @@ export const CONTENT = {
   visitors: {
     buyer: {
       name: 'A buyer',
-      // For something you have.
       lines: [
-        '"I\'ll take all the {name} you\'ve got at {mult}x the yard price. No questions."',
-        '"{mult}x what the yard pays for your {name}. Deal?"',
-        '"My client wants {name}. {mult}x the going rate, and he doesn\'t haggle."',
-        '"There\'s a jeweler in town who can\'t get enough {name}. {mult}x the yard price."',
-        '"I\'ve got an empty cart and a long road. Fill it with {name} and I\'ll pay {mult}x the yard price."',
+        '"I\'ll pay {mult}x for {name}. As much as your crew can dig while I\'m here."',
+        '"There\'s a jeweler in town who can\'t get enough {name}. {mult}x what it\'s worth."',
+        '"My client wants {name}, and he doesn\'t haggle. {mult}x its worth."',
+        '"I\'ve got an empty cart and a long road. Fill it with {name} and I\'ll pay {mult}x."',
+        'A woman in a good coat asks after your {name}. "{mult}x its worth, for all you can dig."',
       ],
-      // For something you have none of yet.
-      errands: [
-        '"I hear there\'s {name} in your ground. I pay {mult}x the yard price for it."',
-        '"You\'re not digging any {name}? Shame. I\'d pay {mult}x the yard price."',
-        '"Dig me some {name} and I\'ll pay {mult}x the yard price for it."',
-      ],
-      where: 'You have none. Put some diggers on the {name} layer and he\'ll wait.',
-      whereBuy: 'You have none. Put some diggers on the {name} layer, or press Buy on its row under Markets, and he\'ll wait.',
-      more: 'He\'ll take up to {n}. Press Buy on its row under Markets for more.',
-      take: 'Sell',
+      offer: 'For the next {t}, every bit of {name} the crew digs sells for that. Put diggers on the {name} layer to make the most of it.',
+      take: 'Deal',
       pass: 'No thanks',
-      taken: 'Sold {n} {name} for {coin} coin.',
+      taken: 'Deal. For {t}, {name} sells for {mult}x.',
       passed: 'The buyer rides off.',
-      empty: '"You don\'t have any. Waste of my time."',
+      lasting: 'A buyer pays {x}x for {name}, {t} left.',
     },
     bonecart: {
       name: 'A bone cart',
@@ -779,11 +796,12 @@ export const CONTENT = {
         '"Digging on the king\'s land takes the king\'s leave. His leave costs money."',
         '"Somebody complained about the smell. I\'m sure we can sort it out."',
       ],
-      offer: 'He wants {coin} coin. Pay him and every market takes 18% more this barrow. Refuse and one market goes cold on you.',
+      offer: 'He wants {coin} coin. Pay him and everything sells for 18% more this barrow. Refuse and he has your carts stopped at the county line for a while.',
       take: 'Pay him',
       pass: 'Slam the gate',
-      taken: 'Paid the tax man {coin}. Every market takes 18% more.',
-      passed: '"You\'ll regret that." One market goes cold for a while.',
+      taken: 'Paid the tax man {coin}. Everything sells for 18% more.',
+      passed: '"You\'ll regret that." Your carts are stopped at the county line: everything sells for 30% less for 10 minutes.',
+      lasting: 'Carts stopped at the county line: everything sells for {x}x, {t} left.',
     },
     relic: {
       name: 'A peddler',
@@ -942,18 +960,8 @@ export const CONTENT = {
                  long: 'Every level: the dead dig 50% faster.' },
     grave:     { name: 'More From a Bone', line: '+50% diggers per bone',
                  long: 'Every level: each bone raises 50% more diggers.' },
-    ledger:    { name: 'Show the Numbers', line: 'See prices, demand and limits',
-                 long: 'Shows what each material usually sells for, how much its market takes and how fast it recovers. Lets you buy, too: fill a buyer at the gate, or buy low and sell high.' },
     picks:     { name: 'Better Picks',   line: '+25% dig-down speed',
                  long: 'Every level: breaking through floors is 25% faster.' },
-    broker:    { name: 'Hire a Seller',  line: 'Sells for you, takes a cut',
-                 long: 'He sells what you dig into each market without crashing the price, for a cut. He never sells bones.' },
-    routes:    { name: 'Trade Routes',   line: '+50% market size',
-                 long: 'Every level: every market takes 50% more before its price drops.' },
-    haste:     { name: 'Quick Buyers',   line: '+25% price recovery',
-                 long: 'Every level: prices climb back 25% faster after you sell.' },
-    foresight: { name: 'Prices Ahead',   line: 'See where prices are going',
-                 long: 'The price charts show where each price is heading, so you can sell at the top.' },
     assay:     { name: 'See One Layer Down', line: 'Know the next layer early',
                  long: 'Shows the layer under the floor, and what it is like, before you break into it.' },
     workings:  { name: 'Keep a Layer Open', line: '+1 old layer kept working',
@@ -1019,13 +1027,13 @@ export const CONTENT = {
     ground:  { name: 'Start Deeper',   line: 'Start every barrow 1 layer down',
                long: 'Every barrow starts 1 more layer down per level, never past the first lord\'s door.' },
     books:   { name: 'Old Habits',     line: 'Start with your first upgrades',
-               long: 'Every barrow starts with Show the Numbers, then Prices Ahead, then Hire a Seller, one per level.' },
+               long: 'Every barrow starts with See One Layer Down, then Town Crier, then Night Shift, one per level.' },
     hands:   { name: 'Strong Hands',   line: '+35% dig speed, every barrow',
                long: 'The dead dig 35% faster per level, in every barrow from now on.' },
     marrow:  { name: 'Deep Marrow',    line: '+40% diggers per bone, every barrow',
                long: 'Each bone raises 40% more diggers per level, in every barrow from now on.' },
-    roads:   { name: 'Old Roads',      line: '+35% market size, every barrow',
-               long: 'Every market takes 35% more per level before its price drops, in every barrow.' },
+    roads:   { name: 'Old Roads',      line: 'Everything sells for 35% more, every barrow',
+               long: 'Every level: everything the dead dig sells for 35% more, in every barrow.' },
     purse:   { name: 'Nest Egg',       line: 'Start every barrow with 500 coin',
                long: 'Every barrow starts with coin in hand, 8x more per level.' },
     night:   { name: 'Long Nights',    line: '+8 hours digging while away',

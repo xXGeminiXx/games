@@ -10,8 +10,8 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=43';
-import * as Lore from './lore.js?v=43';
+import { hash } from './rng.js?v=44';
+import * as Lore from './lore.js?v=44';
 
 /** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {
@@ -101,7 +101,7 @@ export function applyBoon(state, boon) {
 export function boonsOf(state) {
   const b = state.boons || {};
   const m = (k) => (Number.isFinite(b[k]) && b[k] > 0 ? b[k] : 1);
-  const out = { dig: m('dig'), bones: m('bones'), absorb: m('absorb'), value: m('value'), face: m('face'), soft: m('soft') };
+  const out = { dig: m('dig'), bones: m('bones'), value: m('value'), face: m('face'), soft: m('soft') };
   const t = Number.isFinite(state.t) ? state.t : 0;
   for (const sp of (Array.isArray(state.spells) ? state.spells : [])) {
     if (!sp || !(t < sp.until) || !(sp.factor > 0) || !(sp.key in out)) continue;

@@ -22,11 +22,11 @@
 // something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=43';
-import * as R from './rites.js?v=43';
-import * as Rb from './rebirth.js?v=43';
-import * as Lore from './lore.js?v=43';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=43';
+import * as H from './horde.js?v=44';
+import * as R from './rites.js?v=44';
+import * as Rb from './rebirth.js?v=44';
+import * as Lore from './lore.js?v=44';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=44';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -101,9 +101,8 @@ export function next(sim, cfg) {
   }
 
   // Somebody at the gate leaves on a clock; everything else waits. A caller
-  // the player cannot answer - one asking more coin than there is, or a buyer
-  // for something none of is on hand - is not the most useful thing on the
-  // page, so the line goes on to whatever is.
+  // the player cannot answer - one asking more coin than there is - is not
+  // the most useful thing on the page, so the line goes on to whatever is.
   const v = s.visitor;
   if (v && sim.visitorReady()) {
     // Named, so the line says who; and with Dona Calavera's candle nobody
@@ -125,22 +124,14 @@ export function next(sim, cfg) {
     return say('raise', { bones: fmt(Math.floor(s.bones * 10) / 10), cost: fmt(raiseOne) }, 'horde-panel');
   }
 
-  // The first coin comes off the hand, before there is a market to sell into.
-  if (f.sell && !f.market && s.totals.earned <= 0) {
-    const units = s.stock.s0 || 0;
-    if (units >= 1) {
-      return say('sell', { n: fmt(units), name: name(0), coin: fmtCoin(sim.quote('s0', units)) }, 'hand');
-    }
-  }
-
   // These two only ever fire for a player who asked to place the diggers
   // themselves. Left to the game they cannot happen: the way down is always
-  // staffed and no layer is ever worked past what its buyers will take.
+  // staffed and everyone else stands on the layer that pays most.
   if (f.face && s.byHand && !(s.faceWeight > 0)) {
     return say('face', { name: cfg.text.face, next: name(s.depth + 1) }, 'horde-panel');
   }
 
-  // A layer whose buyers filled up hours ago against one that is paying.
+  // A layer paying a digger far less than another one that is open.
   const rows = s.byHand ? perNotch(sim) : [];
   if (rows.length > 1) {
     const low = rows[0], high = rows[rows.length - 1];
@@ -219,7 +210,7 @@ export function next(sim, cfg) {
 
 /** Every key `next` can return, for the suite and for nothing else. */
 export const KEYS = [
-  'room', 'lord', 'gate', 'gateWaits', 'dig', 'raise', 'sell', 'face',
+  'room', 'lord', 'gate', 'gateWaits', 'dig', 'raise', 'face',
   'move', 'raiseMore', 'oath', 'sealBeats', 'seal', 'rite', 'wait', 'work', 'bones', 'idle',
 ];
 

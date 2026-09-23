@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=43';
-import { pick, hash } from './rng.js?v=43';
-import { fill } from '../config.js?v=43';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=43';
+import * as Lore from './lore.js?v=44';
+import { pick, hash } from './rng.js?v=44';
+import { fill } from '../config.js?v=44';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=44';
 
 export const LEGACY_VERSION = 1;
 
@@ -100,7 +100,7 @@ export function restoreLegacy(raw) {
 // ---------------------------------------------------------------------------
 
 /** Remembrance a seal would pay for this run, right now. */
-export function yieldOf(state, cfg) {
+export function yieldOf(state, cfg, mult) {
   const s = cfg.seal;
   const layers = Math.max(0, state.depth - s.fromDepth + 1) * s.perStratum;
   const earned = Math.max(0, state.totals.earned);
@@ -109,7 +109,8 @@ export function yieldOf(state, cfg) {
   // Coin spent on the books late in a barrow comes back out of it as relics,
   // which is the only thing coin can buy that the next barrow keeps.
   const books = (cfg.rites.recordsRelics || 0) * ((state.rites && state.rites.records) || 0);
-  const total = layers + decades + bonus + books;
+  // Neb-Amenti's scales weigh it all again.
+  const total = (layers + decades + bonus + books) * (mult > 0 ? mult : 1);
   return Number.isFinite(total) ? Math.floor(total) : 0;
 }
 
@@ -192,7 +193,7 @@ export function oathMods(legacy, cfg) {
   return {
     dig:     Math.pow(o.handsFactor, lv('hands')),
     soft:    Math.pow(o.marrowFactor, lv('marrow')),
-    absorb:  Math.pow(o.roadsFactor, lv('roads')),
+    value:   Math.pow(o.roadsFactor, lv('roads')),
     face:    Math.pow(o.depthFactor, lv('depth')),
     visitGap: Math.pow(o.callingGap, lv('calling')),
     visitPay: Math.pow(o.callingPay, lv('calling')),
@@ -215,7 +216,8 @@ export function oathMods(legacy, cfg) {
  * The state is not touched: the caller builds the next run from a fresh one.
  */
 export function seal(state, cfg, legacy) {
-  const rem = yieldOf(state, cfg);
+  const scales = legacy.trophies && legacy.trophies.neb && cfg.lords ? (cfg.lords.trophy.sealRelics || 1) : 1;
+  const rem = yieldOf(state, cfg, scales);
   legacy.remembrance += rem;
   legacy.earned += rem;
   legacy.seals += 1;

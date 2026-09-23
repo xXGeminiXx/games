@@ -11,17 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=43';
-import * as Mk from './market.js?v=43';
-import * as H from './horde.js?v=43';
-import * as R from './rites.js?v=43';
-import * as Rb from './rebirth.js?v=43';
-import * as Lore from './lore.js?v=43';
-import * as Advice from './advice.js?v=43';
-import * as Lords from './lords.js?v=43';
-import * as Ranks from './ranks.js?v=43';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=43';
-import { fill } from '../config.js?v=43';
+import * as Mat from './materials.js?v=44';
+import * as H from './horde.js?v=44';
+import * as R from './rites.js?v=44';
+import * as Rb from './rebirth.js?v=44';
+import * as Lore from './lore.js?v=44';
+import * as Advice from './advice.js?v=44';
+import * as Lords from './lords.js?v=44';
+import * as Ranks from './ranks.js?v=44';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=44';
+import { fill } from '../config.js?v=44';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -49,10 +48,10 @@ export function createUI(doc, sim, cfg, actions) {
 
   const nodes = {
     log: byId('log'),
-    hand: byId('hand'), dig: byId('dig'), sell: byId('sell'), handline: byId('handline'),
+    hand: byId('hand'), dig: byId('dig'),
     hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
     handOver: byId('handover'), handNote: byId('handnote'), spent: byId('spent'),
-    marketPanel: byId('market-panel'), market: byId('market'),
+
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
     tabOathsCount: byId('tab-oaths-n'), oathsNote: byId('oaths-note'),
@@ -104,13 +103,6 @@ export function createUI(doc, sim, cfg, actions) {
     if (e.text) log(e.text);
   };
 
-  /**
-   * How far past its ceiling a market is, as a multiple. A layer worked far
-   * past what its market can pay reads in the hundreds as a percentage, which
-   * is five digits of noise; what the player needs is how many times over.
-   */
-  const overBy = (sat) => (sat < 10 ? sat.toFixed(1) : fmt(Math.round(sat)));
-
   /** The tag a layer's seam shows, or nothing at all for plain ground. */
   const seamTag = (k) => {
     const layer = sim.ground.at(k);
@@ -128,7 +120,6 @@ export function createUI(doc, sim, cfg, actions) {
   // -- the hand ------------------------------------------------------------
 
   if (nodes.dig) nodes.dig.addEventListener('click', () => actions.dig());
-  if (nodes.sell) nodes.sell.addEventListener('click', () => actions.sell('s0', sim.held('s0')));
 
   // -- the horde -----------------------------------------------------------
 
@@ -330,229 +321,18 @@ export function createUI(doc, sim, cfg, actions) {
     if (!spentLine) return;
     const s = sim.state;
     const from = sim.activeFrom();
-    let n = 0, worth = 0;
-    for (let k = from; k <= s.depth; k++) {
-      if ((split.strata[k] || 0) > 1e-9) continue;
-      n++;
-      const id = 's' + k;
-      const held = sim.held(id);
-      if (held > 0) worth += sim.quote(id, held);
-    }
+    let n = 0;
+    for (let k = from; k <= s.depth; k++) if (!((split.strata[k] || 0) > 1e-9)) n++;
     // By hand every row is the player's business, so nothing folds.
     const on = n > 0 && !s.byHand;
     show(nodes.spent, on);
     if (!on) return;
-    spentLine.textContent = worth > 0.005
-      ? fill(T.spentWorth, { n: n, coin: fmtCoin(worth) })
-      : fill(T.spent, { n: n });
+    spentLine.textContent = fill(T.spent, { n: n });
     spentButton.textContent = showSpent ? T.spentHide : T.spentShow;
   };
 
   const currentWeight = (key) =>
     (key === 'face' ? sim.state.faceWeight : sim.state.weights[key]) | 0;
-
-  // -- the market ----------------------------------------------------------
-
-  const marketRows = new Map(); // id -> row parts
-  let lesserRow = null;
-
-  /**
-   * Which materials get a row of their own, deepest first, bones last.
-   *
-   * A row for something nobody is bringing up any more, with under a unit of
-   * it left on hand, is a picture of a finished layer: it goes in with the
-   * older ones on a single line instead of taking a row of the table.
-   */
-  const rowIds = () => {
-    const from = sim.activeFrom();
-    const split = sim.split();
-    const own = [];
-    const lesser = [];
-    for (const id of sim.goods()) {
-      if (id === Mat.BONES) continue;
-      const k = Mat.strataOf(id);
-      const done = !sim.state.byHand && k < sim.state.depth
-        && !((split.strata[k] || 0) > 1e-9) && sim.held(id) < 1;
-      if (k >= from && !done) own.push(id); else lesser.push(id);
-    }
-    own.sort((a, b) => Mat.strataOf(b) - Mat.strataOf(a));
-    if (sim.goods().includes(Mat.BONES)) own.push(Mat.BONES);
-    return { own, lesser };
-  };
-
-  const sparkline = () => {
-    const svg = doc.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', '0 0 96 24');
-    svg.setAttribute('class', 'spark');
-    const base = doc.createElementNS(SVG, 'line');
-    base.setAttribute('class', 'base');
-    const future = doc.createElementNS(SVG, 'polyline');
-    future.setAttribute('class', 'future');
-    const line = doc.createElementNS(SVG, 'polyline');
-    line.setAttribute('class', 'line');
-    svg.appendChild(base); svg.appendChild(future); svg.appendChild(line);
-    return { svg, base, line, future };
-  };
-
-  const makeRow = (id) => {
-    const k = Mat.strataOf(id);
-    const good = k >= 0 ? sim.ground.at(k) : { name: cfg.text.stats.bones, hue: cfg.palette.bone, seam: null };
-    const spark = sparkline();
-    const held = el('td', { class: 'num' });
-    const price = el('td', { class: 'num' });
-    const delta = el('i');
-    price.appendChild(el('b'));
-    price.appendChild(delta);
-    const demand = el('span', { class: 'demand' }, el('span'));
-    const buttons = el('td', { class: 'acts' },
-      el('button', { text: T.sellLot, title: T.sellLotTip, onclick: () => actions.sellLot(id) }),
-      el('button', { text: T.sellAll, onclick: () => actions.sellShare(id, 1) }),
-      el('button', { class: 'buy', text: T.buy, title: T.buyTip, hidden: true, onclick: () => actions.buy(id) }));
-    // The ledger's figures sit under the price (base) and under the chart
-    // (what it takes, how fast it recovers); a choking market is flagged
-    // beside its name.
-    const base = el('small', { class: 'ledger', hidden: true });
-    price.appendChild(base);
-    // What the market takes and how fast it forgets sits under the demand
-    // column. Under "Stock" it read as units on hand, which it is not.
-    const takes = el('small', { class: 'ledger', hidden: true, title: T.ledgerTakesTip });
-    held.appendChild(el('b'));
-    const hot = el('small', { class: 'sat', hidden: true, title: T.ceilingTip });
-    // A buyer at the gate who wants this material, and what he pays: the one
-    // time buying it here is plainly worth doing.
-    const wanted = el('small', { class: 'wanted', hidden: true });
-    const tag = k >= 0 ? seamTag(k) : '';
-    const nameCell = el('td', { class: 'good' },
-      el('span', { class: 'swatch', style: 'background:' + good.hue }),
-      el('span', { text: Lore.label(good.name) }),
-      tag ? el('small', { class: 'seam', text: tag, title: seamLine(k) }) : null,
-      hot, wanted);
-    nameCell.firstChild.style.background = good.hue;
-    const tr = el('tr', null, nameCell, held, price, el('td', { class: 'chart' }, spark.svg, demand, takes), buttons);
-    return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark,
-      some: buttons.childNodes[0], all: buttons.childNodes[1], buy: buttons.lastChild, base, takes, hot, wanted, sampled: -1 };
-  };
-
-  const buildMarket = () => {
-    const { own, lesser } = rowIds();
-    const wanted = own.join('|') + '#' + (lesser.length ? 'lesser' : '');
-    if (nodes.market._key === wanted) return;
-    nodes.market._key = wanted;
-    clear(nodes.market);
-    const head = el('tr', { class: 'head' },
-      el('th', { text: T.columns.good }), el('th', { text: T.columns.held }),
-      el('th', { text: T.columns.price }), el('th', { text: T.columns.demand }), el('th'));
-    nodes.market.appendChild(head);
-    for (const id of own) {
-      let row = marketRows.get(id);
-      if (!row) { row = makeRow(id); marketRows.set(id, row); }
-      nodes.market.appendChild(row.tr);
-    }
-    if (lesser.length) {
-      const meta = el('td', { class: 'num', colspan: '3' });
-      const name = el('td', { class: 'good lesser' });
-      lesserRow = { tr: el('tr', { class: 'lesserrow' }, name, meta,
-        el('td', { class: 'acts' }, el('button', { text: T.sellAll, onclick: () => actions.sellLesser() }))), name, meta };
-      nodes.market.appendChild(lesserRow.tr);
-    } else {
-      lesserRow = null;
-    }
-  };
-
-  const drawSpark = (row, m, t, md) => {
-    const hist = m.history;
-    if (hist.length < 2) { row.spark.line.setAttribute('points', ''); return; }
-    const keep = md.ledger ? cfg.market.historyLedger : cfg.market.history;
-    const fut = md.foresight ? Mk.forecast(m, t, 24, cfg.market.forecastSeconds / 24) : [];
-    let lo = m.base, hi = m.base;
-    for (const v of hist) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    for (const v of fut) { if (v < lo) lo = v; if (v > hi) hi = v; }
-    if (hi - lo < 1e-9) { hi = lo * 1.05 + 1e-9; lo = lo * 0.95; }
-    const span = fut.length ? 76 : 96;
-    const xOf = (i, n) => (i / Math.max(1, keep - 1)) * span + (span - Math.min(n, keep) / Math.max(1, keep - 1) * span);
-    const yOf = (v) => 22 - ((v - lo) / (hi - lo)) * 20;
-    const pts = [];
-    const n = hist.length;
-    for (let i = 0; i < n; i++) pts.push(xOf(i, n).toFixed(1) + ',' + yOf(hist[i]).toFixed(1));
-    row.spark.line.setAttribute('points', pts.join(' '));
-    const by = yOf(m.base).toFixed(1);
-    row.spark.base.setAttribute('x1', '0'); row.spark.base.setAttribute('x2', '96');
-    row.spark.base.setAttribute('y1', by); row.spark.base.setAttribute('y2', by);
-    if (fut.length) {
-      const fp = [];
-      const x0 = span;
-      for (let i = 0; i < fut.length; i++) fp.push((x0 + (i + 1) / fut.length * 20).toFixed(1) + ',' + yOf(fut[i]).toFixed(1));
-      row.spark.future.setAttribute('points', pts[pts.length - 1] + ' ' + fp.join(' '));
-    } else {
-      row.spark.future.setAttribute('points', '');
-    }
-  };
-
-  const renderMarket = () => {
-    const s = sim.state;
-    const md = sim.mods();
-    const t = s.t;
-    for (const row of marketRows.values()) {
-      if (!row.tr.parentNode) continue;
-      const id = row.id;
-      const m = sim.marketFor(id);
-      const units = sim.held(id);
-      const p = sim.price(id);
-      const base = sim.baseOf(id);
-      row.held.textContent = id === Mat.BONES ? fmt(Math.floor(units)) : fmt(units);
-      row.price.textContent = fmtCoin(p);
-      const rel = p / base - 1;
-      row.delta.textContent = (rel >= 0 ? '+' : '') + Math.round(rel * 100) + '%';
-      row.delta.className = rel >= 0.05 ? 'up' : (rel <= -0.05 ? 'down' : '');
-      const d = Math.max(0, Math.min(1, Mk.demandOf(m)));
-      row.demandBar.style.width = Math.round(d * 100) + '%';
-      row.demandBar.className = d < cfg.market.buckleBelow ? 'low' : '';
-      if (row.sampled !== m.history.length) { row.sampled = m.history.length; drawSpark(row, m, t, md); }
-      // A button that can do nothing right now says so by going grey: Some and
-      // All with none on hand, Buy with no coin. Lit and silent read as broken.
-      const none = !(units > 1e-9);
-      if (row.some.disabled !== none) { row.some.disabled = none; row.all.disabled = none; }
-      const broke = !(s.coin > 0) || s.coin < p * 1e-6;
-      if (row.buy.disabled !== broke) row.buy.disabled = broke;
-      show(row.buy, md.ledger);
-      const v = s.visitor;
-      const want = !!(v && v.kind === 'buyer' && v.data && v.data.id === id);
-      if (want) {
-        const said = fill(T.wantedTag, { mult: v.data.mult.toFixed(1) });
-        if (row.wanted.textContent !== said) row.wanted.textContent = said;
-      }
-      show(row.wanted, want);
-      row.buy.classList.toggle('wanted', want && md.ledger);
-      if (md.ledger) {
-        const { absorb, recovery } = Mk.effective(m, md);
-        const sat = Mk.saturation(m, sim.flowOf(id), md);
-        row.base.textContent = fill(T.ledgerBase, { base: fmtCoin(base) });
-        row.takes.textContent = fill(T.ledgerTakes, { absorb: fmt(absorb), t: fmtTime(recovery) });
-        // What one press of Buy costs, worked out on the same terms the
-        // action uses. A button that can spend half a purse says the figure.
-        const q = absorb * cfg.market.buyShare;
-        row.buy.title = fill(T.buyTip, { n: fmt(q), coin: fmtCoin(Mk.quoteBuy(m, q, t, md)) });
-        // Bones are raised, not sold by the ton, so their thin market is not
-        // flagged as choking.
-        const choking = sat > (T.ceilingAt || 1) && id !== Mat.BONES;
-        row.hot.textContent = choking ? fill(T.ceilingLine, { x: overBy(sat) }) : '';
-        show(row.hot, choking);
-      }
-      show(row.base, md.ledger);
-      show(row.takes, md.ledger);
-    }
-    if (lesserRow) {
-      const { lesser } = rowIds();
-      let value = 0;
-      for (const id of lesser) value += sim.quote(id, sim.held(id));
-      lesserRow.name.textContent = fill(T.lesserGoods, { n: lesser.length });
-      lesserRow.name.title = T.lesserTip;
-      // Nothing left on hand is nothing to say, not "worth about 0".
-      lesserRow.meta.textContent = value > 0.005 ? fill(T.lesserWorth, { coin: fmtCoin(value) }) : '';
-      const all = lesserRow.tr.lastChild && lesserRow.tr.lastChild.firstChild;
-      if (all) all.disabled = !(value > 0.005);
-    }
-  };
 
   // -- rites ---------------------------------------------------------------
 
@@ -598,7 +378,10 @@ export function createUI(doc, sim, cfg, actions) {
     for (const sp of (Array.isArray(s.spells) ? s.spells : [])) {
       if (!sp || !(s.t < sp.until)) continue;
       const words = Lore.visitor(sp.from);
-      if (words && words.lasting) lasting.push(fill(words.lasting, { x: sp.factor, t: fmtTime(Math.ceil(sp.until - s.t)) }));
+      // A buyer's is for one material, named by the layer it comes from.
+      const k = typeof sp.key === 'string' && sp.key.startsWith('worth:') ? Mat.strataOf(sp.key.slice(6)) : -1;
+      const name = k >= 0 ? Lore.inline(sim.ground.at(k).name) : '';
+      if (words && words.lasting) lasting.push(fill(words.lasting, { x: sp.factor.toFixed(1).replace(/\.0$/, ''), t: fmtTime(Math.ceil(sp.until - s.t)), name }));
     }
     // When he asks more than is on hand, say how far off it is, so a greyed
     // button is never a puzzle.
@@ -1041,11 +824,6 @@ export function createUI(doc, sim, cfg, actions) {
 
     // The hand.
     show(nodes.hand, !f.handHidden);
-    show(nodes.sell, f.sell && !f.market);
-    if (nodes.handline) {
-      const soil = s.stock.s0 || 0;
-      nodes.handline.textContent = soil > 0 && !f.market ? fmt(soil) + ' ' + Lore.label(sim.ground.at(0).name) : '';
-    }
 
     renderEnding();
     renderChamber();
@@ -1097,11 +875,16 @@ export function createUI(doc, sim, cfg, actions) {
           const bits = [];
           if (rate.coin > 0.005) bits.push(fill(T.rowRate, { coin: fmtCoin(rate.coin) }));
           if (rate.bones > 0.005) bits.push(fill(T.rowBones, { bones: fmt(rate.bones) }));
+          // How far the crew has dug this layer out, which is where its finds are.
+          if (key !== 'face' && cfg.view.clearSeconds > 0) {
+            const dug = (s.worked && s.worked[key] || 0) / cfg.view.clearSeconds;
+            if (dug >= 1) bits.push(T.rowCleared);
+            else if (dug > 0.005) bits.push(fill(T.rowDug, { pct: fmtPct(dug) }));
+          }
           r.rate.textContent = bits.length ? bits.join('   ') : (share > 0 ? T.rowNothing : '');
           r.rate.className = 'rate' + (share > 0 && !bits.length ? ' hot' : '');
         }
-        let meta = fmtPct(share);
-        let hot = false;
+        const meta = fmtPct(share);
         if (key === 'face' && r.nameEl) {
           // Breaking a lord's door is the row's whole meaning while it lasts.
           const door = sim.ground.at(s.depth + 1).door;
@@ -1126,13 +909,8 @@ export function createUI(doc, sim, cfg, actions) {
             r.ahead.textContent = names.length ? fill(T.aheadLine, { list: names.join(', ') }) : '';
             show(r.ahead, names.length > 0);
           }
-        } else if (md.ledger) {
-          const sat = Mk.saturation(sim.marketFor('s' + key), sim.flowOf('s' + key), md);
-          if (sat > (T.ceilingAt || 1)) { meta += ' - ' + fill(T.ceilingLine, { x: overBy(sat) }); hot = true; }
         }
-        r.meta.textContent = meta;
-        r.meta.className = hot ? 'hot' : '';
-        r.meta.title = hot ? T.ceilingTip : '';
+        if (r.meta.textContent !== meta) r.meta.textContent = meta;
       }
       paintHandOver();
       paintSpent(split);
@@ -1140,10 +918,6 @@ export function createUI(doc, sim, cfg, actions) {
       show(nodes.handNote, f.face || s.depth > 0);
       show(nodes.weights, f.face || s.depth > 0);
     }
-
-    // The market.
-    show(nodes.marketPanel, f.market);
-    if (f.market) { buildMarket(); renderMarket(); }
 
     // Rites, and beside them what relics buy.
     show(nodes.ritesPanel, f.rites);

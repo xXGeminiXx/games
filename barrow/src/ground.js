@@ -12,11 +12,11 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=43';
-import * as Lords from './lords.js?v=43';
-import { pickWeighted, unit } from './rng.js?v=43';
+import * as Mat from './materials.js?v=44';
+import * as Lords from './lords.js?v=44';
+import { pickWeighted, unit } from './rng.js?v=44';
 
-const ONE = { value: 1, hardness: 1, absorb: 1, bones: 1, swell: 1, cap: 1 };
+const ONE = { value: 1, hardness: 1, bones: 1, cap: 1 };
 
 /**
  * @param {object} cfg   the whole config
@@ -62,16 +62,13 @@ export function createGround(cfg, seed, hillRule) {
       lord: lorded ? lorded.lord : null,
       door,
       band: bandOf(k),
-      // The four numbers that decide how a layer is worked, and the two that
-      // decide how its market behaves.
+      // The four numbers that decide how a layer is worked.
       value:    Mat.valueAt(k, cfg.strata) * f('value'),
       hardness: Mat.hardnessAt(k, cfg.strata) * f('hardness'),
-      absorb:   Mat.absorbAt(k, cfg.market) * f('absorb'),
       // Straight line, not a curve: an older grave holds more of the dead than
       // a young one, but nothing here may compound, because whatever compounds
       // in the bones compounds again through the horde and runs the game away.
       bones:    cfg.horde.boneShare * (1 + Mat.rung(k, cfg.strata) * cfg.horde.bonePerLayer) * f('bones'),
-      swell:    cfg.market.cycle.amplitude * f('swell'),
       // The floor between the layer above and this one, in units dug at this
       // layer's hardness. A sealed layer is the one that is hard to break into.
       // A lord's door is that many floors deep on top of whatever the ground is.

@@ -139,7 +139,6 @@
   .panel{border-top:1px solid var(--rule);padding:12px 0 10px}
   .lbl{color:var(--dim);margin-right:8px;font-size:11px}
   #hand button{padding:5px 14px}
-  #hand #handline{color:var(--dim);margin-left:12px}
   #raise{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
   .raise i{margin-left:6px}
   .wrow{margin:5px 0;font-size:12px}
@@ -207,40 +206,6 @@
      it, so the two sides of a choice can be compared. */
   .offer .line b{color:var(--bone);font-weight:500;margin-left:8px;white-space:nowrap}
 
-  /* The market table. */
-  #market-panel{padding-bottom:4px}
-  #market{border-collapse:collapse;width:100%;table-layout:fixed}
-  #market th:nth-child(1){width:88px} #market th:nth-child(2){width:88px}
-  #market th:nth-child(3){width:92px} #market th:nth-child(4){width:100px}
-  #market th{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--quiet);text-align:left;padding:0 6px 4px 0}
-  #market td{padding:2px 5px 2px 0;vertical-align:middle;border-top:1px solid var(--rule);font-size:12px;overflow:hidden}
-  #market td.num{text-align:right;white-space:nowrap}
-  #market td.good{white-space:nowrap;text-overflow:ellipsis}
-  #market tr.lesserrow td.good{white-space:normal}
-  #market small{display:block;color:var(--quiet);font-size:10px;line-height:1.2;white-space:nowrap}
-  /* "takes 538.69K, back in 2s" does not fit on one line in a column sized
-     for a chart, and nowrap clipped the end of it. It wraps to two. */
-  #market small.ledger{white-space:normal;line-height:1.2}
-  #market small.sat{color:var(--hot)}
-  #market small.seam{color:var(--dim);opacity:.75}
-  #market td.num b{font-weight:500}
-  #market td.num i{font-style:normal;font-size:10px;margin-left:5px;color:var(--quiet)}
-  #market td.num i.up{color:var(--good)} #market td.num i.down{color:var(--hot)}
-  #market td.chart{width:104px}
-  .spark{display:block;width:96px;height:20px}
-  .spark .line{fill:none;stroke:var(--ink);stroke-width:1.2;vector-effect:non-scaling-stroke}
-  .spark .base{stroke:var(--quiet);stroke-width:1;stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
-  .spark .future{fill:none;stroke:var(--dim);stroke-width:1;stroke-dasharray:1.5 2.5;vector-effect:non-scaling-stroke}
-  .demand{display:block;height:2px;background:var(--rule);width:96px;margin-top:3px}
-  .demand span{display:block;height:2px;background:var(--good);width:100%}
-  .demand span.low{background:var(--hot)}
-  #market td.acts{white-space:nowrap;text-align:right}
-  #market td.acts button{padding:1px 5px;font-size:11px;margin-left:2px}
-  #market td.acts button.buy{border-color:var(--quiet);color:var(--coin)}
-  #market td.acts button.buy.wanted{border-color:var(--coin)}
-  #market small.wanted{display:block;white-space:normal;line-height:1.25;color:var(--coin);font-size:10px}
-  #market tr.lesserrow td{color:var(--dim)}
-
   /* Rites and oaths: one line each. */
   .rrow{display:grid;grid-template-columns:246px 1fr auto;align-items:center;gap:8px;margin:0 0 2px;min-width:0}
   .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -276,8 +241,6 @@
     #log{margin-bottom:8px;min-height:0}
     .panel{padding:8px 0 6px}
     .wrow{margin:1px 0}
-    #market td{padding:1px 5px 1px 0}
-    .spark{height:16px}
     #raise{margin-bottom:5px}
     h2{margin-bottom:5px}
   }
@@ -288,7 +251,7 @@
        fixed frame - so main has to be allowed to grow past the viewport.
        Left at flex:1 with min-height:0 it stays locked to the window height
        while its children are told to overflow visibly, and the rites end up
-       painted straight through the market table underneath them. */
+       painted straight through the panel underneath them. */
     main{display:flex;flex-direction:column;flex:none;min-height:auto}
     #field{order:-1;border-bottom:1px solid var(--rule)}
     #hill{height:200px;flex:none}
@@ -312,29 +275,6 @@
     #standing .grid{grid-template-columns:1fr}
     #standing .grid div{white-space:normal}
     #panel-tabs{gap:14px;flex-wrap:wrap}
-    /* The market's columns are pinned wide enough for a chart and a base
-       price beside it. On a phone that pushed the sell buttons a good sixty
-       pixels off the right edge of the page, where nothing could reach them.
-       The chart keeps its shape at two thirds the width and the rest give. */
-    #market{table-layout:auto}
-    #market th:nth-child(1){width:auto}
-    #market th:nth-child(2){width:48px}
-    #market th:nth-child(3){width:auto}
-    #market th:nth-child(4){width:66px}
-    #market td.chart{width:66px}
-    .spark{width:62px}
-    .demand{width:62px}
-    #market td.acts button{padding:1px 4px;margin-left:1px}
-    #market small{white-space:normal}
-  }
-  /* A 360 pixel phone is the narrowest thing anybody plays this on, and three
-     sell buttons on one line do not fit beside a chart there. They wrap. */
-  @media (max-width:440px){
-    #market td.acts{white-space:normal}
-    #market th:nth-child(4){width:58px}
-    #market td.chart{width:58px}
-    .spark{width:54px}
-    .demand{width:54px}
   }
 
 /* A thumb, not a pointer: on touch devices every control gets a real target
@@ -482,7 +422,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="5c1e49f17ef2">
+<meta name="build" content="6abe485b0141">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -557,9 +497,8 @@
       <div id="visitor-acts"></div>
       <p id="visitor-after" hidden></p>
     </div>
-    <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
+    <div id="hand" class="panel"><button id="dig">Dig</button></div>
     <div id="horde-panel" class="panel" hidden><div class="phead"><h2 id="p-horde">Where they dig</h2><div id="handover"></div></div><p id="handnote"></p><div id="raise"></div><div id="spent" hidden></div><div id="weights"></div></div>
-    <div id="market-panel" class="panel" hidden><h2 id="p-market">The market</h2><table id="market"></table></div>
     <div id="seal-panel" class="panel" hidden>
       <h2 id="p-seal">Fill it in</h2>
       <p id="seal-note"></p>
@@ -596,8 +535,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=43';
-import { createGame } from './src/game.js?v=43';
+import { CONFIG, applyIdentity } from './config.js?v=44';
+import { createGame } from './src/game.js?v=44';
 
 applyIdentity(document);
 

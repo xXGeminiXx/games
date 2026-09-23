@@ -3,7 +3,7 @@
 //
 // The dig is not the only thing that happens in the field. At long, uneven
 // gaps somebody walks up the track with an offer: a buyer paying over the odds
-// for one good, a cart of bone for sale, a gang looking for work, the reeve
+// for one material for a while, a cart of bone for sale, a gang looking for work, the reeve
 // wanting his tithe, a peddler with something wrapped in cloth, a preacher, a
 // tinker, a man with three cups, a collector, the next lord's herald.
 //
@@ -20,11 +20,10 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=43';
-import * as Mk from './market.js?v=43';
-import * as Lore from './lore.js?v=43';
-import { fill } from '../config.js?v=43';
-import { fmt, fmtCoin, fmtCount, fmtTime } from './numbers.js?v=43';
+import { hash, unit, range } from './rng.js?v=44';
+import * as Lore from './lore.js?v=44';
+import { fill } from '../config.js?v=44';
+import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=44';
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in
@@ -90,13 +89,9 @@ export function order(api, i) {
   const last = recent[recent.length - 1];
   const W = v.weight || {};
   const pool = [];
-  // A buyer for something none of is on hand sends the player off to dig
-  // it, which is a fine thing now and then and a nuisance every time.
-  const holding = kind => kind !== 'buyer' || !api.goods || tradeable(api).some(id => api.held(id) > 1e-6);
   for (const kind of KINDS) {
     if (kind === last || !available(api, kind)) continue;
-    const base = holding(kind) ? (W[kind] === undefined ? 1 : W[kind]) : v.errandWeight;
-    const w = base * (recent.includes(kind) ? v.recentWeight : 1);
+    const w = (W[kind] === undefined ? 1 : W[kind]) * (recent.includes(kind) ? v.recentWeight : 1);
     if (w > 0) pool.push({ kind, w });
   }
   const out = [];
@@ -160,10 +155,6 @@ function boneRef(api) {
   return api.boneRate();
 }
 
-/** The goods with a market and a row of their own, deepest last. */
-function tradeable(api) {
-  return api.goods().filter(id => id !== 'bones' && api.strataOf(id) >= 0);
-}
 
 /**
  * Which of a kind's lines caller i says: a pick from the seed, and never the
@@ -251,43 +242,18 @@ function buildKind(api, i, kind) {
   };
 
   if (kind === 'buyer') {
-    // He asks for something you have, the bigger the pile the likelier. With
-    // nothing on hand he asks for something your open layers hold and says
-    // where it is, and waits longer while you dig it.
-    const ids = tradeable(api);
-    const worth = (id) => api.held(id) * api.ground.at(api.strataOf(id)).value;
-    const have = ids.filter(id => api.held(id) > 1e-6 && worth(id) > 0);
+    // He wants one material from the layers the crew can reach, and pays
+    // over its worth for every bit of it they dig while his offer runs. Where
+    // the crew stands decides what that comes to.
     const from = api.activeFrom ? api.activeFrom() : 0;
-    const open = ids.filter(id => api.strataOf(id) >= from && api.strataOf(id) <= state.depth);
-    const errand = !have.length;
-    const pool = errand ? open : have;
-    if (!pool.length) return null;
-    let id = pool[hash(seed, 'visit-good:' + i) % pool.length];
-    if (!errand) {
-      let total = 0;
-      for (const g of have) total += worth(g);
-      let roll = unit(seed, 'visit-good:' + i) * total;
-      for (const g of have) { id = g; if (roll < worth(g)) break; roll -= worth(g); }
-    }
-    const k = api.strataOf(id);
+    const n = state.depth - from + 1;
+    if (!(n > 0)) return null;
+    const k = from + (hash(seed, 'visit-good:' + i) % n);
     const g = api.ground.at(k);
-    const m = api.marketFor(id);
     const mult = range(seed, 'visit-mult:' + i, v.buyer.multMin, v.buyer.multMax) * pay;
-    const want = Mk.bestFlow(m, md) * v.buyer.seconds;
-    rec.data = { id, k, mult, want, errand };
-    if (errand) {
-      const e = lineFor(state, words, kind, i, 'errands');
-      rec.lines = 'errands';
-      rec.line = e.at;
-      // With Show the Numbers the market sells too, so he can be filled
-      // from there as well as from the ground; the line says both.
-      rec.text = spoken(words.name, fill(e.line.say, { name: g.name, mult: mult.toFixed(1) }))
-        + ' ' + fill(md.ledger && words.whereBuy ? words.whereBuy : words.where, { name: g.name });
-      rec.expires = state.t + v.stay * v.buyer.errandStay;
-    } else {
-      rec.text = spoken(words.name, fill(said, { name: g.name, mult: mult.toFixed(1) }));
-      if (md.ledger && words.more && api.held(id) < want * 0.5) rec.text += ' ' + fill(words.more, { n: fmt(want) });
-    }
+    rec.data = { id: 's' + k, k, mult, lasts: v.buyer.lasts };
+    rec.text = spoken(words.name, fill(said, { name: g.name, mult: mult.toFixed(1) }))
+      + offer({ name: g.name, t: fmtTime(v.buyer.lasts) });
     return rec;
   }
 
@@ -475,7 +441,6 @@ export function refresh(state, cfg) {
 export function affordable(api, rec) {
   if (!rec) return false;
   if (rec.cost > 0 && api.state.coin < rec.cost) return false;
-  if (rec.kind === 'buyer' && !(api.held(rec.data.id) > 1e-9)) return false;
   return true;
 }
 
@@ -496,18 +461,9 @@ export function accept(api) {
 
   let line = '';
   if (rec.kind === 'buyer') {
-    const { id, k, mult, want } = rec.data;
-    const units = Math.min(api.held(id), want);
-    if (!(units > 1e-9)) {
-      line = words.empty;
-    } else {
-      // An off-market sale: it is carted away rather than put on the yard, so
-      // the price the yard is asking is not moved by it.
-      const coin = units * api.ground.at(k).value * mult;
-      api.take(id, units);
-      api.earn(coin);
-      line = fill(words.taken, { coin: fmtCoin(coin), name: api.ground.at(k).name, n: fmt(units) });
-    }
+    const { id, k, mult, lasts } = rec.data;
+    api.spell('buyer', 'worth:' + id, mult, lasts);
+    line = say('taken', { name: api.ground.at(k).name, mult: mult.toFixed(1), t: fmtTime(lasts) });
   } else if (rec.kind === 'bonecart') {
     api.addBones(rec.data.bones);
     line = say('taken', { n: fmtCount(rec.data.bones) });
@@ -515,7 +471,7 @@ export function accept(api) {
     api.raiseFree(rec.data.n);
     line = say('taken', { n: fmtCount(rec.data.n) });
   } else if (rec.kind === 'reeve') {
-    api.boon({ absorb: api.cfg.visitors.reeve.absorb });
+    api.boon({ value: api.cfg.visitors.reeve.value });
     line = say('taken', { coin: fmtCoin(rec.cost) });
   } else if (rec.kind === 'relic') {
     const b = {}; b[rec.data.key] = rec.data.factor;
@@ -565,7 +521,8 @@ export function decline(api) {
   const words = Lore.visitor(rec.kind);
   const own = lineOf(words, rec);
   let line = fill(own.passed || words.passed || '', { lord: rec.data && rec.data.lord });
-  if (rec.kind === 'reeve') api.sting(api.cfg.visitors.reeve.sting);
+  // Turned away, the tax man has the carts stopped at the county line.
+  if (rec.kind === 'reeve') api.spell('reeve', 'value', api.cfg.visitors.reeve.sting, api.cfg.visitors.reeve.stingLasts);
   if (rec.kind === 'collector') {
     // The collector's other answer: relics instead of coin.
     if (api.addRelics) api.addRelics(rec.data.relics);
@@ -584,7 +541,6 @@ export function describeBoon(boon) {
     bones: 'bones found',
     value: 'prices',
     face: 'dig-down speed',
-    absorb: 'market size',
     soft: 'diggers per bone',
   };
   const parts = [];

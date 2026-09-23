@@ -3,11 +3,11 @@
 //
 // A stratum is a number k. Everything about it derives from k and the config:
 // its name (the ladder, then generated), its good's base value, how hard it
-// is to dig, what its market can absorb, and the cap that must be broken to
+// is to dig, and the cap that must be broken to
 // reach it. Nothing here is stored, so a save is just k.
 // ---------------------------------------------------------------------------
 
-import { CONFIG } from '../config.js?v=43';
+import { CONFIG } from '../config.js?v=44';
 
 const ROMAN = ['', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
@@ -72,10 +72,6 @@ export function mixAt(k, cfg = CONFIG.strata) {
   ];
 }
 
-/** Units the stratum's market takes before it buckles. */
-export function absorbAt(k, cfg = CONFIG.market) {
-  return cfg.absorb0 * Math.pow(cfg.absorbGrowth, Math.max(0, k | 0));
-}
 
 /** The stratum index a good id refers to, or -1 for bones and anything else. */
 export function strataOf(id) {

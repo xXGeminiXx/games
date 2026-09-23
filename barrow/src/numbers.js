@@ -1,18 +1,18 @@
 // ---------------------------------------------------------------------------
 // Numbers as the player reads them.
 //
-// Idle-game suffixes up to a decillion, then scientific. Quantities below a
-// thousand keep the decimals that matter and nothing else, so a price of 0.81
-// reads as 0.81 and a stock of 4,812 reads as 4.81K. Every formatter here is
-// pure and safe on anything: NaN and infinities come out as a question mark
-// rather than as text a player has to decode.
+// Thousand, million, billion and trillion by their letters, then the power of
+// ten. Quantities below a thousand keep the decimals that matter and nothing
+// else, so a price of 0.81 reads as 0.81 and a stock of 4,812 reads as 4.81K.
+// Every formatter here is pure and safe on anything: NaN and infinities come
+// out as a question mark rather than as text a player has to decode.
 // ---------------------------------------------------------------------------
 
-// Thousand to decillion, then on through the undecillions. A week of play
-// already reaches the far end of this list, and a figure that falls off it
-// comes back as 6.14e36, which is not a number anybody reads.
-export const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc',
-  'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg'];
+// Past a trillion the old names ran Qa, Qi, Sx, Sp, Oc, No, Dc, UDc, DDc ...
+// and nobody can say at a glance whether 2.36DDc is more than 5.24Dc. A power
+// of ten says it: 2.36e36 is a thousand times 5.24e33 and it looks it. The
+// four letters everybody already knows stay.
+export const SUFFIXES = ['', 'K', 'M', 'B', 'T'];
 
 /** The figure past which there is no suffix left and the exponent takes over. */
 export const SUFFIX_CEILING = Math.pow(10, SUFFIXES.length * 3);

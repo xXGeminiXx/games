@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=43';
-import { pick } from './rng.js?v=43';
-import { fill } from '../config.js?v=43';
+import { CONTENT } from '../content.js?v=44';
+import { pick } from './rng.js?v=44';
+import { fill } from '../config.js?v=44';
 
 /**
  * One line from a log pool.
@@ -72,6 +72,11 @@ export function rite(id) {
 /** The name and line for an oath id. */
 export function oath(id) {
   return CONTENT.oaths[id] || { name: id, line: '' };
+}
+
+/** The writing for what clearing a layer turns up. */
+export function finds() {
+  return CONTENT.finds || null;
 }
 
 /** The visitor writing for a kind. */

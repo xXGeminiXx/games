@@ -18,7 +18,7 @@
 // HOW TO TRY A NUMBER WITHOUT EDITING THIS FILE
 //   Append overrides to the URL, which is the fastest way to test a hosted
 //   build from a phone:
-//     ?set=horde.digRate=2&set=market.recoverySeconds=30
+//     ?set=horde.digRate=2&set=visitors.stay=600
 //   They last for that one page load. To make one stick in this browser, open
 //   the console and run:
 //     localStorage.setItem('cfg', '{"horde":{"digRate":2}}')
@@ -56,14 +56,6 @@ export const CONFIG = {
     },
 
     dig:        'Dig',
-    sell:       'Sell',
-    sellLot:    'Some',
-    sellLotTip: 'Sells a small load, so the price barely moves',
-    sellAll:    'All',
-    buy:        'Buy',
-    buyTip:     'Buys {n} for {coin}. Worth it to fill a buyer at the gate, or to buy low and sell high',
-    // On a market row while a buyer at the gate wants that material.
-    wantedTag:  'Buyer pays {mult}x',
     raise:      'Raise',
     raiseMax:   'Max',
     raiseTip:   'Bones raise the dead. Each button shows what it costs. Max spends every bone you have.',
@@ -83,8 +75,7 @@ export const CONFIG = {
     // Under the gate's buttons when what is asked is more than is on hand.
     gateShort:  'You have {have} coin of the {cost} he wants.',
     // Layers nobody is digging any more, folded into one line.
-    spent:      '{N} older layers, worked out.',
-    spentWorth: '{N} older layers, worked out. What they left is worth {coin}.',
+    spent:      '{N} older layers nobody is digging.',
     spentShow:  'Show them',
     spentHide:  'Hide them',
     // Under each row: what that layer is actually paying and how many of the
@@ -94,6 +85,9 @@ export const CONFIG = {
     rowRate:     '{coin} coin/s',
     rowBones:    '{bones} bones/s',
     rowNothing:  'Nothing yet',
+    // How much of a layer the crew has dug out, beside what it pays.
+    rowDug:      '{pct} dug out',
+    rowCleared:  'Cleared',
     rowRateTip:  'What this layer pays and how many of the dead it turns up, every second',
     face:       'Digging down',
     doorRow:    '{Name}\'s door',
@@ -124,7 +118,6 @@ export const CONFIG = {
 
     panels: {
       horde:   'Where they dig',
-      market:  'Markets',
       rites:   'Upgrades',
       riteBulk: 'Buy',
       visitor: 'At the gate',
@@ -135,48 +128,20 @@ export const CONFIG = {
       oaths:   'Kept forever',
     },
 
-    // "Held" is what a bought row reads, so the units of a good on hand are
-    // stock. One word, one meaning.
-    columns: {
-      good:   'Material',
-      held:   'On hand',
-      price:  'Price',
-      demand: 'Demand',
-    },
-
     // What a room's offer moves, named the same way on both sides of a choice
     // so the two can be compared. The figure beside it is worked out from the
     // run as it stands when the room opens.
     effects: {
       dig:      'Dig speed',
       bones:    'Bones found',
-      value:    'Prices',
+      value:    'Worth',
       face:     'Digs down',
-      absorb:   'Markets take',
       soft:     'Bones raise more',
       windfall: '{Coin} coin now',
       diggers:  '{N} diggers now',
       rem:      '{N} relics when you fill it in',
     },
 
-    ledgerBase:  'Usually {base}',
-    // Units the market takes over the time it needs to forget them, which is
-    // the flow it pays best for. It sits under the demand column, where a
-    // figure about the market's appetite belongs.
-    ledgerTakes: 'takes {absorb}, back in {t}',
-    ledgerTakesTip: 'How much this market takes before the price drops, and how long it needs to come back',
-    // Appended after a figure and a dash, so these three stay lower case:
-    // "38% - oversold 1.7x" reads right and "38% - Oversold" does not.
-    ceilingLine: '{x}x more than it buys',
-    // Anything past the market's capacity is technically over it, and a run
-    // sitting a few percent past is exactly where a player wants to be. Crying
-    // oversold there teaches them to ignore the word. It is said once the
-    // overshoot is large enough to be costing them something.
-    ceilingAt: 1.15,
-    ceilingTip:  'More of this is coming up than the buyers will take. The rest of it sells for almost nothing',
-    lesserGoods: '{n} older materials',
-    lesserTip:   'Everything still on hand from layers the dead have left behind',
-    lesserWorth: 'Worth about {coin}',
     fieldHint:   'The surface',
     aheadLine:   'Next down: {list}',
 
@@ -211,7 +176,6 @@ export const CONFIG = {
       gate:      '{Who} is at the gate. They go in {t}.',
       gateWaits: '{Who} is at the gate, and waits for you.',
       dig:       'Press Dig. Every {n} presses turns up a bone, and bones raise the dead.',
-      sell:      "You're holding {n} {name}, worth {coin}. Press Sell.",
       raise:     '{Bones} bones in hand and a digger costs {cost}. Press Raise.',
       raiseMore: '{Bones} bones will raise {n} more diggers. Nothing else uses bones.',
       face:      "Nothing's digging down. Send some of them to {name} and they break into {next}.",
@@ -270,10 +234,9 @@ export const CONFIG = {
     // Every time a layer opens, the layers above it step back by this much,
     // down to nothing, so the horde follows the work down without being told
     // to. A layer whose weight the player has set by hand is never moved
-    // again. Deep ground is worth more per digger and its market is nowhere
-    // near full, while a shallow one is a thousand times over what its buyers
-    // will take, so an untouched panel spread evenly earns about half what the
-    // same horde earns leaning down.
+    // again. Deep ground is worth more per digger - its worth climbs faster
+    // than its hardness - so an untouched panel spread evenly earns less than
+    // the same horde leaning down.
     weightDecay: 1,
     weightFace: 2,       // where the way down starts when it is set by hand
     // The share of the diggers kept on the way down when the game is doing
@@ -304,7 +267,11 @@ export const CONFIG = {
     ownShare: 0.75,      // share of a stratum's dig that is its own good
     carryShare: 0.20,    // share that is the stratum above's good
     traceShare: 0.05,    // share that is the stratum below's good, as a preview
-    soilValue: 1,        // coin per unit of soil at base
+    // Coin per unit of soil. Everything is worth a multiple of it. With the
+    // market gone every unit dug sells in full, where before the buyers took
+    // a share and a seller took his cut; 0.3 puts the lords' doors back where
+    // they fell with the market (measured, three seeds, twelve hours).
+    soilValue: 0.3,
 
     // The named ladder. Past its end the names are generated (see
     // src/materials.js) and the numbers keep climbing.
@@ -348,9 +315,8 @@ export const CONFIG = {
   //
   // Every layer below the surface rolls one of these from the run's seed, or
   // none at all. The numbers are multipliers on that layer only: what its
-  // good is worth, how hard it digs, how much its market takes, how far its
-  // price swings, how many of the dead are in it, and how much floor stands
-  // between it and the layer below.
+  // good is worth, how hard it digs, how many of the dead are in it, and how
+  // much floor stands between it and the layer below.
   //
   // `weight` is how often the seam comes up relative to the others.
   // -------------------------------------------------------------------------
@@ -362,14 +328,14 @@ export const CONFIG = {
       { id: 'dense',     weight: 8,  value: 2.8, hardness: 1.8 },
       { id: 'brittle',   weight: 9,  value: 0.6, hardness: 0.5 },
       { id: 'bonefield', weight: 9,  value: 0.7, bones: 3.2 },
-      { id: 'thin',      weight: 8,  value: 1.8, absorb: 0.4 },
-      { id: 'wide',      weight: 8,  absorb: 2.8 },
-      { id: 'salted',    weight: 7,  swell: 2.8 },
-      { id: 'still',     weight: 6,  value: 1.2, swell: 0.15 },
+      { id: 'thin',      weight: 8,  value: 1.8, hardness: 1.3 },
+      { id: 'wide',      weight: 8,  hardness: 0.55 },
+      { id: 'salted',    weight: 7,  value: 1.5, cap: 1.3 },
+      { id: 'still',     weight: 6,  value: 1.3 },
       { id: 'hollow',    weight: 8,  cap: 0.35 },
       { id: 'sealed',    weight: 6,  value: 1.7, cap: 2.6 },
       { id: 'flooded',   weight: 7,  value: 1.4, hardness: 2.0, bones: 2.2 },
-      { id: 'burnt',     weight: 6,  value: 1.9, absorb: 0.7, cap: 0.7 },
+      { id: 'burnt',     weight: 6,  value: 1.9, hardness: 1.4, cap: 0.7 },
     ],
   },
 
@@ -411,7 +377,7 @@ export const CONFIG = {
   // makes a door thicker and a hoard richer together.
   //
   // `rule` bends every layer in the stretch the way a seam bends one layer
-  // (value, hardness, absorb, bones, swell, cap), plus visitGap, which moves
+  // (value, hardness, bones, cap), plus visitGap, which moves
   // how often callers come while the dig is in that stretch.
   // -------------------------------------------------------------------------
   lords: {
@@ -432,10 +398,11 @@ export const CONFIG = {
       doorEase: 2,          // El Sepulturero's: doors give way this many times faster
       carryShare: 0.01,     // Mother Natron's: this share of the dead come to the next barrow
       hoardMult: 2,         // Mortifer's: every hoard is this many times bigger
+      sealRelics: 1.5,      // Neb-Amenti's: filling in pays this many times the relics
     },
     // What each lord hands over for good beside his trophy, the first time his
     // door breaks. Never for sale. Pater's bones, Rey's prices, Sepulturero's
-    // digging down, Neb-Amenti's markets and Dona's callers are each `factor`;
+    // digging down, Neb-Amenti's digging and Dona's callers are each `factor`;
     // Rex's brings diggers with every new layer; Natron's keeps the pace up
     // while nobody watches; Mortifer's raises the dead by itself.
     power: {
@@ -480,7 +447,7 @@ export const CONFIG = {
           ['nickel', '#a3a08f'], ['cinnabar', '#b3302a'], ['quicksilver', '#d0d4d8'], ['cobalt', '#3f6fb8'],
           ['platinum', '#d8dde3'], ['palladium', '#bfc3c8'],
         ],
-        gifts: [{ value: 2 }, { absorb: 3 }],
+        gifts: [{ value: 2 }, { dig: 2 }],
       },
       dona: {
         color: '#f0a030',    // his mark: his door, his name, his scene
@@ -504,13 +471,13 @@ export const CONFIG = {
       },
       neb: {
         color: '#4a78d8',    // his mark: his door, his name, his scene
-        rule: { value: 3, absorb: 0.35 },
+        rule: { value: 3, hardness: 1.5 },
         materials: [
           ['sand', '#d8bf8a'], ['ochre', '#c7862f'], ['gypsum', '#ece6d6'], ['malachite', '#2f8f62'],
           ['carnelian', '#c24a2a'], ['amethyst', '#8e5bb5'], ['lapis', '#2c4f9e'], ['feldspar', '#d4b8a0'],
           ['electrum', '#d8c070'], ['meteor iron', '#6a6e78'],
         ],
-        gifts: [{ value: 2.5 }, { absorb: 2.5, value: 1.5 }],
+        gifts: [{ value: 2.5 }, { dig: 2, value: 1.5 }],
       },
       natron: {
         color: '#d8d0b0',    // his mark: his door, his name, his scene
@@ -541,7 +508,7 @@ export const CONFIG = {
   // Filling a barrow in opens the next one on a new hill. With the rank for
   // it, the player picks that hill from two or three, each with a twist that
   // holds in every layer of it: the same keys a lord's rule bends (value,
-  // hardness, absorb, bones, cap), plus visitGap for callers and soft for how
+  // hardness, bones, cap), plus visitGap for callers and soft for how
   // far a bone goes. Without the rank it is a plain hill.
   // -------------------------------------------------------------------------
   hills: {
@@ -552,7 +519,7 @@ export const CONFIG = {
       { id: 'drowned', rule: { bones: 2, cap: 1.3 },          tint: '#2f5566' },
       { id: 'kings',   rule: { value: 1.6, cap: 1.25 },       tint: '#8a6a2e' },
       { id: 'plague',  rule: { soft: 2, value: 0.8 },         tint: '#56643a' },
-      { id: 'burned',  rule: { absorb: 2, visitGap: 2 },      tint: '#1a1210' },
+      { id: 'burned',  rule: { value: 1.4, visitGap: 2 },     tint: '#1a1210' },
       { id: 'road',    rule: { visitGap: 0.5, value: 0.85 },  tint: '#6a5838' },
       { id: 'stony',   rule: { value: 2, hardness: 1.5 },     tint: '#62646c' },
       { id: 'soft',    rule: { hardness: 0.7, value: 0.75 },  tint: '#5e4632' },
@@ -575,16 +542,16 @@ export const CONFIG = {
     grades: ['Under-', '', 'High ', 'Grand '],
     titles: ['Fossor', 'Sexton', 'Capataz', 'Custos', 'Mortenant', 'Nomarch', 'Psychopomp', 'Tumularch', 'Virrey', 'Rex'],
     keys: [
-      { rank: 3,  id: 'ledger' },
-      { rank: 5,  id: 'broker' },
+      { rank: 3,  id: 'startDeeper' },
+      { rank: 5,  id: 'clearFinds' },
       { rank: 6,  id: 'hillTwo' },
       { rank: 7,  id: 'readTwo' },
-      { rank: 9,  id: 'foresight' },
+      { rank: 9,  id: 'openMore' },
       { rank: 11, id: 'autoBuy' },
       { rank: 13, id: 'hillThree' },
       { rank: 14, id: 'assay' },
       { rank: 16, id: 'hoardPlus' },
-      { rank: 17, id: 'broker2' },
+      { rank: 17, id: 'doorsEasy' },
       { rank: 20, id: 'autoSeal' },
       { rank: 25, id: 'bothGifts' },
       { rank: 40, id: 'lordHoard' },
@@ -610,7 +577,6 @@ export const CONFIG = {
     // that came last never comes next, and the few before it come at
     // recentWeight of their weight.
     weight: { buyer: 2, herald: 2, cups: 0.7, collector: 0.6 },
-    errandWeight: 0.5,   // a buyer's weight when there is nothing on hand to sell him
     // Prices are seconds of what the player is actually bringing in, never
     // less than this share of what the barrow would earn with the game
     // placing the crew. Gifts are seconds of the larger figure.
@@ -618,10 +584,9 @@ export const CONFIG = {
     recentWeight: 0.35,
     recentKeep: 3,
     buyer: {
-      multMin: 2.5,      // times base price, and the market's mood is ignored
+      multMin: 2.5,      // he pays this many times a material's worth
       multMax: 7,
-      seconds: 300,      // takes about this many seconds of the good's best flow
-      errandStay: 2,     // waits this many times as long for a good you have none of
+      lasts: 300,        // for everything of it the crew digs in this many seconds
     },
     bonecart: {
       seconds: 180,      // bones worth about this many seconds of bone income
@@ -638,8 +603,9 @@ export const CONFIG = {
     },
     reeve: {
       seconds: 240,      // costs about this many seconds of income
-      absorb: 1.18,      // paid: every market takes this much more for the run
-      sting: 0.7,        // refused: one market carries this much pressure
+      value: 1.18,       // paid: everything is worth this much more for the run
+      sting: 0.7,        // refused: everything is worth this much for a while
+      stingLasts: 600,   // and the while is this long
       max: 5,            // and he only has this many arrangements to sell
       priceGrowth: 2.5,  // each dearer than the last
     },
@@ -689,37 +655,6 @@ export const CONFIG = {
     },
   },
 
-  // -------------------------------------------------------------------------
-  // THE MARKET - one price per good, and what moves it
-  //
-  // price = base * swell(t) * exp(-pressure). Selling q units adds q/absorb to
-  // pressure, buying takes it away, and pressure drains back toward zero over
-  // recoverySeconds. The swell is a slow, deterministic wave around the base:
-  // it can be read, and with the right rite it can be seen coming.
-  // -------------------------------------------------------------------------
-  market: {
-    absorb0: 300,            // units the soil market takes before it buckles
-    absorbGrowth: 1.0,       // deeper markets take the same units; the units are worth more
-    recoverySeconds: 60,     // pressure falls by e in this long
-    cycle: {
-      amplitude: 0.25,       // swell of +-25% around base
-      periodMin: 240,        // seconds
-      periodMax: 720,
-    },
-    sampleSeconds: 2,        // how often the chart takes a point
-    history: 90,             // points on the chart
-    historyLedger: 240,      // points once the ledger is held
-    forecastSeconds: 180,    // how far ahead foresight draws
-    buckleBelow: 0.6,        // price/base at which the market is called buckled
-    buyShare: 0.1,           // a buy takes this share of what the market holds
-    lotShare: 0.5,           // the lot button sells this share of what it takes;
-                             // must stay below -ln(buckleBelow) so a lot never buckles a calm market
-    bones: {
-      base: 5,               // coin per bone
-      absorb: 60,
-      recoverySeconds: 90,
-    },
-  },
 
   // -------------------------------------------------------------------------
   // RITES - what coin buys
@@ -735,12 +670,10 @@ export const CONFIG = {
   //
   // The effects: hands multiplies dig speed; grave multiplies how far bones
   // go; pits multiplies how many of the dead the ground gives up; picks
-  // multiplies how fast the face gives way; routes multiplies what every
-  // market takes; haste multiplies how fast every market forgets; workings
-  // keeps another layer open; crier brings visitors sooner and richer; vigil
-  // adds hours to the time the dead work alone; records pay relics when the
-  // barrow is filled in; ledger, assay, foresight and survey buy information;
-  // the factor sells for you.
+  // multiplies how fast the face gives way; workings keeps another layer
+  // open; crier brings visitors sooner and richer; vigil adds hours to the
+  // time the dead work alone; records pay relics when the barrow is filled
+  // in; assay and survey buy information.
   //
   // The depths the last seven are held back to are the schedule the list
   // arrives on. Set at four to eight they were all in hand inside a quarter
@@ -752,8 +685,6 @@ export const CONFIG = {
     handsFactor:  1.5,
     graveFactor:  1.5,
     picksFactor:  1.25,
-    routesFactor: 1.5,
-    hasteFactor:  1.25,
     // The ground gives up this much more of the dead per level, and it stops
     // after twelve of them. Anything bought with coin that multiplies the
     // bones multiplies the horde, which multiplies the depth, which multiplies
@@ -769,12 +700,7 @@ export const CONFIG = {
     list: [
       { id: 'hands',     cost: 40,      growth: 8,    max: 200 },
       { id: 'grave',     cost: 60,      growth: 8,    max: 200 },
-      { id: 'ledger',    cost: 110,     growth: 1,    max: 1 },
       { id: 'picks',     cost: 260,     growth: 12,   max: 120 },
-      { id: 'broker',    cost: 400,     growth: 14,   max: 4 },
-      { id: 'routes',    cost: 900,     growth: 7,    max: 150 },
-      { id: 'haste',     cost: 1800,    growth: 7,    max: 100 },
-      { id: 'foresight', cost: 4000,    growth: 1,    max: 1 },
       { id: 'crier',     cost: 12000,   growth: 9,    max: 6,   atDepth: 4 },
       { id: 'assay',     cost: 30000,   growth: 1,    max: 1,   atDepth: 6 },
       { id: 'vigil',     cost: 120000,  growth: 14,   max: 5,   atDepth: 9 },
@@ -783,16 +709,16 @@ export const CONFIG = {
       { id: 'records',   cost: 5e13,    growth: 6,    max: 10,  atDepth: 17 },
       { id: 'pits',      cost: 1e16,    growth: 8,    max: 12,  atDepth: 21 },
     ],
-    // The factor by level: the share of each market's best flow it sells into
-    // every second, its cut, and how choosy it is about the swell. It never
-    // touches bones - raising them is the player's decision and nothing sells
-    // the horde out from under a click.
-    broker: [
-      { flow: 0.40, fee: 0.14, above: 0 },
-      { flow: 0.75, fee: 0.07, above: 0 },
-      { flow: 1.00, fee: 0.03, above: 1.0 },
-      { flow: 1.30, fee: 0.01, above: 1.05 },
-    ],
+    // The market's upgrades, gone with it. Kept only so a save that bought
+    // them gets its coin back: the price they had, and the rank or Old Habits
+    // level that used to hand the first levels over free.
+    retired: {
+      ledger:    { cost: 110,  growth: 1,  freeAtRank: 3, booksLevel: 1 },
+      broker:    { cost: 400,  growth: 14, freeAtRank: 5, booksLevel: 3, freeTwoAtRank: 17 },
+      routes:    { cost: 900,  growth: 7 },
+      haste:     { cost: 1800, growth: 7 },
+      foresight: { cost: 4000, growth: 1,  freeAtRank: 9, booksLevel: 2 },
+    },
     // A rite is shown once coin reaches this share of its cost.
     showAtShare: 0.35,
   },
@@ -833,7 +759,7 @@ export const CONFIG = {
     deadGrowth: 4,
     handsFactor: 1.35,   // dig speed per level
     marrowFactor: 1.4,   // bones per level
-    roadsFactor: 1.35,   // what every market takes, per level
+    roadsFactor: 1.35,   // what everything is worth, per level
     depthFactor: 1.35,   // how fast the face gives way, per level
     purseBase: 500,      // coin to begin with, times purseGrowth per level
     purseGrowth: 8,
@@ -841,7 +767,7 @@ export const CONFIG = {
     callingGap: 0.82,    // visitor gap per level
     callingPay: 1.25,    // visitor generosity per level
     // What the books remember, one rite per level, in this order.
-    booksRites: ['ledger', 'foresight', 'broker'],
+    booksRites: ['assay', 'crier', 'vigil'],
   },
 
   // -------------------------------------------------------------------------
@@ -851,8 +777,6 @@ export const CONFIG = {
   // has appeared it stays.
   // -------------------------------------------------------------------------
   reveal: {
-    sellAtUnits: 5,      // the sell button appears at this much soil
-    marketAtGoods: 2,    // the market appears once a digger has brought up this many goods
     ritesAtCoin: 15,     // the rites panel appears at this much coin
   },
 
@@ -872,6 +796,20 @@ export const CONFIG = {
 
   // -------------------------------------------------------------------------
   // THE FIELD - the one drawing: a cross-section of the hill
+  // -------------------------------------------------------------------------
+  // FINDS - what clearing a layer turns up
+  //
+  // A layer never runs out, but the crew can dig it out: the whole crew for
+  // view.clearSeconds hollows one wall to wall. On the way it turns up a find
+  // at each of these marks, paid once, sized in seconds of what the barrow
+  // earns and of the bones it turns up. The last is the layer cleared.
+  // -------------------------------------------------------------------------
+  finds: {
+    at:          [0.25, 0.5, 0.75, 1],
+    coinSeconds: [30, 30, 30, 120],
+    boneSeconds: [0, 0, 0, 120],
+  },
+
   // -------------------------------------------------------------------------
   view: {
     bandHeight: 150,       // px per stratum until the field runs out of room; a
@@ -938,7 +876,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 43,
+    build: 44,
   },
 };
 
@@ -1100,12 +1038,10 @@ export function applyIdentity(doc) {
   put('lbl-income', t.stats.income);
   put('lbl-rem',    t.stats.rem);
   put('dig',        t.dig);
-  put('sell',       t.sell);
   put('export',     t.export);
   put('import',     t.import);
   put('reset',      t.reset);
   put('p-horde',    t.panels.horde);
-  put('p-market',   t.panels.market);
   put('p-rites',    t.panels.rites);
   put('p-visitor',  t.panels.visitor);
   put('chamber-title', t.panels.chamber);

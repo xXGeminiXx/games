@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=43';
-import * as Rb from './rebirth.js?v=43';
-import * as Lore from './lore.js?v=43';
-import * as Lords from './lords.js?v=43';
-import * as Ranks from './ranks.js?v=43';
+import * as Ch from './chambers.js?v=44';
+import * as Rb from './rebirth.js?v=44';
+import * as Lore from './lore.js?v=44';
+import * as Lords from './lords.js?v=44';
+import * as Ranks from './ranks.js?v=44';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -95,8 +95,6 @@ export function modsOf(s, cfg, legacy) {
   const b = Ch.boonsOf(s);
   const o = legacy ? Rb.oathMods(legacy, cfg) : null;
   const oath = (key, fallback) => (o ? o[key] : fallback);
-  const brokerLv = lv('broker');
-  const table = r.broker;
   const trophy = (id) => !!(legacy && legacy.trophies && legacy.trophies[id]);
   const rank = (id) => !!(legacy && cfg.ranks && Ranks.has(legacy, cfg, id));
   // The lord whose layers the dig is in: his rule on callers holds while the
@@ -108,8 +106,6 @@ export function modsOf(s, cfg, legacy) {
   const hillGap = hill.visitGap !== undefined ? hill.visitGap : 1;
   const hillSoft = hill.soft !== undefined ? hill.soft : 1;
   const hillDef = cfg.hills && s.hill ? cfg.hills.list.find(h => h.id === s.hill) : null;
-  let broker = brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null;
-  if (broker && trophy('neb')) broker = Object.assign({}, broker, { fee: 0 });
   const T = cfg.lords ? cfg.lords.trophy : {};
   // What a lord hands over beside his trophy, held for good once his door
   // has been broken. Never bought, so never a level.
@@ -117,19 +113,13 @@ export function modsOf(s, cfg, legacy) {
   const twice = id => (P && trophy(id) ? P.factor : 1);
   return {
     // Production.
-    digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1),
+    digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1) * twice('neb'),
     boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones * twice('pater'),
     softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1) * hillSoft,
     faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1) * twice('sepulturero'),
-    valueMult: b.value * twice('rey'),
-    activeStrata: cfg.horde.activeStrata + lv('workings'),
-    // Markets.
-    absorbMult: Math.pow(r.routesFactor, lv('routes')) * b.absorb * oath('absorb', 1) * twice('neb'),
-    recoveryMult: Math.pow(r.hasteFactor, lv('haste')),
-    broker,
+    valueMult: b.value * twice('rey') * oath('value', 1),
+    activeStrata: cfg.horde.activeStrata + lv('workings') + (rank('openMore') ? 1 : 0),
     // Information.
-    ledger: lv('ledger') > 0,
-    foresight: lv('foresight') > 0,
     assay: lv('assay') > 0,
     // Layers below the cut whose ground is known before the dead reach it.
     readAhead: Math.max(lv('survey') > 0 ? r.surveyReads : 0, rank('readTwo') ? 2 : 0),
@@ -143,8 +133,12 @@ export function modsOf(s, cfg, legacy) {
     visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1) * twice('dona'),
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
     // What the lords' trophies do.
-    doorEase: trophy('sepulturero') ? (T.doorEase || 1) : 1,
+    doorEase: (trophy('sepulturero') ? (T.doorEase || 1) : 1) * (rank('doorsEasy') ? 1.25 : 1),
     hoardMult: (trophy('mortifer') ? (T.hoardMult || 1) : 1) * (rank('hoardPlus') ? 1.5 : 1) * (rank('lordHoard') ? 2 : 1),
+    // Neb-Amenti's scales weigh every barrow again when it is filled in.
+    sealRelics: trophy('neb') ? (T.sealRelics || 1) : 1,
+    // What clearing a layer turns up, and how many times over.
+    findsMult: rank('clearFinds') ? 2 : 1,
     boneCart: trophy('pater') ? (T.boneCartSeconds || 0) : 0,
     callersWait: trophy('dona'),
     // The lords' powers that are not a doubling.

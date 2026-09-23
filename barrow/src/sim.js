@@ -3,36 +3,39 @@
 //
 // Everything one barrow is lives in `state`, a plain object a save can hold.
 // What carries between barrows lives in `legacy`, which the simulation reads
-// and never writes except when a run is sealed. The markets are kept beside
-// the state (their swell is regenerated from the seed; only their pressure
-// and chart survive a save).
+// and never writes except when a run is sealed.
 //
-// A step is dt seconds of the horde digging, the markets recovering, the
-// factor selling, the gate being watched and the reveal flags catching up.
-// The step size is free: every rate is continuous and the recovery is closed
-// form, so a second stepped once and a second stepped ten times land in the
-// same place. That is what lets the time away be caught up in coarse chunks.
+// A step is dt seconds of the horde digging, what it dug going for what it
+// is worth, the gate being watched and the reveal flags catching up. The step
+// size is free: every rate is continuous, so a second stepped once and a
+// second stepped ten times land in the same place. That is what lets the time
+// away be caught up in coarse chunks.
+//
+// There is no market. Every material has a worth - its layer's, lifted by
+// the run's boons - and whatever the dead dig is sold at that worth the moment
+// it comes up. What the player decides is where the crew stands, what coin
+// buys and how deep to go.
 //
 // Events come back from every step and action as plain records carrying the
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=43';
-import * as Mat from './materials.js?v=43';
-import * as Mk from './market.js?v=43';
-import * as H from './horde.js?v=43';
-import * as Crew from './crew.js?v=43';
-import * as R from './rites.js?v=43';
-import * as Rv from './reveal.js?v=43';
-import * as Ch from './chambers.js?v=43';
-import * as Vi from './visitors.js?v=43';
-import * as Rb from './rebirth.js?v=43';
-import * as Lore from './lore.js?v=43';
-import * as Lords from './lords.js?v=43';
-import * as Ranks from './ranks.js?v=43';
-import { createGround } from './ground.js?v=43';
-import { fill } from '../config.js?v=43';
-import { fmt, fmtCoin } from './numbers.js?v=43';
+import { CONFIG as DEFAULT } from '../config.js?v=44';
+import * as Mat from './materials.js?v=44';
+import * as H from './horde.js?v=44';
+import * as Crew from './crew.js?v=44';
+import * as R from './rites.js?v=44';
+import * as Rv from './reveal.js?v=44';
+import * as Ch from './chambers.js?v=44';
+import * as Vi from './visitors.js?v=44';
+import * as Rb from './rebirth.js?v=44';
+import * as Lore from './lore.js?v=44';
+import * as Lords from './lords.js?v=44';
+import * as Ranks from './ranks.js?v=44';
+import { createGround } from './ground.js?v=44';
+import { hash } from './rng.js?v=44';
+import { fill } from '../config.js?v=44';
+import { fmt, fmtCoin } from './numbers.js?v=44';
 
 export const SAVE_VERSION = 2;
 
@@ -66,6 +69,7 @@ export function freshState(cfg, seed) {
     visitCount: 0,
     visitorsSeen: 0, visitorsTaken: 0, visitorsMissed: 0,
     visitorsBought: {},   // kind -> how many of it this barrow has taken
+    marketGone: 1,        // begun after the market came out of the game
     visitRecent: [],      // the last few kinds that came, newest last
     spells: [],           // what callers handed over for a while
     doorEase: {},         // door layer -> how much easier a herald made it
@@ -73,6 +77,7 @@ export function freshState(cfg, seed) {
     hand: { digs: 0 },
     effort: [],           // digger-seconds spent per layer, for the drawing
     worked: [],           // seconds of the whole crew spent on each layer, for the hollow
+    finds: {},            // layer -> how many of its finds have been turned up
     flags: {},            // reveal flags, monotonic
     fired: {},            // log lines that have gone out, once each
     milestones: { horde: 0, depth: 0 },
@@ -101,29 +106,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const state = opts.state || freshState(cfg, seed);
   const legacy = opts.legacy || Rb.freshLegacy();
   const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill));
-  const markets = new Map();
-
-  const marketFor = (id) => {
-    let m = markets.get(id);
-    if (m) return m;
-    if (id === Mat.BONES) {
-      m = Mk.createMarket({
-        id, seed: state.seed, base: cfg.market.bones.base, absorb: cfg.market.bones.absorb,
-        recovery: cfg.market.bones.recoverySeconds, cycle: cfg.market.cycle,
-      });
-    } else {
-      const k = Mat.strataOf(id);
-      if (k < 0) throw new Error('no such good: ' + id);
-      const layer = ground.at(k);
-      m = Mk.createMarket({
-        id, seed: state.seed, base: layer.value, absorb: layer.absorb, amp: layer.swell,
-        recovery: cfg.market.recoverySeconds, cycle: cfg.market.cycle,
-      });
-    }
-    markets.set(id, m);
-    return m;
-  };
-
   const mods = () => R.modsOf(state, cfg, legacy);
   // A save from before ranks gets credit for what it had already done.
   if (legacy.renown === null || legacy.renown === undefined) legacy.renown = Ranks.fromHistory(legacy, cfg);
@@ -139,27 +121,25 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   if (!legacy.trophies) legacy.trophies = {};
   if (!legacy.lordsMet) legacy.lordsMet = {};
 
-  /** A market's base price, after any boon that lifted what everything fetches. */
-  const baseOf = (id) => {
-    const m = marketFor(id);
-    return m.base * (id === Mat.BONES ? 1 : mods().valueMult);
-  };
-
-  const held = (id) => (id === Mat.BONES ? state.bones : (state.stock[id] || 0));
-  const take = (id, q) => {
-    if (id === Mat.BONES) state.bones = Math.max(0, state.bones - q);
-    else state.stock[id] = Math.max(0, (state.stock[id] || 0) - q);
-  };
-
   const activeFrom = () => H.activeFrom(state.depth, cfg.horde, mods().activeStrata);
 
-  /** Every good whose market row is on the table, in layer order, bones last. */
-  const goods = () => {
-    const ids = Object.keys(state.stock)
-      .filter(id => Rv.marketVisible(state, id))
-      .sort((a, b) => Mat.strataOf(a) - Mat.strataOf(b));
-    if (Rv.marketVisible(state, Mat.BONES)) ids.push(Mat.BONES);
-    return ids;
+  /** How much a buyer at the gate is paying over the odds for one material, right now. */
+  const buyerFor = (id) => {
+    let f = 1;
+    for (const sp of (Array.isArray(state.spells) ? state.spells : [])) {
+      if (sp && sp.key === 'worth:' + id && state.t < sp.until && sp.factor > 0) f *= sp.factor;
+    }
+    return f;
+  };
+
+  /**
+   * What one unit of a material fetches: its layer's worth, the run's boons
+   * on everything, and a buyer at the gate who wants that one in particular.
+   */
+  const worthOf = (id, md) => {
+    const k = Mat.strataOf(id);
+    if (k < 0) return 0;
+    return ground.at(k).value * (md || mods()).valueMult * buyerFor(id);
   };
 
   const earn = (coin) => {
@@ -222,22 +202,31 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     }
   };
 
-  const noteSeen = (events) => {
+  /**
+   * Sell everything the dead have brought up at what it is worth. Called
+   * after every dig, so nothing is ever held: a material is coin the moment
+   * it reaches the top.
+   */
+  const cashIn = (events, md) => {
+    let coin = 0;
     for (const id of Object.keys(state.stock)) {
-      if (!state.seen[id] && state.stock[id] > 1e-9) {
+      const q = state.stock[id];
+      if (!(q > 0)) continue;
+      coin += q * worthOf(id, md);
+      state.totals.sold += q;
+      state.stock[id] = 0;
+      if (!state.seen[id]) {
         state.seen[id] = true;
-        marketFor(id);
         const k = Mat.strataOf(id);
-        // Said for the first couple of markets, while a new player is still
-        // learning that every layer sells. After that every layer would say
-        // it, and a line said every layer is a line nobody reads.
-        if (k > 0 && k <= 2) fire(events, 'market:' + id, 'newMarket', { name: ground.at(k).name }, String(k));
+        // Said for the first couple of materials, while a new player is
+        // still learning that deeper is worth more. After that every layer
+        // would say it, and a line said every layer is a line nobody reads.
+        if (events && k > 0 && k <= 2) fire(events, 'market:' + id, 'newMarket', { name: ground.at(k).name }, String(k));
       }
     }
-    if (!state.seen[Mat.BONES] && state.bones > 1e-9) {
-      state.seen[Mat.BONES] = true;
-      marketFor(Mat.BONES);
-    }
+    earn(coin);
+    if (coin > 0 && events) fire(events, 'firstSale', 'firstSale');
+    return coin;
   };
 
   /**
@@ -279,39 +268,48 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   /**
-   * The factor. It sells into the room each market has rather than a share of
-   * what is held, so a tab left open earns close to what a market can pay and
-   * the player's edge is in where the horde stands and when to sell by hand.
-   * It never touches bones: the horde is raised by decision, not by a clerk.
+   * What the crew turns up as it digs a layer out: a find at each mark in
+   * config.finds.at, paid once, the last one the layer cleared. Sized in
+   * seconds of what the barrow earns and of the bones it turns up, so a find
+   * is worth the same share of a run however far along it is. While nobody is
+   * watching they are paid without a line each, so a night away does not
+   * come back as a page of them; the away line has the coin and bones.
    */
-  const brokerStep = (dt, md) => {
-    const b = md.broker;
-    if (!b) return;
-    for (const id of goods()) {
-      if (id === Mat.BONES) continue;
-      const units = held(id);
-      if (!(units > 1e-9)) continue;
-      const m = marketFor(id);
-      if (b.above > 0 && Mk.cycleAt(m, state.t) < b.above) continue;
-      const q = Math.min(units, Mk.bestFlow(m, md) * b.flow * dt);
-      if (!(q > 1e-12)) continue;
-      const revenue = Mk.sell(m, q, state.t, md) * (1 - b.fee) * md.valueMult;
-      take(id, q);
-      state.totals.sold += q;
-      earn(revenue);
+  const turnUp = (events, md) => {
+    const F = cfg.finds;
+    const T = cfg.view && cfg.view.clearSeconds;
+    if (!F || !(T > 0)) return;
+    if (!state.finds || typeof state.finds !== 'object') state.finds = {};
+    const words = Lore.finds();
+    for (let k = activeFrom(); k <= state.depth; k++) {
+      const frac = (state.worked[k] || 0) / T;
+      let paid = state.finds[k] || 0;
+      while (paid < F.at.length && frac >= F.at[paid] - 1e-9) {
+        const mult = md.findsMult || 1;
+        const coin = steadyIncome() * (F.coinSeconds[paid] || 0) * mult;
+        const bones = boneRate() * (F.boneSeconds[paid] || 0) * mult;
+        earn(coin);
+        if (bones > 0) state.bones += bones;
+        const last = paid === F.at.length - 1;
+        if (events && words) {
+          const item = words.items[hash(state.seed, 'find:' + k + ':' + paid) % words.items.length];
+          const text = fill(last ? words.cleared : words.found, {
+            item, name: ground.at(k).name, coin: fmtCoin(coin), bones: fmt(bones),
+          });
+          events.push({ type: 'log', key: last ? 'cleared' : 'found', text });
+        }
+        paid++;
+      }
+      state.finds[k] = paid;
     }
   };
 
-  /** Drop dust and the charts of markets nobody can see, so a long run stays small. */
+  /** Drop the empty entries for layers left behind, so a long run stays small. */
   const tidy = () => {
     const from = activeFrom();
     for (const id of Object.keys(state.stock)) {
       const k = Mat.strataOf(id);
-      if (state.stock[id] < 1e-9 && k >= 0 && k < from - 1) delete state.stock[id];
-    }
-    for (const m of markets.values()) {
-      const k = Mat.strataOf(m.id);
-      if (k >= 0 && k < from - 1 && m.history.length) m.history.length = 0;
+      if (!(state.stock[id] > 1e-9) && k >= 0 && k < from - 1) delete state.stock[id];
     }
   };
 
@@ -526,12 +524,12 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   /**
-   * Where the diggers stand. The game works it out from what each layer's
-   * buyers will actually take, and keeps working it out as the run changes,
-   * so a player who never opens the panel is never behind one who does. It
-   * is only read off the rows when the player has asked to set it by hand.
+   * Where the diggers stand. The game works it out from what each layer pays
+   * a digger, and keeps working it out as the run changes, so a player who
+   * never opens the panel is never behind one who does. It is only read off
+   * the rows when the player has asked to set it by hand.
    */
-  const crewApi = { state, cfg, ground, mods, marketFor };
+  const crewApi = { state, cfg, ground, mods, worthOf };
   const split = () => {
     if (state.byHand) return H.distribute(state.weights, state.faceWeight, activeFrom());
     return Crew.bestSplit(crewApi);
@@ -550,15 +548,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   /**
    * What every open layer and the way down are making right now, at the
-   * weights as they stand: coin per second at the price its own flow holds
-   * the market down to, and bones per second.
-   *
-   * A layer's goods land in three markets - its own, the one above and a
-   * trace of the one below - and a market's price is set by everything
-   * arriving in it, so the flows are added up first and each layer is then
-   * credited with what its own share of them fetches. That is why a row can
-   * read near zero while its neighbour reads in the billions: they are
-   * selling into the same buyers and the shallow one filled them hours ago.
+   * weights as they stand: coin per second at what each material is worth,
+   * and bones per second.
    */
   const layerRates = (given) => {
     const md = mods();
@@ -566,35 +557,22 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const sp = given || split();
     const perSec = state.horde * cfg.horde.digRate * md.digMult;
     const diggerSeconds = state.horde * cfg.horde.digRate;
-    const flow = {};                       // good id -> units per second, all layers
     const rows = new Map();
     for (let k = from; k <= state.depth; k++) {
       const share = sp.strata[k] || 0;
       const layer = ground.at(k);
       const parts = [];
+      let coin = 0;
       if (share > 0) {
         const units = perSec * share / layer.hardness;
         for (const part of ground.mixAt(k)) {
           const id = 's' + part.k;
           const q = units * part.share;
-          flow[id] = (flow[id] || 0) + q;
           parts.push({ id, q });
+          coin += q * worthOf(id, md);
         }
       }
-      rows.set(k, { share, parts, coin: 0, bones: diggerSeconds * share * layer.bones * md.boneMult });
-    }
-    // The price each good settles at once the whole flow is arriving. The
-    // multipliers are read once for the whole panel rather than once per
-    // market: this runs ten times a second.
-    const settled = {};
-    for (const id of Object.keys(flow)) {
-      const k = Mat.strataOf(id);
-      if (k < 0) continue;
-      const m = marketFor(id);
-      settled[id] = m.base * md.valueMult * Math.exp(-Mk.saturation(m, flow[id], md));
-    }
-    for (const row of rows.values()) {
-      for (const part of row.parts) row.coin += part.q * (settled[part.id] || 0);
+      rows.set(k, { share, parts, coin, bones: diggerSeconds * share * layer.bones * md.boneMult });
     }
     // The dead on the way down bring up no goods, only the bones of the layer
     // they are breaking into.
@@ -630,7 +608,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   /** What the gate is allowed to reach into. Nothing else is exposed to it. */
   const visitorApi = {
     state, cfg, ground,
-    mods, goods, held, take, earn, spend, marketFor,
+    mods, earn, spend, worthOf,
     strataOf: Mat.strataOf,
     boneRate,
     growthOver,
@@ -639,11 +617,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     addBones: (n) => { if (n > 0) state.bones += n; },
     raiseFree: (n) => H.raiseFree(state, n),
     boon: (b) => payBoon(Ch.applyBoon(state, b)),
-    sting: (p) => {
-      const ids = goods().filter(id => id !== Mat.BONES);
-      if (!ids.length) return;
-      marketFor(ids[ids.length - 1]).pressure += p;
-    },
     survey: (n) => {
       const names = [];
       for (let i = 1; i <= n; i++) {
@@ -671,7 +644,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // whose callers come every minute cannot keep it running for good.
     spell: (from, key, factor, seconds) => {
       if (!Array.isArray(state.spells)) state.spells = [];
-      const live = state.spells.find(x => x && x.from === from && state.t < x.until);
+      const live = state.spells.find(x => x && x.from === from && x.key === key && state.t < x.until);
       if (live) live.until = Math.max(live.until, state.t + seconds);
       else state.spells.push({ from, key, factor, until: state.t + seconds });
     },
@@ -712,7 +685,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const events = [];
     if (!(dt > 0)) return events;
     const md = mods();
-    const before = Math.floor(state.t / cfg.market.sampleSeconds);
 
     const sp = split();
     // A hungry lord eats some of the crew working his door, every minute it
@@ -727,6 +699,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       }
     }
     const opened = H.dig(state, dt, cfg, md, ground, sp);
+    cashIn(events, md);
+    turnUp(unwatched ? null : events, md);
     for (const k of opened) {
       events.push({ type: 'opened', k });
       fire(events, 'break:' + k, 'breakthrough', { name: ground.at(k).name }, String(k));
@@ -740,8 +714,6 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     }
     if (opened.length) readAhead();
 
-    for (const m of markets.values()) Mk.relax(m, dt, md);
-    brokerStep(dt, md);
     // A rank that lets upgrades buy themselves: the cheapest one on the panel
     // that coin will cover, one a step, while the player has it switched on.
     if (md.autoBuy && legacy.autoBuy) {
@@ -761,15 +733,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     trimIncome();
     Vi.tick(visitorApi, unwatched ? null : events, unwatched);
 
-    const after = Math.floor(state.t / cfg.market.sampleSeconds);
-    if (after !== before) {
-      const keep = md.ledger ? cfg.market.historyLedger : cfg.market.history;
-      const on = new Set(goods());
-      for (const m of markets.values()) if (on.has(m.id)) Mk.sample(m, state.t, keep);
-      if (opened.length) tidy();
-    }
+    if (opened.length) tidy();
 
-    noteSeen(events);
     announce(events, Rv.update(state, cfg, legacy));
     milestones(events);
     return events;
@@ -842,60 +807,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       state.bones += cfg.hand.bonesPerDig;
     }
     fire(events, 'firstDig', 'firstDig');
-    noteSeen(events);
+    cashIn(events, mods());
     announce(events, Rv.update(state, cfg, legacy));
     return events;
-  };
-
-  const sell = (id, q) => {
-    const events = [];
-    const have = held(id);
-    q = Math.min(q, have);
-    if (!(q > 1e-12)) return { events, coin: 0 };
-    const md = mods();
-    const m = marketFor(id);
-    const revenue = Mk.sell(m, q, state.t, md) * (id === Mat.BONES ? 1 : md.valueMult);
-    take(id, q);
-    state.totals.sold += q;
-    earn(revenue);
-    fire(events, 'firstSale', 'firstSale');
-    if (Mk.demandOf(m) < cfg.market.buckleBelow) {
-      const k = Mat.strataOf(id);
-      const name = k >= 0 ? ground.at(k).name : Lore.inline(cfg.text.stats.bones);
-      if (!state.fired.buckled) state.totals.buckled += 1;
-      fire(events, 'buckled', 'buckled', { name });
-    }
-    announce(events, Rv.update(state, cfg, legacy));
-    return { events, coin: revenue };
-  };
-
-  const sellShare = (id, share) => sell(id, held(id) * share);
-
-  /** Sell one lot: about what the market takes before it buckles. */
-  const sellLot = (id) => {
-    const { absorb } = Mk.effective(marketFor(id), mods());
-    return sell(id, Math.min(held(id), absorb * cfg.market.lotShare));
-  };
-
-  /** Buy with up to `coin` coin (default: one buyShare of what the market holds). */
-  const buy = (id, coinLimit) => {
-    const events = [];
-    const md = mods();
-    if (!md.ledger) return { events, units: 0, coin: 0 };
-    const m = marketFor(id);
-    const { absorb } = Mk.effective(m, md);
-    let q = absorb * cfg.market.buyShare;
-    const budget = Math.min(state.coin, coinLimit === undefined ? Infinity : coinLimit);
-    const cost = Mk.quoteBuy(m, q, state.t, md);
-    if (cost > budget) {
-      const head = Mk.priceAt(m, state.t);
-      q = absorb * Math.log(1 + budget / (head * absorb));
-    }
-    if (!(q > 1e-12)) return { events, units: 0, coin: 0 };
-    const paid = Mk.buy(m, q, state.t, md);
-    spend(paid);
-    if (id === Mat.BONES) state.bones += q; else state.stock[id] = (state.stock[id] || 0) + q;
-    return { events, units: q, coin: paid };
   };
 
   const raise = (count) => {
@@ -993,45 +907,57 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   const snapshot = () => ({
     state: JSON.parse(JSON.stringify(state)),
-    markets: Array.from(markets.values()).map(Mk.snapshotMarket),
     legacy: JSON.parse(JSON.stringify(legacy)),
   });
 
   const sim = {
-    cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
-    step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
+    cfg, state, legacy, ground, mods, worthOf, activeFrom,
+    step, advance, dig, raise, setWeight, setWeightAt, buyRite,
     split, setByHand, setAutoBuy, setAutoRaise, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver, visitorApi,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
-    sealYield: () => Rb.yieldOf(state, cfg),
+    sealYield: () => Rb.yieldOf(state, cfg, mods().sealRelics),
     canSeal: () => Rb.canSeal(state, cfg),
-    price: (id) => Mk.priceAt(marketFor(id), state.t) * (id === Mat.BONES ? 1 : mods().valueMult),
-    quote: (id, q) => Mk.quote(marketFor(id), q, state.t, mods()) * (id === Mat.BONES ? 1 : mods().valueMult),
     layerRates,
-    /** Steady flow of a good in units per second from the horde as it is set. */
-    flowOf: (id) => {
-      const md = mods();
-      const from = activeFrom();
-      const sp = split();
-      const perSec = state.horde * cfg.horde.digRate * md.digMult;
-      let q = 0;
-      for (let k = from; k <= state.depth; k++) {
-        const share = sp.strata[k] || 0;
-        if (share <= 0) continue;
-        const units = perSec * share / ground.at(k).hardness;
-        for (const part of ground.mixAt(k)) if ('s' + part.k === id) q += units * part.share;
-      }
-      if (id === Mat.BONES) q = boneRate();
-      return q;
-    },
   };
 
-  if (opts.snapshot) {
-    for (const ms of opts.snapshot.markets || []) {
-      try { Mk.restoreMarket(marketFor(ms.id), ms); } catch (e) { /* an unknown good is dropped */ }
+  // A run from before the market came out: what it had on hand sells at its
+  // worth, and whatever it spent on the market's own upgrades comes back.
+  // Levels rank or Old Habits handed over free are not paid for twice.
+  if (opts.state && !state.marketGone) {
+    state.marketGone = 1;
+    const md = mods();
+    let sold = 0;
+    for (const id of Object.keys(state.stock)) {
+      if (state.stock[id] > 0) sold += state.stock[id] * worthOf(id, md);
+      state.stock[id] = 0;
+    }
+    const gone = (cfg.rites && cfg.rites.retired) || {};
+    const rank = cfg.ranks ? Ranks.rankOf(legacy.renown || 0, cfg) : 0;
+    const books = (legacy.oaths && legacy.oaths.books) || 0;
+    let back = 0;
+    for (const id of Object.keys(gone)) {
+      const lv = state.rites[id] || 0;
+      const g = gone[id];
+      let free = 0;
+      if ((g.freeAtRank && rank >= g.freeAtRank) || (g.booksLevel && books >= g.booksLevel)) free = 1;
+      if (g.freeTwoAtRank && rank >= g.freeTwoAtRank) free = 2;
+      for (let l = free; l < lv; l++) back += g.cost * Math.pow(g.growth, l);
+      delete state.rites[id];
+    }
+    if (sold > 0) earn(sold);
+    if (back > 0) state.coin += back;
+    const w = Lore.CONTENT.log.marketGone;
+    if (w && (sold > 0 || back > 0)) {
+      const parts = [w.head];
+      if (sold > 0) parts.push(fill(w.sold, { coin: fmtCoin(sold) }));
+      if (back > 0) parts.push(fill(w.back, { coin: fmtCoin(back) }));
+      state.log.unshift(parts.join(' '));
+      if (state.log.length > 14) state.log.length = 14;
     }
   }
+
 
   // A run from before there were lords has already dug past some of their
   // doors. They come up to meet the player now: each one pays, talks and
@@ -1060,6 +986,9 @@ export function restoreSim(cfg, snap) {
   // A run saved before there were lords says nothing about doors; the fresh
   // state underneath says it has had them all along, which is not true of it.
   if (!Object.prototype.hasOwnProperty.call(st, 'doorsV')) state.doorsV = 0;
+  // Likewise a run saved while there was still a market: the fresh state
+  // says it never had one, which is not true of it.
+  if (!Object.prototype.hasOwnProperty.call(st, 'marketGone')) state.marketGone = 0;
   state.totals = Object.assign(defaults.totals, st.totals || {});
   state.milestones = Object.assign(defaults.milestones, st.milestones || {});
   state.hand = Object.assign(defaults.hand, st.hand || {});
@@ -1080,6 +1009,20 @@ export function restoreSim(cfg, snap) {
       const scale = (v.carveScale || 60) * Math.pow(1.35, k);
       return Math.min(1, Math.log10(1 + e / scale) / 3) * v.clearSeconds;
     });
+  }
+  // A save from before finds: whatever its layers were already dug out to has
+  // been passed, so it is not paid in one flood the moment it opens.
+  if (!st.finds || typeof st.finds !== 'object') {
+    state.finds = {};
+    const F = cfg.finds, T = cfg.view && cfg.view.clearSeconds;
+    if (F && T > 0) {
+      for (let k = 0; k < state.worked.length; k++) {
+        const frac = (state.worked[k] || 0) / T;
+        let n = 0;
+        while (n < F.at.length && frac >= F.at[n] - 1e-9) n++;
+        if (n > 0) state.finds[k] = n;
+      }
+    }
   }
   if (!Array.isArray(state.log)) state.log = [];
   if (!Array.isArray(state.chamberQueue)) state.chamberQueue = [];
@@ -1120,29 +1063,26 @@ export function openedState(cfg, legacy, seed, lines, hill) {
 
   for (const id of o.startRites) state.rites[id] = 1;
   // What rank hands over at the start of every barrow.
-  const rankRites = { ledger: 'ledger', broker: 'broker', foresight: 'foresight', assay: 'assay' };
-  for (const key of Object.keys(rankRites)) {
-    if (cfg.ranks && Ranks.has(legacy, cfg, key)) state.rites[rankRites[key]] = Math.max(state.rites[rankRites[key]] || 0, 1);
-  }
-  if (cfg.ranks && Ranks.has(legacy, cfg, 'broker2')) state.rites.broker = Math.max(state.rites.broker || 0, 2);
+  if (cfg.ranks && Ranks.has(legacy, cfg, 'assay')) state.rites.assay = Math.max(state.rites.assay || 0, 1);
   if (o.startCoin > 0) state.coin = o.startCoin;
 
   // A barrow never starts past the first lord's door: he is always met.
   const firstDoor = cfg.lords ? cfg.lords.every - 1 : 40;
-  const depth = Math.max(0, Math.min(o.startDepth, 40, firstDoor));
+  const deeper = cfg.ranks && Ranks.has(legacy, cfg, 'startDeeper') ? 1 : 0;
+  const depth = Math.max(0, Math.min(o.startDepth + deeper, 40, firstDoor));
   for (let k = 0; k <= depth; k++) {
     if (k > state.depth) state.depth = k;
     while (state.weights.length <= k) state.weights.push(0);
     // The same step back a breakthrough applies, so ground that comes free
     // with a new barrow is already leaning down rather than spread flat.
     H.settle(state, cfg.horde);
-    // Enough of each good to put its market on the table, and enough effort
-    // spent for the drawing to show the tunnels that were supposedly cut.
-    state.stock['s' + k] = ground.at(k).absorb * 0.05;
+    // Ground that comes free with a new barrow has been seen and half dug.
     state.seen['s' + k] = true;
     state.effort[k] = ground.at(k).cap * ground.at(k).hardness;
     if (!Array.isArray(state.worked)) state.worked = [];
     state.worked[k] = (cfg.view && cfg.view.clearSeconds ? cfg.view.clearSeconds : 0) * 0.5;
+    // Half dug out, and the finds in that half were somebody else's.
+    if (cfg.finds) state.finds[k] = cfg.finds.at.filter(a => a <= 0.5).length;
   }
   // The jar's share of the last barrow's dead comes along, once.
   const carried = legacy.carry > 0 ? legacy.carry : 0;

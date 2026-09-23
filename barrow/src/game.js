@@ -14,16 +14,15 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=43';
-import { createSim, restoreSim, openedState } from './sim.js?v=43';
-import * as Save from './save.js?v=43';
-import * as Rb from './rebirth.js?v=43';
-import * as Lore from './lore.js?v=43';
-import { hash } from './rng.js?v=43';
-import { createUI } from './ui.js?v=43';
-import { createView } from './view.js?v=43';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=43';
-import * as Mat from './materials.js?v=43';
+import { storageKey, fill } from '../config.js?v=44';
+import { createSim, restoreSim, openedState } from './sim.js?v=44';
+import * as Save from './save.js?v=44';
+import * as Rb from './rebirth.js?v=44';
+import * as Lore from './lore.js?v=44';
+import { hash } from './rng.js?v=44';
+import { createUI } from './ui.js?v=44';
+import { createView } from './view.js?v=44';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=44';
 
 /**
  * @param {object} o
@@ -60,19 +59,6 @@ export function createGame(o) {
     return r;
   };
   actions.dig = wrap(() => sim.dig());
-  actions.sell = wrap((id, q) => sim.sell(id, q));
-  actions.sellShare = wrap((id, share) => sim.sellShare(id, share));
-  actions.sellLot = wrap((id) => sim.sellLot(id));
-  actions.sellLesser = wrap(() => {
-    const events = [];
-    const from = sim.activeFrom();
-    for (const id of sim.goods()) {
-      const k = Mat.strataOf(id);
-      if (k >= 0 && k < from) for (const e of sim.sellShare(id, 1).events) events.push(e);
-    }
-    return events;
-  });
-  actions.buy = wrap((id) => sim.buy(id));
   actions.raise = wrap((count) => { const r = sim.raise(count); save(); return r; });
   actions.setWeight = wrap((key, delta) => { sim.setWeight(key, delta); return []; });
   actions.setWeightAt = wrap((key, value) => { sim.setWeightAt(key, value); return []; });
