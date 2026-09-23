@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=22';
-import * as Mk from './market.js?v=22';
-import * as H from './horde.js?v=22';
-import * as R from './rites.js?v=22';
-import * as Rb from './rebirth.js?v=22';
-import * as Lore from './lore.js?v=22';
-import * as Advice from './advice.js?v=22';
-import * as Lords from './lords.js?v=22';
-import * as Ranks from './ranks.js?v=22';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=22';
-import { fill } from '../config.js?v=22';
+import * as Mat from './materials.js?v=23';
+import * as Mk from './market.js?v=23';
+import * as H from './horde.js?v=23';
+import * as R from './rites.js?v=23';
+import * as Rb from './rebirth.js?v=23';
+import * as Lore from './lore.js?v=23';
+import * as Advice from './advice.js?v=23';
+import * as Lords from './lords.js?v=23';
+import * as Ranks from './ranks.js?v=23';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=23';
+import { fill } from '../config.js?v=23';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -68,6 +68,7 @@ export function createUI(doc, sim, cfg, actions) {
       hordeBox: byId('st-horde'), depthBox: byId('st-depth'), remBox: byId('st-rem'), rankBox: byId('st-rank'),
     },
     goal: byId('goal'), goalSay: byId('goal-say'), goalBar: byId('goal-bar'), goalRule: byId('goal-rule'),
+    ending: byId('ending-panel'),
     standing: byId('standing'),
     fieldhint: byId('fieldhint'),
     compass: byId('compass'), compassSay: byId('compass-say'), compassGo: byId('compass-go'),
@@ -726,6 +727,34 @@ export function createUI(doc, sim, cfg, actions) {
     }
   };
 
+  // -- the ending card --------------------------------------------------------
+
+  /**
+   * The barrow just filled in, summed up at the top of the next one: how deep
+   * it got against the best, the lords it broke, what it paid and the rank it
+   * left, until the player moves on.
+   */
+  let endingShown = false;
+  const renderEnding = () => {
+    if (!nodes.ending) return;
+    const s = sim.state;
+    const b = s.ending && sim.legacy.barrows && sim.legacy.barrows[0];
+    show(nodes.ending, !!b);
+    if (!b) { endingShown = false; return; }
+    if (endingShown) return;
+    endingShown = true;
+    const E = Lore.seal().ending;
+    const best = ((sim.legacy.best && sim.legacy.best.depth) || 0) + 1;
+    clear(nodes.ending);
+    nodes.ending.appendChild(el('h2', { text: fill(E.title, { n: b.n }) }));
+    nodes.ending.appendChild(el('p', { text: b.depth >= best ? fill(E.best, { depth: b.depth }) : fill(E.depth, { depth: b.depth, best }) }));
+    nodes.ending.appendChild(el('p', { text: b.lords > 0 ? fill(E.lords, { n: b.lords }) : E.noLords }));
+    const rk = Ranks.standing(sim.legacy, cfg);
+    nodes.ending.appendChild(el('p', { text: fill(E.paid, { n: fmt(b.relics), rank: rk.name }) }));
+    nodes.ending.appendChild(el('p', { class: 'dim', text: fill(E.totals, { coin: fmtCoin(b.coin), horde: fmtCount(b.horde) }) }));
+    nodes.ending.appendChild(el('button', { text: E.button, onclick: () => actions.dismissEnding() }));
+  };
+
   // -- rank and trophies ------------------------------------------------------
 
   /**
@@ -740,7 +769,7 @@ export function createUI(doc, sim, cfg, actions) {
     const st = Ranks.standing(legacy, cfg);
     const W = T.standing;
     const owned = Object.keys(legacy.trophies || {}).sort().join(',');
-    const key = st.points + '|' + owned + '|' + panelTab;
+    const key = st.points + '|' + owned + '|' + panelTab + '|' + ((legacy.barrows || []).length);
     if (key === standingKey) return;
     standingKey = key;
     clear(nodes.standing);
@@ -770,6 +799,14 @@ export function createUI(doc, sim, cfg, actions) {
       keys.appendChild(el('div', { class: got ? '' : 'off' }, el('b', { text: fill(W.atRank, { n: k.rank }) }), ' - ' + Lore.rankKey(k.id)));
     }
     nodes.standing.appendChild(keys);
+    const rec = (legacy.barrows || []).slice(0, 8);
+    if (rec.length) {
+      const words = Lore.seal();
+      nodes.standing.appendChild(el('h3', { text: words.recordTitle }));
+      const list = el('div', { class: 'grid' });
+      for (const b of rec) list.appendChild(el('div', { text: fill(words.record, { n: b.n, depth: b.depth, lords: b.lords, relics: fmt(b.relics) }) }));
+      nodes.standing.appendChild(list);
+    }
   };
 
   // -- the line at the top -------------------------------------------------
@@ -865,6 +902,7 @@ export function createUI(doc, sim, cfg, actions) {
       nodes.handline.textContent = soil > 0 && !f.market ? fmt(soil) + ' ' + Lore.label(sim.ground.at(0).name) : '';
     }
 
+    renderEnding();
     renderChamber();
     renderVisitor();
     renderCompass();

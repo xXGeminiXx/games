@@ -10,8 +10,8 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=22';
-import * as Lore from './lore.js?v=22';
+import { hash } from './rng.js?v=23';
+import * as Lore from './lore.js?v=23';
 
 /** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {
@@ -33,8 +33,10 @@ export function poolOf(k, cfg, ground) {
   const key = id && pools[id] ? id : 'other';
   const bands = pools[key] || [0];
   const rooms = [];
+  // A lord's own rooms first, then the shared ones his pool draws on.
+  for (const r of Lore.lordRooms(id)) rooms.push(r);
   for (const b of bands) for (const r of Lore.chamberBand(b)) rooms.push(r);
-  return { key, rooms };
+  return { key: id && Lore.lordRooms(id).length ? id : key, rooms };
 }
 
 /**

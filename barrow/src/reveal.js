@@ -8,7 +8,7 @@
 // announced by one line in the log.
 // ---------------------------------------------------------------------------
 
-import { BONES } from './materials.js?v=22';
+import { BONES } from './materials.js?v=23';
 
 /** Flag -> the pool in the writing that announces it. */
 export const ANNOUNCE = {

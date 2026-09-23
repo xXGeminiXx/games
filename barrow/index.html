@@ -98,6 +98,12 @@
   #goal-bar{height:3px;background:var(--rule);margin:5px 0 4px;max-width:340px}
   #goal-bar span{display:block;height:3px;background:var(--deepink);width:0}
   #goal-rule{color:var(--dim);font-size:11px;display:block}
+  /* The card a barrow opens with after the last one was filled in. */
+  #ending-panel{border:1px solid var(--deepink);border-radius:2px;padding:12px 14px;margin:0 0 12px}
+  #ending-panel h2{color:var(--deepink);font-size:12px;letter-spacing:.14em}
+  #ending-panel p{margin:0 0 3px;color:var(--ink)}
+  #ending-panel p.dim{color:var(--dim)}
+  #ending-panel button{margin-top:8px;border-color:var(--deepink);color:var(--deepink)}
   /* A lord in front of the player reads differently from a room. */
   #chamber-panel.lord{border-left:2px solid var(--deepink);padding-left:12px}
   #chamber-panel.lord h2{color:var(--deepink)}
@@ -458,7 +464,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="7e07dd7048e6">
+<meta name="build" content="18799aa078b3">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -519,6 +525,7 @@
 <main>
   <section id="books">
     <p id="compass"><span id="compass-say"></span><button id="compass-go" hidden></button></p>
+    <div id="ending-panel" class="panel" hidden></div>
     <div id="goal" hidden><div id="goal-say"></div><div id="goal-bar"></div><small id="goal-rule"></small></div>
     <div id="log"></div>
     <div id="chamber-panel" class="panel" hidden>
@@ -570,8 +577,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=22';
-import { createGame } from './src/game.js?v=22';
+import { CONFIG, applyIdentity } from './config.js?v=23';
+import { createGame } from './src/game.js?v=23';
 
 applyIdentity(document);
 

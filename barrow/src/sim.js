@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=22';
-import * as Mat from './materials.js?v=22';
-import * as Mk from './market.js?v=22';
-import * as H from './horde.js?v=22';
-import * as Crew from './crew.js?v=22';
-import * as R from './rites.js?v=22';
-import * as Rv from './reveal.js?v=22';
-import * as Ch from './chambers.js?v=22';
-import * as Vi from './visitors.js?v=22';
-import * as Rb from './rebirth.js?v=22';
-import * as Lore from './lore.js?v=22';
-import * as Lords from './lords.js?v=22';
-import * as Ranks from './ranks.js?v=22';
-import { createGround } from './ground.js?v=22';
-import { fill } from '../config.js?v=22';
-import { fmt, fmtCoin } from './numbers.js?v=22';
+import { CONFIG as DEFAULT } from '../config.js?v=23';
+import * as Mat from './materials.js?v=23';
+import * as Mk from './market.js?v=23';
+import * as H from './horde.js?v=23';
+import * as Crew from './crew.js?v=23';
+import * as R from './rites.js?v=23';
+import * as Rv from './reveal.js?v=23';
+import * as Ch from './chambers.js?v=23';
+import * as Vi from './visitors.js?v=23';
+import * as Rb from './rebirth.js?v=23';
+import * as Lore from './lore.js?v=23';
+import * as Lords from './lords.js?v=23';
+import * as Ranks from './ranks.js?v=23';
+import { createGround } from './ground.js?v=23';
+import { fill } from '../config.js?v=23';
+import { fmt, fmtCoin } from './numbers.js?v=23';
 
 export const SAVE_VERSION = 2;
 
@@ -799,6 +799,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   /** The switches rank hands over, kept with the things that carry between barrows. */
   const setAutoBuy = (on) => { legacy.autoBuy = !!on; return legacy.autoBuy; };
+  const dismissEnding = () => { state.ending = false; };
   const setAutoSeal = (layer) => {
     const n = Math.max(0, Math.round(layer) || 0);
     legacy.autoSealAt = n > 0 ? Math.max(cfg.seal.unlockDepth + 1, n) : 0;
@@ -833,7 +834,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue,
+    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -932,6 +933,8 @@ export function restoreSim(cfg, snap) {
 export function openedState(cfg, legacy, seed, lines) {
   const state = freshState(cfg, seed);
   const o = Rb.oathMods(legacy, cfg);
+  // The barrow just filled in gets a card at the top of the next one.
+  state.ending = Array.isArray(legacy.barrows) && legacy.barrows.length > 0;
   const ground = createGround(cfg, state.seed);
   if (lines) state.log = lines.slice(0, 14);
 

@@ -327,6 +327,181 @@ export const CONTENT = {
   },
 
   // -------------------------------------------------------------------------
+  // ROOMS OF THEIR OWN - two in every lord's ten, beside the shared ones.
+  // config.chambers.pools says which lords draw from which.
+  // -------------------------------------------------------------------------
+  lordRooms: {
+    pater: [
+      {
+        title: 'The sorting floor',
+        lines: [
+          'Long tables, and on them, bones sorted by size. Somebody was halfway through a new pile.',
+          'A tag on the pile says: "Yours. Please return."',
+        ],
+        offers: [
+          { name: 'Take the pile', line: 'Every bone on the table stands up and grabs a spade.', boon: { diggers: 1.5 } },
+          { name: 'Finish the sorting', line: 'Sorted bones go further.', boon: { soft: 1.6 } },
+        ],
+      },
+      {
+        title: 'The choir',
+        lines: [
+          'Skulls on shelves from floor to ceiling, all facing the door. The jaws move when you walk in.',
+          'They\'re singing. Badly.',
+        ],
+        offers: [
+          { name: 'Let them sing', line: 'The diggers work to the beat.', boon: { dig: 1.5 } },
+          { name: 'Take the shelves down', line: 'Bone by the cartload.', boon: { bones: 1.7 } },
+        ],
+      },
+    ],
+    rey: [
+      {
+        title: 'The miners\' shrine',
+        lines: [
+          'A little horned statue in a niche. Someone left him cigar stubs and a cup that still smells of rum.',
+          'There\'s a pile of silver at his feet.',
+        ],
+        offers: [
+          { name: 'Leave him a gift', line: 'He likes you now. Everything sells higher.', boon: { value: 1.6 } },
+          { name: 'Take the silver', line: 'An hour of income, right now.', boon: { windfall: 3600 } },
+        ],
+      },
+      {
+        title: 'The flooded drift',
+        lines: [
+          'An old mine tunnel, knee deep in something that shines like a mirror. It\'s quicksilver.',
+          'The ore carts are still on the rails, still loaded.',
+        ],
+        offers: [
+          { name: 'Push the carts out', line: 'Sell what the old miners left behind.', boon: { windfall: 2400, value: 1.2 } },
+          { name: 'Drain it', line: 'The floor under it gives way faster.', boon: { face: 1.8 } },
+        ],
+      },
+    ],
+    dona: [
+      {
+        title: 'The long table',
+        lines: [
+          'A banquet table set for a hundred. Every chair has a skeleton in it and every plate is full.',
+          '"Sit! Sit! Nobody ever leaves this party."',
+        ],
+        offers: [
+          { name: 'Pull up a chair', line: 'Her guests lend a hand.', boon: { diggers: 2 } },
+          { name: 'Take the silverware', line: 'Solid gold forks. Everything sells higher.', boon: { value: 1.5, absorb: 1.3 } },
+        ],
+      },
+      {
+        title: 'The dance floor',
+        lines: [
+          'Candles on every step, marigolds everywhere, and the dead dancing in pairs.',
+          'The band waves at you with bony hands.',
+        ],
+        offers: [
+          { name: 'Dance', line: 'Everyone digs faster after a dance.', boon: { dig: 1.6 } },
+          { name: 'Hire the band', line: 'The dead dig to the music, and more of them get up for it.', boon: { soft: 1.5 } },
+        ],
+      },
+    ],
+    sepulturero: [
+      {
+        title: 'His other shaft',
+        lines: [
+          'A second shaft, cut from below, running up to meet yours.',
+          'The walls are neat. Better than yours, honestly.',
+        ],
+        offers: [
+          { name: 'Use his shaft', line: 'Digging down goes faster.', boon: { face: 2 } },
+          { name: 'Take his tools', line: 'Good shovels, well kept.', boon: { dig: 1.5 } },
+        ],
+      },
+      {
+        title: 'The headstone yard',
+        lines: [
+          'A room full of blank headstones, stacked like plates.',
+          'One of them already has your name on it. The date is blank.',
+        ],
+        offers: [
+          { name: 'Sell the stone', line: 'Fine marble. The markets want it.', boon: { value: 1.4, absorb: 1.4 } },
+          { name: 'Break yours', line: 'You feel better. So do the diggers.', boon: { dig: 1.3, face: 1.4 } },
+        ],
+      },
+    ],
+    neb: [
+      {
+        title: 'The hall of scales',
+        lines: [
+          'A hall of brass scales, a feather on every one.',
+          'Every scale tips toward you as you walk past.',
+        ],
+        offers: [
+          { name: 'Weigh the gold', line: 'Everything is worth more on these scales.', boon: { value: 1.7 } },
+          { name: 'Weigh the dead', line: 'The light ones stand up and dig.', boon: { diggers: 1.2, bones: 1.3 } },
+        ],
+      },
+      {
+        title: 'The painted tomb',
+        lines: [
+          'Walls painted with jackals, boats and a long line of the dead waiting their turn.',
+          'The last figure in the line has a spade. It looks like one of yours.',
+        ],
+        offers: [
+          { name: 'Copy the map', line: 'The paint shows where to dig. Digging down goes faster.', boon: { face: 1.8 } },
+          { name: 'Scrape the paint', line: 'Lapis and gold leaf, sold by the pound.', boon: { windfall: 3000 } },
+        ],
+      },
+    ],
+    natron: [
+      {
+        title: 'The drying room',
+        lines: [
+          'Rows of bodies on stone slabs, packed in white salt.',
+          'They\'ve been drying for three thousand years. They\'re nearly ready.',
+        ],
+        offers: [
+          { name: 'Wake them early', line: 'Salted dead dig all day.', boon: { diggers: 1.5, dig: 1.2 } },
+          { name: 'Take the salt', line: 'Salt sells anywhere.', boon: { value: 1.3, absorb: 1.6 } },
+        ],
+      },
+      {
+        title: 'The jar room',
+        lines: [
+          'Shelves of stone jars, each with a little carved head on the lid.',
+          'Something inside one of them is knocking.',
+        ],
+        offers: [
+          { name: 'Open the jars', line: 'What was kept is yours now.', boon: { bones: 1.8 } },
+          { name: 'Leave them sealed', line: 'She appreciates it. The ground gives easier.', boon: { face: 1.5, dig: 1.2 } },
+        ],
+      },
+    ],
+    mortifer: [
+      {
+        title: 'The warm gate',
+        lines: [
+          'An archway of black stone, warm to the touch, standing in the middle of the room with no wall around it.',
+          'Walk through it and you come out the other side of the same room. The diggers won\'t go near it.',
+        ],
+        offers: [
+          { name: 'Walk through', line: 'The dead will follow you anywhere after that.', boon: { soft: 1.8 } },
+          { name: 'Break it', line: 'Black stone sells for a fortune.', boon: { value: 1.8 } },
+        ],
+      },
+      {
+        title: 'The waiting line',
+        lines: [
+          'A line of the dead, shoulder to shoulder, going down a stair farther than your lamp reaches.',
+          'They step aside to let your diggers pass. Somebody told them you were coming.',
+        ],
+        offers: [
+          { name: 'Join the line', line: 'A few hundred of them join yours instead.', boon: { diggers: 2.5 } },
+          { name: 'Cut ahead', line: 'Your crew takes the fast way down.', boon: { face: 2.2 } },
+        ],
+      },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
   // THE LORDS - who is under the hill. Numbers live in config.lords.
   //
   // `meet` is what a lord says the first time a player ever breaks his door;
@@ -662,6 +837,19 @@ export const CONTENT = {
       'On to the next hill. You know what\'s under it now.',
     ],
     statLine: 'Barrow {n} filled in: layer {depth}, {coin} coin, {horde} diggers.',
+    // The card the next barrow opens with.
+    ending: {
+      title: 'Barrow {n} filled in',
+      depth: 'Reached layer {depth}. Your best is layer {best}.',
+      best: 'Reached layer {depth}. That\'s your best yet.',
+      lords: 'Lords broken: {n}.',
+      noLords: 'No lords broken this time.',
+      paid: 'Filling in paid {n} relics. You\'re {rank} now.',
+      totals: 'Earned {coin} coin and raised {horde} diggers.',
+      button: 'On to the next hill',
+    },
+    record: 'Barrow {n}: layer {depth}, {lords} lords, {relics} relics.',
+    recordTitle: 'Your barrows',
   },
 
 
