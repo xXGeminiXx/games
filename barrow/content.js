@@ -82,6 +82,9 @@ export const CONTENT = {
     away: [
       'You were away {t}.',
     ],
+    slow: [
+      'With nobody watching, they got {t} of digging done.',
+    ],
     waiting: [
       'Someone is waiting at the gate.',
     ],

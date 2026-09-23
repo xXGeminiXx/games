@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=36';
-import { createSim, restoreSim, openedState } from './sim.js?v=36';
-import * as Save from './save.js?v=36';
-import * as Rb from './rebirth.js?v=36';
-import * as Lore from './lore.js?v=36';
-import { hash } from './rng.js?v=36';
-import { createUI } from './ui.js?v=36';
-import { createView } from './view.js?v=36';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=36';
-import * as Mat from './materials.js?v=36';
+import { storageKey, fill } from '../config.js?v=37';
+import { createSim, restoreSim, openedState } from './sim.js?v=37';
+import * as Save from './save.js?v=37';
+import * as Rb from './rebirth.js?v=37';
+import * as Lore from './lore.js?v=37';
+import { hash } from './rng.js?v=37';
+import { createUI } from './ui.js?v=37';
+import { createView } from './view.js?v=37';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=37';
+import * as Mat from './materials.js?v=37';
 
 /**
  * @param {object} o
@@ -102,8 +102,10 @@ export function createGame(o) {
   let running = false;
   let disposed = false;     // after a reset, an import or a seal: never write the old run again
 
+  // Nobody was looking at the page for this stretch, so it is dug at the away
+  // pace: an open tab with the player watching always gets further.
   const away = (seconds) => {
-    const r = sim.advance(seconds);
+    const r = sim.advance(seconds, { unwatched: true });
     tell(r.events);
     if (r.away && r.elapsed > 30) {
       // The stat labels are stored the way a label reads, so they come back
@@ -119,6 +121,8 @@ export function createGame(o) {
       // two differ, the tail below says where they stopped.
       const gone = r.capped ? seconds : r.elapsed;
       let line = Lore.line(sim.state.seed, 'away', { t: fmtTime(gone) }, String(Math.floor(sim.state.t)));
+      // How much digging that came to, when nobody watching made it less.
+      if (r.elapsed - r.worked >= 1) line += ' ' + Lore.line(sim.state.seed, 'slow', { t: fmtTime(r.worked) }, String(Math.floor(sim.state.t)));
       if (parts.length) line += ' ' + parts.join(', ') + '.';
       // These are whole sentences after a full stop, so they take capitals
       // like every other sentence the game writes.

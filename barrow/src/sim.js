@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=36';
-import * as Mat from './materials.js?v=36';
-import * as Mk from './market.js?v=36';
-import * as H from './horde.js?v=36';
-import * as Crew from './crew.js?v=36';
-import * as R from './rites.js?v=36';
-import * as Rv from './reveal.js?v=36';
-import * as Ch from './chambers.js?v=36';
-import * as Vi from './visitors.js?v=36';
-import * as Rb from './rebirth.js?v=36';
-import * as Lore from './lore.js?v=36';
-import * as Lords from './lords.js?v=36';
-import * as Ranks from './ranks.js?v=36';
-import { createGround } from './ground.js?v=36';
-import { fill } from '../config.js?v=36';
-import { fmt, fmtCoin } from './numbers.js?v=36';
+import { CONFIG as DEFAULT } from '../config.js?v=37';
+import * as Mat from './materials.js?v=37';
+import * as Mk from './market.js?v=37';
+import * as H from './horde.js?v=37';
+import * as Crew from './crew.js?v=37';
+import * as R from './rites.js?v=37';
+import * as Rv from './reveal.js?v=37';
+import * as Ch from './chambers.js?v=37';
+import * as Vi from './visitors.js?v=37';
+import * as Rb from './rebirth.js?v=37';
+import * as Lore from './lore.js?v=37';
+import * as Lords from './lords.js?v=37';
+import * as Ranks from './ranks.js?v=37';
+import { createGround } from './ground.js?v=37';
+import { fill } from '../config.js?v=37';
+import { fmt, fmtCoin } from './numbers.js?v=37';
 
 export const SAVE_VERSION = 2;
 
@@ -77,6 +77,18 @@ export function freshState(cfg, seed) {
     rate: 0,
     log: [],              // the last lines said, newest first
   };
+}
+
+/**
+ * How many seconds of digging a stretch nobody watched is worth. The first
+ * minute counts in full, so a look at another tab costs nothing; the rest is
+ * dug at the away pace.
+ */
+export function awayWork(seconds, time) {
+  if (!(seconds > 0)) return 0;
+  const pace = time.awayPace > 0 ? Math.min(1, time.awayPace) : 1;
+  const grace = Math.min(seconds, time.awayGrace > 0 ? time.awayGrace : 0);
+  return grace + (seconds - grace) * pace;
 }
 
 export function createSim(cfg = DEFAULT, opts = {}) {
@@ -694,14 +706,20 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * a long gap (a closed tab, a phone in a pocket) is stepped in coarse
    * chunks and capped, and the summary of what happened is returned with the
    * events so the page can say what the dead did while nobody watched.
+   *
+   * `opts.unwatched` is the page saying nobody was looking: the gap is then
+   * dug at the away pace, so time at the machine always beats time away.
+   * Without it every second counts in full, which is what a caller stepping
+   * the simulation forward on purpose wants.
    */
-  const advance = (seconds) => {
+  const advance = (seconds, opts) => {
     const events = [];
-    if (!(seconds > 0)) return { events, elapsed: 0, capped: false, away: false };
+    if (!(seconds > 0)) return { events, elapsed: 0, worked: 0, capped: false, away: false };
     const away = seconds > cfg.time.catchUpAfter;
     const max = mods().offlineHours * 3600;
     const capped = away && seconds > max;
     const total = capped ? max : seconds;
+    const worked = away && opts && opts.unwatched ? awayWork(total, cfg.time) : total;
     const chunk = away ? cfg.time.offlineStep : cfg.time.tick;
     const startCoin = state.coin, startBones = state.bones;
     const startDepth = state.depth, startHorde = state.horde;
@@ -709,7 +727,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const startVisits = state.visitorsSeen || 0;
     const startRelics = legacy.remembrance || 0;
     const startDoors = Object.keys(state.doors || {}).length;
-    let left = total;
+    let left = worked;
     let guard = 0;
     while (left > 1e-9 && guard++ < 2e6) {
       const dt = Math.min(chunk, left);
@@ -734,7 +752,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       const d = state.stock[id] - (startStock[id] || 0);
       if (d > 1e-9) gained.stock[id] = d;
     }
-    return { events, elapsed: total, capped, away, gained };
+    return { events, elapsed: total, worked, capped, away, gained };
   };
 
   // -- actions ------------------------------------------------------------

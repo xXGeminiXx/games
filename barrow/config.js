@@ -797,6 +797,8 @@ export const CONFIG = {
     catchUpAfter: 4,       // a gap longer than this is stepped in coarse chunks
     offlineStep: 1,        // seconds per chunk when catching up
     offlineMaxHours: 12,   // the dead stop after this long without you
+    awayPace: 0.75,        // share of full speed the dead dig at with nobody watching
+    awayGrace: 60,         // seconds out of sight that still count in full (a look at another tab)
     autosaveSeconds: 5,
     incomeWindow: 10,      // seconds the coin/s figure averages over
   },
@@ -864,7 +866,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 36,
+    build: 37,
   },
 };
 
