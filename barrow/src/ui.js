@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=41';
-import * as Mk from './market.js?v=41';
-import * as H from './horde.js?v=41';
-import * as R from './rites.js?v=41';
-import * as Rb from './rebirth.js?v=41';
-import * as Lore from './lore.js?v=41';
-import * as Advice from './advice.js?v=41';
-import * as Lords from './lords.js?v=41';
-import * as Ranks from './ranks.js?v=41';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=41';
-import { fill } from '../config.js?v=41';
+import * as Mat from './materials.js?v=42';
+import * as Mk from './market.js?v=42';
+import * as H from './horde.js?v=42';
+import * as R from './rites.js?v=42';
+import * as Rb from './rebirth.js?v=42';
+import * as Lore from './lore.js?v=42';
+import * as Advice from './advice.js?v=42';
+import * as Lords from './lords.js?v=42';
+import * as Ranks from './ranks.js?v=42';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=42';
+import { fill } from '../config.js?v=42';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -418,15 +418,18 @@ export function createUI(doc, sim, cfg, actions) {
     const takes = el('small', { class: 'ledger', hidden: true, title: T.ledgerTakesTip });
     held.appendChild(el('b'));
     const hot = el('small', { class: 'sat', hidden: true, title: T.ceilingTip });
+    // A buyer at the gate who wants this material, and what he pays: the one
+    // time buying it here is plainly worth doing.
+    const wanted = el('small', { class: 'wanted', hidden: true });
     const tag = k >= 0 ? seamTag(k) : '';
     const nameCell = el('td', { class: 'good' },
       el('span', { class: 'swatch', style: 'background:' + good.hue }),
       el('span', { text: Lore.label(good.name) }),
       tag ? el('small', { class: 'seam', text: tag, title: seamLine(k) }) : null,
-      hot);
+      hot, wanted);
     nameCell.firstChild.style.background = good.hue;
     const tr = el('tr', null, nameCell, held, price, el('td', { class: 'chart' }, spark.svg, demand, takes), buttons);
-    return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark, buy: buttons.lastChild, base, takes, hot, sampled: -1 };
+    return { id, tr, held: held.firstChild, price: price.firstChild, delta, demandBar: demand.firstChild, spark, buy: buttons.lastChild, base, takes, hot, wanted, sampled: -1 };
   };
 
   const buildMarket = () => {
@@ -505,6 +508,14 @@ export function createUI(doc, sim, cfg, actions) {
       row.demandBar.className = d < cfg.market.buckleBelow ? 'low' : '';
       if (row.sampled !== m.history.length) { row.sampled = m.history.length; drawSpark(row, m, t, md); }
       show(row.buy, md.ledger);
+      const v = s.visitor;
+      const want = !!(v && v.kind === 'buyer' && v.data && v.data.id === id);
+      if (want) {
+        const said = fill(T.wantedTag, { mult: v.data.mult.toFixed(1) });
+        if (row.wanted.textContent !== said) row.wanted.textContent = said;
+      }
+      show(row.wanted, want);
+      row.buy.classList.toggle('wanted', want && md.ledger);
       if (md.ledger) {
         const { absorb, recovery } = Mk.effective(m, md);
         const sat = Mk.saturation(m, sim.flowOf(id), md);
@@ -580,6 +591,9 @@ export function createUI(doc, sim, cfg, actions) {
       const words = Lore.visitor(sp.from);
       if (words && words.lasting) lasting.push(fill(words.lasting, { x: sp.factor, t: fmtTime(Math.ceil(sp.until - s.t)) }));
     }
+    // When he asks more than is on hand, say how far off it is, so a greyed
+    // button is never a puzzle.
+    if (v && v.cost > 0 && s.coin < v.cost) lasting.unshift(fill(T.gateShort, { have: fmtCoin(s.coin), cost: fmtCoin(v.cost) }));
     const said = lasting.join(' ');
     if (nodes.visitorAfter && said !== lastingSaid) { lastingSaid = said; nodes.visitorAfter.textContent = said; }
     show(nodes.visitorAfter, lasting.length > 0);

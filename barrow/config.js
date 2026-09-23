@@ -61,7 +61,9 @@ export const CONFIG = {
     sellLotTip: 'Sells a small load, so the price barely moves',
     sellAll:    'All',
     buy:        'Buy',
-    buyTip:     'Buys back {n} units for {coin}, which lifts the price back up',
+    buyTip:     'Buys {n} for {coin}. Worth it to fill a buyer at the gate, or to buy low and sell high',
+    // On a market row while a buyer at the gate wants that material.
+    wantedTag:  'Buyer pays {mult}x',
     raise:      'Raise',
     raiseMax:   'Max',
     raiseTip:   'Bones raise the dead. Each button shows what it costs. Max spends every bone you have.',
@@ -78,6 +80,8 @@ export const CONFIG = {
     autoOnTip:  'The game keeps them where they earn most, and moves them as the ground changes',
     autoNoteGame: 'The game places them where they earn most, and moves them as the ground changes.',
     autoNoteHand: 'You place them with + and -. They stay where you put them.',
+    // Under the gate's buttons when what is asked is more than is on hand.
+    gateShort:  'You have {have} coin of the {cost} he wants.',
     // Layers nobody is digging any more, folded into one line.
     spent:      '{N} older layers, worked out.',
     spentWorth: '{N} older layers, worked out. What they left is worth {coin}.',
@@ -601,6 +605,10 @@ export const CONFIG = {
     // recentWeight of their weight.
     weight: { buyer: 2, herald: 2, cups: 0.7, collector: 0.6 },
     errandWeight: 0.5,   // a buyer's weight when there is nothing on hand to sell him
+    // Prices are seconds of what the player is actually bringing in, never
+    // less than this share of what the barrow would earn with the game
+    // placing the crew. Gifts are seconds of the larger figure.
+    priceFloor: 0.25,
     recentWeight: 0.35,
     recentKeep: 3,
     buyer: {
@@ -924,7 +932,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 41,
+    build: 42,
   },
 };
 

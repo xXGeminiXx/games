@@ -236,6 +236,8 @@
   #market td.acts{white-space:nowrap;text-align:right}
   #market td.acts button{padding:1px 5px;font-size:11px;margin-left:2px}
   #market td.acts button.buy{border-color:var(--quiet);color:var(--coin)}
+  #market td.acts button.buy.wanted{border-color:var(--coin)}
+  #market small.wanted{display:block;white-space:normal;line-height:1.25;color:var(--coin);font-size:10px}
   #market tr.lesserrow td{color:var(--dim)}
 
   /* Rites and oaths: one line each. */
@@ -479,7 +481,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="617123a14ed9">
+<meta name="build" content="7613ef8157c1">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -593,8 +595,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=41';
-import { createGame } from './src/game.js?v=41';
+import { CONFIG, applyIdentity } from './config.js?v=42';
+import { createGame } from './src/game.js?v=42';
 
 applyIdentity(document);
 

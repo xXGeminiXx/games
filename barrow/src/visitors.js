@@ -20,11 +20,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=41';
-import * as Mk from './market.js?v=41';
-import * as Lore from './lore.js?v=41';
-import { fill } from '../config.js?v=41';
-import { fmt, fmtCoin, fmtCount, fmtTime } from './numbers.js?v=41';
+import { hash, unit, range } from './rng.js?v=42';
+import * as Mk from './market.js?v=42';
+import * as Lore from './lore.js?v=42';
+import { fill } from '../config.js?v=42';
+import { fmt, fmtCoin, fmtCount, fmtTime } from './numbers.js?v=42';
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in
@@ -139,6 +139,22 @@ function incomeRef(api) {
   return Number.isFinite(r) && r > 0 ? r : 0;
 }
 
+/**
+ * The yardstick a price is set against: what the player is actually bringing
+ * in, not what the barrow would earn with the crew where the game would put
+ * it. A player who places the crew by hand and sells slowly can make a fifth
+ * of that, and a tinker priced off the larger figure asked 289No of somebody
+ * holding 39No and making 1No a second. Never under a quarter of what the
+ * barrow is worth, so a crew parked on the way down with one digger left on a
+ * shallow layer does not make a permanent boon cost nothing.
+ */
+function priceRef(api) {
+  const worth = incomeRef(api);
+  const now = typeof api.earning === 'function' ? api.earning() : worth;
+  const got = Number.isFinite(now) && now > 0 ? now : 0;
+  return Math.max(got, worth * api.cfg.visitors.priceFloor);
+}
+
 /** Bones per second the horde is turning up right now. */
 function boneRef(api) {
   return api.boneRate();
@@ -191,24 +207,25 @@ function spoken(name, text) {
 export function build(api, i) {
   for (const kind of order(api, i)) {
     const rec = buildKind(api, i, kind);
-    if (rec && withinReach(api, rec)) return rec;
+    if (!rec) continue;
+    // The one whose turn it is asks more than the player has: nobody comes
+    // this time. Sending the next in line instead handed a player who spends
+    // every coin a free gift every time a paying caller was due.
+    return withinReach(api, rec) ? rec : null;
   }
   return null;
 }
 
 /**
- * Whether the player could pay what a caller asks before the caller gives up
- * and goes: the coin on hand plus what the crew is actually bringing in over
- * the wait. Prices are set off what the barrow could earn, so a player who
- * has sent the whole crew down the shaft earns next to nothing while the
- * prices stay put, and a caller who can only be turned away is somebody else
- * not getting a turn at the gate.
+ * Whether the player can pay what a caller asks the moment he arrives. A
+ * caller who can only be turned away is somebody else not getting a turn at
+ * the gate. Counting what the crew would bring in over his wait was tried and
+ * let a caller come to a player who spends coin on upgrades as it arrives:
+ * the money was always five minutes away and never in hand.
  */
 function withinReach(api, rec) {
   if (!(rec.cost > 0)) return true;
-  const now = typeof api.earning === 'function' ? api.earning() : api.state.rate;
-  const per = Number.isFinite(now) && now > 0 ? now : 0;
-  return rec.cost <= api.state.coin + per * Math.max(0, rec.expires - rec.born);
+  return rec.cost <= api.state.coin;
 }
 
 /** One caller of a given kind, or null when that kind has nothing to offer. */
@@ -218,7 +235,8 @@ function buildKind(api, i, kind) {
   const md = api.mods();
   const v = cfg.visitors;
   const pay = md.visitPay || 1;
-  const ref = incomeRef(api);
+  const ref = incomeRef(api);        // what gifts are sized off
+  const cost = priceRef(api);        // and what prices are
   const words = Lore.visitor(kind);
   if (!words) return null;
   const picked = lineFor(state, words, kind, i);
@@ -261,21 +279,24 @@ function buildKind(api, i, kind) {
       const e = lineFor(state, words, kind, i, 'errands');
       rec.lines = 'errands';
       rec.line = e.at;
+      // With Show the Numbers the market sells too, so he can be filled
+      // from there as well as from the ground; the line says both.
       rec.text = spoken(words.name, fill(e.line.say, { name: g.name, mult: mult.toFixed(1) }))
-        + ' ' + fill(words.where, { name: g.name });
+        + ' ' + fill(md.ledger && words.whereBuy ? words.whereBuy : words.where, { name: g.name });
       rec.expires = state.t + v.stay * v.buyer.errandStay;
     } else {
       rec.text = spoken(words.name, fill(said, { name: g.name, mult: mult.toFixed(1) }));
+      if (md.ledger && words.more && api.held(id) < want * 0.5) rec.text += ' ' + fill(words.more, { n: fmt(want) });
     }
     return rec;
   }
 
   if (kind === 'bonecart') {
     const bones = Math.max(v.bonecart.floor, boneRef(api) * v.bonecart.seconds);
-    const price = ref * v.bonecart.priceSeconds;
+    const price = cost * v.bonecart.priceSeconds;
     if (!(price > 0)) return null;
     rec.data = { bones, price };
-    rec.text = spoken(words.name, said) + offer({ n: fmtCount(bones) });
+    rec.text = spoken(words.name, said) + offer({ n: fmtCount(bones), coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
@@ -290,32 +311,32 @@ function buildKind(api, i, kind) {
   }
 
   if (kind === 'reeve') {
-    const price = ref * v.reeve.seconds * Math.pow(v.reeve.priceGrowth, takenOf(state, 'reeve'));
+    const price = cost * v.reeve.seconds * Math.pow(v.reeve.priceGrowth, takenOf(state, 'reeve'));
     if (!(price > 0)) return null;
     rec.data = { price };
-    rec.text = spoken(words.name, said) + offer();
+    rec.text = spoken(words.name, said) + offer({ coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
   }
 
   if (kind === 'relic') {
-    const price = ref * v.relic.seconds * Math.pow(v.relic.priceGrowth, takenOf(state, 'relic'));
+    const price = cost * v.relic.seconds * Math.pow(v.relic.priceGrowth, takenOf(state, 'relic'));
     if (!(price > 0)) return null;
     const keys = ['dig', 'bones', 'value', 'face'];
     const key = keys[hash(seed, 'visit-boon:' + i) % keys.length];
     const factor = range(seed, 'visit-factor:' + i, v.relic.boonMin, v.relic.boonMax);
     rec.data = { price, key, factor };
-    rec.text = spoken(words.name, said) + offer();
+    rec.text = spoken(words.name, said) + offer({ coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
   }
 
   if (kind === 'surveyor') {
-    const price = ref * v.surveyor.seconds;
+    const price = cost * v.surveyor.seconds;
     rec.data = { price, reads: v.surveyor.reads };
-    rec.text = spoken(words.name, said) + offer({ n: v.surveyor.reads });
+    rec.text = spoken(words.name, said) + offer({ n: v.surveyor.reads, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
@@ -325,9 +346,9 @@ function buildKind(api, i, kind) {
     // Something for a while: twice the bones, or twice the digging, for a
     // few coins in the hat.
     const c = v[kind];
-    const price = ref * c.seconds;
+    const price = cost * c.seconds;
     rec.data = { price, key: c.key, factor: c.factor, lasts: c.lasts };
-    rec.text = spoken(words.name, said) + offer({ t: fmtTime(c.lasts), x: c.factor });
+    rec.text = spoken(words.name, said) + offer({ t: fmtTime(c.lasts), x: c.factor, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
@@ -336,11 +357,11 @@ function buildKind(api, i, kind) {
   if (kind === 'cups') {
     // A bet on a pea under a cup. Which cup it is under is the seed's, so
     // reloading the page does not change the answer.
-    const stake = ref * v.cups.seconds;
+    const stake = cost * v.cups.seconds;
     if (!(stake > 0)) return null;
     const won = unit(seed, 'visit-cups:' + i) < v.cups.odds;
     rec.data = { stake, won, pays: v.cups.pays };
-    rec.text = spoken(words.name, said) + offer({ x: v.cups.pays });
+    rec.text = spoken(words.name, said) + offer({ x: v.cups.pays, coin: fmtCoin(stake) });
     rec.take = priced(words.take, stake);
     rec.cost = stake;
     return rec;
@@ -361,12 +382,12 @@ function buildKind(api, i, kind) {
     // faster. One per door.
     const d = api.doorAhead(v.herald.within);
     if (!d) return null;
-    const price = ref * v.herald.seconds;
+    const price = cost * v.herald.seconds;
     if (!(price > 0)) return null;
     const pct = Math.round((v.herald.ease - 1) * 100);
     rec.name = fill(words.name, { lord: d.lord });
     rec.data = { price, k: d.k, ease: v.herald.ease, lord: d.lord, pct };
-    rec.text = spoken(rec.name, fill(said, { lord: d.lord })) + offer({ lord: d.lord, pct });
+    rec.text = spoken(rec.name, fill(said, { lord: d.lord })) + offer({ lord: d.lord, pct, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
