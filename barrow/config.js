@@ -278,7 +278,7 @@ export const CONFIG = {
     hardnessGrowth: 2.5,
     valueGrowth: 3.5,
     capBase: 12,
-    capGrowth: 1.7,      // ordinary floors thicken this much a layer; the doors carry the weight (lords.doorThickness)
+    capGrowth: 1.6,      // ordinary floors thicken this much a layer; the doors carry the weight (lords.doorThickness)
     // The ladder stops climbing here. Every layer past it is worth, costs and
     // holds what the horizon layer does, so the numbers stay inside a double
     // forever. It sits hundreds of layers below anything reachable: each layer
@@ -861,7 +861,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 27,
+    build: 28,
   },
 };
 
