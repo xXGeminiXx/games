@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=33';
-import { pick, hash } from './rng.js?v=33';
-import { fill } from '../config.js?v=33';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=33';
+import * as Lore from './lore.js?v=34';
+import { pick, hash } from './rng.js?v=34';
+import { fill } from '../config.js?v=34';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=34';
 
 export const LEGACY_VERSION = 1;
 
@@ -48,6 +48,8 @@ export function freshLegacy() {
     // The rest of what the player last set on the page: the open tab and
     // whether the worked-out layers are shown.
     ui: {},
+    // How many of the digger milestones have ever been reached, across barrows.
+    crewMark: 0,
   };
 }
 
@@ -63,6 +65,7 @@ export function restoreLegacy(raw) {
   if (Number.isFinite(raw.carry) && raw.carry > 0) l.carry = raw.carry;
   l.autoBuy = !!raw.autoBuy;
   if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
+  if (Number.isFinite(raw.crewMark) && raw.crewMark > 0) l.crewMark = Math.floor(raw.crewMark);
   if (raw.ui && typeof raw.ui === 'object') {
     if (typeof raw.ui.showSpent === 'boolean') l.ui.showSpent = raw.ui.showSpent;
     if (raw.ui.tab === 'oaths' || raw.ui.tab === 'rites') l.ui.tab = raw.ui.tab;

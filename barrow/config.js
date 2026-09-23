@@ -409,6 +409,7 @@ export const CONFIG = {
     hoardSeconds: 1800,     // coin a broken door pays: this much of the income
     hoardRelics: 10,        // relics it pays, times which door of the round it is
     newDepthRelics: 3,      // relics for every layer deeper than the player has ever been
+    crewRelics: 2,          // relics for a crew bigger than ever: this times which milestone it is
     // What the trophies do, where a number is involved.
     trophy: {
       startLayers: 3,       // Rex Mortis's: barrows start this many layers down
@@ -863,7 +864,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 33,
+    build: 34,
   },
 };
 

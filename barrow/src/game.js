@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=33';
-import { createSim, restoreSim, openedState } from './sim.js?v=33';
-import * as Save from './save.js?v=33';
-import * as Rb from './rebirth.js?v=33';
-import * as Lore from './lore.js?v=33';
-import { hash } from './rng.js?v=33';
-import { createUI } from './ui.js?v=33';
-import { createView } from './view.js?v=33';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=33';
-import * as Mat from './materials.js?v=33';
+import { storageKey, fill } from '../config.js?v=34';
+import { createSim, restoreSim, openedState } from './sim.js?v=34';
+import * as Save from './save.js?v=34';
+import * as Rb from './rebirth.js?v=34';
+import * as Lore from './lore.js?v=34';
+import { hash } from './rng.js?v=34';
+import { createUI } from './ui.js?v=34';
+import { createView } from './view.js?v=34';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=34';
+import * as Mat from './materials.js?v=34';
 
 /**
  * @param {object} o

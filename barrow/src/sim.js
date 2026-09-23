@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=33';
-import * as Mat from './materials.js?v=33';
-import * as Mk from './market.js?v=33';
-import * as H from './horde.js?v=33';
-import * as Crew from './crew.js?v=33';
-import * as R from './rites.js?v=33';
-import * as Rv from './reveal.js?v=33';
-import * as Ch from './chambers.js?v=33';
-import * as Vi from './visitors.js?v=33';
-import * as Rb from './rebirth.js?v=33';
-import * as Lore from './lore.js?v=33';
-import * as Lords from './lords.js?v=33';
-import * as Ranks from './ranks.js?v=33';
-import { createGround } from './ground.js?v=33';
-import { fill } from '../config.js?v=33';
-import { fmt, fmtCoin } from './numbers.js?v=33';
+import { CONFIG as DEFAULT } from '../config.js?v=34';
+import * as Mat from './materials.js?v=34';
+import * as Mk from './market.js?v=34';
+import * as H from './horde.js?v=34';
+import * as Crew from './crew.js?v=34';
+import * as R from './rites.js?v=34';
+import * as Rv from './reveal.js?v=34';
+import * as Ch from './chambers.js?v=34';
+import * as Vi from './visitors.js?v=34';
+import * as Rb from './rebirth.js?v=34';
+import * as Lore from './lore.js?v=34';
+import * as Lords from './lords.js?v=34';
+import * as Ranks from './ranks.js?v=34';
+import { createGround } from './ground.js?v=34';
+import { fill } from '../config.js?v=34';
+import { fmt, fmtCoin } from './numbers.js?v=34';
 
 export const SAVE_VERSION = 2;
 
@@ -110,6 +110,15 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const mods = () => R.modsOf(state, cfg, legacy);
   // A save from before ranks gets credit for what it had already done.
   if (legacy.renown === null || legacy.renown === undefined) legacy.renown = Ranks.fromHistory(legacy, cfg);
+  // A save from before the crew milestones paid has reached, at the least,
+  // the ones this run's crew already passed; they are not paid twice.
+  if (!(legacy.crewMark > 0)) {
+    const biggest = Math.max((legacy.best && legacy.best.horde) || 0, state.horde || 0);
+    const hm0 = Lore.CONTENT.log.hordeMilestones;
+    let n = 0;
+    while (n < hm0.length && biggest >= hm0[n][0]) n++;
+    if (n > 0) legacy.crewMark = n;
+  }
   if (!legacy.trophies) legacy.trophies = {};
   if (!legacy.lordsMet) legacy.lordsMet = {};
 
@@ -175,7 +184,18 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const milestones = (events) => {
     const hm = Lore.CONTENT.log.hordeMilestones;
     while (state.milestones.horde < hm.length && state.horde >= hm[state.milestones.horde][0]) {
-      events.push({ type: 'log', key: 'hordeMilestone', text: hm[state.milestones.horde][1] });
+      const i = state.milestones.horde;
+      let text = hm[i][1];
+      // The first time ever a crew this size stands up, it pays relics: the
+      // biggest crew a player has had is a record like the deepest layer.
+      const pay = cfg.lords ? cfg.lords.crewRelics * (i + 1) : 0;
+      if (pay > 0 && i >= (legacy.crewMark || 0)) {
+        legacy.crewMark = i + 1;
+        legacy.remembrance = (legacy.remembrance || 0) + pay;
+        legacy.earned = (legacy.earned || 0) + pay;
+        text += ' ' + fill(Lore.doors().crew, { relics: pay });
+      }
+      events.push({ type: 'log', key: 'hordeMilestone', text });
       state.milestones.horde += 1;
     }
     const dm = Lore.CONTENT.log.depthMilestones;
