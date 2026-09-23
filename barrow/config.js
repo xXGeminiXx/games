@@ -172,6 +172,7 @@ export const CONFIG = {
       one:   '{Name}\'s door is under the next layer.',
       at:    'Breaking {Name}\'s door: {pct} through.',
       rule:  'In {Name}\'s layers: {line}',
+      tip:   'Every tenth layer\'s floor is a lord\'s door. Break it and he pays his hoard, talks, and gives you a gift.',
     },
     // The Kept forever tab: rank, trophies, and what rank hands over.
     standing: {
@@ -862,7 +863,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 30,
+    build: 31,
   },
 };
 

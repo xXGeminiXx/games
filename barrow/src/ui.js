@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=30';
-import * as Mk from './market.js?v=30';
-import * as H from './horde.js?v=30';
-import * as R from './rites.js?v=30';
-import * as Rb from './rebirth.js?v=30';
-import * as Lore from './lore.js?v=30';
-import * as Advice from './advice.js?v=30';
-import * as Lords from './lords.js?v=30';
-import * as Ranks from './ranks.js?v=30';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=30';
-import { fill } from '../config.js?v=30';
+import * as Mat from './materials.js?v=31';
+import * as Mk from './market.js?v=31';
+import * as H from './horde.js?v=31';
+import * as R from './rites.js?v=31';
+import * as Rb from './rebirth.js?v=31';
+import * as Lore from './lore.js?v=31';
+import * as Advice from './advice.js?v=31';
+import * as Lords from './lords.js?v=31';
+import * as Ranks from './ranks.js?v=31';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=31';
+import { fill } from '../config.js?v=31';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -767,7 +767,7 @@ export function createUI(doc, sim, cfg, actions) {
     } else {
       text = fill(G.ahead, { name, n: doorK, m: left });
     }
-    if (text !== goalSaid) { goalSaid = text; nodes.goalSay.textContent = text; }
+    if (text !== goalSaid) { goalSaid = text; nodes.goalSay.textContent = text; nodes.goal.title = G.tip; }
     // The goal wears the colour of the lord it names.
     const hue = door.lord.def.color || '';
     if (nodes.goal.style && nodes.goal.style.borderLeftColor !== hue) nodes.goal.style.borderLeftColor = hue;
