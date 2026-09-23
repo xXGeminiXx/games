@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=29';
-import * as Mat from './materials.js?v=29';
-import * as Mk from './market.js?v=29';
-import * as H from './horde.js?v=29';
-import * as Crew from './crew.js?v=29';
-import * as R from './rites.js?v=29';
-import * as Rv from './reveal.js?v=29';
-import * as Ch from './chambers.js?v=29';
-import * as Vi from './visitors.js?v=29';
-import * as Rb from './rebirth.js?v=29';
-import * as Lore from './lore.js?v=29';
-import * as Lords from './lords.js?v=29';
-import * as Ranks from './ranks.js?v=29';
-import { createGround } from './ground.js?v=29';
-import { fill } from '../config.js?v=29';
-import { fmt, fmtCoin } from './numbers.js?v=29';
+import { CONFIG as DEFAULT } from '../config.js?v=30';
+import * as Mat from './materials.js?v=30';
+import * as Mk from './market.js?v=30';
+import * as H from './horde.js?v=30';
+import * as Crew from './crew.js?v=30';
+import * as R from './rites.js?v=30';
+import * as Rv from './reveal.js?v=30';
+import * as Ch from './chambers.js?v=30';
+import * as Vi from './visitors.js?v=30';
+import * as Rb from './rebirth.js?v=30';
+import * as Lore from './lore.js?v=30';
+import * as Lords from './lords.js?v=30';
+import * as Ranks from './ranks.js?v=30';
+import { createGround } from './ground.js?v=30';
+import { fill } from '../config.js?v=30';
+import { fmt, fmtCoin } from './numbers.js?v=30';
 
 export const SAVE_VERSION = 2;
 
@@ -662,6 +662,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const startDepth = state.depth, startHorde = state.horde;
     const startStock = Object.assign({}, state.stock);
     const startVisits = state.visitorsSeen || 0;
+    const startRelics = legacy.remembrance || 0;
+    const startDoors = Object.keys(state.doors || {}).length;
     let left = total;
     let guard = 0;
     while (left > 1e-9 && guard++ < 2e6) {
@@ -678,6 +680,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       strata: state.depth - startDepth,
       horde: state.horde - startHorde,
       visits: (state.visitorsSeen || 0) - startVisits,
+      relics: (legacy.remembrance || 0) - startRelics,
+      doors: Object.keys(state.doors || {}).length - startDoors,
       waiting,
       stock: {},
     };

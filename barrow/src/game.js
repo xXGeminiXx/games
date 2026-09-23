@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=29';
-import { createSim, restoreSim, openedState } from './sim.js?v=29';
-import * as Save from './save.js?v=29';
-import * as Rb from './rebirth.js?v=29';
-import * as Lore from './lore.js?v=29';
-import { hash } from './rng.js?v=29';
-import { createUI } from './ui.js?v=29';
-import { createView } from './view.js?v=29';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=29';
-import * as Mat from './materials.js?v=29';
+import { storageKey, fill } from '../config.js?v=30';
+import { createSim, restoreSim, openedState } from './sim.js?v=30';
+import * as Save from './save.js?v=30';
+import * as Rb from './rebirth.js?v=30';
+import * as Lore from './lore.js?v=30';
+import { hash } from './rng.js?v=30';
+import { createUI } from './ui.js?v=30';
+import { createView } from './view.js?v=30';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=30';
+import * as Mat from './materials.js?v=30';
 
 /**
  * @param {object} o
@@ -112,6 +112,8 @@ export function createGame(o) {
       if (r.gained.horde >= 1) parts.push(fmtCount(r.gained.horde) + ' more diggers');
       if (r.gained.bones >= 1) parts.push(fmt(Math.floor(r.gained.bones)) + ' ' + Lore.inline(cfg.text.stats.bones));
       if (r.gained.strata > 0) parts.push(r.gained.strata + (r.gained.strata === 1 ? ' layer' : ' layers'));
+      if (r.gained.doors > 0) parts.push(r.gained.doors + (r.gained.doors === 1 ? ' lord\'s door broken' : ' lords\' doors broken'));
+      if (r.gained.relics >= 1) parts.push('+' + fmt(Math.floor(r.gained.relics)) + ' relics');
       // How long the player was gone, not how long the dead lasted: when the
       // two differ, the tail below says where they stopped.
       const gone = r.capped ? seconds : r.elapsed;

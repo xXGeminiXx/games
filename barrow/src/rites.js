@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=29';
-import * as Rb from './rebirth.js?v=29';
-import * as Lore from './lore.js?v=29';
-import * as Lords from './lords.js?v=29';
-import * as Ranks from './ranks.js?v=29';
+import * as Ch from './chambers.js?v=30';
+import * as Rb from './rebirth.js?v=30';
+import * as Lore from './lore.js?v=30';
+import * as Lords from './lords.js?v=30';
+import * as Ranks from './ranks.js?v=30';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -107,6 +107,7 @@ export function modsOf(s, cfg, legacy) {
   const hill = Rb.hillRule(cfg, s.hill);
   const hillGap = hill.visitGap !== undefined ? hill.visitGap : 1;
   const hillSoft = hill.soft !== undefined ? hill.soft : 1;
+  const hillDef = cfg.hills && s.hill ? cfg.hills.list.find(h => h.id === s.hill) : null;
   let broker = brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null;
   if (broker && trophy('neb')) broker = Object.assign({}, broker, { fee: 0 });
   const T = cfg.lords ? cfg.lords.trophy : {};
@@ -146,6 +147,8 @@ export function modsOf(s, cfg, legacy) {
     autoBuy: rank('autoBuy'),
     autoSeal: rank('autoSeal'),
     bothGifts: rank('bothGifts'),
+    // What the drawing needs to know about the hill.
+    hillTint: hillDef && hillDef.tint ? hillDef.tint : null,
   };
 }
 

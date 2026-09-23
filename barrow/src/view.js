@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=29';
-import { activeFrom } from './horde.js?v=29';
-import * as Lore from './lore.js?v=29';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=30';
+import { activeFrom } from './horde.js?v=30';
+import * as Lore from './lore.js?v=30';
 
 /** mulberry32 */
 function rng(seed) {
@@ -182,6 +182,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   // ladder, which is what the drawing looked like before seams existed.
   /** A lord's own colour, falling back to the page's for a lord without one. */
   const lordColor = (lord) => (lord && lord.def && lord.def.color) || palette.deepink;
+  let hillTint = null;
   const layerAt = ground ? (k) => ground.at(k) : (k) => {
     const g = goodAt(k, strataCfg);
     return { name: g.name, hue: g.hue, seam: null, cap: capUnits(Math.max(0, k - 1), strataCfg) };
@@ -231,7 +232,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       revealed.push(Math.round(frac * cfg.tunnelSegments));
     }
     const dug = Math.max(0, Math.log10(1 + (s.totals ? s.totals.dug || 0 : 0)));
-    const key = [width, height, s.depth, L.from, L.ahead.length, Math.round(dug * 4), revealed.join(',')].join('|');
+    const key = [width, height, s.depth, L.from, L.ahead.length, Math.round(dug * 4), hillTint || '', revealed.join(',')].join('|');
     if (key === carve.key) return;
     carve.key = key;
     carve.revealed = revealed;
@@ -261,7 +262,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // three quarters of the width with a ten pixel rise in the middle.
     const half = Math.max(60, Math.min(220, width * 0.22));
     const crest = Math.min(L.surface - 5, 16 + dug * 1.5);
-    c.fillStyle = palette.mound;
+    // The hill this barrow is dug in colours the mound a little.
+    c.fillStyle = hillTint ? mix(palette.mound, hillTint, 0.4) : palette.mound;
     c.beginPath();
     c.moveTo(width * 0.5 - half, L.surface);
     c.quadraticCurveTo(width * 0.5, L.surface - crest * 1.6, width * 0.5 + half, L.surface);
@@ -744,6 +746,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   const draw = (s, effort, dt, active, split, md) => {
     if (!split) split = { strata: [], face: 0 };
     seed = s.seed;
+    hillTint = (md && md.hillTint) || null;
     const L = layout(width, height, s.depth, cfg, focusOf(s, cfg));
     drawGround(L, s, effort);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

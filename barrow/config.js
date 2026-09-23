@@ -520,14 +520,15 @@ export const CONFIG = {
   hills: {
     plain: 'plain',
     list: [
+      // `tint` is what the mound looks like from the field above.
       { id: 'plain',   rule: {} },
-      { id: 'drowned', rule: { bones: 2, cap: 1.3 } },
-      { id: 'kings',   rule: { value: 1.6, cap: 1.25 } },
-      { id: 'plague',  rule: { soft: 2, value: 0.8 } },
-      { id: 'burned',  rule: { absorb: 2, visitGap: 2 } },
-      { id: 'road',    rule: { visitGap: 0.5, value: 0.85 } },
-      { id: 'stony',   rule: { value: 2, hardness: 1.5 } },
-      { id: 'soft',    rule: { hardness: 0.7, value: 0.75 } },
+      { id: 'drowned', rule: { bones: 2, cap: 1.3 },          tint: '#2f5566' },
+      { id: 'kings',   rule: { value: 1.6, cap: 1.25 },       tint: '#8a6a2e' },
+      { id: 'plague',  rule: { soft: 2, value: 0.8 },         tint: '#56643a' },
+      { id: 'burned',  rule: { absorb: 2, visitGap: 2 },      tint: '#1a1210' },
+      { id: 'road',    rule: { visitGap: 0.5, value: 0.85 },  tint: '#6a5838' },
+      { id: 'stony',   rule: { value: 2, hardness: 1.5 },     tint: '#62646c' },
+      { id: 'soft',    rule: { hardness: 0.7, value: 0.75 },  tint: '#5e4632' },
     ],
   },
 
@@ -861,7 +862,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 29,
+    build: 30,
   },
 };
 
