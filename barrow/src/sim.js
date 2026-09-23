@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=39';
-import * as Mat from './materials.js?v=39';
-import * as Mk from './market.js?v=39';
-import * as H from './horde.js?v=39';
-import * as Crew from './crew.js?v=39';
-import * as R from './rites.js?v=39';
-import * as Rv from './reveal.js?v=39';
-import * as Ch from './chambers.js?v=39';
-import * as Vi from './visitors.js?v=39';
-import * as Rb from './rebirth.js?v=39';
-import * as Lore from './lore.js?v=39';
-import * as Lords from './lords.js?v=39';
-import * as Ranks from './ranks.js?v=39';
-import { createGround } from './ground.js?v=39';
-import { fill } from '../config.js?v=39';
-import { fmt, fmtCoin } from './numbers.js?v=39';
+import { CONFIG as DEFAULT } from '../config.js?v=40';
+import * as Mat from './materials.js?v=40';
+import * as Mk from './market.js?v=40';
+import * as H from './horde.js?v=40';
+import * as Crew from './crew.js?v=40';
+import * as R from './rites.js?v=40';
+import * as Rv from './reveal.js?v=40';
+import * as Ch from './chambers.js?v=40';
+import * as Vi from './visitors.js?v=40';
+import * as Rb from './rebirth.js?v=40';
+import * as Lore from './lore.js?v=40';
+import * as Lords from './lords.js?v=40';
+import * as Ranks from './ranks.js?v=40';
+import { createGround } from './ground.js?v=40';
+import { fill } from '../config.js?v=40';
+import { fmt, fmtCoin } from './numbers.js?v=40';
 
 export const SAVE_VERSION = 2;
 
@@ -66,6 +66,9 @@ export function freshState(cfg, seed) {
     visitCount: 0,
     visitorsSeen: 0, visitorsTaken: 0, visitorsMissed: 0,
     visitorsBought: {},   // kind -> how many of it this barrow has taken
+    visitRecent: [],      // the last few kinds that came, newest last
+    spells: [],           // what callers handed over for a while
+    doorEase: {},         // door layer -> how much easier a herald made it
     remBonus: 0,          // remembrance promised by chambers
     hand: { digs: 0 },
     effort: [],           // digger-seconds spent per layer, for the drawing
@@ -479,11 +482,35 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * What a second of this barrow is worth, for anything paid in seconds of
    * income. The coin/s figure counts sales over the last ten seconds, and a
    * seller who only sells above the usual price can go quiet for longer than
-   * that - a hoard priced off it once paid nothing. So it is the larger of
-   * that figure and what the diggers are turning up per second at the price
-   * their own flow holds each market to.
+   * that - a hoard priced off it once paid nothing. So it is the largest of
+   * that figure, what the diggers are turning up per second where they stand,
+   * and what they would turn up standing where the game would put them.
+   *
+   * The last one is for a player who has placed the crew by hand, all of it
+   * on the way down: nobody is digging anything to sell, so the first two
+   * read nothing, and every gift, hoard and caller priced off them came to 0
+   * coin. Where the crew stands is a choice about how fast to go down, and it
+   * does not make a lord's hoard any smaller.
    */
   const steadyIncome = () => {
+    const coinOf = (sp) => {
+      let made = 0;
+      try { for (const r of layerRates(sp).values()) made += r.coin || 0; } catch (e) { made = 0; }
+      return Number.isFinite(made) ? made : 0;
+    };
+    const rate = Number.isFinite(state.rate) ? state.rate : 0;
+    const here = coinOf(null);
+    const best = state.byHand ? coinOf(Crew.bestSplit(crewApi)) : here;
+    return Math.max(0, rate, here, best);
+  };
+
+  /**
+   * What the crew is actually bringing in a second where it stands: the coin
+   * figure, or what the diggers turn up at the price their flow holds. This
+   * is what a player can count on to pay for something, where steadyIncome is
+   * what the barrow is worth.
+   */
+  const earningNow = () => {
     let made = 0;
     try { for (const r of layerRates().values()) made += r.coin || 0; } catch (e) { made = 0; }
     const rate = Number.isFinite(state.rate) ? state.rate : 0;
@@ -532,10 +559,10 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * read near zero while its neighbour reads in the billions: they are
    * selling into the same buyers and the shallow one filled them hours ago.
    */
-  const layerRates = () => {
+  const layerRates = (given) => {
     const md = mods();
     const from = activeFrom();
-    const sp = split();
+    const sp = given || split();
     const perSec = state.horde * cfg.horde.digRate * md.digMult;
     const diggerSeconds = state.horde * cfg.horde.digRate;
     const flow = {};                       // good id -> units per second, all layers
@@ -607,6 +634,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     boneRate,
     growthOver,
     income: () => steadyIncome(),
+    earning: () => earningNow(),
     addBones: (n) => { if (n > 0) state.bones += n; },
     raiseFree: (n) => H.raiseFree(state, n),
     boon: (b) => payBoon(Ch.applyBoon(state, b)),
@@ -625,6 +653,41 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         names.push(layer.name + (words ? ' (' + words.tag + ')' : ''));
       }
       return fill(Lore.visitor('surveyor').reading, { name: names.join(', ') });
+    },
+    // The shallowest layer the crew still works, for a buyer deciding what
+    // to ask for.
+    activeFrom: () => activeFrom(),
+    // Relics wait for the first lord's door, like every other relic.
+    relicsOpen: () => opened(),
+    addRelics: (n) => {
+      if (!(n > 0)) return;
+      legacy.remembrance = (legacy.remembrance || 0) + n;
+      legacy.earned = (legacy.earned || 0) + n;
+    },
+    // Something a caller hands over for a while. A second one from the same
+    // caller while the first is still running starts the clock again from
+    // now; it neither doubles it again nor adds the time on, so a player
+    // whose callers come every minute cannot keep it running for good.
+    spell: (from, key, factor, seconds) => {
+      if (!Array.isArray(state.spells)) state.spells = [];
+      const live = state.spells.find(x => x && x.from === from && state.t < x.until);
+      if (live) live.until = Math.max(live.until, state.t + seconds);
+      else state.spells.push({ from, key, factor, until: state.t + seconds });
+    },
+    // The next lord's door below the dig, when it is close enough for his
+    // herald to come up the track and nobody has paid him yet.
+    doorAhead: (within) => {
+      if (!cfg.lords) return null;
+      const k = Lords.nextDoor(state.depth, cfg);
+      if (!(k > state.depth && k - state.depth <= within)) return null;
+      if (state.doorEase && state.doorEase[k]) return null;
+      const door = ground.at(k).door;
+      if (!door) return null;
+      return { k, lord: Lords.shortName(door.lord), togo: k - state.depth };
+    },
+    easeDoor: (k, factor) => {
+      if (!state.doorEase || typeof state.doorEase !== 'object') state.doorEase = {};
+      state.doorEase[k] = factor;
     },
   };
 
@@ -938,7 +1001,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
     split, setByHand, setAutoBuy, setAutoRaise, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
-    takeOffer, acceptVisitor, declineVisitor, growthOver,
+    takeOffer, acceptVisitor, declineVisitor, growthOver, visitorApi,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
     sealYield: () => Rb.yieldOf(state, cfg),
     canSeal: () => Rb.canSeal(state, cfg),
@@ -1019,7 +1082,9 @@ export function restoreSim(cfg, snap) {
   state.byHand = Object.prototype.hasOwnProperty.call(st, 'byHand')
     ? !!st.byHand
     : Object.keys((st.tuned && typeof st.tuned === 'object') ? st.tuned : {}).length > 0;
-  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned', 'doors']) {
+  if (!Array.isArray(state.visitRecent)) state.visitRecent = [];
+  if (!Array.isArray(state.spells)) state.spells = [];
+  for (const k of ['stock', 'seen', 'rites', 'flags', 'fired', 'boons', 'read', 'chambersDone', 'visitorsBought', 'tuned', 'doors', 'doorEase']) {
     if (!state[k] || typeof state[k] !== 'object') state[k] = {};
   }
   if (state.visitor && typeof state.visitor !== 'object') state.visitor = null;

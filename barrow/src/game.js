@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=39';
-import { createSim, restoreSim, openedState } from './sim.js?v=39';
-import * as Save from './save.js?v=39';
-import * as Rb from './rebirth.js?v=39';
-import * as Lore from './lore.js?v=39';
-import { hash } from './rng.js?v=39';
-import { createUI } from './ui.js?v=39';
-import { createView } from './view.js?v=39';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=39';
-import * as Mat from './materials.js?v=39';
+import { storageKey, fill } from '../config.js?v=40';
+import { createSim, restoreSim, openedState } from './sim.js?v=40';
+import * as Save from './save.js?v=40';
+import * as Rb from './rebirth.js?v=40';
+import * as Lore from './lore.js?v=40';
+import { hash } from './rng.js?v=40';
+import { createUI } from './ui.js?v=40';
+import { createView } from './view.js?v=40';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=40';
+import * as Mat from './materials.js?v=40';
 
 /**
  * @param {object} o
@@ -127,7 +127,10 @@ export function createGame(o) {
       if (parts.length) line += ' ' + parts.join(', ') + '.';
       // These are whole sentences after a full stop, so they take capitals
       // like every other sentence the game writes.
-      if (r.gained.waiting) line += ' ' + Lore.line(sim.state.seed, 'waiting', null, String(sim.state.visitCount));
+      if (r.gained.waiting) {
+        const who = sim.state.visitor && sim.state.visitor.name ? sim.state.visitor.name : 'Someone';
+        line += ' ' + Lore.line(sim.state.seed, 'waiting', { who }, String(sim.state.visitCount));
+      }
       if (r.capped) line += ' They stopped digging after ' + fmtTime(r.elapsed) + '.';
       ui.log(line);
     }

@@ -185,6 +185,8 @@
   #visitor-text{margin:0 0 7px;color:var(--ink)}
   #visitor-acts{display:flex;gap:8px}
   #visitor-acts button.take{border-color:var(--coin);color:var(--coin)}
+  #visitor-after{margin:7px 0 0;color:var(--dim);font-size:12px}
+  #visitor-text[hidden]+#visitor-acts[hidden]+#visitor-after{margin-top:0}
 
   /* A room, and what to do about it. */
   #chamber-panel{border-left:2px solid var(--deepink);padding-left:12px}
@@ -471,7 +473,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="ca973a6dfaf9">
+<meta name="build" content="fbeb003b2fef">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -544,6 +546,7 @@
       <h2 id="p-visitor">At the gate</h2>
       <p id="visitor-text"></p>
       <div id="visitor-acts"></div>
+      <p id="visitor-after" hidden></p>
     </div>
     <div id="hand" class="panel"><button id="dig">Dig</button><button id="sell" hidden>Sell</button><span id="handline"></span></div>
     <div id="horde-panel" class="panel" hidden><h2 id="p-horde">Where they dig</h2><div id="raise"></div><div id="handover"></div><div id="spent" hidden></div><div id="weights"></div></div>
@@ -584,8 +587,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=39';
-import { createGame } from './src/game.js?v=39';
+import { CONFIG, applyIdentity } from './config.js?v=40';
+import { createGame } from './src/game.js?v=40';
 
 applyIdentity(document);
 

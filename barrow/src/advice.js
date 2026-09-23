@@ -22,11 +22,11 @@
 // something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=39';
-import * as R from './rites.js?v=39';
-import * as Rb from './rebirth.js?v=39';
-import * as Lore from './lore.js?v=39';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=39';
+import * as H from './horde.js?v=40';
+import * as R from './rites.js?v=40';
+import * as Rb from './rebirth.js?v=40';
+import * as Lore from './lore.js?v=40';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=40';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -106,7 +106,11 @@ export function next(sim, cfg) {
   // page, so the line goes on to whatever is.
   const v = s.visitor;
   if (v && sim.visitorReady()) {
-    return say('gate', { t: fmtTime(Math.max(0, v.expires - s.t)) }, 'visitor-panel');
+    // Named, so the line says who; and with Dona Calavera's candle nobody
+    // leaves, so there is no clock to give.
+    const who = v.name || 'Somebody';
+    if (md.callersWait) return say('gateWaits', { who }, 'visitor-panel');
+    return say('gate', { who, t: fmtTime(Math.max(0, v.expires - s.t)) }, 'visitor-panel');
   }
 
   // Before there is a horde there is a hand, and one button.
@@ -215,7 +219,7 @@ export function next(sim, cfg) {
 
 /** Every key `next` can return, for the suite and for nothing else. */
 export const KEYS = [
-  'room', 'lord', 'gate', 'dig', 'raise', 'sell', 'face',
+  'room', 'lord', 'gate', 'gateWaits', 'dig', 'raise', 'sell', 'face',
   'move', 'raiseMore', 'oath', 'sealBeats', 'seal', 'rite', 'wait', 'work', 'bones', 'idle',
 ];
 

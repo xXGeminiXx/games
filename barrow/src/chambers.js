@@ -10,8 +10,8 @@
 // the next and both are fixed the moment the run begins.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=39';
-import * as Lore from './lore.js?v=39';
+import { hash } from './rng.js?v=40';
+import * as Lore from './lore.js?v=40';
 
 /** Whether a chamber waits under layer k: at fixed places in every lord's ten. */
 export function isChamberDepth(k, cfg) {
@@ -92,9 +92,20 @@ export function applyBoon(state, boon) {
   return out;
 }
 
-/** Every standing multiplier a boon can set, defaulted to one. */
+/**
+ * Every standing multiplier a boon can set, defaulted to one, with whatever a
+ * caller has handed over for a while still running on top. Those are kept in
+ * state.spells as { key, factor, until } and count only while the run's clock
+ * is short of `until`.
+ */
 export function boonsOf(state) {
   const b = state.boons || {};
   const m = (k) => (Number.isFinite(b[k]) && b[k] > 0 ? b[k] : 1);
-  return { dig: m('dig'), bones: m('bones'), absorb: m('absorb'), value: m('value'), face: m('face'), soft: m('soft') };
+  const out = { dig: m('dig'), bones: m('bones'), absorb: m('absorb'), value: m('value'), face: m('face'), soft: m('soft') };
+  const t = Number.isFinite(state.t) ? state.t : 0;
+  for (const sp of (Array.isArray(state.spells) ? state.spells : [])) {
+    if (!sp || !(t < sp.until) || !(sp.factor > 0) || !(sp.key in out)) continue;
+    out[sp.key] *= sp.factor;
+  }
+  return out;
 }

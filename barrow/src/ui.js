@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=39';
-import * as Mk from './market.js?v=39';
-import * as H from './horde.js?v=39';
-import * as R from './rites.js?v=39';
-import * as Rb from './rebirth.js?v=39';
-import * as Lore from './lore.js?v=39';
-import * as Advice from './advice.js?v=39';
-import * as Lords from './lords.js?v=39';
-import * as Ranks from './ranks.js?v=39';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=39';
-import { fill } from '../config.js?v=39';
+import * as Mat from './materials.js?v=40';
+import * as Mk from './market.js?v=40';
+import * as H from './horde.js?v=40';
+import * as R from './rites.js?v=40';
+import * as Rb from './rebirth.js?v=40';
+import * as Lore from './lore.js?v=40';
+import * as Advice from './advice.js?v=40';
+import * as Lords from './lords.js?v=40';
+import * as Ranks from './ranks.js?v=40';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=40';
+import { fill } from '../config.js?v=40';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -57,6 +57,7 @@ export function createUI(doc, sim, cfg, actions) {
     tabs: byId('panel-tabs'), tabRites: byId('tab-rites'), tabOaths: byId('tab-oaths'),
     tabOathsCount: byId('tab-oaths-n'), oathsNote: byId('oaths-note'),
     visitorPanel: byId('visitor-panel'), visitorText: byId('visitor-text'), visitorActs: byId('visitor-acts'),
+    visitorAfter: byId('visitor-after'),
     chamberPanel: byId('chamber-panel'), chamberTitle: byId('chamber-title'),
     chamberText: byId('chamber-text'), chamberOffers: byId('chamber-offers'),
     sealPanel: byId('seal-panel'), sealNote: byId('seal-note'), sealActs: byId('seal-acts'),
@@ -559,9 +560,24 @@ export function createUI(doc, sim, cfg, actions) {
   // -- the gate ------------------------------------------------------------
 
   let visitorKey = '';
+  let lastingSaid = '';
   const renderVisitor = () => {
-    const v = sim.state.visitor;
-    show(nodes.visitorPanel, !!v);
+    const s = sim.state;
+    const v = s.visitor;
+    // What an earlier caller handed over for a while, with the time it has
+    // left, under whoever is at the gate now.
+    const lasting = [];
+    for (const sp of (Array.isArray(s.spells) ? s.spells : [])) {
+      if (!sp || !(s.t < sp.until)) continue;
+      const words = Lore.visitor(sp.from);
+      if (words && words.lasting) lasting.push(fill(words.lasting, { x: sp.factor, t: fmtTime(Math.ceil(sp.until - s.t)) }));
+    }
+    const said = lasting.join(' ');
+    if (nodes.visitorAfter && said !== lastingSaid) { lastingSaid = said; nodes.visitorAfter.textContent = said; }
+    show(nodes.visitorAfter, lasting.length > 0);
+    show(nodes.visitorPanel, !!v || lasting.length > 0);
+    show(nodes.visitorText, !!v);
+    show(nodes.visitorActs, !!v);
     if (!v) { visitorKey = ''; return; }
     const key = v.kind + ':' + v.i;
     if (key !== visitorKey) {

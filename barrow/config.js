@@ -197,7 +197,8 @@ export const CONFIG = {
     compass: {
       room:      'A room is open. Pick one; it lasts the rest of this barrow.',
       lord:      '{Name} is waiting. Pick one of {his} gifts.',
-      gate:      "Somebody's at the gate. They go in {t}.",
+      gate:      '{Who} is at the gate. They go in {t}.',
+      gateWaits: '{Who} is at the gate, and waits for you.',
       dig:       'Press Dig. Every {n} presses turns up a bone, and bones raise the dead.',
       sell:      "You're holding {n} {name}, worth {coin}. Press Sell.",
       raise:     '{Bones} bones in hand and a digger costs {cost}. Press Raise.',
@@ -588,13 +589,24 @@ export const CONFIG = {
   // -------------------------------------------------------------------------
   visitors: {
     firstAt: 240,        // seconds into a run before the first one
-    gapMin: 200,
-    gapMax: 520,
+    // Somebody who can only be turned away never comes (visitors.js), so every
+    // caller is one the player can answer; the gaps are half again as long as
+    // when a third of them were dead time at the gate.
+    gapMin: 300,
+    gapMax: 780,
     stay: 300,           // seconds a visitor waits at the gate
+    // How often each kind comes, against one for anybody not listed. The kind
+    // that came last never comes next, and the few before it come at
+    // recentWeight of their weight.
+    weight: { buyer: 2, herald: 2, cups: 0.7, collector: 0.6 },
+    errandWeight: 0.5,   // a buyer's weight when there is nothing on hand to sell him
+    recentWeight: 0.35,
+    recentKeep: 3,
     buyer: {
       multMin: 2.5,      // times base price, and the market's mood is ignored
       multMax: 7,
       seconds: 300,      // takes about this many seconds of the good's best flow
+      errandStay: 2,     // waits this many times as long for a good you have none of
     },
     bonecart: {
       seconds: 180,      // bones worth about this many seconds of bone income
@@ -632,6 +644,33 @@ export const CONFIG = {
     },
     mourner: {
       seconds: 120,      // leaves about this many seconds of income on the heap
+    },
+    preacher: {
+      seconds: 30,       // what goes in his hat, in seconds of income
+      key: 'bones',      // and what he does for it: 2x bones for five minutes
+      factor: 2,
+      lasts: 300,
+    },
+    tinker: {
+      seconds: 60,       // sharpening costs this many seconds of income
+      key: 'dig',        // and every spade digs 2x as fast for five minutes
+      factor: 2,
+      lasts: 300,
+    },
+    cups: {
+      seconds: 300,      // the stake, in seconds of income
+      odds: 0.5,         // the pea is found this often
+      pays: 3,           // and pays this many times the stake back
+    },
+    collector: {
+      seconds: 900,      // coin for the find, in seconds of income
+      relics: 3,         // or this many relics instead
+      max: 3,            // and he buys this many finds a barrow
+    },
+    herald: {
+      within: 4,         // comes once his lord's door is this close
+      seconds: 600,      // costs this many seconds of income
+      ease: 1.5,         // and that door breaks this much faster
     },
   },
 
@@ -879,7 +918,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 39,
+    build: 40,
   },
 };
 

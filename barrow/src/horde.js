@@ -55,8 +55,18 @@ export function maxRaisable(bones, n, cfg, softMult) {
  * follows the shaft down on its own. A row the player has set by hand is left
  * exactly where they put it, for good: keeping an old bonefield working is a
  * decision, and a decision is not undone by the next breakthrough.
+ *
+ * Once the player is placing the crew themselves, a breakthrough moves
+ * nobody. The new layer opens with nobody on it and every other row stays
+ * where it was; the panel says "They stay where you put them", and a player
+ * sending everyone down the shaft does not want half of them pulled onto
+ * each new floor.
  */
 export function settle(s, cfg) {
+  if (s.byHand) {
+    if (!(s.tuned && s.tuned[s.depth])) s.weights[s.depth] = 0;
+    return;
+  }
   const step = cfg.weightDecay || 0;
   if (step > 0) {
     for (let k = 0; k < s.depth; k++) {
@@ -127,7 +137,11 @@ export function dig(s, dt, cfg, mods, ground, given) {
     // The dead on the face are still in the ground of the layer they are
     // breaking into, so they turn up its bones as they go.
     s.bones += diggerSeconds * split.face * target.bones * boneMult;
-    const ease = (t) => (t.door && mods && mods.doorEase ? mods.doorEase : 1);
+    // A lord's door gives way faster for his trophy's holder, and for a
+    // player who paid his herald.
+    const ease = (t) => (t.door
+      ? ((mods && mods.doorEase) || 1) * ((s.doorEase && s.doorEase[t.k]) || 1)
+      : 1);
     let progress = s.capProgress + rate * split.face * faceMult * ease(target) / target.hardness;
     while (progress >= target.cap) {
       progress -= target.cap;
