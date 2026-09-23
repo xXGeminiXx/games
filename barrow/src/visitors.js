@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=35';
-import * as Mk from './market.js?v=35';
-import * as Lore from './lore.js?v=35';
-import { fill } from '../config.js?v=35';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=35';
+import { hash, unit, range, pick } from './rng.js?v=36';
+import * as Mk from './market.js?v=36';
+import * as Lore from './lore.js?v=36';
+import { fill } from '../config.js?v=36';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=36';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 
@@ -91,7 +91,10 @@ export function begin(state, cfg, md) {
  * yet, is floored so a caller never hands out something for nothing.
  */
 function incomeRef(api) {
-  const r = api.state.rate;
+  // The simulation's steady figure when it offers one: the coin/s reading
+  // goes to nothing while a choosy seller waits on a better price, and a
+  // caller priced off that stays away for no reason the player can see.
+  const r = typeof api.income === 'function' ? api.income() : api.state.rate;
   return Number.isFinite(r) && r > 0 ? r : 0;
 }
 

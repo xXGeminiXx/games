@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=35';
-import * as Mat from './materials.js?v=35';
-import * as Mk from './market.js?v=35';
-import * as H from './horde.js?v=35';
-import * as Crew from './crew.js?v=35';
-import * as R from './rites.js?v=35';
-import * as Rv from './reveal.js?v=35';
-import * as Ch from './chambers.js?v=35';
-import * as Vi from './visitors.js?v=35';
-import * as Rb from './rebirth.js?v=35';
-import * as Lore from './lore.js?v=35';
-import * as Lords from './lords.js?v=35';
-import * as Ranks from './ranks.js?v=35';
-import { createGround } from './ground.js?v=35';
-import { fill } from '../config.js?v=35';
-import { fmt, fmtCoin } from './numbers.js?v=35';
+import { CONFIG as DEFAULT } from '../config.js?v=36';
+import * as Mat from './materials.js?v=36';
+import * as Mk from './market.js?v=36';
+import * as H from './horde.js?v=36';
+import * as Crew from './crew.js?v=36';
+import * as R from './rites.js?v=36';
+import * as Rv from './reveal.js?v=36';
+import * as Ch from './chambers.js?v=36';
+import * as Vi from './visitors.js?v=36';
+import * as Rb from './rebirth.js?v=36';
+import * as Lore from './lore.js?v=36';
+import * as Lords from './lords.js?v=36';
+import * as Ranks from './ranks.js?v=36';
+import { createGround } from './ground.js?v=36';
+import { fill } from '../config.js?v=36';
+import { fmt, fmtCoin } from './numbers.js?v=36';
 
 export const SAVE_VERSION = 2;
 
@@ -589,6 +589,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     strataOf: Mat.strataOf,
     boneRate,
     growthOver,
+    income: () => steadyIncome(),
     addBones: (n) => { if (n > 0) state.bones += n; },
     raiseFree: (n) => H.raiseFree(state, n),
     boon: (b) => payBoon(Ch.applyBoon(state, b)),
