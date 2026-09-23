@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=37';
-import * as Mk from './market.js?v=37';
-import * as H from './horde.js?v=37';
-import * as R from './rites.js?v=37';
-import * as Rb from './rebirth.js?v=37';
-import * as Lore from './lore.js?v=37';
-import * as Advice from './advice.js?v=37';
-import * as Lords from './lords.js?v=37';
-import * as Ranks from './ranks.js?v=37';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=37';
-import { fill } from '../config.js?v=37';
+import * as Mat from './materials.js?v=38';
+import * as Mk from './market.js?v=38';
+import * as H from './horde.js?v=38';
+import * as R from './rites.js?v=38';
+import * as Rb from './rebirth.js?v=38';
+import * as Lore from './lore.js?v=38';
+import * as Advice from './advice.js?v=38';
+import * as Lords from './lords.js?v=38';
+import * as Ranks from './ranks.js?v=38';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=38';
+import { fill } from '../config.js?v=38';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -172,6 +172,24 @@ export function createUI(doc, sim, cfg, actions) {
     const text = sim.legacy.autoBuy ? T.autoBuyOn : T.autoBuyOff;
     if (autoBuyButton.textContent !== text) autoBuyButton.textContent = text;
     autoBuyButton.setAttribute('aria-pressed', String(!!sim.legacy.autoBuy));
+  };
+
+  // Mortifer's upgrade hands over a third: the dead raising themselves, beside
+  // the raise buttons it stands in for.
+  let autoRaiseButton = null;
+  const paintAutoRaise = () => {
+    const on = !!sim.mods().autoRaise;
+    if (!on && !autoRaiseButton) return;
+    if (!autoRaiseButton && nodes.raise) {
+      autoRaiseButton = el('button', { class: 'auto', title: T.autoRaiseTip, onclick: () => actions.setAutoRaise(sim.legacy.autoRaise === false) });
+      nodes.raise.appendChild(autoRaiseButton);
+    }
+    if (!autoRaiseButton) return;
+    show(autoRaiseButton, on);
+    const running = sim.legacy.autoRaise !== false;
+    const text = running ? T.autoRaiseOn : T.autoRaiseOff;
+    if (autoRaiseButton.textContent !== text) autoRaiseButton.textContent = text;
+    autoRaiseButton.setAttribute('aria-pressed', String(running));
   };
 
   let autoSealRow = null;
@@ -512,7 +530,7 @@ export function createUI(doc, sim, cfg, actions) {
   const riteRows = new Map();
   const buildRites = () => {
     const s = sim.state;
-    const vis = R.visible(s, cfg);
+    const vis = R.visible(s, cfg, sim.legacy);
     for (const def of vis) {
       if (riteRows.has(def.id)) continue;
       const words = R.wordsOf(def.id);
@@ -521,8 +539,11 @@ export function createUI(doc, sim, cfg, actions) {
       const button = el('button', { class: 'rite', onclick: () => actions.buyRite(def.id, riteCount(def.id)) }, el('b', { text: words.name }), cost);
       // The row shows the short line and says the whole of it on hover, so a
       // narrow column never hides something the player needed.
-      const row = el('div', { class: 'rrow', title: words.name + ': ' + (words.long || words.line) },
+      const row = el('div', { class: 'rrow' + (def.lord ? ' lordrite' : ''), title: words.name + ': ' + (words.long || words.line) },
         button, el('span', { class: 'line', text: words.line, title: words.long || words.line }), level);
+      // A lord's upgrade wears his colour, the way his door and his room do.
+      const lordDef = def.lord && cfg.lords ? cfg.lords.list[def.lord] : null;
+      if (lordDef && button.style) button.style.borderLeftColor = lordDef.color;
       nodes.rites.appendChild(row);
       riteRows.set(def.id, { def, row, button, cost, level });
     }
@@ -980,6 +1001,7 @@ export function createUI(doc, sim, cfg, actions) {
     show(nodes.hordePanel, f.raise);
     if (f.raise) {
       if (!raiseButtons.length) buildRaise();
+      paintAutoRaise();
       const soft = md.softMult;
       for (const b of raiseButtons) {
         const n = b.count === 'max' ? H.maxRaisable(s.bones, s.horde, cfg.horde, soft) : b.count;

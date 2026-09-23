@@ -22,11 +22,11 @@
 // something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=37';
-import * as R from './rites.js?v=37';
-import * as Rb from './rebirth.js?v=37';
-import * as Lore from './lore.js?v=37';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=37';
+import * as H from './horde.js?v=38';
+import * as R from './rites.js?v=38';
+import * as Rb from './rebirth.js?v=38';
+import * as Lore from './lore.js?v=38';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=38';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;
@@ -39,7 +39,7 @@ const say = (key, values, target) => ({ key, values: values || {}, target: targe
 function riteChoice(sim, cfg) {
   const s = sim.state;
   let best = null, next = null;
-  for (const def of R.visible(s, cfg)) {
+  for (const def of R.visible(s, cfg, sim.legacy)) {
     if (R.maxed(s, def)) continue;
     const price = R.cost(def, R.levelOf(s, def.id));
     if (price <= s.coin) { if (!best || price < best.price) best = { def, price }; }

@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=37';
-import { pick, hash } from './rng.js?v=37';
-import { fill } from '../config.js?v=37';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=37';
+import * as Lore from './lore.js?v=38';
+import { pick, hash } from './rng.js?v=38';
+import { fill } from '../config.js?v=38';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=38';
 
 export const LEGACY_VERSION = 1;
 
@@ -43,6 +43,9 @@ export function freshLegacy() {
     // a barrow fills itself in at (0 is off).
     autoBuy: false,
     autoSealAt: 0,
+    // Mortifer's upgrade raises the dead by itself; this is its switch, on
+    // until the player turns it off.
+    autoRaise: true,
     // How many levels one press of an upgrade buys: 1, 5, 25 or 'max'.
     ritePick: 1,
     // The rest of what the player last set on the page: the open tab and
@@ -64,6 +67,7 @@ export function restoreLegacy(raw) {
   l.renown = Number.isFinite(raw.renown) ? raw.renown : null;
   if (Number.isFinite(raw.carry) && raw.carry > 0) l.carry = raw.carry;
   l.autoBuy = !!raw.autoBuy;
+  l.autoRaise = raw.autoRaise !== false;
   if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
   if (Number.isFinite(raw.crewMark) && raw.crewMark > 0) l.crewMark = Math.floor(raw.crewMark);
   if (raw.ui && typeof raw.ui === 'object') {
@@ -222,7 +226,9 @@ export function seal(state, cfg, legacy) {
   // the dead across to the next one.
   if (cfg.ranks) legacy.renown = (legacy.renown || 0) + cfg.ranks.points.sealPer;
   if (legacy.trophies && legacy.trophies.natron && cfg.lords) {
-    legacy.carry = Math.floor(state.horde * cfg.lords.trophy.carryShare);
+    // Her jars, bought this barrow, carry more of them.
+    const jars = ((state.rites && state.rites.jars) || 0) * (cfg.rites.jarsShare || 0);
+    legacy.carry = Math.floor(state.horde * (cfg.lords.trophy.carryShare + jars));
   }
   const lordsBroken = Object.keys(state.doors || {}).length;
   if (!Array.isArray(legacy.barrows)) legacy.barrows = [];

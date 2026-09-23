@@ -233,6 +233,7 @@
   .rrow button.rite{text-align:left;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rrow .line{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rrow .lv{color:var(--quiet);font-size:10px}
+  .rrow.lordrite button.rite{border-left-width:3px}
 
   /* Closing one barrow and opening the next. */
   #seal-note{margin:0 0 8px;color:var(--dim)}
@@ -469,7 +470,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="9c234cff40f3">
+<meta name="build" content="1874c1721f73">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -582,8 +583,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=37';
-import { createGame } from './src/game.js?v=37';
+import { CONFIG, applyIdentity } from './config.js?v=38';
+import { createGame } from './src/game.js?v=38';
 
 applyIdentity(document);
 

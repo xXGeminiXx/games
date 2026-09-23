@@ -17,22 +17,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=37';
-import * as Mat from './materials.js?v=37';
-import * as Mk from './market.js?v=37';
-import * as H from './horde.js?v=37';
-import * as Crew from './crew.js?v=37';
-import * as R from './rites.js?v=37';
-import * as Rv from './reveal.js?v=37';
-import * as Ch from './chambers.js?v=37';
-import * as Vi from './visitors.js?v=37';
-import * as Rb from './rebirth.js?v=37';
-import * as Lore from './lore.js?v=37';
-import * as Lords from './lords.js?v=37';
-import * as Ranks from './ranks.js?v=37';
-import { createGround } from './ground.js?v=37';
-import { fill } from '../config.js?v=37';
-import { fmt, fmtCoin } from './numbers.js?v=37';
+import { CONFIG as DEFAULT } from '../config.js?v=38';
+import * as Mat from './materials.js?v=38';
+import * as Mk from './market.js?v=38';
+import * as H from './horde.js?v=38';
+import * as Crew from './crew.js?v=38';
+import * as R from './rites.js?v=38';
+import * as Rv from './reveal.js?v=38';
+import * as Ch from './chambers.js?v=38';
+import * as Vi from './visitors.js?v=38';
+import * as Rb from './rebirth.js?v=38';
+import * as Lore from './lore.js?v=38';
+import * as Lords from './lords.js?v=38';
+import * as Ranks from './ranks.js?v=38';
+import { createGround } from './ground.js?v=38';
+import { fill } from '../config.js?v=38';
+import { fmt, fmtCoin } from './numbers.js?v=38';
 
 export const SAVE_VERSION = 2;
 
@@ -415,6 +415,12 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (first && words.trophy) {
       events.push({ type: 'log', key: 'trophy', text: fill(D.trophy, { name: words.trophy.name, line: words.trophy.line }) });
     }
+    // His upgrade goes on the panel for good the first time.
+    const his = first && R.defs(cfg).find(d => d.lord === lord.id);
+    if (his && D.upgrade) {
+      const rw = R.wordsOf(his.id);
+      if (rw) events.push({ type: 'log', key: 'lordUpgrade', text: fill(D.upgrade, { name: rw.name, line: Lore.inline(rw.line) }) });
+    }
     present(events, hallFor(door, first));
     addRenown(events, first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
   };
@@ -664,6 +670,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       seamLine(events, k);
       newDepth(events, k);
       if (md.boneCart > 0) state.bones += boneRate() * md.boneCart;
+      // Rex Mortis's muster: every new layer brings diggers up with it.
+      if (md.muster > 0) H.raiseFree(state, growthOver(md.muster));
       if (ground.at(k).door) breakDoor(events, k);
       else openChamber(events, k);
     }
@@ -675,13 +683,16 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // that coin will cover, one a step, while the player has it switched on.
     if (md.autoBuy && legacy.autoBuy) {
       let best = null;
-      for (const def of R.visible(state, cfg)) {
+      for (const def of R.visible(state, cfg, legacy)) {
         if (!R.canBuy(state, def)) continue;
         const price = R.cost(def, R.levelOf(state, def.id));
         if (!best || price < best.price) best = { def, price };
       }
       if (best) { R.buy(state, best.def.id, cfg, 1); readAhead(); }
     }
+    // Mortifer's call: every spare bone raises diggers, while the player has
+    // it switched on.
+    if (md.autoRaise && legacy.autoRaise !== false) H.raise(state, 'max', cfg.horde, mods().softMult);
 
     state.t += dt;
     trimIncome();
@@ -888,6 +899,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   /** The switches rank hands over, kept with the things that carry between barrows. */
   const setAutoBuy = (on) => { legacy.autoBuy = !!on; return legacy.autoBuy; };
+  const setAutoRaise = (on) => { legacy.autoRaise = !!on; return legacy.autoRaise; };
   const dismissEnding = () => { state.ending = false; };
   /** The hills on offer for the next barrow, if rank offers any. */
   const hillChoices = () => Rb.hillChoices(legacy, cfg, state.seed, (id) => Ranks.has(legacy, cfg, id));
@@ -905,6 +917,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
   const buyRite = (id, count) => {
     const events = [];
+    // A lord's upgrade is his to hand over: nothing buys it before his door.
+    const def = R.defOf(cfg, id);
+    if (def && !R.unlocked(def, legacy)) return { events, level: 0 };
     const level = R.buy(state, id, cfg, count);
     if (level > 0) {
       events.push({ type: 'rite', id, level });
@@ -925,7 +940,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, markets, marketFor, mods, goods, held, baseOf, activeFrom,
     step, advance, dig, sell, sellShare, sellLot, buy, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand, setAutoBuy, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
+    split, setByHand, setAutoBuy, setAutoRaise, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),

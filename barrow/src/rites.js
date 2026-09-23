@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=37';
-import * as Rb from './rebirth.js?v=37';
-import * as Lore from './lore.js?v=37';
-import * as Lords from './lords.js?v=37';
-import * as Ranks from './ranks.js?v=37';
+import * as Ch from './chambers.js?v=38';
+import * as Rb from './rebirth.js?v=38';
+import * as Lore from './lore.js?v=38';
+import * as Lords from './lords.js?v=38';
+import * as Ranks from './ranks.js?v=38';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -111,16 +111,18 @@ export function modsOf(s, cfg, legacy) {
   let broker = brokerLv > 0 ? table[Math.min(brokerLv, table.length) - 1] : null;
   if (broker && trophy('neb')) broker = Object.assign({}, broker, { fee: 0 });
   const T = cfg.lords ? cfg.lords.trophy : {};
+  // A level of a lord's doubling upgrade.
+  const twice = id => Math.pow(r.lordFactor || 1, lv(id));
   return {
     // Production.
     digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1),
-    boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones,
+    boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones * twice('ossuary'),
     softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1) * hillSoft,
-    faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1),
-    valueMult: b.value,
+    faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1) * twice('spades'),
+    valueMult: b.value * twice('mint'),
     activeStrata: cfg.horde.activeStrata + lv('workings'),
     // Markets.
-    absorbMult: Math.pow(r.routesFactor, lv('routes')) * b.absorb * oath('absorb', 1),
+    absorbMult: Math.pow(r.routesFactor, lv('routes')) * b.absorb * oath('absorb', 1) * twice('balance'),
     recoveryMult: Math.pow(r.hasteFactor, lv('haste')),
     broker,
     // Information.
@@ -135,14 +137,18 @@ export function modsOf(s, cfg, legacy) {
     // and its earnings are worth on their own.
     records: r.recordsRelics * lv('records'),
     // The world outside the field.
-    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1) * hereGap * hillGap,
-    visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1),
+    visitGap: Math.pow(r.crierGap, lv('crier')) * oath('visitGap', 1) * hereGap * hillGap / twice('invites'),
+    visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1) * twice('invites'),
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
     // What the lords' trophies do.
     doorEase: trophy('sepulturero') ? (T.doorEase || 1) : 1,
     hoardMult: (trophy('mortifer') ? (T.hoardMult || 1) : 1) * (rank('hoardPlus') ? 1.5 : 1) * (rank('lordHoard') ? 2 : 1),
     boneCart: trophy('pater') ? (T.boneCartSeconds || 0) : 0,
     callersWait: trophy('dona'),
+    // What the lords' upgrades do that is not a doubling.
+    muster: (r.musterSeconds || 0) * lv('muster'),
+    jars: (r.jarsShare || 0) * lv('jars'),
+    autoRaise: lv('raising') > 0,
     // What rank has handed over that the run has to know about.
     autoBuy: rank('autoBuy'),
     autoSeal: rank('autoSeal'),
@@ -161,11 +167,24 @@ export function modsOf(s, cfg, legacy) {
  *
  * Once shown a rite stays shown (a flag on the state), so the list only ever
  * grows.
+ *
+ * A lord's upgrade is outside the chain: it is on the panel from the moment
+ * his door has ever been broken, in every barrow after, so what he handed
+ * over is there to be seen. Without the legacy nobody has broken anyone.
  */
-export function visible(s, cfg) {
+export function unlocked(def, legacy) {
+  return !def.lord || !!(legacy && legacy.trophies && legacy.trophies[def.lord]);
+}
+
+export function visible(s, cfg, legacy) {
   const out = [];
   let prevHeld = true;
   for (const def of cfg.rites.list) {
+    if (def.lord) {
+      if (unlocked(def, legacy) || levelOf(s, def.id) > 0) s.flags['rite:' + def.id] = true;
+      if (s.flags['rite:' + def.id]) out.push(def);
+      continue;
+    }
     const flag = 'rite:' + def.id;
     const lv = levelOf(s, def.id);
     const deepEnough = !def.atDepth || s.depth >= def.atDepth;

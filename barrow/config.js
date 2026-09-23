@@ -96,6 +96,9 @@ export const CONFIG = {
     autoBuyOn:  'Auto-buy: on',
     autoBuyOff: 'Auto-buy: off',
     autoBuyTip: 'Buys the cheapest upgrade you can afford, as soon as you can afford it',
+    autoRaiseOn:  'Auto-raise: on',
+    autoRaiseOff: 'Auto-raise: off',
+    autoRaiseTip: 'Every spare bone raises diggers, every second. Switch it off to keep bones for selling.',
     autoSeal:   'Fill in by itself at layer {n}',
     autoSealOff: 'Fill in by itself: off',
     autoSealTip: 'The barrow fills itself in once it reaches this layer, and the next one starts',
@@ -699,6 +702,11 @@ export const CONFIG = {
     vigilHours:   4,      // offline hours added per level
     surveyReads:  5,      // layers below the cut named ahead of time
     recordsRelics: 3,     // relics per level, paid when the barrow is filled in
+    // The lords' upgrades: one each, on the panel of every barrow once his
+    // door has ever been broken, and bought with coin like the rest.
+    lordFactor:   1.5,    // what a level of the lords' plain ones multiplies (three levels: 3.4x)
+    musterSeconds: 60,    // Rex Mortis's: diggers per new layer, as seconds of the horde's own growth
+    jarsShare:    0.01,   // Mother Natron's: share of the dead carried to the next barrow per level
     list: [
       { id: 'hands',     cost: 40,      growth: 8,    max: 200 },
       { id: 'grave',     cost: 60,      growth: 8,    max: 200 },
@@ -715,6 +723,15 @@ export const CONFIG = {
       { id: 'survey',    cost: 2e12,    growth: 1,    max: 1,   atDepth: 13 },
       { id: 'records',   cost: 5e13,    growth: 6,    max: 10,  atDepth: 17 },
       { id: 'pits',      cost: 1e16,    growth: 8,    max: 12,  atDepth: 21 },
+      // One from each lord. `lord` is whose door unlocks it.
+      { id: 'muster',    lord: 'rex',         cost: 1e4, growth: 1e3, max: 5 },
+      { id: 'ossuary',   lord: 'pater',       cost: 1e5, growth: 1e6, max: 3 },
+      { id: 'mint',      lord: 'rey',         cost: 1e4, growth: 1e6, max: 3 },
+      { id: 'invites',   lord: 'dona',        cost: 1e4, growth: 1e6, max: 3 },
+      { id: 'spades',    lord: 'sepulturero', cost: 1e5, growth: 1e6, max: 3 },
+      { id: 'balance',   lord: 'neb',         cost: 1e4, growth: 1e6, max: 3 },
+      { id: 'jars',      lord: 'natron',      cost: 1e6, growth: 1e4, max: 4 },
+      { id: 'raising',   lord: 'mortifer',    cost: 1e4, growth: 1,   max: 1 },
     ],
     // The factor by level: the share of each market's best flow it sells into
     // every second, its cut, and how choosy it is about the swell. It never
@@ -866,7 +883,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 37,
+    build: 38,
   },
 };
 

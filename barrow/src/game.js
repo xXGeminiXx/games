@@ -14,16 +14,16 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=37';
-import { createSim, restoreSim, openedState } from './sim.js?v=37';
-import * as Save from './save.js?v=37';
-import * as Rb from './rebirth.js?v=37';
-import * as Lore from './lore.js?v=37';
-import { hash } from './rng.js?v=37';
-import { createUI } from './ui.js?v=37';
-import { createView } from './view.js?v=37';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=37';
-import * as Mat from './materials.js?v=37';
+import { storageKey, fill } from '../config.js?v=38';
+import { createSim, restoreSim, openedState } from './sim.js?v=38';
+import * as Save from './save.js?v=38';
+import * as Rb from './rebirth.js?v=38';
+import * as Lore from './lore.js?v=38';
+import { hash } from './rng.js?v=38';
+import { createUI } from './ui.js?v=38';
+import { createView } from './view.js?v=38';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=38';
+import * as Mat from './materials.js?v=38';
 
 /**
  * @param {object} o
@@ -88,6 +88,7 @@ export function createGame(o) {
   });
   actions.seal = (hill) => seal(hill);
   actions.setAutoBuy = wrap((on) => { sim.setAutoBuy(on); save(); return []; });
+  actions.setAutoRaise = wrap((on) => { sim.setAutoRaise(on); save(); return []; });
   actions.dismissEnding = wrap(() => { sim.dismissEnding(); save(); return []; });
   actions.setRitePick = (n) => { sim.legacy.ritePick = n; save(); };
   actions.savePrefs = () => { save(); };
