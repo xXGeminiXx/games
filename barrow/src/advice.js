@@ -22,11 +22,11 @@
 // something that outlasts it.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=28';
-import * as R from './rites.js?v=28';
-import * as Rb from './rebirth.js?v=28';
-import * as Lore from './lore.js?v=28';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=28';
+import * as H from './horde.js?v=29';
+import * as R from './rites.js?v=29';
+import * as Rb from './rebirth.js?v=29';
+import * as Lore from './lore.js?v=29';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime } from './numbers.js?v=29';
 
 /** How much better a layer has to pay per notch before the line says to move one. */
 const MOVE_RATIO = 4;

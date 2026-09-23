@@ -14,9 +14,9 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=28';
-import { activeFrom } from './horde.js?v=28';
-import * as Lore from './lore.js?v=28';
+import { goodAt, valueAt, hardnessAt, absorbAt, capUnits } from './materials.js?v=29';
+import { activeFrom } from './horde.js?v=29';
+import * as Lore from './lore.js?v=29';
 
 /** mulberry32 */
 function rng(seed) {
@@ -645,6 +645,71 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   };
 
   /**
+   * While a lord waits to be answered, his hall is drawn where his door gave
+   * way: an arched room at the foot of the shaft, lit in his colour, pillars
+   * either side, candles along the floor and the lord on his seat. It goes
+   * when he has been answered.
+   */
+  let hallClock = 0;
+  const drawHall = (L, s) => {
+    const c0 = s.chamber;
+    if (!c0 || c0.kind !== 'lord') return;
+    const row = L.rows[c0.k];
+    if (!row || row.h < 8) return;
+    const def = layerAt(c0.k).door ? layerAt(c0.k).door.lord : null;
+    const hue = lordColor(def) || palette.deepink;
+    const big = c0.lord === 'mortifer';
+    hallClock += 0.016;
+    const cx = width * 0.5;
+    const hw = Math.min(big ? 240 : 170, width * (big ? 0.34 : 0.26)) / 2;
+    const top = row.y + row.h * 0.1, floor = row.y + row.h * 0.94;
+    const h = floor - top;
+    // The room: an arch cut into the rock.
+    ctx.fillStyle = withAlpha(palette.void, 0.92);
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, floor);
+    ctx.lineTo(cx - hw, top + h * 0.35);
+    ctx.quadraticCurveTo(cx, top - h * 0.25, cx + hw, top + h * 0.35);
+    ctx.lineTo(cx + hw, floor);
+    ctx.closePath();
+    ctx.fill();
+    const glow = ctx.createRadialGradient(cx, floor - h * 0.3, 2, cx, floor - h * 0.3, hw);
+    glow.addColorStop(0, withAlpha(hue, 0.32));
+    glow.addColorStop(1, withAlpha(hue, 0));
+    ctx.fillStyle = glow;
+    ctx.fill();
+    ctx.strokeStyle = withAlpha(hue, 0.7);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Pillars either side.
+    ctx.fillStyle = withAlpha(hue, 0.35);
+    for (const px of [cx - hw * 0.72, cx + hw * 0.72]) ctx.fillRect(px - 2, top + h * 0.3, 4, floor - top - h * 0.3);
+    // His seat, and him on it.
+    const sw = Math.max(8, Math.min(22, h * 0.5));
+    ctx.fillStyle = withAlpha(hue, 0.55);
+    ctx.fillRect(cx - sw / 2, floor - h * 0.62, sw, h * 0.62);
+    ctx.fillStyle = withAlpha(palette.void, 0.9);
+    ctx.fillRect(cx - sw / 2 + 2, floor - h * 0.3, sw - 4, 3);
+    ctx.fillStyle = withAlpha(palette.bone, 0.9);
+    const head = Math.max(1.5, sw * 0.14);
+    ctx.beginPath();
+    ctx.arc(cx, floor - h * 0.5, head, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - head * 0.9, floor - h * 0.5 + head, head * 1.8, h * 0.22);
+    // Candles along the floor, flickering.
+    const n = big ? 9 : 6;
+    for (let i = 0; i < n; i++) {
+      const x = cx - hw * 0.9 + (i / (n - 1)) * hw * 1.8;
+      if (Math.abs(x - cx) < sw) continue;
+      const f = 0.55 + 0.45 * Math.sin(hallClock * 9 + i * 1.7);
+      ctx.fillStyle = withAlpha(palette.bone, 0.5);
+      ctx.fillRect(x - 0.5, floor - 4, 1, 3);
+      ctx.fillStyle = withAlpha(hue, 0.5 + 0.5 * f);
+      ctx.fillRect(x - 1, floor - 6, 2, 2);
+    }
+  };
+
+  /**
    * Mortifer's layers are warm. While the dig is in them, sparks drift up
    * out of the worked ground and fade; anywhere else there are none.
    */
@@ -692,6 +757,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     drawDots(L, s, Math.min(0.1, dt || 0.016));
     drawDoorWork(L, s, Math.min(0.1, dt || 0.016));
     drawEmbers(L, s, Math.min(0.1, dt || 0.016));
+    drawHall(L, s);
 
     // Band names on the left, and on the right a bar for the share of the
     // horde standing in that band, so the panel and the picture say the same
