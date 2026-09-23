@@ -18,11 +18,11 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range, pick } from './rng.js?v=31';
-import * as Mk from './market.js?v=31';
-import * as Lore from './lore.js?v=31';
-import { fill } from '../config.js?v=31';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=31';
+import { hash, unit, range, pick } from './rng.js?v=32';
+import * as Mk from './market.js?v=32';
+import * as Lore from './lore.js?v=32';
+import { fill } from '../config.js?v=32';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=32';
 
 const KINDS = ['buyer', 'buyer', 'bonecart', 'gang', 'reeve', 'relic', 'surveyor', 'mourner'];
 

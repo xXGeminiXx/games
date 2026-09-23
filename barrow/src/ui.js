@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=31';
-import * as Mk from './market.js?v=31';
-import * as H from './horde.js?v=31';
-import * as R from './rites.js?v=31';
-import * as Rb from './rebirth.js?v=31';
-import * as Lore from './lore.js?v=31';
-import * as Advice from './advice.js?v=31';
-import * as Lords from './lords.js?v=31';
-import * as Ranks from './ranks.js?v=31';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=31';
-import { fill } from '../config.js?v=31';
+import * as Mat from './materials.js?v=32';
+import * as Mk from './market.js?v=32';
+import * as H from './horde.js?v=32';
+import * as R from './rites.js?v=32';
+import * as Rb from './rebirth.js?v=32';
+import * as Lore from './lore.js?v=32';
+import * as Advice from './advice.js?v=32';
+import * as Lords from './lords.js?v=32';
+import * as Ranks from './ranks.js?v=32';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=32';
+import { fill } from '../config.js?v=32';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -500,7 +500,8 @@ export function createUI(doc, sim, cfg, actions) {
       for (const id of lesser) value += sim.quote(id, sim.held(id));
       lesserRow.name.textContent = fill(T.lesserGoods, { n: lesser.length });
       lesserRow.name.title = T.lesserTip;
-      lesserRow.meta.textContent = fill(T.lesserWorth, { coin: fmtCoin(value) });
+      // Nothing left on hand is nothing to say, not "worth about 0".
+      lesserRow.meta.textContent = value > 0.005 ? fill(T.lesserWorth, { coin: fmtCoin(value) }) : '';
     }
   };
 
