@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=44';
-import { pick, hash } from './rng.js?v=44';
-import { fill } from '../config.js?v=44';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=44';
+import * as Lore from './lore.js?v=45';
+import { pick, hash } from './rng.js?v=45';
+import { fill } from '../config.js?v=45';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=45';
 
 export const LEGACY_VERSION = 1;
 
@@ -53,6 +53,9 @@ export function freshLegacy() {
     ui: {},
     // How many of the digger milestones have ever been reached, across barrows.
     crewMark: 0,
+    // Who placed the crew when the last barrow filled in, and where: the next
+    // barrow starts the same way. Null until a barrow has been filled in.
+    placing: null,
   };
 }
 
@@ -70,6 +73,13 @@ export function restoreLegacy(raw) {
   l.autoRaise = raw.autoRaise !== false;
   if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
   if (Number.isFinite(raw.crewMark) && raw.crewMark > 0) l.crewMark = Math.floor(raw.crewMark);
+  if (raw.placing && typeof raw.placing === 'object') {
+    const p = raw.placing;
+    const notch = (w) => (Number.isFinite(w) && w > 0 ? Math.floor(w) : 0);
+    l.placing = p.byHand
+      ? { byHand: true, face: notch(p.face), rows: Array.isArray(p.rows) ? p.rows.slice(0, 32).map(notch) : [] }
+      : { byHand: false };
+  }
   if (raw.ui && typeof raw.ui === 'object') {
     if (typeof raw.ui.showSpent === 'boolean') l.ui.showSpent = raw.ui.showSpent;
     if (raw.ui.tab === 'oaths' || raw.ui.tab === 'rites') l.ui.tab = raw.ui.tab;

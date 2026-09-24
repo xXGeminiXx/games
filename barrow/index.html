@@ -47,7 +47,7 @@
   /* Two columns: the books on the left, the hill on the right. */
   main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;min-height:0}
   #books{overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;border-right:1px solid var(--rule)}
-  #field{display:flex;flex-direction:column;min-height:0}
+  #field{display:flex;flex-direction:column;min-height:0;position:relative}
   #hill{flex:1 1 auto;position:relative;min-height:150px}
   #hill canvas{display:block;width:100%;height:100%}
   #fieldhint{position:absolute;left:14px;top:10px;color:var(--quiet);font-size:11px;pointer-events:none}
@@ -80,10 +80,12 @@
   /* The line that names the next move. It stays at the top of the column
      while the column scrolls, because the panel it points at is often the
      part of the page that is off the bottom of the screen. */
+  /* Two lines are kept for it whether it needs them or not, because
+     everything under it moves when it grows. */
   #compass{
     position:sticky;top:0;z-index:2;background:var(--void);
     display:flex;gap:12px;align-items:baseline;
-    margin:0 0 10px;padding:2px 0 9px 12px;
+    margin:0 0 10px;padding:2px 0 9px 12px;min-height:calc(2.9em + 12px);
     border-left:2px solid var(--bone);border-bottom:1px solid var(--rule);
   }
   #compass-say{color:var(--ink);flex:1}
@@ -97,7 +99,9 @@
   #goal-say b{color:var(--deepink);font-weight:600}
   #goal-bar{height:3px;background:var(--rule);margin:5px 0 4px;max-width:340px}
   #goal-bar span{display:block;height:3px;background:var(--deepink);width:0}
-  #goal-rule{color:var(--dim);font-size:11px;display:block}
+  /* The bar keeps its place when there is nothing to fill, and the lord's
+     rule keeps two lines, so the goal is one height all barrow long. */
+  #goal-rule{color:var(--dim);font-size:11px;display:block;min-height:2.9em}
   #goal small.hill{color:var(--coin);font-size:11px;display:block;margin-top:2px}
   #seal-acts .hills{margin-top:10px}
   #seal-acts .hills .lbl{color:var(--dim);font-size:11px;margin:0 0 5px}
@@ -129,18 +133,24 @@
   #standing .grid div.off b{color:var(--quiet)}
   #stats #rank{color:var(--deepink)}
 
-  /* The log: newest on top, fading down, five lines on screen. */
-  #log{margin:0 0 12px;min-height:44px}
+  /* The log: newest on top, fading down. It is ONE HEIGHT, always: it sits
+     above the buttons that place and raise the crew, and a log that grew
+     and shrank with each line moved every one of them while the player was
+     reaching for it. A long line pushes the oldest out of the bottom. */
+  #log{margin:0 0 12px;height:124px;overflow:hidden;
+    -webkit-mask-image:linear-gradient(to bottom,#000 72%,transparent);
+    mask-image:linear-gradient(to bottom,#000 72%,transparent)}
   #log p{margin:0 0 2px;color:var(--ink)}
   #log p:nth-child(n+2){color:var(--dim)}
   #log p:nth-child(n+4){color:var(--quiet)}
-  #log p:nth-child(n+6){display:none}
 
   .panel{border-top:1px solid var(--rule);padding:12px 0 10px}
   .lbl{color:var(--dim);margin-right:8px;font-size:11px}
   #hand button{padding:5px 14px}
   #raise{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
-  .raise i{margin-left:6px}
+  /* The price on a raise button keeps one width, so the button beside it
+     does not slide over when a price goes from 9.99K to 10.0K. */
+  .raise i{margin-left:6px;display:inline-block;min-width:8ch;text-align:left}
   .wrow{margin:5px 0;font-size:12px}
   .wtop{display:flex;align-items:center;gap:6px}
   .wrow .name{width:100px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -185,6 +195,22 @@
 
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
+  /* A room and a caller sit over the top of the hill, not in the column of
+     buttons. Both turn up on their own and a caller leaves on its own, and
+     in the column each arrival shoved the crew's buttons down by a whole box
+     and each departure pulled them back up. Over the hill they move nothing:
+     the top of the picture is the surface and the old layers. */
+  #events{
+    position:absolute;top:0;left:0;right:0;z-index:3;padding:10px 14px;
+    display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;pointer-events:none;
+  }
+  #events .panel{
+    pointer-events:auto;flex:0 1 470px;min-width:300px;max-height:46vh;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--rule);padding:10px 14px 10px 12px;
+    box-shadow:0 6px 24px rgba(0,0,0,.55);border-radius:2px;
+  }
+  #events #visitor-panel{border-left:2px solid var(--coin)}
+  #events #chamber-panel{border-left:2px solid var(--deepink)}
   /* Somebody at the gate. */
   #visitor-panel{border-left:2px solid var(--coin);padding-left:12px}
   #visitor-text{margin:0 0 7px;color:var(--ink)}
@@ -237,8 +263,7 @@
     .offer{grid-template-columns:130px 1fr}
   }
   @media (max-height:700px){
-    #log p:nth-child(n+4){display:none}
-    #log{margin-bottom:8px;min-height:0}
+    #log{margin-bottom:8px;height:66px}
     .panel{padding:8px 0 6px}
     .wrow{margin:1px 0}
     #raise{margin-bottom:5px}
@@ -275,6 +300,10 @@
     #standing .grid{grid-template-columns:1fr}
     #standing .grid div{white-space:normal}
     #panel-tabs{gap:14px;flex-wrap:wrap}
+    /* No hill tall enough to sit on, so a room or a caller comes up from
+       the bottom of the screen instead, over the page rather than into it. */
+    #events{position:fixed;top:auto;bottom:0;padding:0 8px;flex-direction:column;align-items:stretch;gap:6px}
+    #events .panel{flex:none;min-width:0;max-height:38vh;margin-bottom:6px}
   }
 
 /* A thumb, not a pointer: on touch devices every control gets a real target
@@ -422,7 +451,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="6abe485b0141">
+<meta name="build" content="a945d2a93d22">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -486,17 +515,6 @@
     <div id="ending-panel" class="panel" hidden></div>
     <div id="goal" hidden><div id="goal-say"></div><div id="goal-bar"></div><small id="goal-rule"></small></div>
     <div id="log"></div>
-    <div id="chamber-panel" class="panel" hidden>
-      <h2 id="chamber-title">A room</h2>
-      <div id="chamber-text"></div>
-      <div id="chamber-offers"></div>
-    </div>
-    <div id="visitor-panel" class="panel" hidden>
-      <h2 id="p-visitor">At the gate</h2>
-      <p id="visitor-text"></p>
-      <div id="visitor-acts"></div>
-      <p id="visitor-after" hidden></p>
-    </div>
     <div id="hand" class="panel"><button id="dig">Dig</button></div>
     <div id="horde-panel" class="panel" hidden><div class="phead"><h2 id="p-horde">Where they dig</h2><div id="handover"></div></div><p id="handnote"></p><div id="raise"></div><div id="spent" hidden></div><div id="weights"></div></div>
     <div id="seal-panel" class="panel" hidden>
@@ -506,6 +524,19 @@
     </div>
   </section>
   <section id="field">
+    <div id="events">
+      <div id="chamber-panel" class="panel" hidden>
+        <h2 id="chamber-title">A room</h2>
+        <div id="chamber-text"></div>
+        <div id="chamber-offers"></div>
+      </div>
+      <div id="visitor-panel" class="panel" hidden>
+        <h2 id="p-visitor">At the gate</h2>
+        <p id="visitor-text"></p>
+        <div id="visitor-acts"></div>
+        <p id="visitor-after" hidden></p>
+      </div>
+    </div>
     <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
     <div id="rites-panel" hidden>
       <div id="panel-tabs">
@@ -535,8 +566,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=44';
-import { createGame } from './src/game.js?v=44';
+import { CONFIG, applyIdentity } from './config.js?v=45';
+import { createGame } from './src/game.js?v=45';
 
 applyIdentity(document);
 

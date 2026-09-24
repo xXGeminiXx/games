@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=44';
-import * as Mat from './materials.js?v=44';
-import * as H from './horde.js?v=44';
-import * as Crew from './crew.js?v=44';
-import * as R from './rites.js?v=44';
-import * as Rv from './reveal.js?v=44';
-import * as Ch from './chambers.js?v=44';
-import * as Vi from './visitors.js?v=44';
-import * as Rb from './rebirth.js?v=44';
-import * as Lore from './lore.js?v=44';
-import * as Lords from './lords.js?v=44';
-import * as Ranks from './ranks.js?v=44';
-import { createGround } from './ground.js?v=44';
-import { hash } from './rng.js?v=44';
-import { fill } from '../config.js?v=44';
-import { fmt, fmtCoin } from './numbers.js?v=44';
+import { CONFIG as DEFAULT } from '../config.js?v=45';
+import * as Mat from './materials.js?v=45';
+import * as H from './horde.js?v=45';
+import * as Crew from './crew.js?v=45';
+import * as R from './rites.js?v=45';
+import * as Rv from './reveal.js?v=45';
+import * as Ch from './chambers.js?v=45';
+import * as Vi from './visitors.js?v=45';
+import * as Rb from './rebirth.js?v=45';
+import * as Lore from './lore.js?v=45';
+import * as Lords from './lords.js?v=45';
+import * as Ranks from './ranks.js?v=45';
+import { createGround } from './ground.js?v=45';
+import { hash } from './rng.js?v=45';
+import { fill } from '../config.js?v=45';
+import { fmt, fmtCoin } from './numbers.js?v=45';
 
 export const SAVE_VERSION = 2;
 
@@ -603,6 +603,71 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return { events };
   };
 
+  /**
+   * With the rank that hands over both of a lord's gifts there is nothing to
+   * pick between, so no lord waits to be answered: what he says goes in the
+   * log and both gifts are handed over, whether he is in front of the player,
+   * queued behind a room, or was left waiting in a save from before.
+   */
+  const takeLordsGifts = (events) => {
+    if (!mods().bothGifts) return;
+    const say = (room) => {
+      const line = room.lines && room.lines[0];
+      if (line) events.push({ type: 'log', text: room.title + ': ' + line });
+    };
+    const queue = state.chamberQueue || [];
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const q = queue[i];
+      if (!q || typeof q !== 'object' || q.kind !== 'lord') continue;
+      queue.splice(i, 1);
+      if (state.chambersDone[q.k]) continue;
+      say(q);
+      for (const o of q.offers) {
+        payBoon(Ch.applyBoon(state, o.boon));
+        events.push({ type: 'log', text: o.name + ': ' + o.line });
+      }
+      state.chambersDone[q.k] = q.offers.length ? q.offers[0].name : true;
+    }
+    let guard = 0;
+    while (state.chamber && state.chamber.kind === 'lord' && guard++ < 50) {
+      say(state.chamber);
+      for (const e of takeOffer(0).events) events.push(e);
+    }
+  };
+
+  /**
+   * Rooms still waiting when the barrow fills itself in. Everything a room
+   * offers lasts the rest of this barrow, which is nothing once it is filled
+   * in - except relics, which the fill-in pays out. So a waiting room that
+   * offers relics is answered with that offer, the rest are left where they
+   * are, and the barrow fills in at the layer the player set rather than
+   * digging on until somebody comes back to answer a room.
+   */
+  const answerForFillIn = () => {
+    const events = [];
+    takeLordsGifts(events);
+    const rooms = state.chamber ? [state.chamber] : [];
+    for (const q of state.chamberQueue || []) {
+      if (q && typeof q === 'object') rooms.push(q);
+      else if (!state.chambersDone[q]) {
+        const room = Ch.chamberAt(state.seed, q, cfg, ground);
+        if (room) rooms.push(room);
+      }
+    }
+    for (const room of rooms) {
+      if (state.chambersDone[room.k]) continue;
+      const o = room.offers.find(x => x.boon && x.boon.rem > 0);
+      if (!o) continue;
+      payBoon(Ch.applyBoon(state, o.boon));
+      events.push({ type: 'log', text: (room.kind === 'lord' ? o.name + ': ' : '') + o.line });
+      state.chambersDone[room.k] = o.name;
+    }
+    // The barrow is filled in next, and nothing else in these rooms outlives it.
+    state.chamber = null;
+    state.chamberQueue = [];
+    return events;
+  };
+
   // -- visitors -------------------------------------------------------------
 
   /** What the gate is allowed to reach into. Nothing else is exposed to it. */
@@ -713,6 +778,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       else openChamber(events, k);
     }
     if (opened.length) readAhead();
+    if (state.chamber || (state.chamberQueue && state.chamberQueue.length)) takeLordsGifts(events);
 
     // A rank that lets upgrades buy themselves: the cheapest one on the panel
     // that coin will cover, one a step, while the player has it switched on.
@@ -768,10 +834,28 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     const startDoors = Object.keys(state.doors || {}).length;
     let left = worked;
     let guard = 0;
+    // A barrow set to fill itself in stops here when it reaches that layer,
+    // and the time still owed goes to the next barrow rather than digging
+    // this one on past where the player asked it to end.
+    const stop = !!(opts && opts.stopForFillIn);
+    let stopped = false;
     while (left > 1e-9 && guard++ < 2e6) {
       const dt = Math.min(chunk, left);
       for (const e of step(dt, away)) events.push(e);
       left -= dt;
+      if (stop && autoSealDue()) { stopped = true; break; }
+    }
+    // What is left, as time on the clock: the unwatched stretch was dug at
+    // the away pace after its free first part, so a second still owed to the
+    // dig is more than a second of the clock.
+    let leftover = 0;
+    if (stopped && left > 1e-9) {
+      const done = worked - left;
+      const p = mods().awayPace;
+      const pace = away && opts && opts.unwatched ? (p > 0 ? Math.min(1, p) : 1) : 1;
+      const grace = away && opts && opts.unwatched ? Math.min(total, cfg.time.awayGrace > 0 ? cfg.time.awayGrace : 0) : total;
+      const spent = done <= grace ? done : grace + (done - grace) / pace;
+      leftover = Math.max(0, total - spent);
     }
     // Whoever walked up while the tab was shut gets their full wait from the
     // moment the player looks at the page again.
@@ -791,7 +875,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       const d = state.stock[id] - (startStock[id] || 0);
       if (d > 1e-9) gained.stock[id] = d;
     }
-    return { events, elapsed: total, worked, capped, away, gained };
+    return { events, elapsed: total, worked, capped, away, gained, stopped, leftover };
   };
 
   // -- actions ------------------------------------------------------------
@@ -848,6 +932,24 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return want;
   };
 
+  /**
+   * What the next barrow is handed of how the crew was placed. A player who
+   * took the placing over keeps it: the switch stays on Me, the way down keeps
+   * its notches, and the layers keep theirs counted up from the bottom, so
+   * "everyone straight down" is still everyone straight down on new ground.
+   * Only the layers the crew can still reach are read; the ones above them
+   * count for nothing now and would count for nothing next time.
+   */
+  const keepPlacing = () => {
+    if (!state.byHand) { legacy.placing = { byHand: false }; return legacy.placing; }
+    const rows = [];
+    const from = activeFrom();
+    for (let k = state.depth; k >= from; k--) rows.push(state.weights[k] | 0);
+    while (rows.length && !rows[rows.length - 1]) rows.pop();
+    legacy.placing = { byHand: true, face: state.faceWeight | 0, rows };
+    return legacy.placing;
+  };
+
   const setWeight = (target, delta) => {
     if (target === 'face') return setWeightAt(target, (state.faceWeight | 0) + delta);
     const k = target | 0;
@@ -886,10 +988,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     return legacy.autoSealAt;
   };
   /** Whether the barrow has reached the layer the player asked it to fill itself in at. */
+  // A room left waiting does not hold it up: answerForFillIn takes what a
+  // room offers that the fill-in can still pay, and the rest is buried with
+  // the barrow like everything else it held.
   const autoSealDue = () => {
     const md = mods();
     return !!(md.autoSeal && legacy.autoSealAt > 0 && state.depth + 1 >= legacy.autoSealAt
-      && Rb.canSeal(state, cfg) && !state.chamber);
+      && Rb.canSeal(state, cfg));
   };
 
   const buyRite = (id, count) => {
@@ -913,7 +1018,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const sim = {
     cfg, state, legacy, ground, mods, worthOf, activeFrom,
     step, advance, dig, raise, setWeight, setWeightAt, buyRite,
-    split, setByHand, setAutoBuy, setAutoRaise, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
+    split, setByHand, keepPlacing, answerForFillIn, setAutoBuy, setAutoRaise, setAutoSeal, autoSealDue, dismissEnding, hillChoices, steadyIncome,
     riteMax: (id) => R.maxBuy(state, id, cfg), snapshot,
     takeOffer, acceptVisitor, declineVisitor, growthOver, visitorApi,
     visitorReady: () => Vi.affordable(visitorApi, state.visitor),
@@ -1093,5 +1198,27 @@ export function openedState(cfg, legacy, seed, lines, hill) {
     state.faceWeight = cfg.horde.weightFace;
   }
   Rv.update(state, cfg, legacy);
+  placeAsLeft(state, cfg, legacy.placing);
   return state;
+}
+
+/**
+ * Put the crew where the player had them when the last barrow filled in.
+ * The rows are counted up from the bottom, so they land on the new barrow's
+ * deepest layers. A placing that had nobody anywhere would leave a new barrow
+ * with nobody digging, so it keeps the switch on Me and starts from where the
+ * game put them - the same as pressing Me does.
+ */
+function placeAsLeft(state, cfg, placing) {
+  if (!placing || !placing.byHand) return;
+  const max = cfg.horde.maxWeight;
+  const clamp = (w) => Math.max(0, Math.min(max, w | 0));
+  const rows = Array.isArray(placing.rows) ? placing.rows : [];
+  const face = clamp(placing.face);
+  if (face > 0 || rows.some(w => w > 0)) {
+    for (let k = 0; k < state.weights.length; k++) state.weights[k] = 0;
+    for (let i = 0; i < rows.length && state.depth - i >= 0; i++) state.weights[state.depth - i] = clamp(rows[i]);
+    state.faceWeight = face;
+  }
+  state.byHand = true;
 }

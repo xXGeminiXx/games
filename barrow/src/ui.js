@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=44';
-import * as H from './horde.js?v=44';
-import * as R from './rites.js?v=44';
-import * as Rb from './rebirth.js?v=44';
-import * as Lore from './lore.js?v=44';
-import * as Advice from './advice.js?v=44';
-import * as Lords from './lords.js?v=44';
-import * as Ranks from './ranks.js?v=44';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=44';
-import { fill } from '../config.js?v=44';
+import * as Mat from './materials.js?v=45';
+import * as H from './horde.js?v=45';
+import * as R from './rites.js?v=45';
+import * as Rb from './rebirth.js?v=45';
+import * as Lore from './lore.js?v=45';
+import * as Advice from './advice.js?v=45';
+import * as Lords from './lords.js?v=45';
+import * as Ranks from './ranks.js?v=45';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=45';
+import { fill } from '../config.js?v=45';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -231,15 +231,30 @@ export function createUI(doc, sim, cfg, actions) {
   let showSpent = !!prefs().showSpent;
 
   const weightRows = new Map(); // key -> { node, bar, meta }
+  // While the pointer is over the rows they keep their places. A layer that
+  // opens, or one that goes out of reach, would otherwise slide every row
+  // under it by one while the player is aiming at a notch; the new row joins
+  // the list the moment the pointer leaves it. The figures on the rows that
+  // are there keep moving, because only the order is held.
+  let rowsHeld = false;
+  if (nodes.weights && nodes.weights.addEventListener) {
+    nodes.weights.addEventListener('pointerenter', () => { rowsHeld = true; });
+    nodes.weights.addEventListener('pointerleave', () => { rowsHeld = false; });
+  }
   const buildWeights = (split) => {
+    if (rowsHeld && weightRows.size) return;
     const s = sim.state;
     const from = sim.activeFrom();
-    const keys = [];
+    // The way down leads the list. The layers under it change as the dig
+    // goes deeper - a new one comes in, the oldest the crew can still reach
+    // goes out - so every layer row slides whenever a layer opens. The way
+    // down is always there, so at the top it is the one row that never moves,
+    // and for a crew sent straight down it is the only row that matters.
+    const keys = s.flags.face ? ['face'] : [];
     for (let k = s.depth; k >= from; k--) {
       const live = (split.strata[k] || 0) > 1e-9;
       if (live || showSpent || s.byHand) keys.push(k);
     }
-    if (s.flags.face) keys.push('face');
     const have = Array.from(weightRows.keys());
     const same = have.length === keys.length && have.every((k, i) => k === keys[i]);
     if (same) return;
@@ -633,7 +648,9 @@ export function createUI(doc, sim, cfg, actions) {
     if (nodes.goal.style && nodes.goal.style.borderLeftColor !== hue) nodes.goal.style.borderLeftColor = hue;
     if (nodes.goalBar) {
       if (!nodes.goalFill) { clear(nodes.goalBar); nodes.goalFill = el('span'); nodes.goalBar.appendChild(nodes.goalFill); }
-      show(nodes.goalBar, left <= 0);
+      // Hidden without giving up its place, so the goal is the same height
+      // with the bar and without it.
+      if (nodes.goalBar.style) nodes.goalBar.style.visibility = left <= 0 ? 'visible' : 'hidden';
       nodes.goalFill.style.width = Math.round(pct * 100) + '%';
       nodes.goalFill.style.background = hue;
     }
@@ -930,7 +947,31 @@ export function createUI(doc, sim, cfg, actions) {
     renderStanding();
 
     if (nodes.fieldhint) show(nodes.fieldhint, !f.field);
+
+    hold(nodes.compass); hold(nodes.goal); hold(nodes.hordePanel);
   };
+
+  // A box with buttons under it only ever grows while the page is up. Its
+  // words change on their own - the next move, the next door, a layer row
+  // folding away - and every time one got shorter, everything under it came
+  // up to meet the pointer. The room it once needed stays kept, so it can
+  // grow but never pull back. A new barrow is a new page, so it starts
+  // snug; a window of a different size starts over too.
+  const held = new Map();
+  const hold = (node) => {
+    if (!node || node.hidden) return;
+    const h = node.offsetHeight;
+    if (!(h > 0) || h <= (held.get(node) || 0) + 0.5) return;
+    held.set(node, h);
+    node.style.minHeight = h + 'px';
+  };
+  const win = doc.defaultView;
+  if (win && win.addEventListener) {
+    win.addEventListener('resize', () => {
+      for (const node of held.keys()) node.style.minHeight = '';
+      held.clear();
+    });
+  }
 
   const savedNote = (text) => { if (nodes.saved) nodes.saved.textContent = text; };
 

@@ -14,15 +14,15 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=44';
-import { createSim, restoreSim, openedState } from './sim.js?v=44';
-import * as Save from './save.js?v=44';
-import * as Rb from './rebirth.js?v=44';
-import * as Lore from './lore.js?v=44';
-import { hash } from './rng.js?v=44';
-import { createUI } from './ui.js?v=44';
-import { createView } from './view.js?v=44';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=44';
+import { storageKey, fill } from '../config.js?v=45';
+import { createSim, restoreSim, openedState } from './sim.js?v=45';
+import * as Save from './save.js?v=45';
+import * as Rb from './rebirth.js?v=45';
+import * as Lore from './lore.js?v=45';
+import { hash } from './rng.js?v=45';
+import { createUI } from './ui.js?v=45';
+import { createView } from './view.js?v=45';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=45';
 
 /**
  * @param {object} o
@@ -91,8 +91,13 @@ export function createGame(o) {
 
   // Nobody was looking at the page for this stretch, so it is dug at the away
   // pace: an open tab with the player watching always gets further.
+  // Time away that belongs to the next barrow: the one open now reached the
+  // layer it fills itself in at before the time ran out.
+  let owedNext = 0;
+
   const away = (seconds) => {
-    const r = sim.advance(seconds, { unwatched: true });
+    const r = sim.advance(seconds, { unwatched: true, stopForFillIn: true });
+    owedNext = r.stopped ? r.leftover : 0;
     tell(r.events);
     if (r.away && r.elapsed > 30) {
       // The stat labels are stored the way a label reads, so they come back
@@ -151,7 +156,8 @@ export function createGame(o) {
     view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md);
 
     // A barrow the player asked to fill itself in, once it is deep enough.
-    if (sim.autoSealDue()) { seal(); return; }
+    if (sim.autoSealDue()) { sim.answerForFillIn(); seal(null, owedNext); return; }
+    owedNext = 0;
 
     sinceSave += dt;
     if (sinceSave >= cfg.time.autosaveSeconds) { save(); sinceSave = 0; }
@@ -186,19 +192,23 @@ export function createGame(o) {
    * the legacy, the closing lines go to the top of the new run's log, and the
    * page comes back on ground it has never seen.
    */
-  const seal = (hill) => {
+  // `owed` is time away the next barrow is still to be given: its save is
+  // dated that far back, so the page that comes up catches it up the way it
+  // would any time away.
+  const seal = (hill, owed) => {
     if (!sim.canSeal()) return null;
     // The next hill: the one picked, or the first on offer when the barrow
     // filled itself in, or a plain one when rank offers no choice.
     const choices = sim.hillChoices();
     const next = choices.includes(hill) ? hill : (choices[0] || null);
+    sim.keepPlacing();
     const result = Rb.seal(sim.state, cfg, sim.legacy);
     const seed = hash(sim.state.seed, 'next-barrow:' + sim.legacy.seals);
     const state = openedState(cfg, sim.legacy, seed, result.lines.slice().reverse(), next);
     const snap = { state, markets: [], legacy: JSON.parse(JSON.stringify(sim.legacy)) };
     disposed = true;
     running = false;
-    if (storage) Save.write(storage, KEY, snap, now());
+    if (storage) Save.write(storage, KEY, snap, now() - (owed > 0 ? owed * 1000 : 0));
     reload();
     return result;
   };

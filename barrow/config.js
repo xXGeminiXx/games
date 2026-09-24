@@ -71,7 +71,7 @@ export const CONFIG = {
     autoOffTip: 'Place the diggers yourself with the + and - on each row. You never have to',
     autoOnTip:  'The game keeps them where they earn most, and moves them as the ground changes',
     autoNoteGame: 'The game places them where they earn most, and moves them as the ground changes.',
-    autoNoteHand: 'You place them with + and -. They stay where you put them.',
+    autoNoteHand: 'You place them with + and -. They stay where you put them, and the next barrow starts the same way.',
     // Under the gate's buttons when what is asked is more than is on hand.
     gateShort:  'You have {have} coin of the {cost} he wants.',
     // Layers nobody is digging any more, folded into one line.
@@ -876,7 +876,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 44,
+    build: 45,
   },
 };
 
