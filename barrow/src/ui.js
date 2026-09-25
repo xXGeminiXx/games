@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=45';
-import * as H from './horde.js?v=45';
-import * as R from './rites.js?v=45';
-import * as Rb from './rebirth.js?v=45';
-import * as Lore from './lore.js?v=45';
-import * as Advice from './advice.js?v=45';
-import * as Lords from './lords.js?v=45';
-import * as Ranks from './ranks.js?v=45';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=45';
-import { fill } from '../config.js?v=45';
+import * as Mat from './materials.js?v=46';
+import * as H from './horde.js?v=46';
+import * as R from './rites.js?v=46';
+import * as Rb from './rebirth.js?v=46';
+import * as Lore from './lore.js?v=46';
+import * as Advice from './advice.js?v=46';
+import * as Lords from './lords.js?v=46';
+import * as Ranks from './ranks.js?v=46';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=46';
+import { fill } from '../config.js?v=46';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -49,7 +49,7 @@ export function createUI(doc, sim, cfg, actions) {
   const nodes = {
     log: byId('log'),
     hand: byId('hand'), dig: byId('dig'),
-    hordePanel: byId('horde-panel'), raise: byId('raise'), weights: byId('weights'),
+    hordePanel: byId('horde-panel'), events: byId('events'), eventsEmpty: byId('events-empty'), raise: byId('raise'), weights: byId('weights'),
     handOver: byId('handover'), handNote: byId('handnote'), spent: byId('spent'),
 
     ritesPanel: byId('rites-panel'), rites: byId('rites'), riteBulk: byId('rite-bulk'),
@@ -850,6 +850,10 @@ export function createUI(doc, sim, cfg, actions) {
 
     // The horde.
     show(nodes.hordePanel, f.raise);
+    // The box for rooms and callers keeps its place from the moment the crew
+    // can be raised, empty or not, so nothing under it moves when one comes.
+    show(nodes.events, f.raise);
+    show(nodes.eventsEmpty, !!(nodes.chamberPanel && nodes.chamberPanel.hidden && nodes.visitorPanel && nodes.visitorPanel.hidden));
     if (f.raise) {
       if (!raiseButtons.length) buildRaise();
       paintAutoRaise();

@@ -47,7 +47,7 @@
   /* Two columns: the books on the left, the hill on the right. */
   main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;min-height:0}
   #books{overflow-y:auto;overflow-x:hidden;padding:14px 20px 18px;border-right:1px solid var(--rule)}
-  #field{display:flex;flex-direction:column;min-height:0;position:relative}
+  #field{display:flex;flex-direction:column;min-height:0}
   #hill{flex:1 1 auto;position:relative;min-height:150px}
   #hill canvas{display:block;width:100%;height:100%}
   #fieldhint{position:absolute;left:14px;top:10px;color:var(--quiet);font-size:11px;pointer-events:none}
@@ -195,22 +195,15 @@
 
   .swatch{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;opacity:.9}
 
-  /* A room and a caller sit over the top of the hill, not in the column of
-     buttons. Both turn up on their own and a caller leaves on its own, and
-     in the column each arrival shoved the crew's buttons down by a whole box
-     and each departure pulled them back up. Over the hill they move nothing:
-     the top of the picture is the surface and the old layers. */
-  #events{
-    position:absolute;top:0;left:0;right:0;z-index:3;padding:10px 14px;
-    display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;pointer-events:none;
-  }
-  #events .panel{
-    pointer-events:auto;flex:0 1 470px;min-width:300px;max-height:46vh;overflow-y:auto;
-    background:var(--panel);border:1px solid var(--rule);padding:10px 14px 10px 12px;
-    box-shadow:0 6px 24px rgba(0,0,0,.55);border-radius:2px;
-  }
-  #events #visitor-panel{border-left:2px solid var(--coin)}
-  #events #chamber-panel{border-left:2px solid var(--deepink)}
+  /* A room and a caller sit in their own box in the column, above the
+     crew's buttons. The box is ONE HEIGHT whether it is empty or full and
+     scrolls inside itself, so an arrival or a departure never moves a
+     button under it. */
+  #events{height:210px;overflow-y:auto;overflow-x:hidden;margin:0 0 4px;
+    border-top:1px solid var(--rule);overscroll-behavior:contain}
+  #events .panel{border-top:0;padding:8px 0 8px 12px}
+  #events .panel + .panel{border-top:1px solid var(--rule)}
+  #events-empty{color:var(--quiet);font-size:11px;margin:10px 0 0 12px}
   /* Somebody at the gate. */
   #visitor-panel{border-left:2px solid var(--coin);padding-left:12px}
   #visitor-text{margin:0 0 7px;color:var(--ink)}
@@ -264,6 +257,7 @@
   }
   @media (max-height:700px){
     #log{margin-bottom:8px;height:66px}
+    #events{height:150px}
     .panel{padding:8px 0 6px}
     .wrow{margin:1px 0}
     #raise{margin-bottom:5px}
@@ -300,10 +294,6 @@
     #standing .grid{grid-template-columns:1fr}
     #standing .grid div{white-space:normal}
     #panel-tabs{gap:14px;flex-wrap:wrap}
-    /* No hill tall enough to sit on, so a room or a caller comes up from
-       the bottom of the screen instead, over the page rather than into it. */
-    #events{position:fixed;top:auto;bottom:0;padding:0 8px;flex-direction:column;align-items:stretch;gap:6px}
-    #events .panel{flex:none;min-width:0;max-height:38vh;margin-bottom:6px}
   }
 
 /* A thumb, not a pointer: on touch devices every control gets a real target
@@ -451,7 +441,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="a945d2a93d22">
+<meta name="build" content="c46261593bf2">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -515,16 +505,8 @@
     <div id="ending-panel" class="panel" hidden></div>
     <div id="goal" hidden><div id="goal-say"></div><div id="goal-bar"></div><small id="goal-rule"></small></div>
     <div id="log"></div>
-    <div id="hand" class="panel"><button id="dig">Dig</button></div>
-    <div id="horde-panel" class="panel" hidden><div class="phead"><h2 id="p-horde">Where they dig</h2><div id="handover"></div></div><p id="handnote"></p><div id="raise"></div><div id="spent" hidden></div><div id="weights"></div></div>
-    <div id="seal-panel" class="panel" hidden>
-      <h2 id="p-seal">Fill it in</h2>
-      <p id="seal-note"></p>
-      <div id="seal-acts"></div>
-    </div>
-  </section>
-  <section id="field">
-    <div id="events">
+    <div id="events" hidden>
+      <p id="events-empty">Nobody at the gate, and no room open.</p>
       <div id="chamber-panel" class="panel" hidden>
         <h2 id="chamber-title">A room</h2>
         <div id="chamber-text"></div>
@@ -537,6 +519,15 @@
         <p id="visitor-after" hidden></p>
       </div>
     </div>
+    <div id="hand" class="panel"><button id="dig">Dig</button></div>
+    <div id="horde-panel" class="panel" hidden><div class="phead"><h2 id="p-horde">Where they dig</h2><div id="handover"></div></div><p id="handnote"></p><div id="raise"></div><div id="spent" hidden></div><div id="weights"></div></div>
+    <div id="seal-panel" class="panel" hidden>
+      <h2 id="p-seal">Fill it in</h2>
+      <p id="seal-note"></p>
+      <div id="seal-acts"></div>
+    </div>
+  </section>
+  <section id="field">
     <div id="hill"><canvas id="v"></canvas><div id="fieldhint">The surface</div></div>
     <div id="rites-panel" hidden>
       <div id="panel-tabs">
@@ -566,8 +557,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=45';
-import { createGame } from './src/game.js?v=45';
+import { CONFIG, applyIdentity } from './config.js?v=46';
+import { createGame } from './src/game.js?v=46';
 
 applyIdentity(document);
 
