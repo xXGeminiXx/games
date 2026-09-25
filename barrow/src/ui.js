@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=47';
-import * as H from './horde.js?v=47';
-import * as R from './rites.js?v=47';
-import * as Rb from './rebirth.js?v=47';
-import * as Lore from './lore.js?v=47';
-import * as Advice from './advice.js?v=47';
-import * as Lords from './lords.js?v=47';
-import * as Ranks from './ranks.js?v=47';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=47';
-import { fill } from '../config.js?v=47';
+import * as Mat from './materials.js?v=48';
+import * as H from './horde.js?v=48';
+import * as R from './rites.js?v=48';
+import * as Rb from './rebirth.js?v=48';
+import * as Lore from './lore.js?v=48';
+import * as Advice from './advice.js?v=48';
+import * as Lords from './lords.js?v=48';
+import * as Ranks from './ranks.js?v=48';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=48';
+import { fill } from '../config.js?v=48';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -193,10 +193,15 @@ export function createUI(doc, sim, cfg, actions) {
         const at = sim.legacy.autoSealAt;
         actions.setAutoSeal(at > 0 ? 0 : Math.max(sim.state.depth + 6, cfg.seal.unlockDepth + 1));
       } });
-      const less = el('button', { class: 'w', text: '-5', onclick: () => actions.setAutoSeal(Math.max(0, (sim.legacy.autoSealAt || 0) - 5)) });
-      const more = el('button', { class: 'w', text: '+5', onclick: () => actions.setAutoSeal((sim.legacy.autoSealAt || (sim.state.depth + 1)) + 5) });
-      autoSealRow = el('div', { class: 'autoseal' }, label, less, more);
-      autoSealRow._label = label; autoSealRow._less = less; autoSealRow._more = more;
+      // One layer at a time as well as five: a player aiming for 71 from 75
+      // had only -5, and it went to 70.
+      const by = (d) => () => actions.setAutoSeal(Math.max(1, (sim.legacy.autoSealAt || (sim.state.depth + 1)) + d));
+      const less5 = el('button', { class: 'w', text: '-5', onclick: by(-5) });
+      const less = el('button', { class: 'w', text: '-1', onclick: by(-1) });
+      const more = el('button', { class: 'w', text: '+1', onclick: by(1) });
+      const more5 = el('button', { class: 'w', text: '+5', onclick: by(5) });
+      autoSealRow = el('div', { class: 'autoseal' }, label, less5, less, more, more5);
+      autoSealRow._label = label; autoSealRow._steps = [less5, less, more, more5];
       nodes.sealActs.appendChild(autoSealRow);
     }
     if (!autoSealRow) return;
@@ -205,8 +210,7 @@ export function createUI(doc, sim, cfg, actions) {
     const text = at > 0 ? fill(T.autoSeal, { n: at }) : T.autoSealOff;
     if (autoSealRow._label.textContent !== text) autoSealRow._label.textContent = text;
     autoSealRow._label.setAttribute('aria-pressed', String(at > 0));
-    show(autoSealRow._less, at > 0);
-    show(autoSealRow._more, at > 0);
+    for (const b of autoSealRow._steps) show(b, at > 0);
   };
 
   const raiseButtons = [];

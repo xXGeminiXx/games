@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=47';
-import * as Mat from './materials.js?v=47';
-import * as H from './horde.js?v=47';
-import * as Crew from './crew.js?v=47';
-import * as R from './rites.js?v=47';
-import * as Rv from './reveal.js?v=47';
-import * as Ch from './chambers.js?v=47';
-import * as Vi from './visitors.js?v=47';
-import * as Rb from './rebirth.js?v=47';
-import * as Lore from './lore.js?v=47';
-import * as Lords from './lords.js?v=47';
-import * as Ranks from './ranks.js?v=47';
-import { createGround } from './ground.js?v=47';
-import { hash } from './rng.js?v=47';
-import { fill } from '../config.js?v=47';
-import { fmt, fmtCoin } from './numbers.js?v=47';
+import { CONFIG as DEFAULT } from '../config.js?v=48';
+import * as Mat from './materials.js?v=48';
+import * as H from './horde.js?v=48';
+import * as Crew from './crew.js?v=48';
+import * as R from './rites.js?v=48';
+import * as Rv from './reveal.js?v=48';
+import * as Ch from './chambers.js?v=48';
+import * as Vi from './visitors.js?v=48';
+import * as Rb from './rebirth.js?v=48';
+import * as Lore from './lore.js?v=48';
+import * as Lords from './lords.js?v=48';
+import * as Ranks from './ranks.js?v=48';
+import { createGround } from './ground.js?v=48';
+import { hash } from './rng.js?v=48';
+import { fill } from '../config.js?v=48';
+import { fmt, fmtCoin } from './numbers.js?v=48';
 
 export const SAVE_VERSION = 2;
 
@@ -1013,9 +1013,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const dismissEnding = () => { state.ending = false; };
   /** The hills on offer for the next barrow, if rank offers any. */
   const hillChoices = () => Rb.hillChoices(legacy, cfg, state.seed, (id) => Ranks.has(legacy, cfg, id));
+  // Setting the layer never fills the barrow in on the spot. A layer the dig
+  // has already reached would have ended the barrow the moment it was
+  // pressed, and a player stepping the number down from 75 to 71 lost a
+  // barrow on the way past 70. The lowest it goes is the next layer down.
   const setAutoSeal = (layer) => {
     const n = Math.max(0, Math.round(layer) || 0);
-    legacy.autoSealAt = n > 0 ? Math.max(cfg.seal.unlockDepth + 1, n) : 0;
+    legacy.autoSealAt = n > 0 ? Math.max(cfg.seal.unlockDepth + 1, state.depth + 2, n) : 0;
     return legacy.autoSealAt;
   };
   /** Whether the barrow has reached the layer the player asked it to fill itself in at. */
