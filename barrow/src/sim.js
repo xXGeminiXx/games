@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=46';
-import * as Mat from './materials.js?v=46';
-import * as H from './horde.js?v=46';
-import * as Crew from './crew.js?v=46';
-import * as R from './rites.js?v=46';
-import * as Rv from './reveal.js?v=46';
-import * as Ch from './chambers.js?v=46';
-import * as Vi from './visitors.js?v=46';
-import * as Rb from './rebirth.js?v=46';
-import * as Lore from './lore.js?v=46';
-import * as Lords from './lords.js?v=46';
-import * as Ranks from './ranks.js?v=46';
-import { createGround } from './ground.js?v=46';
-import { hash } from './rng.js?v=46';
-import { fill } from '../config.js?v=46';
-import { fmt, fmtCoin } from './numbers.js?v=46';
+import { CONFIG as DEFAULT } from '../config.js?v=47';
+import * as Mat from './materials.js?v=47';
+import * as H from './horde.js?v=47';
+import * as Crew from './crew.js?v=47';
+import * as R from './rites.js?v=47';
+import * as Rv from './reveal.js?v=47';
+import * as Ch from './chambers.js?v=47';
+import * as Vi from './visitors.js?v=47';
+import * as Rb from './rebirth.js?v=47';
+import * as Lore from './lore.js?v=47';
+import * as Lords from './lords.js?v=47';
+import * as Ranks from './ranks.js?v=47';
+import { createGround } from './ground.js?v=47';
+import { hash } from './rng.js?v=47';
+import { fill } from '../config.js?v=47';
+import { fmt, fmtCoin } from './numbers.js?v=47';
 
 export const SAVE_VERSION = 2;
 
@@ -53,6 +53,7 @@ export function freshState(cfg, seed) {
     byHand: false,        // the player took the splitting over; nothing forces this
     faceWeight: 0,        // where the way down sits when it is set by hand
     capProgress: 0,
+    recordFind: false,    // this barrow has already had its artifact for a new deepest layer
     stock: {},            // good id -> units held
     seen: {},             // good id -> true once its market has been on the table
     rites: {},            // rite id -> level
@@ -390,6 +391,24 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   /**
+   * One more of a deep lord's artifacts, kept forever. Only between the deep
+   * line and the last layer that has any: shallower ground has none, and
+   * past it there is nothing new to find yet.
+   */
+  const giveArtifact = (events, id, k) => {
+    const A = cfg.artifacts;
+    const words = Lore.lord(id);
+    if (!A || !A.list[id] || !(k > A.from && k <= A.to) || !words || !words.artifact) return;
+    if (!legacy.artifacts) legacy.artifacts = {};
+    if (A.most > 0 && (legacy.artifacts[id] || 0) >= A.most) return;
+    const n = (legacy.artifacts[id] || 0) + 1;
+    legacy.artifacts[id] = n;
+    const D = Lore.doors();
+    events.push({ type: 'artifact', lord: id, n });
+    events.push({ type: 'log', key: 'artifact', text: fill(n > 1 ? D.artifactMore : D.artifact, { name: words.artifact.name, line: words.artifact.line, n }) });
+  };
+
+  /**
    * A lord's door has given way. His hoard is paid on the spot - coin priced
    * in seconds of income, never a share of anything, and relics that go
    * straight into what carries over - and the first time a player ever breaks
@@ -422,6 +441,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     if (first && words.power) {
       events.push({ type: 'log', key: 'power', text: fill(D.trophy, { name: words.power.name, line: words.power.line }) });
     }
+    // Past the deep line every door hands over one of his artifacts, every
+    // time, up to the last door that has any.
+    giveArtifact(events, lord.id, k);
     present(events, hallFor(door, first));
     addRenown(events, first ? cfg.ranks.points.firstLord : cfg.ranks.points.door);
   };
@@ -457,6 +479,15 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       if (e.type === 'log' && e.once === 'break:' + k) { e.text += ' ' + note; said = true; }
     }
     if (!said) events.push({ type: 'log', key: 'newDepth', text: note });
+    // Deeper than ever, past the deep line: the lord whose layers these are
+    // leaves one of his artifacts in the ground - once a barrow, on its first
+    // new record. One a layer fed itself: every find made the next layer
+    // easier to reach, and one barrow went from 86 to 107.
+    if (cfg.lords && !state.recordFind && !ground.at(k).door) {
+      const before = legacy.artifacts ? JSON.stringify(legacy.artifacts) : '';
+      giveArtifact(events, Lords.lordAt(cfg, state.seed, Lords.realmOf(k, cfg)).id, k);
+      if ((legacy.artifacts ? JSON.stringify(legacy.artifacts) : '') !== before) state.recordFind = true;
+    }
     addRenown(events, cfg.ranks.points.newDepth);
   };
 

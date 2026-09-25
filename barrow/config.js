@@ -164,6 +164,12 @@ export const CONFIG = {
       unknown:  '???',
       unmet:    'Break the door to keep it.',
       atRank:   'Rank {n}',
+      artifacts: 'Artifacts',
+      artifactsHow: 'Found past layer 50, up to {n} of each. Every lord\'s door from layer 60 to 100 hands over one of his, and your first new deepest layer in a barrow turns up another. They stack, and they only work past layer 50.',
+      artifactHeld: '{Name} x{n}',
+      artifactFull: '{Name} x{n}, all he has',
+      artifactTotal: 'Together, {x}x.',
+      artifactNone: 'Not found yet.',
     },
 
     // THE LINE AT THE TOP. One rung of the ordered list in src/advice.js,
@@ -559,6 +565,38 @@ export const CONFIG = {
   },
 
   // -------------------------------------------------------------------------
+  // ARTIFACTS - what the deep lords hand over, one more every time
+  //
+  // Past layer `from`, every lord's door that gives way hands over one of his
+  // artifacts, every time, not only the first. They are kept forever and they
+  // stack: holding three of one is three times its step. They only work in
+  // the deep - while the dig is past layer `below` - so the first fifty
+  // layers of a barrow go exactly as they always did. Doors past `to` hand
+  // over nothing new, which is what makes layer 100 the place the game levels
+  // off, until something new is put under it.
+  //
+  // Each step is a multiplier on one thing: face (digging down), dig (every
+  // digger), bones, value (what things sell for), door (how fast a lord's door
+  // gives way).
+  // -------------------------------------------------------------------------
+  artifacts: {
+    from: 50,
+    to: 100,
+    below: 50,
+    most: 10,     // of any one lord's; with all eight lords full the dig levels off a little past layer 100 (measured: 99 by the 37th barrow from his save, 108 by the 49th, 114 by the 61st)
+    list: {
+      rex:         { face: 2 },
+      pater:       { bones: 3 },
+      rey:         { value: 3 },
+      dona:        { door: 2 },
+      sepulturero: { face: 2 },
+      neb:         { dig: 2 },
+      natron:      { door: 2 },
+      mortifer:    { face: 2, dig: 2 },
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // VISITORS - who comes up the track while the work goes on
   //
   // One at a time, at long gaps, and never on a clock the player has to beat:
@@ -876,7 +914,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 46,
+    build: 47,
   },
 };
 

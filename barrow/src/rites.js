@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=46';
-import * as Rb from './rebirth.js?v=46';
-import * as Lore from './lore.js?v=46';
-import * as Lords from './lords.js?v=46';
-import * as Ranks from './ranks.js?v=46';
+import * as Ch from './chambers.js?v=47';
+import * as Rb from './rebirth.js?v=47';
+import * as Lore from './lore.js?v=47';
+import * as Lords from './lords.js?v=47';
+import * as Ranks from './ranks.js?v=47';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -111,13 +111,15 @@ export function modsOf(s, cfg, legacy) {
   // has been broken. Never bought, so never a level.
   const P = (cfg.lords && cfg.lords.power) || null;
   const twice = id => (P && trophy(id) ? P.factor : 1);
+  // The deep lords' artifacts, working only past the depth they belong to.
+  const art = Rb.artifactMods(legacy, cfg, s.depth);
   return {
     // Production.
-    digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1) * twice('neb'),
-    boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones * twice('pater'),
+    digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1) * twice('neb') * art.dig,
+    boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones * twice('pater') * art.bones,
     softMult: Math.pow(r.graveFactor, lv('grave')) * b.soft * oath('soft', 1) * hillSoft,
-    faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1) * twice('sepulturero'),
-    valueMult: b.value * twice('rey') * oath('value', 1),
+    faceMult: Math.pow(r.picksFactor, lv('picks')) * b.face * oath('face', 1) * twice('sepulturero') * art.face,
+    valueMult: b.value * twice('rey') * oath('value', 1) * art.value,
     activeStrata: cfg.horde.activeStrata + lv('workings') + (rank('openMore') ? 1 : 0),
     // Information.
     assay: lv('assay') > 0,
@@ -133,7 +135,7 @@ export function modsOf(s, cfg, legacy) {
     visitPay: Math.pow(r.crierPay, lv('crier')) * oath('visitPay', 1) * twice('dona'),
     offlineHours: cfg.time.offlineMaxHours + r.vigilHours * lv('vigil') + oath('offlineHours', 0),
     // What the lords' trophies do.
-    doorEase: (trophy('sepulturero') ? (T.doorEase || 1) : 1) * (rank('doorsEasy') ? 1.25 : 1),
+    doorEase: (trophy('sepulturero') ? (T.doorEase || 1) : 1) * (rank('doorsEasy') ? 1.25 : 1) * art.door,
     hoardMult: (trophy('mortifer') ? (T.hoardMult || 1) : 1) * (rank('hoardPlus') ? 1.5 : 1) * (rank('lordHoard') ? 2 : 1),
     // Neb-Amenti's scales weigh every barrow again when it is filled in.
     sealRelics: trophy('neb') ? (T.sealRelics || 1) : 1,

@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=46';
-import { pick, hash } from './rng.js?v=46';
-import { fill } from '../config.js?v=46';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=46';
+import * as Lore from './lore.js?v=47';
+import { pick, hash } from './rng.js?v=47';
+import { fill } from '../config.js?v=47';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=47';
 
 export const LEGACY_VERSION = 1;
 
@@ -32,6 +32,8 @@ export function freshLegacy() {
     // each has been met.
     trophies: {},
     lordsMet: {},
+    // The deep lords' artifacts, by lord: how many of each the player holds.
+    artifacts: {},
     // Rank points. Null on a save from before ranks, which the simulation
     // fills in from what that save had already done.
     renown: 0,
@@ -88,6 +90,12 @@ export function restoreLegacy(raw) {
   for (const key of ['trophies', 'lordsMet']) {
     if (raw[key] && typeof raw[key] === 'object') {
       for (const id of Object.keys(raw[key])) if (raw[key][id]) l[key][id] = raw[key][id];
+    }
+  }
+  if (raw.artifacts && typeof raw.artifacts === 'object') {
+    for (const id of Object.keys(raw.artifacts)) {
+      const n = raw.artifacts[id];
+      if (Number.isFinite(n) && n > 0) l.artifacts[id] = Math.floor(n);
     }
   }
   if (Array.isArray(raw.barrows)) l.barrows = raw.barrows.filter(b => b && typeof b === 'object').slice(0, 50);
@@ -261,4 +269,22 @@ export function seal(state, cfg, legacy) {
   lines.push(fill(words.yieldPaid, { n: fmt(rem) }));
   lines.push(pick(words.openLines, state.seed, salt) || '');
   return { rem, lines: lines.filter(Boolean) };
+}
+
+/**
+ * What the artifacts held add up to, as multipliers, while the dig is past
+ * `artifacts.below`. Above it every one of them is 1, so the first layers of a
+ * barrow never feel them.
+ */
+export function artifactMods(legacy, cfg, depth) {
+  const out = { face: 1, dig: 1, bones: 1, value: 1, door: 1 };
+  const A = cfg.artifacts;
+  if (!A || !legacy || !legacy.artifacts || !(depth >= A.below)) return out;
+  for (const id of Object.keys(legacy.artifacts)) {
+    const def = A.list[id];
+    const n = legacy.artifacts[id];
+    if (!def || !(n > 0)) continue;
+    for (const kind of Object.keys(out)) if (def[kind]) out[kind] *= Math.pow(def[kind], n);
+  }
+  return out;
 }

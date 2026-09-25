@@ -528,6 +528,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Rex Mortis\'s crown', line: 'Every barrow starts 3 layers down.' },
       power: { name: 'Rex Mortis\'s banner', line: 'Every layer you break into brings up new diggers, as many as 5 minutes of bones would raise.' },
+      artifact: { name: 'Rex Mortis\'s war horn', line: 'Past layer 50 your crew digs down 2x faster.' },
     },
     pater: {
       his: 'his',
@@ -545,6 +546,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Pater Ossium\'s throne', line: 'A cart of bones every time you break a layer.' },
       power: { name: 'Pater Ossium\'s charnel', line: 'The ground gives up 2x the bones.' },
+      artifact: { name: 'Pater Ossium\'s reliquary', line: 'Past layer 50 the ground gives up 3x the bones.' },
     },
     rey: {
       his: 'his',
@@ -562,6 +564,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Rey Muerto\'s lamp', line: 'Every layer down to the next door is named.' },
       power: { name: 'Rey Muerto\'s mint', line: 'Everything sells for 2x.' },
+      artifact: { name: 'Rey Muerto\'s coin press', line: 'Past layer 50 everything sells for 3x.' },
     },
     dona: {
       his: 'her',
@@ -579,6 +582,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Doña Calavera\'s candle', line: 'Callers wait at the gate until you answer them.' },
       power: { name: 'Doña Calavera\'s guest list', line: 'Callers come 2x as often and pay 2x.' },
+      artifact: { name: 'Doña Calavera\'s mask', line: 'Past layer 50 every lord\'s door breaks 2x faster.' },
     },
     sepulturero: {
       his: 'his',
@@ -596,6 +600,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'El Sepulturero\'s shovel', line: 'Every lord\'s door breaks 2x faster.' },
       power: { name: 'El Sepulturero\'s night crew', line: 'Digging down is 2x faster.' },
+      artifact: { name: 'El Sepulturero\'s lantern', line: 'Past layer 50 your crew digs down 2x faster.' },
     },
     neb: {
       his: 'his',
@@ -613,6 +618,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Neb-Amenti\'s scales', line: 'Filling in pays 50% more relics.' },
       power: { name: 'Neb-Amenti\'s measure', line: 'Everyone digs 2x faster.' },
+      artifact: { name: 'Neb-Amenti\'s plumb line', line: 'Past layer 50 everyone digs 2x faster.' },
     },
     natron: {
       his: 'her',
@@ -630,6 +636,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Mother Natron\'s jar', line: '1 in 100 of your diggers comes with you to the next barrow.' },
       power: { name: 'Mother Natron\'s salt', line: 'While you\'re away the dead dig at 90% of full speed instead of 75%.' },
+      artifact: { name: 'Mother Natron\'s hook', line: 'Past layer 50 every lord\'s door breaks 2x faster.' },
     },
     mortifer: {
       his: 'his',
@@ -649,6 +656,7 @@ export const CONTENT = {
       ],
       trophy: { name: 'Mortifer\'s ring', line: 'Every lord\'s hoard is 2x bigger.' },
       power: { name: 'Mortifer\'s call', line: 'The dead raise themselves: every spare bone stands up as a digger. Auto-raise, by the raise buttons, turns it off.' },
+      artifact: { name: 'Mortifer\'s key', line: 'Past layer 50 everyone digs 2x faster, and your crew digs down 2x faster.' },
     },
   },
 
@@ -669,6 +677,8 @@ export const CONTENT = {
     doorTag: '\'s door',
     broke: 'BROKE THROUGH: {Name}\'s door. {His} hoard: {coin} coin and {n} relics.',
     trophy: 'You keep {Name} for good: {line}',
+    artifact: 'You take {Name}. {line}',
+    artifactMore: '{Name} again: you have {n} now, and each one counts. {line}',
     newDepth: 'Deepest yet: +{relics} relics.',
     crew: 'Biggest crew yet: +{relics} relics.',
     rankUp: 'RANK UP: you\'re {name} now.',
@@ -985,10 +995,10 @@ export const CONTENT = {
   seal: {
     title: 'Fill it in',
     button: 'Fill In This Barrow',
-    confirm: 'Sure? Relics, rank and trophies carry on. Everything else is buried.',
+    confirm: 'Sure? Relics, rank, trophies and artifacts carry on. Everything else is buried.',
     notYet: 'Not yet',
     locked: 'Reach layer {depth} to fill this barrow in for relics.',
-    ready: 'Filling in ends this barrow. Coin, diggers, layers and coin upgrades are buried with it. Relics, rank and trophies carry on to the next hill.',
+    ready: 'Filling in ends this barrow. Coin, diggers, layers and coin upgrades are buried with it. Relics, rank, trophies and artifacts carry on to the next hill.',
     yieldNow: 'Fill in now for {n} relics.',
     yieldPaid: 'Paid {n} relics.',
     oathsNote: 'Bought with relics. Kept in every barrow from now on.',

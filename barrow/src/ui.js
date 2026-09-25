@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=46';
-import * as H from './horde.js?v=46';
-import * as R from './rites.js?v=46';
-import * as Rb from './rebirth.js?v=46';
-import * as Lore from './lore.js?v=46';
-import * as Advice from './advice.js?v=46';
-import * as Lords from './lords.js?v=46';
-import * as Ranks from './ranks.js?v=46';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=46';
-import { fill } from '../config.js?v=46';
+import * as Mat from './materials.js?v=47';
+import * as H from './horde.js?v=47';
+import * as R from './rites.js?v=47';
+import * as Rb from './rebirth.js?v=47';
+import * as Lore from './lore.js?v=47';
+import * as Advice from './advice.js?v=47';
+import * as Lords from './lords.js?v=47';
+import * as Ranks from './ranks.js?v=47';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=47';
+import { fill } from '../config.js?v=47';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -710,7 +710,8 @@ export function createUI(doc, sim, cfg, actions) {
     const st = Ranks.standing(legacy, cfg);
     const W = T.standing;
     const owned = Object.keys(legacy.trophies || {}).sort().join(',');
-    const key = st.points + '|' + owned + '|' + panelTab + '|' + ((legacy.barrows || []).length);
+    const arts = JSON.stringify(legacy.artifacts || {});
+    const key = st.points + '|' + owned + '|' + arts + '|' + panelTab + '|' + ((legacy.barrows || []).length);
     if (key === standingKey) return;
     standingKey = key;
     clear(nodes.standing);
@@ -737,6 +738,23 @@ export function createUI(doc, sim, cfg, actions) {
       grid.appendChild(cell);
     }
     nodes.standing.appendChild(grid);
+    // The deep lords' artifacts, once the dig has been deep enough to find one.
+    const A = cfg.artifacts;
+    if (A && ((legacy.best && legacy.best.depth) || 0) >= A.from) {
+      nodes.standing.appendChild(el('h3', { text: W.artifacts }));
+      nodes.standing.appendChild(el('small', { text: fill(W.artifactsHow, { n: A.most }) }));
+      const agrid = el('div', { class: 'grid' });
+      for (const id of ids) {
+        const words = Lore.lord(id);
+        if (!A.list[id] || !words || !words.artifact) continue;
+        const n = (legacy.artifacts && legacy.artifacts[id]) || 0;
+        agrid.appendChild(n > 0
+          ? el('div', { title: words.artifact.line }, el('b', { text: fill(A.most > 0 && n >= A.most ? W.artifactFull : W.artifactHeld, { name: words.artifact.name, n }) }),
+            ' - ' + words.artifact.line + (n > 1 ? ' ' + fill(W.artifactTotal, { x: fmt(Math.pow(Object.values(A.list[id])[0], n)) }) : ''))
+          : el('div', { class: 'off' }, el('b', { text: words.artifact.name }), ' - ' + W.artifactNone));
+      }
+      nodes.standing.appendChild(agrid);
+    }
     nodes.standing.appendChild(el('h3', { text: W.keys }));
     const keys = el('div', { class: 'grid' });
     for (const k of cfg.ranks.keys) {

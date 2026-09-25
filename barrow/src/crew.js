@@ -13,7 +13,7 @@
 // setting the panel makes a player fill in by hand.
 // ---------------------------------------------------------------------------
 
-import * as H from './horde.js?v=46';
+import * as H from './horde.js?v=47';
 
 /** Coin a digger earns a second on layer k, before the crew's own speed. */
 export function payOn(api, k, md) {

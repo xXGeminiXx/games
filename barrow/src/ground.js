@@ -12,9 +12,9 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=46';
-import * as Lords from './lords.js?v=46';
-import { pickWeighted, unit } from './rng.js?v=46';
+import * as Mat from './materials.js?v=47';
+import * as Lords from './lords.js?v=47';
+import { pickWeighted, unit } from './rng.js?v=47';
 
 const ONE = { value: 1, hardness: 1, bones: 1, cap: 1 };
 
