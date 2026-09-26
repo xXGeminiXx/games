@@ -893,7 +893,8 @@ export const CONFIG = {
     // crew takes twice as long.
     clearSeconds: 600,
     carveScale: 60,        // the old measure, read once to carry old saves over
-    shaftWidth: 3,
+    shaftWidth: 3,         // the shaft at the start; it widens with the size of the crew
+    doorHeight: 44,        // px a lord's door gets when it is on screen, room permitting
     glintCount: 14,        // mineral glints per band, in the good's color
   },
 
@@ -927,7 +928,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 52,
+    build: 53,
   },
 };
 

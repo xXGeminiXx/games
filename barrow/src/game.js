@@ -14,15 +14,15 @@
 // reloads onto it.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=52';
-import { createSim, restoreSim, openedState } from './sim.js?v=52';
-import * as Save from './save.js?v=52';
-import * as Rb from './rebirth.js?v=52';
-import * as Lore from './lore.js?v=52';
-import { hash } from './rng.js?v=52';
-import { createUI } from './ui.js?v=52';
-import { createView } from './view.js?v=52';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=52';
+import { storageKey, fill } from '../config.js?v=53';
+import { createSim, restoreSim, openedState } from './sim.js?v=53';
+import * as Save from './save.js?v=53';
+import * as Rb from './rebirth.js?v=53';
+import * as Lore from './lore.js?v=53';
+import { hash } from './rng.js?v=53';
+import { createUI } from './ui.js?v=53';
+import { createView } from './view.js?v=53';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=53';
 
 /**
  * @param {object} o
@@ -45,7 +45,7 @@ export function createGame(o) {
   const resumed = !!sim;
   if (!sim) sim = createSim(cfg, { seed: o.seed });
 
-  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground);
+  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground, cfg.lords);
 
   const actions = {};
   const ui = createUI(doc, sim, cfg, actions);
@@ -153,7 +153,7 @@ export function createGame(o) {
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
     const md = sim.mods();
-    view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md);
+    view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md, sim.legacy);
 
     // A barrow the player asked to fill itself in, once it is deep enough.
     if (sim.autoSealDue()) { sim.answerForFillIn(); seal(null, owedNext); return; }
@@ -230,11 +230,29 @@ export function createGame(o) {
     const host = canvas.parentNode;
     const w = host && host.clientWidth ? host.clientWidth : (win.innerWidth || 600);
     const h = host && host.clientHeight ? host.clientHeight : (win.innerHeight || 400);
+    const now0 = view.size;
+    if (now0 && now0.width === w && now0.height === h && now0.dpr === (win.devicePixelRatio || 1)) return;
     view.resize(w, h, win.devicePixelRatio || 1);
+  };
+
+  // The hill's box changes size after the page opens - the upgrades panel
+  // under it appears, a window is resized - and a canvas sized once at the
+  // start was then stretched to its new box: the picture was drawn for a
+  // field twice as tall and squashed to half height, writing and all. It is
+  // measured again whenever its box changes.
+  let watching = false;
+  const watchSize = () => {
+    if (watching) return;
+    watching = true;
+    const host = canvas.parentNode;
+    if (host && win.ResizeObserver) {
+      try { new win.ResizeObserver(() => fit()).observe(host); } catch (e) { /* no observer: the window's resize event below still fits it */ }
+    }
   };
 
   const start = () => {
     fit();
+    watchSize();
     if (resumed && saved && saved.wall) {
       const gap = (now() - saved.wall) / 1000;
       if (gap > cfg.time.catchUpAfter) away(gap);

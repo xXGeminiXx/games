@@ -20,10 +20,10 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=52';
-import * as Lore from './lore.js?v=52';
-import { fill } from '../config.js?v=52';
-import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=52';
+import { hash, unit, range } from './rng.js?v=53';
+import * as Lore from './lore.js?v=53';
+import { fill } from '../config.js?v=53';
+import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=53';
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in

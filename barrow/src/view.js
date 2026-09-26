@@ -14,9 +14,10 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, capUnits } from './materials.js?v=52';
-import { activeFrom } from './horde.js?v=52';
-import * as Lore from './lore.js?v=52';
+import { goodAt, valueAt, hardnessAt, capUnits } from './materials.js?v=53';
+import { activeFrom } from './horde.js?v=53';
+import * as Lore from './lore.js?v=53';
+import * as Icons from './icons.js?v=53';
 
 /** mulberry32 */
 function rng(seed) {
@@ -120,18 +121,33 @@ export function layout(width, height, depth, cfg, focus) {
   // the face off the bottom of a phone's two hundred pixel field, and the
   // face is the part worth looking at. What a thin band loses is its writing,
   // and that is what labelBandHeight decides.
-  const bandH = Math.max(cfg.minBandHeight, Math.min(cfg.bandHeight, (avail - oldTotal) / live));
+  let bandH = Math.max(cfg.minBandHeight, Math.min(cfg.bandHeight, (avail - oldTotal) / live));
+  // A lord's door being broken, or known below it, gets room enough to read
+  // as a wall: up to doorHeight, never more than a share of the field, and
+  // only while the other layers keep at least their floor.
+  const tall = new Set(((focus && focus.tall) || []).filter(k => k > from && k <= depth + 1 + aheadN));
+  let doorH = bandH;
+  if (tall.size && cfg.doorHeight > bandH) {
+    const want = Math.min(cfg.doorHeight, (avail - oldTotal) * 0.28);
+    const rest = (avail - oldTotal - tall.size * want) / Math.max(1, live - tall.size);
+    if (want > bandH && rest >= cfg.minBandHeight) {
+      doorH = want;
+      bandH = Math.max(cfg.minBandHeight, Math.min(cfg.bandHeight, rest));
+    }
+  }
+  const hOf = (k) => (tall.has(k) ? Math.max(doorH, bandH) : bandH);
   const rows = [];
   let y = surface;
   for (let k = 0; k <= depth + 1; k++) {
-    const h = k < from ? oldH : bandH;
+    const h = k < from ? oldH : hOf(k);
     rows.push({ k, y, h });
     y += h;
   }
   const ahead = [];
   for (let i = 0; i < aheadN; i++) {
-    ahead.push({ k: depth + 2 + i, y, h: bandH });
-    y += bandH;
+    const h = hOf(depth + 2 + i);
+    ahead.push({ k: depth + 2 + i, y, h });
+    y += h;
   }
   const bottom = y;
   // Whatever room is left under the cut is ground too, and drawing it as one
@@ -170,8 +186,24 @@ function hex(h) {
 }
 
 function withAlpha(h, a) {
-  const [r, g, b] = hex(h);
-  return `rgba(${r},${g},${b},${a})`;
+  // A colour from mix() arrives as rgb(r,g,b); anything else is #rrggbb.
+  const m = typeof h === 'string' && h.startsWith('rgb(') ? h.slice(4, -1).split(',').map(Number) : null;
+  const [r, g, b] = m || hex(h);
+  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, a))})`;
+}
+
+/**
+ * What a layer is made of decides its texture, so two layers side by side
+ * read as two different things rather than two shades of one: grain, fine
+ * bedding lines, pebbles, crystals, veins or fractures. Picked from the
+ * material's name, so the same material looks the same in every barrow.
+ */
+const TEXTURES = ['grain', 'laminae', 'pebbles', 'crystals', 'veins', 'fractured'];
+export function textureOf(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
+  return TEXTURES[h % TEXTURES.length];
 }
 
 /**
@@ -193,7 +225,7 @@ function wave(rand, width, every) {
   };
 }
 
-export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, ground) {
+export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, ground, lordsCfg) {
   const d = doc || (typeof document !== 'undefined' ? document : null);
   // The view is happy without a run's ground: it falls back to the plain
   // ladder, which is what the drawing looked like before seams existed.
@@ -217,6 +249,172 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   let doorsSeen = -1;
   const flash = { k: -1, t: 0, hue: null };
   const FLASH_SECONDS = 1.8;
+  // The lords whose trophies the player holds, as markers on the mound.
+  let trophies = [];
+  let trophyKey = '';
+  // Loose bits: chips off the face, coin lifting out of worked ground, and
+  // the rubble of a door coming down. Few, short-lived, and capped.
+  const bits = [];
+  const BITS_MAX = 240;
+  let chipDue = 0, coinDue = 0, clock = 0;
+  const spawn = (b) => { if (bits.length < BITS_MAX) bits.push(b); };
+
+  /** The shaft widens with the crew: a hand's width at the start, a road at a trillion. */
+  const shaftW = (s) => cfg.shaftWidth + Math.min(10, Math.log10(1 + Math.max(0, s.horde || 0)) * 0.4);
+
+  /**
+   * A band's texture, painted once into the cached ground. `a` is how strong:
+   * full for a layer the dig has opened, fainter for ground only read ahead.
+   */
+  const texture = (c, row, g, a) => {
+    if (!(row.h >= 5)) return;
+    const r = rng((seed ^ Math.imul(row.k + 3, 0x2c1b3c6d)) >>> 0);
+    const kind = textureOf(g.name);
+    const light = mix(g.hue, palette.bone, 0.45);
+    const dark = palette.void;
+    const y0 = row.y + 1, h = row.h - 2;
+    const area = width * h;
+    if (kind === 'grain') {
+      const n = Math.min(2400, Math.round(area / 85));
+      for (let i = 0; i < n; i++) {
+        c.fillStyle = withAlpha(r() < 0.5 ? light : dark, (0.10 + r() * 0.16) * a);
+        c.fillRect(r() * width, y0 + r() * h, 1, 1);
+      }
+    } else if (kind === 'laminae') {
+      const lines = Math.max(2, Math.floor(h / 5));
+      for (let i = 1; i < lines; i++) {
+        const base = y0 + (i / lines) * h;
+        c.beginPath();
+        c.moveTo(0, base);
+        for (let x = 0; x <= width; x += 40) c.lineTo(x, base + (r() - 0.5) * 2.2);
+        c.strokeStyle = withAlpha(i % 2 ? light : dark, (i % 2 ? 0.13 : 0.3) * a);
+        c.lineWidth = 1;
+        c.stroke();
+      }
+    } else if (kind === 'pebbles') {
+      const n = Math.min(500, Math.round(area / 520));
+      for (let i = 0; i < n; i++) {
+        const x = r() * width, y = y0 + r() * Math.max(1, h - 3), w = 2 + r() * 3, hh = 1.5 + r() * 2;
+        c.fillStyle = withAlpha(dark, 0.32 * a);
+        c.fillRect(x, y + 1, w, hh);
+        c.fillStyle = withAlpha(light, 0.22 * a);
+        c.fillRect(x, y, w - 1, 1);
+      }
+    } else if (kind === 'crystals') {
+      const n = Math.min(260, Math.round(area / 1300));
+      for (let i = 0; i < n; i++) {
+        const x = r() * width, y = y0 + 2 + r() * Math.max(1, h - 4), s0 = 1.5 + r() * 2;
+        c.fillStyle = withAlpha(light, (0.35 + r() * 0.3) * a);
+        c.beginPath();
+        c.moveTo(x, y - s0); c.lineTo(x + s0 * 0.7, y); c.lineTo(x, y + s0); c.lineTo(x - s0 * 0.7, y); c.closePath();
+        c.fill();
+        c.fillStyle = withAlpha(palette.bone, 0.55 * a);
+        c.fillRect(x - 0.5, y - 0.5, 1, 1);
+      }
+    } else if (kind === 'veins') {
+      const n = 2 + Math.floor(r() * 3);
+      for (let i = 0; i < n; i++) {
+        let y = y0 + r() * h;
+        const drift = (r() - 0.5) * h * 0.6;
+        c.beginPath();
+        c.moveTo(0, y);
+        for (let x = 0; x <= width; x += 16) {
+          y = Math.max(y0, Math.min(y0 + h, y + (r() - 0.5) * 3 + drift / Math.max(1, width / 16)));
+          c.lineTo(x, y);
+        }
+        c.strokeStyle = withAlpha(light, 0.3 * a);
+        c.lineWidth = 1 + (i === 0 ? 0.6 : 0);
+        c.stroke();
+      }
+    } else {
+      const n = Math.min(160, Math.round(width / 28));
+      for (let i = 0; i < n; i++) {
+        let x = r() * width, y = y0 + r() * h;
+        c.beginPath();
+        c.moveTo(x, y);
+        const steps = 2 + Math.floor(r() * 3);
+        for (let j = 0; j < steps; j++) {
+          x += (r() - 0.3) * 9; y = Math.max(y0, Math.min(y0 + h, y + (r() - 0.5) * 7));
+          c.lineTo(x, y);
+        }
+        c.strokeStyle = withAlpha(dark, 0.45 * a);
+        c.lineWidth = 1;
+        c.stroke();
+      }
+    }
+  };
+
+  /** What a band's seam looks like on top of its texture. */
+  const seamMark = (c, row, g, a) => {
+    const id = g.seam && g.seam.id;
+    if (!id || !(row.h >= 5)) return;
+    const r = rng((seed ^ Math.imul(row.k + 11, 0x51ed270b)) >>> 0);
+    const y0 = row.y + 1, h = row.h - 2;
+    const light = mix(g.hue, palette.bone, 0.5);
+    if (id === 'flooded') {
+      const wl = y0 + h * 0.58;
+      c.fillStyle = withAlpha('#0e1a24', 0.55 * a);
+      c.fillRect(0, wl, width, y0 + h - wl);
+      c.fillStyle = withAlpha('#7fa6c0', 0.3 * a);
+      c.fillRect(0, wl, width, 1);
+    } else if (id === 'burnt') {
+      const n = Math.round(width / 70);
+      for (let i = 0; i < n; i++) {
+        const x = r() * width, w = 20 + r() * 50;
+        c.fillStyle = withAlpha(palette.void, 0.3 * a);
+        c.fillRect(x, y0 + h * (0.2 + r() * 0.5), w, h * 0.3);
+      }
+      for (let i = 0; i < n * 2; i++) {
+        c.fillStyle = withAlpha(palette.hot, (0.35 + r() * 0.3) * a);
+        c.fillRect(r() * width, y0 + r() * h, 1.5, 1.5);
+      }
+    } else if (id === 'salted') {
+      const n = Math.round(width * h / 260);
+      for (let i = 0; i < n; i++) {
+        c.fillStyle = withAlpha('#eeeeea', (0.18 + r() * 0.22) * a);
+        c.fillRect(r() * width, y0 + r() * h, 1, 1);
+      }
+    } else if (id === 'bonefield') {
+      const n = Math.round(width / 55);
+      for (let i = 0; i < n; i++) Icons.paint(c, 'bone', r() * width, y0 + r() * Math.max(1, h - 9), 1, palette.bone, 0.3 * a);
+    } else if (id === 'hollow') {
+      const n = Math.round(width / 45);
+      for (let i = 0; i < n; i++) {
+        const x = r() * width, y = y0 + 1 + r() * Math.max(1, h - 5), w = 3 + r() * 6;
+        c.fillStyle = withAlpha(palette.tunnel, 0.75 * a);
+        c.fillRect(x, y, w, 2 + r() * 2);
+      }
+    } else if (id === 'brittle') {
+      const n = Math.round(width / 30);
+      for (let i = 0; i < n; i++) {
+        let x = r() * width, y = y0 + r() * h;
+        c.beginPath(); c.moveTo(x, y);
+        for (let j = 0; j < 3; j++) { x += (r() - 0.5) * 10; y = Math.max(y0, Math.min(y0 + h, y + (r() - 0.5) * 8)); c.lineTo(x, y); }
+        c.strokeStyle = withAlpha(light, 0.28 * a); c.lineWidth = 1; c.stroke();
+      }
+    } else if (id === 'dense') {
+      const n = Math.min(2400, Math.round(width * h / 70));
+      for (let i = 0; i < n; i++) {
+        c.fillStyle = withAlpha(palette.void, (0.14 + r() * 0.18) * a);
+        c.fillRect(r() * width, y0 + r() * h, 1.5, 1.5);
+      }
+    } else if (id === 'rich') {
+      const n = Math.round(width / 22);
+      for (let i = 0; i < n; i++) {
+        c.fillStyle = withAlpha(light, (0.5 + r() * 0.4) * a);
+        const s0 = 1 + r() * 1.5;
+        c.fillRect(r() * width, y0 + r() * h, s0, s0);
+      }
+    } else if (id === 'sealed') {
+      c.fillStyle = withAlpha(palette.void, 0.5 * a);
+      c.fillRect(0, y0 + h - 3, width, 3);
+      c.fillStyle = withAlpha(light, 0.18 * a);
+      c.fillRect(0, y0 + h - 4, width, 1);
+    } else if (id === 'thin') {
+      c.fillStyle = withAlpha(light, 0.3 * a);
+      c.fillRect(0, y0 + h * 0.5, width, 1);
+    }
+  };
 
   const segs = (k) => {
     let s = segCache.get(k);
@@ -249,7 +447,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       revealed.push(Math.round(frac * cfg.tunnelSegments));
     }
     const dug = Math.max(0, Math.log10(1 + (s.totals ? s.totals.dug || 0 : 0)));
-    const key = [width, height, s.depth, L.from, L.ahead.length, Math.round(dug * 4), hillTint || '', revealed.join(',')].join('|');
+    const key = [width, height, s.depth, L.from, L.ahead.length, Math.round(dug * 4), hillTint || '', Math.round(shaftW(s)), trophyKey, L.rows.length ? L.rows[L.rows.length - 1].h : 0, revealed.join(',')].join('|');
     if (key === carve.key) return;
     carve.key = key;
     carve.revealed = revealed;
@@ -303,6 +501,21 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       c.closePath();
       c.fill();
     }
+    // A marker on the mound for every lord whose trophy the player holds, in
+    // his colour: the hill shows who it has beaten.
+    for (let i = 0; i < trophies.length; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const step = Math.floor(i / 2) + 1;
+      const mx = width * 0.5 + side * half * (0.12 + 0.13 * step);
+      const u = (mx - (width * 0.5 - half)) / (2 * half);
+      if (!(u > 0.04 && u < 0.96)) continue;
+      const gy = L.surface - crest * 1.6 * 2 * u * (1 - u);
+      const mh = Math.min(L.surface - 6, 7 + crest * 0.12);
+      c.fillStyle = mix(palette.mound, palette.bone, 0.18);
+      c.fillRect(mx - 1.5, gy - mh + 1, 3, mh);
+      c.fillStyle = withAlpha(trophies[i], 0.9);
+      c.fillRect(mx - 1.5, gy - mh, 3, 2);
+    }
     const heap = Math.min(L.surface - 6, dug * 1.3);
     if (heap > 1) {
       c.fillStyle = withAlpha(palette.bone, 0.16);
@@ -331,15 +544,24 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       c.fillStyle = base;
       c.fillRect(0, row.y, width, row.h);
       const g = layerAt(row.k);
-      c.fillStyle = withAlpha(g.hue, open ? 0.19 : 0.07);
+      // The layer's own colour, stronger than it was: side by side, two
+      // layers should read as two materials at a glance. Every other layer
+      // sits a shade darker, so the boundary is there even between two
+      // layers of a like colour.
+      c.fillStyle = withAlpha(g.hue, open ? 0.27 : 0.08);
       c.fillRect(0, row.y, width, row.h);
+      if (row.k % 2 === 1) { c.fillStyle = withAlpha(palette.void, 0.12); c.fillRect(0, row.y, width, row.h); }
       if (row.h >= 6) {
         const bed = c.createLinearGradient(0, row.y, 0, row.y + row.h);
-        bed.addColorStop(0, withAlpha(palette.bone, 0.035));
+        bed.addColorStop(0, withAlpha(palette.bone, 0.045));
         bed.addColorStop(0.55, 'rgba(0,0,0,0)');
-        bed.addColorStop(1, 'rgba(0,0,0,0.30)');
+        bed.addColorStop(1, 'rgba(0,0,0,0.34)');
         c.fillStyle = bed;
         c.fillRect(0, row.y, width, row.h);
+      }
+      if (open || row.k === s.depth + 1) {
+        texture(c, row, g, open ? 1 : 0.55);
+        seamMark(c, row, g, open ? 1 : 0.55);
       }
       c.fillStyle = withAlpha(palette.tunnel, 0.55);
       c.fillRect(0, row.y, width, 1);
@@ -352,7 +574,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const t = 1 - Math.exp(-row.k / 9);
       c.fillStyle = mix(palette.face, palette.deep, Math.min(1, t + 0.3));
       c.fillRect(0, row.y, width, row.h);
-      c.fillStyle = withAlpha(layerAt(row.k).hue, 0.09);
+      c.fillStyle = withAlpha(layerAt(row.k).hue, 0.11);
       c.fillRect(0, row.y, width, row.h);
       if (row.h >= 6) {
         const bed = c.createLinearGradient(0, row.y, 0, row.y + row.h);
@@ -362,6 +584,9 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
         c.fillStyle = bed;
         c.fillRect(0, row.y, width, row.h);
       }
+      // Known ground shows what it is made of, faintly.
+      texture(c, row, layerAt(row.k), 0.4);
+      seamMark(c, row, layerAt(row.k), 0.4);
       c.fillStyle = withAlpha(palette.tunnel, 0.5);
       c.fillRect(0, row.y, width, 1);
     }
@@ -393,41 +618,64 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const g = layerAt(row.k);
       if (!g.door || row.h < 3) return;
       const hue = lordColor(g.door.lord);
+      const lordId = g.door.lord && g.door.lord.id;
       c.fillStyle = mix(palette.deep, palette.void, 0.35);
       c.fillRect(0, row.y, width, row.h);
-      // Dressed stone: a wash of his colour, courses of blocks, and the
-      // joints between them staggered course to course.
-      c.fillStyle = withAlpha(hue, 0.13);
+      // Dressed stone: a wash of his colour, courses of blocks with the
+      // joints staggered course to course, and each block lit along its top
+      // and shadowed along its foot, so the wall has a face to it.
+      c.fillStyle = withAlpha(hue, 0.16);
       c.fillRect(0, row.y, width, row.h);
-      const courses = Math.max(1, Math.min(4, Math.floor(row.h / 8)));
+      const courses = Math.max(1, Math.min(4, Math.floor(row.h / 9)));
       const ch = row.h / courses;
-      const blockW = Math.max(18, Math.min(60, ch * 2.6));
-      c.fillStyle = withAlpha(palette.void, 0.55);
+      const blockW = Math.max(18, Math.min(64, ch * 2.8));
       for (let i = 0; i < courses; i++) {
         const y0 = row.y + i * ch;
-        if (i > 0) c.fillRect(0, y0, width, 1);
         const off = (i % 2) * blockW / 2;
+        c.fillStyle = withAlpha(palette.void, 0.6);
+        if (i > 0) c.fillRect(0, y0, width, 1);
         for (let x = off; x < width; x += blockW) c.fillRect(x, y0 + 1, 1, ch - 1);
+        if (ch >= 6) {
+          c.fillStyle = withAlpha(mix(hue, palette.bone, 0.5), 0.13);
+          for (let x = off - blockW; x < width; x += blockW) c.fillRect(x + 2, y0 + 1, blockW - 3, 1);
+          c.fillStyle = withAlpha(palette.void, 0.35);
+          for (let x = off - blockW; x < width; x += blockW) c.fillRect(x + 2, y0 + ch - 2, blockW - 3, 1);
+        }
       }
-      // His mark, big enough to read on the stone.
-      const r = Math.max(3, Math.min(row.h * 0.4, 14));
+      // Skulls cut along the wall, where there is room for them.
       const cx = width * 0.5, cy = row.y + row.h / 2;
-      c.fillStyle = mix(palette.deep, palette.void, 0.5);
-      c.beginPath();
-      c.moveTo(cx, cy - r - 2); c.lineTo(cx + r + 2, cy); c.lineTo(cx, cy + r + 2); c.lineTo(cx - r - 2, cy); c.closePath();
-      c.fill();
-      c.strokeStyle = withAlpha(hue, 0.9);
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.moveTo(cx, cy - r); c.lineTo(cx + r, cy); c.lineTo(cx, cy + r); c.lineTo(cx - r, cy); c.closePath();
-      c.stroke();
-      c.fillStyle = withAlpha(hue, 0.95);
-      c.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+      if (row.h >= 22) {
+        const sy = cy - 4.5;
+        for (let x = 36; x < width - 12; x += 58) {
+          if (Math.abs(x + 4.5 - cx) < 40) continue;
+          if (x < 190) continue; // the name is written there
+          Icons.paint(c, 'skull', x, sy, 1, mix(hue, palette.bone, 0.55), 0.3);
+        }
+      }
+      // His mark, in a carved frame in the middle of the wall.
+      const px = row.h >= 34 ? 3 : row.h >= 20 ? 2 : row.h >= 11 ? 1 : 0;
+      if (px > 0 && lordId && Icons.ICONS[lordId]) {
+        const size = Icons.GRID * px;
+        const pad = Math.max(2, px + 1);
+        c.fillStyle = mix(palette.deep, palette.void, 0.65);
+        c.fillRect(cx - size / 2 - pad, cy - size / 2 - pad, size + pad * 2, size + pad * 2);
+        c.strokeStyle = withAlpha(hue, 0.85);
+        c.lineWidth = 1;
+        c.strokeRect(cx - size / 2 - pad + 0.5, cy - size / 2 - pad + 0.5, size + pad * 2 - 1, size + pad * 2 - 1);
+        Icons.paint(c, lordId, cx - size / 2, cy - size / 2, px, hue, 0.95);
+      } else {
+        const r = Math.max(2, Math.min(row.h * 0.4, 14));
+        c.strokeStyle = withAlpha(hue, 0.9);
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(cx, cy - r); c.lineTo(cx + r, cy); c.lineTo(cx, cy + r); c.lineTo(cx - r, cy); c.closePath();
+        c.stroke();
+      }
       // A lit edge along the top and bottom, so a door reads as a door even
       // when the band is only a few pixels tall.
-      c.fillStyle = withAlpha(hue, 0.5);
-      c.fillRect(0, row.y, width, 1);
-      c.fillRect(0, row.y + row.h - 1, width, 1);
+      c.fillStyle = withAlpha(hue, 0.6);
+      c.fillRect(0, row.y, width, row.h >= 20 ? 2 : 1);
+      c.fillRect(0, row.y + row.h - (row.h >= 20 ? 2 : 1), width, row.h >= 20 ? 2 : 1);
     };
     doorBand(L.rows[s.depth + 1]);
     for (const row of L.ahead) doorBand(row);
@@ -435,18 +683,32 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // Where each lord's ground begins: a line in his colour across the top of
     // his first layer, so the stack of worked-out layers reads as the lords it
     // went through rather than as one long smear.
+    // Up in the stack of worked-out layers, every door the dig has broken is
+    // a line of rubble in the colour of the lord it held back, so looking up
+    // the hill shows the lords the barrow has been through.
     for (let k = 1; k <= s.depth; k++) {
       const row = L.rows[k];
       if (!row || !layerAt(k).door) continue;
       const lord = layerAt(k).lord;
-      c.fillStyle = withAlpha(lordColor(lord), row.h >= 6 ? 0.55 : 0.8);
-      c.fillRect(0, row.y, width, 1);
+      const hue = lordColor(layerAt(k).door ? layerAt(k).door.lord : lord);
+      const r = rng((seed ^ Math.imul(k, 0x7feb352d)) >>> 0);
+      for (let x = 0; x < width;) {
+        const w = 4 + r() * 14;
+        if (r() < 0.7) {
+          c.fillStyle = withAlpha(hue, row.h >= 6 ? 0.5 : 0.4);
+          c.fillRect(x, row.y, w, row.h >= 6 ? 2 : 1);
+        }
+        x += w + 1 + r() * 4;
+      }
     }
 
     // Glints of each band's good, so a rich layer sparkles and the one under
     // the cut only hints.
     for (const row of L.rows) {
       if (row.k > s.depth + 1) continue;
+      // Worked-out layers pressed into the stack are a few pixels tall, and
+      // glints there turned the stack into static.
+      if (row.h < 6) continue;
       const g = layerAt(row.k);
       const r = rng((seed ^ (row.k * 7919)) >>> 0);
       const open = row.k <= s.depth;
@@ -461,13 +723,23 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
 
     // The shaft, from the mound to the face, with its walls picked out.
     const faceRow = L.rows[s.depth + 1];
-    const sx = width * 0.5 - cfg.shaftWidth / 2;
+    const sw = shaftW(s);
+    const sx = width * 0.5 - sw / 2;
     const sh = Math.max(0, faceRow.y - L.surface + 4 + crest * 0.4);
     c.fillStyle = palette.tunnel;
-    c.fillRect(sx, L.surface - 4 - crest * 0.4, cfg.shaftWidth, sh);
-    c.fillStyle = withAlpha(palette.bone, 0.10);
+    c.fillRect(sx, L.surface - 4 - crest * 0.4, sw, sh);
+    c.fillStyle = withAlpha(palette.bone, 0.12);
     c.fillRect(sx - 1, L.surface - 4 - crest * 0.4, 1, sh);
-    c.fillRect(sx + cfg.shaftWidth, L.surface - 4 - crest * 0.4, 1, sh);
+    c.fillRect(sx + sw, L.surface - 4 - crest * 0.4, 1, sh);
+    // Timber props down a wide shaft, every few layers.
+    if (sw >= 7) {
+      c.fillStyle = withAlpha('#6b4f3a', 0.55);
+      for (let k = L.from; k <= s.depth; k++) {
+        const row = L.rows[k];
+        if (!row || row.h < 10) continue;
+        c.fillRect(sx - 1, row.y + 2, sw + 2, 1.5);
+      }
+    }
 
     // What the horde has taken out of each band: a hollow spreading from the
     // shaft, ragged at its edge, with pillars left standing in it. A band is
@@ -547,7 +819,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       lastDepth = s.depth;
     }
     while (particles.length < want) {
-      particles.push({ band: null, seg: 0, u: Math.random(), v: 0.04 + Math.random() * 0.06, dir: Math.random() < 0.5 ? -1 : 1, shaft: Math.random() < 0.12, life: Math.random() * 6 });
+      particles.push({ band: null, seg: 0, u: Math.random(), v: 0.04 + Math.random() * 0.06, dir: Math.random() < 0.5 ? -1 : 1, shaft: Math.random() < 0.12, life: Math.random() * 6, oy: Math.random() - 0.5 });
     }
     for (const p of particles) {
       if (p.band === null || p.life <= 0) {
@@ -579,7 +851,21 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
 
     const over = s.horde > particles.length;
     const size = cfg.particleSize * (over ? 1.25 : 1);
-    ctx.fillStyle = withAlpha(palette.bone, over ? 0.95 : 0.85);
+    const sw = shaftW(s);
+    const boneInk = withAlpha(palette.bone, over ? 0.95 : 0.85);
+    ctx.fillStyle = boneInk;
+    // Where a band is tall enough, a digger is a figure - a head, a body and
+    // a pick that swings - instead of a dot. Deep in a run, when the bands are
+    // thin, they go back to dots and the mass is the picture.
+    // Past a few hundred on screen, figures only pile into a white mass, and
+    // dots say the same thing more clearly.
+    const figures = particles.length <= 500;
+    const figure = (x, y, p) => {
+      const swing = Math.sin(clock * 9 + p.life * 3) > 0 ? 1 : 0;
+      ctx.fillRect(x - 1, y - 5, 2, 2);
+      ctx.fillRect(x - 0.5, y - 3, 1, 3.5);
+      ctx.fillRect(x + (p.dir > 0 ? 1 : -2), y - 4 + swing, 1.5, 1);
+    };
     for (const p of particles) {
       p.life -= dt;
       // A dot sent to a band the layout no longer has (the run was put back
@@ -592,7 +878,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
         if (p.u > 1) { p.u = 1; p.dir = -1; } else if (p.u < 0) { p.u = 0; p.dir = 1; }
         const row = p.band >= 0 ? L.rows[p.band] : faceRow;
         const yEnd = row.y + row.h * 0.5;
-        x = width * 0.5 + (Math.sin(p.u * 9) * 1.2);
+        x = width * 0.5 + (Math.sin(p.u * 9 + p.life) * Math.max(1.2, sw * 0.32));
         y = L.surface - 2 + (yEnd - L.surface + 2) * p.u;
       } else if (p.band >= 0) {
         const row = L.rows[p.band];
@@ -601,7 +887,9 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
         p.u += p.v * dt * p.dir * 4;
         if (p.u > 1) { p.u = 1; p.dir = -1; } else if (p.u < 0) { p.u = 0; p.dir = 1; }
         x = (sg.x0 + (sg.x1 - sg.x0) * p.u) * width;
-        y = row.y + (sg.y0 + (sg.y1 - sg.y0) * p.u) * row.h;
+        // Spread through the height of the band, so a crew packed into a few
+        // tunnels reads as a crowd rather than one white line.
+        y = row.y + Math.max(0.12, Math.min(0.9, (sg.y0 + (sg.y1 - sg.y0) * p.u) + (p.oy || 0) * 0.5)) * row.h;
       } else {
         // At the face: crowded into the bite.
         p.u += p.v * dt * p.dir * 3;
@@ -609,7 +897,9 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
         x = width * 0.5 + (p.u - 0.5) * (12 + bite * 20);
         y = faceRow.y + 1 + Math.abs(Math.sin(p.u * 6.28 + p.life)) * (biteDepth - 2);
       }
-      ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      const hereH = p.shaft ? 0 : (p.band >= 0 ? L.rows[p.band].h : faceRow.h);
+      if (hereH >= 16 && figures) figure(x, y + 2, p);
+      else ctx.fillRect(x - size / 2, y - size / 2, size, size);
     }
   };
 
@@ -625,8 +915,23 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const pct = target.cap > 0 ? Math.max(0, Math.min(1, s.capProgress / target.cap)) : 0;
       const n = Math.ceil(pct * 14);
       const hue = lordColor(target.door.lord);
+      const lit = mix(hue, palette.bone, 0.55);
       const cx = width * 0.5, cy = face.y + face.h / 2;
-      ctx.lineWidth = 1;
+      // Blocks knocked out of the wall as the dig gets through it, near the
+      // shaft first, dark holes with his colour at their rim.
+      const holes = Math.floor(pct * 12);
+      for (let i = 0; i < holes; i++) {
+        const r = rng((seed ^ Math.imul(s.depth + 1, 0x3c6ef372) ^ Math.imul(i + 1, 0x1b873593)) >>> 0);
+        const hx = cx + (r() - 0.5) * width * (0.12 + 0.5 * pct);
+        const hw = 6 + r() * 12, hh = Math.max(2, face.h * (0.2 + r() * 0.3));
+        const hy = face.y + 2 + r() * Math.max(1, face.h - hh - 4);
+        ctx.fillStyle = withAlpha(palette.tunnel, 0.9);
+        ctx.fillRect(hx, hy, hw, hh);
+        ctx.fillStyle = withAlpha(hue, 0.45);
+        ctx.fillRect(hx, hy + hh - 1, hw, 1);
+      }
+      // The cracks: a dark cut with his light showing through it, stronger
+      // the further through the wall the dig is.
       for (let i = 0; i < n; i++) {
         const r = rng((seed ^ Math.imul(s.depth + 1, 0x27d4eb2d) ^ Math.imul(i + 1, 0x165667b1)) >>> 0);
         const dir = i % 2 === 0 ? 1 : -1;
@@ -640,7 +945,11 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
           y = Math.max(face.y + 1, Math.min(face.y + face.h - 1, y + (r() - 0.5) * face.h * 0.6));
           ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = withAlpha(hue, 0.35 + 0.4 * pct);
+        ctx.strokeStyle = withAlpha(palette.void, 0.85);
+        ctx.lineWidth = face.h >= 20 ? 3 : 2;
+        ctx.stroke();
+        ctx.strokeStyle = withAlpha(lit, 0.3 + 0.6 * pct);
+        ctx.lineWidth = 1;
         ctx.stroke();
       }
     }
@@ -652,6 +961,18 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       if (k >= 0 && k <= s.depth + 1) {
         flash.k = k; flash.t = FLASH_SECONDS;
         flash.hue = lordColor(layerAt(k).door ? layerAt(k).door.lord : null);
+        // The wall comes down: chunks of it fall away down the hole.
+        const row = L.rows[k];
+        if (row) {
+          for (let i = 0; i < 70; i++) {
+            spawn({
+              x: Math.random() * width, y: row.y + Math.random() * Math.max(2, row.h * 0.5),
+              vx: (Math.random() - 0.5) * 30, vy: 10 + Math.random() * 40, g: 160,
+              life: 0.8 + Math.random() * 0.9, fade: 0.6, s: 2 + Math.random() * 2.5,
+              color: Math.random() < 0.5 ? flash.hue : mix(palette.deep, palette.bone, 0.25),
+            });
+          }
+        }
       }
     }
     doorsSeen = broken;
@@ -663,6 +984,63 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       ctx.fillStyle = withAlpha(flash.hue, 0.9 * a);
       ctx.fillRect(0, row.y, width, 2);
       flash.t -= dt;
+    }
+  };
+
+  /**
+   * Loose bits, each frame. Chips fly off the face in proportion to how many
+   * are digging down (by the order of the number, so a trillion is a steady
+   * spray and ten is a pick now and then). Coin lifts off the layers being
+   * worked while the barrow is earning. Door rubble is spawned where the door
+   * gives way.
+   */
+  const drawBits = (L, s, dt, split) => {
+    clock += dt;
+    const faceRow = L.rows[s.depth + 1];
+    const target = layerAt(s.depth + 1);
+    const onFace = (s.horde || 0) * (split.face || 0);
+    if (faceRow && onFace >= 1 && !target.beyond) {
+      chipDue += dt * Math.min(28, 2 + 2.2 * Math.log10(1 + onFace));
+      const cap = target.cap;
+      const bite = Math.min(1, cap > 0 ? s.capProgress / cap : 0);
+      const chip = mix(target.hue || palette.bone, palette.bone, 0.35);
+      while (chipDue >= 1) {
+        chipDue -= 1;
+        spawn({
+          x: width * 0.5 + (Math.random() - 0.5) * (12 + bite * 20), y: faceRow.y + 2 + Math.random() * Math.max(2, faceRow.h * 0.3),
+          vx: (Math.random() - 0.5) * 50, vy: -(15 + Math.random() * 45), g: 150,
+          life: 0.45 + Math.random() * 0.5, fade: 0.35, s: 1.5, color: chip,
+        });
+      }
+    }
+    const rate = s.rate || 0;
+    if (rate > 0) {
+      coinDue += dt * Math.min(10, 0.6 + 0.2 * Math.log10(1 + rate));
+      const from = Math.max(L.from, 0);
+      while (coinDue >= 1) {
+        coinDue -= 1;
+        // A layer, picked by how much of the crew is on it.
+        let pick = -1, acc = 0;
+        const r0 = Math.random();
+        for (let k = from; k <= s.depth; k++) { acc += split.strata[k] || 0; if (r0 < acc) { pick = k; break; } }
+        const row = pick >= 0 ? L.rows[pick] : null;
+        if (!row || row.h < 6) continue;
+        spawn({
+          x: width * (0.2 + Math.random() * 0.6), y: row.y + row.h * (0.3 + Math.random() * 0.5),
+          vx: (Math.random() - 0.5) * 6, vy: -(8 + Math.random() * 10), g: 0,
+          life: 1 + Math.random() * 0.8, fade: 0.8, s: 1.6, color: palette.coin,
+        });
+      }
+    }
+    for (let i = bits.length - 1; i >= 0; i--) {
+      const b = bits[i];
+      b.life -= dt;
+      if (!(b.life > 0) || b.y > height + 4) { bits.splice(i, 1); continue; }
+      b.vy += (b.g || 0) * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      ctx.fillStyle = withAlpha(b.color, Math.min(1, b.life / (b.fade || 0.5)));
+      ctx.fillRect(b.x, b.y, b.s, b.s);
     }
   };
 
@@ -764,11 +1142,24 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
    * layer (state.worked); `md` is the
    * run's multipliers, read only for what the player can see ahead.
    */
-  const draw = (s, worked, dt, active, split, md) => {
+  const draw = (s, worked, dt, active, split, md, legacy) => {
     if (!split) split = { strata: [], face: 0 };
     seed = s.seed;
     hillTint = (md && md.hillTint) || null;
-    const L = layout(width, height, s.depth, cfg, focusOf(s, cfg));
+    // The lords whose trophies are held, in their colours, for the mound.
+    if (legacy && legacy.trophies) {
+      const key = Object.keys(legacy.trophies).filter(id => legacy.trophies[id]).sort().join(',');
+      if (key !== trophyKey) {
+        trophyKey = key;
+        trophies = key ? key.split(',').map(id => (lordsCfg && lordsCfg.list && lordsCfg.list[id] && lordsCfg.list[id].color) || palette.deepink) : [];
+      }
+    }
+    const focus = focusOf(s, cfg);
+    // A door on screen below the dig - the one being broken or one read ahead -
+    // gets a taller band.
+    focus.tall = [];
+    for (let k = s.depth + 1; k <= s.depth + 1 + focus.ahead; k++) if (layerAt(k).door) focus.tall.push(k);
+    const L = layout(width, height, s.depth, cfg, focus);
     drawGround(L, s, worked);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -780,6 +1171,7 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     populate(L, s, active, split);
     drawDots(L, s, Math.min(0.1, dt || 0.016));
     drawDoorWork(L, s, Math.min(0.1, dt || 0.016));
+    drawBits(L, s, Math.min(0.1, dt || 0.016), split);
     drawEmbers(L, s, Math.min(0.1, dt || 0.016));
     drawHall(L, s);
 
@@ -788,7 +1180,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     // thing and a layer nobody is working looks empty from here too. Deep in
     // a run the bands are a few pixels tall and a label on every one is
     // noise, so the writing stops and the bars carry on.
-    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    ctx.font = '11px ' + MONO;
     ctx.textBaseline = 'middle';
     const barMax = Math.min(70, width * 0.09);
     for (const row of L.rows) {
@@ -796,14 +1189,14 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const layer = layerAt(row.k);
       const mid = row.y + row.h / 2;
       if (row.h >= cfg.labelBandHeight) {
-        ctx.fillStyle = withAlpha(palette.ink, 0.62);
+        ctx.fillStyle = withAlpha(palette.ink, 0.82);
         ctx.fillText(Lore.label(layer.name), 8, mid);
         // The seam, quieter, so a layer's character reads off the hill as
         // well as off the panel.
         const words = layer.seam ? Lore.seam(layer.seam.id) : null;
         if (words && row.h >= cfg.seamBandHeight) {
           const w = ctx.measureText(Lore.label(layer.name)).width;
-          ctx.fillStyle = withAlpha(layer.hue, 0.72);
+          ctx.fillStyle = withAlpha(mix(layer.hue, palette.bone, 0.3), 0.9);
           ctx.fillText(words.tag, 14 + w, mid);
         }
       }
@@ -853,8 +1246,27 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
       const door = layerAt(row.k).door;
       const words = door && door.lord ? Lore.lord(door.lord.id) : null;
       if (!words) continue;
-      ctx.fillStyle = withAlpha(lordColor(door.lord), 0.95);
-      ctx.fillText(words.name + (Lore.doors().doorTag || ''), 8, mid);
+      const text = words.name + (Lore.doors().doorTag || '');
+      // Cut into the wall: capitals, spaced where there is room, on a dark
+      // plate that stops short of his mark in the middle.
+      ctx.font = '600 11px ' + MONO;
+      const room = width * 0.5 - 34;
+      let cap = text.toUpperCase().split('').join(' ');
+      if (ctx.measureText(cap).width + 12 > room) cap = text.toUpperCase();
+      const fits = ctx.measureText(cap).width + 12 <= room;
+      ctx.font = '11px ' + MONO;
+      if (row.h >= 22 && fits) {
+        ctx.font = '600 11px ' + MONO;
+        const w = ctx.measureText(cap).width;
+        ctx.fillStyle = withAlpha(palette.void, 0.72);
+        ctx.fillRect(4, mid - 9, w + 12, 18);
+        ctx.fillStyle = withAlpha(lordColor(door.lord), 1);
+        ctx.fillText(cap, 10, mid + 0.5);
+        ctx.font = '11px ' + MONO;
+      } else {
+        ctx.fillStyle = withAlpha(lordColor(door.lord), 0.95);
+        ctx.fillText(text, 8, mid);
+      }
     }
     for (const row of known) {
       if (row.h < cfg.labelBandHeight) continue;
