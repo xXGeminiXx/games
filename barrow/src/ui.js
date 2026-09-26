@@ -11,16 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=53';
-import * as H from './horde.js?v=53';
-import * as R from './rites.js?v=53';
-import * as Rb from './rebirth.js?v=53';
-import * as Lore from './lore.js?v=53';
-import * as Advice from './advice.js?v=53';
-import * as Lords from './lords.js?v=53';
-import * as Ranks from './ranks.js?v=53';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=53';
-import { fill } from '../config.js?v=53';
+import * as Mat from './materials.js?v=54';
+import * as H from './horde.js?v=54';
+import * as R from './rites.js?v=54';
+import * as Rb from './rebirth.js?v=54';
+import * as Lore from './lore.js?v=54';
+import * as Advice from './advice.js?v=54';
+import * as Lords from './lords.js?v=54';
+import * as Ranks from './ranks.js?v=54';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=54';
+import { fill } from '../config.js?v=54';
+import * as Icons from './icons.js?v=54';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -44,6 +45,12 @@ export function createUI(doc, sim, cfg, actions) {
     return n;
   };
   const clear = (n) => { while (n && n.firstChild) n.removeChild(n.firstChild); };
+  /** One of the small pictures, in the colour of whatever it sits in. */
+  const ico = (name, size, color) => {
+    const n = el('span', { class: 'icow', 'aria-hidden': 'true' });
+    n.innerHTML = Icons.svg(name, color || 'currentColor', size || 12);
+    return n;
+  };
   const show = (n, on) => { if (n) n.hidden = !on; };
 
   const nodes = {
@@ -74,6 +81,14 @@ export function createUI(doc, sim, cfg, actions) {
     compass: byId('compass'), compassSay: byId('compass-say'), compassGo: byId('compass-go'),
     saved: byId('saved'),
   };
+
+  // A small picture beside each number along the top, so each one reads as
+  // what it counts before its label is read.
+  for (const [id, name] of [['st-coin', 'coin'], ['st-income', 'coin'], ['st-bones', 'bone'], ['st-horde', 'skull'],
+    ['st-depth', 'depth'], ['st-rem', 'relic'], ['st-rank', 'rank']]) {
+    const box = byId(id);
+    if (box && box.insertBefore && !box.querySelector('.icow')) box.insertBefore(ico(name, 15), box.firstChild);
+  }
 
   // The log lives on the state so a reload shows what was last said.
   if (!Array.isArray(sim.state.log)) sim.state.log = [];
@@ -219,11 +234,15 @@ export function createUI(doc, sim, cfg, actions) {
     raiseButtons.length = 0;
     const counts = cfg.horde.bulk.concat(['max']);
     nodes.raise.appendChild(el('span', { class: 'lbl', text: T.raise }));
+    // One control in four parts, so it reads as a choice of how many rather
+    // than four things that happen to sit side by side.
+    const seg = el('span', { class: 'seg' });
     for (const c of counts) {
       const b = el('button', { class: 'raise', title: T.raiseTip, onclick: () => actions.raise(c) }, el('b', { text: c === 'max' ? T.raiseMax : 'x' + c }), el('i'));
       raiseButtons.push({ count: c, node: b, cost: b.lastChild });
-      nodes.raise.appendChild(b);
+      seg.appendChild(b);
     }
+    nodes.raise.appendChild(seg);
   };
 
   // Layers with nobody on them are the set, not the state: deep in a run
@@ -400,17 +419,29 @@ export function createUI(doc, sim, cfg, actions) {
       // A buyer's is for one material, named by the layer it comes from.
       const k = typeof sp.key === 'string' && sp.key.startsWith('worth:') ? Mat.strataOf(sp.key.slice(6)) : -1;
       const name = k >= 0 ? Lore.inline(sim.ground.at(k).name) : '';
-      if (words && words.lasting) lasting.push(fill(words.lasting, { x: sp.factor.toFixed(1).replace(/\.0$/, ''), t: fmtTime(Math.ceil(sp.until - s.t)), name }));
+      if (words && words.lasting) {
+        const left = Math.max(0, sp.until - s.t);
+        lasting.push({ text: fill(words.lasting, { x: sp.factor.toFixed(1).replace(/\.0$/, ''), t: fmtTime(Math.ceil(left)), name }), frac: sp.lasts > 0 ? Math.min(1, left / sp.lasts) : -1 });
+      }
     }
     // When he asks more than is on hand, say how far off it is, so a greyed
     // button is never a puzzle.
-    if (v && v.cost > 0 && s.coin < v.cost) lasting.unshift(fill(T.gateShort, { have: fmtCoin(s.coin), cost: fmtCoin(v.cost) }));
+    if (v && v.cost > 0 && s.coin < v.cost) lasting.unshift({ text: fill(T.gateShort, { have: fmtCoin(s.coin), cost: fmtCoin(v.cost) }), frac: -1 });
     // One line each: two sharing a line read as one having replaced the other.
-    const said = lasting.join('\n');
+    // Each boost has a thin bar under it for the time it has left.
+    const said = lasting.map(x => x.text).join('\n');
     if (nodes.visitorAfter && said !== lastingSaid) {
       lastingSaid = said;
       clear(nodes.visitorAfter);
-      for (const line of lasting) nodes.visitorAfter.appendChild(el('span', { text: line }));
+      for (const line of lasting) {
+        const row = el('span', { class: 'boost' }, line.text);
+        if (line.frac >= 0) {
+          const bar = el('i', { class: 'tbar' }, el('b'));
+          if (bar.firstChild.style) bar.firstChild.style.width = Math.round(line.frac * 100) + '%';
+          row.appendChild(bar);
+        }
+        nodes.visitorAfter.appendChild(row);
+      }
     }
     show(nodes.visitorAfter, lasting.length > 0);
     // With nobody at the gate the box is only the boosts, and says so.
@@ -730,46 +761,49 @@ export function createUI(doc, sim, cfg, actions) {
     if (key === standingKey) return;
     standingKey = key;
     clear(nodes.standing);
-    nodes.standing.appendChild(el('div', { class: 'rankline' }, el('b', { text: fill(W.rank, { n: st.n, name: st.name }) })));
+    nodes.standing.appendChild(el('div', { class: 'rankline' }, ico('rank', 14), el('b', { text: fill(W.rank, { n: st.n, name: st.name }) })));
     const bar = el('div', { class: 'rankbar' }, el('span'));
     bar.firstChild.style.width = Math.round(st.progress * 100) + '%';
-    nodes.standing.appendChild(bar);
+    nodes.standing.appendChild(el('div', { class: 'rankrow' }, bar, el('em', { text: fmt(st.into) + ' / ' + fmt(st.span) })));
     nodes.standing.appendChild(el('small', { text: fill(W.next, { into: fmt(st.into), span: fmt(st.span), next: st.nextName }) }));
     if (st.nextKey) nodes.standing.appendChild(el('small', { text: fill(W.nextKey, { n: st.nextKey.rank, line: Lore.rankKey(st.nextKey.id) }) }));
     nodes.standing.appendChild(el('small', { text: W.how }));
+    // The lords: one card each, with his mark, and everything he has handed
+    // over together - his trophy, his power, and the artifacts of his held -
+    // so the tab reads as a collection rather than a wall of lines. A lord
+    // never met is a dark card.
     nodes.standing.appendChild(el('h3', { text: W.trophies }));
-    const grid = el('div', { class: 'grid' });
+    const A = cfg.artifacts;
+    const deep = A && ((legacy.best && legacy.best.depth) || 0) >= A.from;
+    if (deep) nodes.standing.appendChild(el('small', { class: 'how', text: fill(W.artifactsHow, { n: A.most }) }));
+    const grid = el('div', { class: 'lords' });
     const ids = [cfg.lords.first].concat(cfg.lords.rotating, [cfg.lords.last]);
     for (const id of ids) {
       const words = Lore.lord(id);
+      const def = cfg.lords.list[id] || {};
       const have = !!(legacy.trophies && legacy.trophies[id]);
       const met = have || ((legacy.lordsMet || {})[id] > 0);
-      // One cell a lord: his trophy, and what he hands over beside it, so the
-      // two stay together however many columns the tab has room for.
-      const cell = have
-        ? el('div', { class: 'lordcell' }, el('div', { title: words.trophy.line }, el('b', { text: words.trophy.name }), ' - ' + words.trophy.line))
-        : el('div', { class: 'off' }, el('b', { text: met ? words.trophy.name : W.unknown }), ' - ' + W.unmet);
-      if (have && words.power) cell.appendChild(el('div', { title: words.power.line }, el('b', { text: words.power.name }), ' - ' + words.power.line));
-      grid.appendChild(cell);
+      const n = (legacy.artifacts && legacy.artifacts[id]) || 0;
+      const card = el('div', { class: 'lord' + (have ? '' : ' off') });
+      if (have && card.style && card.style.setProperty) card.style.setProperty('--lord', def.color || '');
+      const head = el('div', { class: 'lhead' }, ico(met ? id : 'skull', 18, have ? (def.color || '') : ''), el('b', { text: met ? words.name : W.unknown }));
+      if (n > 0) head.appendChild(el('em', { text: 'x' + n, title: words.artifact ? words.artifact.name : '' }));
+      card.appendChild(head);
+      if (have) {
+        card.appendChild(el('div', { title: words.trophy.line }, el('b', { text: words.trophy.name }), ' - ' + words.trophy.line));
+        if (words.power) card.appendChild(el('div', { title: words.power.line }, el('b', { text: words.power.name }), ' - ' + words.power.line));
+      } else {
+        card.appendChild(el('div', { text: W.unmet }));
+      }
+      if (deep && A.list[id] && words.artifact) {
+        card.appendChild(n > 0
+          ? el('div', { class: 'art', title: words.artifact.line }, el('b', { text: fill(A.most > 0 && n >= A.most ? W.artifactFull : W.artifactHeld, { name: words.artifact.name, n }) }),
+            ' - ' + words.artifact.line + (n > 1 ? ' ' + fill(W.artifactTotal, { x: fmt(Math.pow(Object.values(A.list[id])[0], n)) }) : ''))
+          : el('div', { class: 'art none' }, el('b', { text: words.artifact.name }), ' - ' + W.artifactNone));
+      }
+      grid.appendChild(card);
     }
     nodes.standing.appendChild(grid);
-    // The deep lords' artifacts, once the dig has been deep enough to find one.
-    const A = cfg.artifacts;
-    if (A && ((legacy.best && legacy.best.depth) || 0) >= A.from) {
-      nodes.standing.appendChild(el('h3', { text: W.artifacts }));
-      nodes.standing.appendChild(el('small', { text: fill(W.artifactsHow, { n: A.most }) }));
-      const agrid = el('div', { class: 'grid' });
-      for (const id of ids) {
-        const words = Lore.lord(id);
-        if (!A.list[id] || !words || !words.artifact) continue;
-        const n = (legacy.artifacts && legacy.artifacts[id]) || 0;
-        agrid.appendChild(n > 0
-          ? el('div', { title: words.artifact.line }, el('b', { text: fill(A.most > 0 && n >= A.most ? W.artifactFull : W.artifactHeld, { name: words.artifact.name, n }) }),
-            ' - ' + words.artifact.line + (n > 1 ? ' ' + fill(W.artifactTotal, { x: fmt(Math.pow(Object.values(A.list[id])[0], n)) }) : ''))
-          : el('div', { class: 'off' }, el('b', { text: words.artifact.name }), ' - ' + W.artifactNone));
-      }
-      nodes.standing.appendChild(agrid);
-    }
     nodes.standing.appendChild(el('h3', { text: W.keys }));
     const keys = el('div', { class: 'grid' });
     for (const k of cfg.ranks.keys) {

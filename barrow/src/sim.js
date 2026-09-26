@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=53';
-import * as Mat from './materials.js?v=53';
-import * as H from './horde.js?v=53';
-import * as Crew from './crew.js?v=53';
-import * as R from './rites.js?v=53';
-import * as Rv from './reveal.js?v=53';
-import * as Ch from './chambers.js?v=53';
-import * as Vi from './visitors.js?v=53';
-import * as Rb from './rebirth.js?v=53';
-import * as Lore from './lore.js?v=53';
-import * as Lords from './lords.js?v=53';
-import * as Ranks from './ranks.js?v=53';
-import { createGround } from './ground.js?v=53';
-import { hash } from './rng.js?v=53';
-import { fill } from '../config.js?v=53';
-import { fmt, fmtCoin } from './numbers.js?v=53';
+import { CONFIG as DEFAULT } from '../config.js?v=54';
+import * as Mat from './materials.js?v=54';
+import * as H from './horde.js?v=54';
+import * as Crew from './crew.js?v=54';
+import * as R from './rites.js?v=54';
+import * as Rv from './reveal.js?v=54';
+import * as Ch from './chambers.js?v=54';
+import * as Vi from './visitors.js?v=54';
+import * as Rb from './rebirth.js?v=54';
+import * as Lore from './lore.js?v=54';
+import * as Lords from './lords.js?v=54';
+import * as Ranks from './ranks.js?v=54';
+import { createGround } from './ground.js?v=54';
+import { hash } from './rng.js?v=54';
+import { fill } from '../config.js?v=54';
+import { fmt, fmtCoin } from './numbers.js?v=54';
 
 export const SAVE_VERSION = 2;
 
@@ -772,8 +772,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     spell: (from, key, factor, seconds) => {
       if (!Array.isArray(state.spells)) state.spells = [];
       const live = state.spells.find(x => x && x.from === from && x.key === key && state.t < x.until);
-      if (live) live.until = Math.max(live.until, state.t + seconds);
-      else state.spells.push({ from, key, factor, until: state.t + seconds });
+      if (live) { live.until = Math.max(live.until, state.t + seconds); live.lasts = Math.max(live.lasts || 0, seconds); }
+      else state.spells.push({ from, key, factor, until: state.t + seconds, lasts: seconds });
     },
     // The next lord's door below the dig, when it is close enough for his
     // herald to come up the track and nobody has paid him yet.
