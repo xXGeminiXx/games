@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=50';
-import * as Mat from './materials.js?v=50';
-import * as H from './horde.js?v=50';
-import * as Crew from './crew.js?v=50';
-import * as R from './rites.js?v=50';
-import * as Rv from './reveal.js?v=50';
-import * as Ch from './chambers.js?v=50';
-import * as Vi from './visitors.js?v=50';
-import * as Rb from './rebirth.js?v=50';
-import * as Lore from './lore.js?v=50';
-import * as Lords from './lords.js?v=50';
-import * as Ranks from './ranks.js?v=50';
-import { createGround } from './ground.js?v=50';
-import { hash } from './rng.js?v=50';
-import { fill } from '../config.js?v=50';
-import { fmt, fmtCoin } from './numbers.js?v=50';
+import { CONFIG as DEFAULT } from '../config.js?v=51';
+import * as Mat from './materials.js?v=51';
+import * as H from './horde.js?v=51';
+import * as Crew from './crew.js?v=51';
+import * as R from './rites.js?v=51';
+import * as Rv from './reveal.js?v=51';
+import * as Ch from './chambers.js?v=51';
+import * as Vi from './visitors.js?v=51';
+import * as Rb from './rebirth.js?v=51';
+import * as Lore from './lore.js?v=51';
+import * as Lords from './lords.js?v=51';
+import * as Ranks from './ranks.js?v=51';
+import { createGround } from './ground.js?v=51';
+import { hash } from './rng.js?v=51';
+import { fill } from '../config.js?v=51';
+import { fmt, fmtCoin } from './numbers.js?v=51';
 
 export const SAVE_VERSION = 2;
 
@@ -145,7 +145,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   };
 
   const earn = (coin) => {
-    if (!Number.isFinite(coin) || coin <= 0) return;
+    // A sale too big for a number counts as the biggest one; NaN counts as none.
+    if (!(coin > 0)) return;
+    if (coin > Number.MAX_VALUE) coin = Number.MAX_VALUE;
     state.coin += coin;
     state.totals.earned += coin;
     state.income.push([state.t, coin]);

@@ -12,9 +12,9 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=50';
-import * as Lords from './lords.js?v=50';
-import { pickWeighted, unit } from './rng.js?v=50';
+import * as Mat from './materials.js?v=51';
+import * as Lords from './lords.js?v=51';
+import { pickWeighted, unit } from './rng.js?v=51';
 
 const ONE = { value: 1, hardness: 1, bones: 1, cap: 1 };
 
@@ -56,8 +56,16 @@ export function createGround(cfg, seed, hillRule, lords) {
     const f = (key) => (s[key] === undefined ? 1 : s[key]) * (rule[key] === undefined ? 1 : rule[key])
       * (hill[key] === undefined ? 1 : hill[key]);
     const door = cfg.lords ? Lords.doorAt(cfg, lordSeed, k) : null;
+    const value = Mat.valueAt(k, cfg.strata) * f('value');
+    const hardness = Mat.hardnessAt(k, cfg.strata) * f('hardness');
+    const cap = Mat.capUnits(Math.max(0, k - 1), cfg.strata) * f('cap') * (door ? door.thickness : 1);
+    const MAX = Number.MAX_VALUE;
     return {
       k,
+      // Past the bottom of the world: a layer whose numbers do not fit in a
+      // number. Nothing digs into it; its numbers are held at the top so
+      // nothing that reads them turns into Infinity or NaN.
+      beyond: !(value < MAX && hardness < MAX && cap < MAX),
       id: good.id,
       name: good.name,
       hue: good.hue,
@@ -66,8 +74,8 @@ export function createGround(cfg, seed, hillRule, lords) {
       door,
       band: bandOf(k),
       // The four numbers that decide how a layer is worked.
-      value:    Mat.valueAt(k, cfg.strata) * f('value'),
-      hardness: Mat.hardnessAt(k, cfg.strata) * f('hardness'),
+      value:    Math.min(value, MAX),
+      hardness: Math.min(hardness, MAX),
       // Straight line, not a curve: an older grave holds more of the dead than
       // a young one, but nothing here may compound, because whatever compounds
       // in the bones compounds again through the horde and runs the game away.
@@ -75,7 +83,7 @@ export function createGround(cfg, seed, hillRule, lords) {
       // The floor between the layer above and this one, in units dug at this
       // layer's hardness. A sealed layer is the one that is hard to break into.
       // A lord's door is that many floors deep on top of whatever the ground is.
-      cap:      Mat.capUnits(Math.max(0, k - 1), cfg.strata) * f('cap') * (door ? door.thickness : 1),
+      cap:      Math.min(cap, MAX),
     };
   };
 
@@ -86,9 +94,20 @@ export function createGround(cfg, seed, hillRule, lords) {
     return g;
   };
 
+  /** The last layer that can be dug: the one above the first layer beyond. */
+  let bottomK = null;
+  const bottom = () => {
+    if (bottomK !== null) return bottomK;
+    let k = 1;
+    while (k < 1e5 && !at(k).beyond) k++;
+    bottomK = k - 1;
+    return bottomK;
+  };
+
   return {
     seed,
     at,
+    bottom,
     bandOf,
     /** The good's name, for a line of text. */
     nameOf: (k) => at(k).name,

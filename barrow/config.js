@@ -97,6 +97,7 @@ export const CONFIG = {
     autoBuyTip: 'Buys the cheapest upgrade you can afford, as soon as you can afford it',
     autoRaiseOn:  'Auto-raise: on',
     autoRaiseOff: 'Auto-raise: off',
+    raiseAuto:    'Auto',   // what Max says while the dead raise themselves
     autoRaiseTip: 'Every spare bone raises diggers, every second. Switch it off to keep bones for selling.',
     autoSeal:   'Fill in by itself at layer {n}',
     autoSealOff: 'Fill in by itself: off',
@@ -135,8 +136,8 @@ export const CONFIG = {
       dig:      'Dig speed',
       bones:    'Bones found',
       value:    'Worth',
-      face:     'Digs down',
-      soft:     'Bones raise more',
+      face:     'Digging down speed',
+      soft:     'Diggers per bone',
       windfall: '{Coin} coin now',
       diggers:  '{N} diggers now',
       rem:      '{N} relics when you fill it in',
@@ -149,7 +150,7 @@ export const CONFIG = {
     goal: {
       ahead: '{Name}\'s door is under layer {n}. {m} layers to go.',
       one:   '{Name}\'s door is under the next layer.',
-      at:    'Breaking {Name}\'s door: {pct} through.',
+      at:    'Breaking {Name}\'s door.',
       rule:  'In {Name}\'s layers: {line}',
       tip:   'Every tenth layer\'s floor is a lord\'s door. Break it and he pays his hoard, talks, and gives you a gift.',
     },
@@ -264,12 +265,14 @@ export const CONFIG = {
     valueGrowth: 3.5,
     capBase: 12,
     capGrowth: 1.6,      // ordinary floors thicken this much a layer; the doors carry the weight (lords.doorThickness)
-    // The ladder stops climbing here. Every layer past it is worth, costs and
-    // holds what the horizon layer does, so the numbers stay inside a double
-    // forever. It sits hundreds of layers below anything reachable: each layer
-    // takes about twice as long as the one above it, so this is insurance
-    // against a config turned by hand, not a wall a player can walk into.
-    horizon: 400,
+    // The ladder never stops climbing (0 is no horizon). A flat stretch of
+    // ground at 400, where every layer cost what the one above it did, was a
+    // runway: a crew that keeps growing tore through thousands of layers there
+    // and the numbers ran off the top. Instead the ground climbs all the way
+    // down, and the first layer whose numbers would not fit in the 1.8e308 a
+    // number can hold is the bottom of the world (ground.bottom), about layer
+    // 560. That is the ceiling the next layer of the game is built around.
+    horizon: 0,
     ownShare: 0.75,      // share of a stratum's dig that is its own good
     carryShare: 0.20,    // share that is the stratum above's good
     traceShare: 0.05,    // share that is the stratum below's good, as a preview
@@ -923,7 +926,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 50,
+    build: 51,
   },
 };
 

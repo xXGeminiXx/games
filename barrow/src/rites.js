@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=50';
-import * as Rb from './rebirth.js?v=50';
-import * as Lore from './lore.js?v=50';
-import * as Lords from './lords.js?v=50';
-import * as Ranks from './ranks.js?v=50';
+import * as Ch from './chambers.js?v=51';
+import * as Rb from './rebirth.js?v=51';
+import * as Lore from './lore.js?v=51';
+import * as Lords from './lords.js?v=51';
+import * as Ranks from './ranks.js?v=51';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -113,7 +113,7 @@ export function modsOf(s, cfg, legacy) {
   const twice = id => (P && trophy(id) ? P.factor : 1);
   // The deep lords' artifacts, working only past the depth they belong to.
   const art = Rb.artifactMods(legacy, cfg, s.depth);
-  return {
+  const out = {
     // Production.
     digMult:  Math.pow(r.handsFactor, lv('hands')) * b.dig * oath('dig', 1) * twice('neb') * art.dig,
     boneMult: Math.pow(r.pitsFactor, lv('pits')) * b.bones * twice('pater') * art.bones,
@@ -156,6 +156,10 @@ export function modsOf(s, cfg, legacy) {
     // What the drawing needs to know about the hill.
     hillTint: hillDef && hillDef.tint ? hillDef.tint : null,
   };
+  // No multiplier runs past what a number can hold: Infinity times nothing is
+  // NaN, and one NaN spreads to every number in the run.
+  for (const key of Object.keys(out)) if (typeof out[key] === 'number' && !(out[key] < Number.MAX_VALUE)) out[key] = Number.MAX_VALUE;
+  return out;
 }
 
 /**

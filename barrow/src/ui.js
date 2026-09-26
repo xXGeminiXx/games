@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=50';
-import * as H from './horde.js?v=50';
-import * as R from './rites.js?v=50';
-import * as Rb from './rebirth.js?v=50';
-import * as Lore from './lore.js?v=50';
-import * as Advice from './advice.js?v=50';
-import * as Lords from './lords.js?v=50';
-import * as Ranks from './ranks.js?v=50';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=50';
-import { fill } from '../config.js?v=50';
+import * as Mat from './materials.js?v=51';
+import * as H from './horde.js?v=51';
+import * as R from './rites.js?v=51';
+import * as Rb from './rebirth.js?v=51';
+import * as Lore from './lore.js?v=51';
+import * as Advice from './advice.js?v=51';
+import * as Lords from './lords.js?v=51';
+import * as Ranks from './ranks.js?v=51';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=51';
+import { fill } from '../config.js?v=51';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -67,7 +67,7 @@ export function createUI(doc, sim, cfg, actions) {
       coinBox: byId('st-coin'), incomeBox: byId('st-income'), bonesBox: byId('st-bones'),
       hordeBox: byId('st-horde'), depthBox: byId('st-depth'), remBox: byId('st-rem'), rankBox: byId('st-rank'),
     },
-    goal: byId('goal'), goalSay: byId('goal-say'), goalBar: byId('goal-bar'), goalRule: byId('goal-rule'),
+    goal: byId('goal'), goalSay: byId('goal-say'), goalBar: byId('goal-bar'), goalPct: byId('goal-pct'), goalRule: byId('goal-rule'),
     ending: byId('ending-panel'),
     standing: byId('standing'),
     fieldhint: byId('fieldhint'),
@@ -640,7 +640,7 @@ export function createUI(doc, sim, cfg, actions) {
     if (left <= 0) {
       const cap = sim.ground.at(doorK).cap;
       pct = cap > 0 ? Math.max(0, Math.min(1, s.capProgress / cap)) : 0;
-      text = fill(G.at, { name, pct: fmtPct(pct) });
+      text = fill(G.at, { name });
     } else if (left === 1) {
       text = fill(G.one, { name });
     } else {
@@ -657,6 +657,14 @@ export function createUI(doc, sim, cfg, actions) {
       if (nodes.goalBar.style) nodes.goalBar.style.visibility = left <= 0 ? 'visible' : 'hidden';
       nodes.goalFill.style.width = Math.round(pct * 100) + '%';
       nodes.goalFill.style.background = hue;
+    }
+    // How far through the door, as a number big enough to read at a glance,
+    // beside the bar and in the lord's colour. It keeps its place when there
+    // is no door to break, so nothing under it moves.
+    if (nodes.goalPct) {
+      const said = left <= 0 ? fmtPct(pct) : '';
+      if (nodes.goalPct.textContent !== said) nodes.goalPct.textContent = said;
+      if (nodes.goalPct.style && nodes.goalPct.style.color !== hue) nodes.goalPct.style.color = hue;
     }
     if (nodes.goalRule) {
       const here = sim.ground.at(s.depth).lord;
@@ -880,13 +888,20 @@ export function createUI(doc, sim, cfg, actions) {
       if (!raiseButtons.length) buildRaise();
       paintAutoRaise();
       const soft = md.softMult;
+      // With the dead raising themselves every bone is spent the moment it
+      // turns up, so the buttons would flip lit and dark every step. They
+      // stay lit instead, still press, and Max says it is being done for you.
+      const selfRaising = !!md.autoRaise && sim.legacy.autoRaise !== false;
       for (const b of raiseButtons) {
         const n = b.count === 'max' ? H.maxRaisable(s.bones, s.horde, cfg.horde, soft) : b.count;
         const cost = H.raiseCostBulk(s.horde, n, cfg.horde, soft);
         // The counted buttons say what they cost; `max` says how many stand
         // up, which is a different kind of number and has to read like one.
-        b.cost.textContent = b.count === 'max' ? (n > 0 ? '+' + fmtCount(n) : '-') : fmt(Math.ceil(cost * 10) / 10);
-        b.node.disabled = !(n > 0) || cost > s.bones + 1e-9;
+        const said = b.count === 'max'
+          ? (selfRaising ? T.raiseAuto : (n > 0 ? '+' + fmtCount(n) : '-'))
+          : fmt(Math.ceil(cost * 10) / 10);
+        if (b.cost.textContent !== said) b.cost.textContent = said;
+        b.node.disabled = selfRaising ? false : (!(n > 0) || cost > s.bones + 1e-9);
       }
       const split = sim.split();
       buildWeights(split);

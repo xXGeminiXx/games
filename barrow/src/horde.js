@@ -156,10 +156,13 @@ export function dig(s, dt, cfg, mods, ground, given, stopAt) {
       ? ((mods && mods.doorEase) || 1) * ((s.doorEase && s.doorEase[t.k]) || 1)
       : 1);
     let progress = s.capProgress + rate * split.face * faceMult * ease(target) / target.hardness;
+    // Nothing digs past the bottom of the world.
+    if (target.beyond) progress = 0;
     while (progress >= target.cap) {
       // A barrow set to fill itself in at a layer never digs past it, however
       // many layers one step could open.
       if (stopAt !== undefined && s.depth >= stopAt) { progress = Math.min(progress, target.cap * 0.999); break; }
+      if (target.beyond) { progress = 0; break; }
       progress -= target.cap;
       s.depth += 1;
       opened.push(s.depth);
@@ -172,7 +175,9 @@ export function dig(s, dt, cfg, mods, ground, given, stopAt) {
       settle(s, cfg.horde);
       if (opened.length > 64) break; // a step cannot open the whole earth
     }
-    s.capProgress = progress;
+    // Progress that ran off the top of the numbers is not carried into the
+    // next step.
+    s.capProgress = Number.isFinite(progress) ? progress : 0;
   }
   return opened;
 }

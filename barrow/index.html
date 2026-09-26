@@ -97,8 +97,11 @@
   #goal{margin:0 0 10px;padding:0 0 8px 12px;border-left:2px solid var(--deepink);border-bottom:1px solid var(--rule)}
   #goal-say{color:var(--ink)}
   #goal-say b{color:var(--deepink);font-weight:600}
-  #goal-bar{height:3px;background:var(--rule);margin:5px 0 4px;max-width:340px}
-  #goal-bar span{display:block;height:3px;background:var(--deepink);width:0}
+  #goal-row{display:flex;align-items:center;gap:12px;margin:4px 0 2px;max-width:420px;min-height:28px}
+  #goal-bar{flex:1;height:6px;background:var(--rule);max-width:340px}
+  #goal-bar span{display:block;height:6px;background:var(--deepink);width:0}
+  /* How far through the door: the number that matters, read at a glance. */
+  #goal-pct{font-size:22px;font-weight:700;line-height:1;min-width:4.2ch;text-align:right;font-variant-numeric:tabular-nums;color:var(--deepink)}
   /* The bar keeps its place when there is nothing to fill, and the lord's
      rule keeps two lines, so the goal is one height all barrow long. */
   #goal-rule{color:var(--dim);font-size:11px;display:block;min-height:2.9em}
@@ -441,7 +444,7 @@
 </script>
 <!-- plays:end -->
 <!-- build-watch:start -->
-<meta name="build" content="8c35deb7cf57">
+<meta name="build" content="c00bed6e0fcc">
 <script>
 (function () {
   var meta = document.querySelector('meta[name="build"]');
@@ -503,7 +506,7 @@
   <section id="books">
     <p id="compass"><span id="compass-say"></span><button id="compass-go" hidden></button></p>
     <div id="ending-panel" class="panel" hidden></div>
-    <div id="goal" hidden><div id="goal-say"></div><div id="goal-bar"></div><small id="goal-rule"></small></div>
+    <div id="goal" hidden><div id="goal-say"></div><div id="goal-row"><div id="goal-bar"></div><b id="goal-pct"></b></div><small id="goal-rule"></small></div>
     <div id="log"></div>
     <div id="events" hidden>
       <p id="events-empty">Nobody at the gate, and no room open.</p>
@@ -557,8 +560,8 @@
 // src/, every number lives in config.js, and every sentence lives in
 // content.js.
 // ---------------------------------------------------------------------------
-import { CONFIG, applyIdentity } from './config.js?v=50';
-import { createGame } from './src/game.js?v=50';
+import { CONFIG, applyIdentity } from './config.js?v=51';
+import { createGame } from './src/game.js?v=51';
 
 applyIdentity(document);
 

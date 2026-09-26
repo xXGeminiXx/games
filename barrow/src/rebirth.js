@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=50';
-import { pick, hash } from './rng.js?v=50';
-import { fill } from '../config.js?v=50';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=50';
+import * as Lore from './lore.js?v=51';
+import { pick, hash } from './rng.js?v=51';
+import { fill } from '../config.js?v=51';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=51';
 
 export const LEGACY_VERSION = 1;
 
@@ -239,8 +239,8 @@ export function oathMods(legacy, cfg) {
 export function seal(state, cfg, legacy) {
   const scales = legacy.trophies && legacy.trophies.neb && cfg.lords ? (cfg.lords.trophy.sealRelics || 1) : 1;
   const rem = yieldOf(state, cfg, scales);
-  legacy.remembrance += rem;
-  legacy.earned += rem;
+  legacy.remembrance = Math.min(Number.MAX_VALUE, legacy.remembrance + rem);
+  legacy.earned = Math.min(Number.MAX_VALUE, legacy.earned + rem);
   legacy.seals += 1;
   legacy.best.depth = Math.max(legacy.best.depth, state.depth);
   legacy.best.earned = Math.max(legacy.best.earned, state.totals.earned);
@@ -289,5 +289,8 @@ export function artifactMods(legacy, cfg, depth) {
     if (!def || !(n > 0)) continue;
     for (const kind of Object.keys(out)) if (def[kind]) out[kind] *= Math.pow(def[kind], n);
   }
+  // Held at the top of what a number can hold, so a great many of them never
+  // turn into Infinity, and Infinity times nothing into NaN.
+  for (const kind of Object.keys(out)) if (!(out[kind] < Number.MAX_VALUE)) out[kind] = Number.MAX_VALUE;
   return out;
 }
