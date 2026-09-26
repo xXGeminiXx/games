@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=51';
-import * as Mat from './materials.js?v=51';
-import * as H from './horde.js?v=51';
-import * as Crew from './crew.js?v=51';
-import * as R from './rites.js?v=51';
-import * as Rv from './reveal.js?v=51';
-import * as Ch from './chambers.js?v=51';
-import * as Vi from './visitors.js?v=51';
-import * as Rb from './rebirth.js?v=51';
-import * as Lore from './lore.js?v=51';
-import * as Lords from './lords.js?v=51';
-import * as Ranks from './ranks.js?v=51';
-import { createGround } from './ground.js?v=51';
-import { hash } from './rng.js?v=51';
-import { fill } from '../config.js?v=51';
-import { fmt, fmtCoin } from './numbers.js?v=51';
+import { CONFIG as DEFAULT } from '../config.js?v=52';
+import * as Mat from './materials.js?v=52';
+import * as H from './horde.js?v=52';
+import * as Crew from './crew.js?v=52';
+import * as R from './rites.js?v=52';
+import * as Rv from './reveal.js?v=52';
+import * as Ch from './chambers.js?v=52';
+import * as Vi from './visitors.js?v=52';
+import * as Rb from './rebirth.js?v=52';
+import * as Lore from './lore.js?v=52';
+import * as Lords from './lords.js?v=52';
+import * as Ranks from './ranks.js?v=52';
+import { createGround } from './ground.js?v=52';
+import { hash } from './rng.js?v=52';
+import { fill } from '../config.js?v=52';
+import { fmt, fmtCoin } from './numbers.js?v=52';
 
 export const SAVE_VERSION = 2;
 
@@ -842,6 +842,8 @@ export function createSim(cfg = DEFAULT, opts = {}) {
       else openChamber(events, k);
     }
     if (opened.length) readAhead();
+    // Once a barrow, the dig reaching the bottom of the world says so.
+    if (opened.length && state.depth >= ground.bottom()) fire(events, 'bottom', 'bottom', { n: state.depth + 1 });
     if (state.chamber || (state.chamberQueue && state.chamberQueue.length)) takeLordsGifts(events);
     payRankArtifacts(events);
 

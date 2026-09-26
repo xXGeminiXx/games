@@ -149,6 +149,7 @@ export const CONFIG = {
     // THE GOAL: the next lord's door, under the line at the top.
     goal: {
       ahead: '{Name}\'s door is under layer {n}. {m} layers to go.',
+      bottom: 'The bottom of the world. Nothing under layer {n} can be dug, for now.',
       one:   '{Name}\'s door is under the next layer.',
       at:    'Breaking {Name}\'s door.',
       rule:  'In {Name}\'s layers: {line}',
@@ -926,7 +927,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 51,
+    build: 52,
   },
 };
 

@@ -58,6 +58,9 @@ export const CONTENT = {
     breakthrough: [
       'Broke through to {name}.',
     ],
+    bottom: [
+      'The spades hit something under layer {n} that nothing digs through. This is the bottom of the world, for now.',
+    ],
     newMarket: [
       '{Name} sells for more than anything above it. The deeper, the richer.',
     ],

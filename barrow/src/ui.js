@@ -11,16 +11,16 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=51';
-import * as H from './horde.js?v=51';
-import * as R from './rites.js?v=51';
-import * as Rb from './rebirth.js?v=51';
-import * as Lore from './lore.js?v=51';
-import * as Advice from './advice.js?v=51';
-import * as Lords from './lords.js?v=51';
-import * as Ranks from './ranks.js?v=51';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=51';
-import { fill } from '../config.js?v=51';
+import * as Mat from './materials.js?v=52';
+import * as H from './horde.js?v=52';
+import * as R from './rites.js?v=52';
+import * as Rb from './rebirth.js?v=52';
+import * as Lore from './lore.js?v=52';
+import * as Advice from './advice.js?v=52';
+import * as Lords from './lords.js?v=52';
+import * as Ranks from './ranks.js?v=52';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=52';
+import { fill } from '../config.js?v=52';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -637,7 +637,10 @@ export function createUI(doc, sim, cfg, actions) {
     const name = Lords.shortName(door.lord);
     const left = doorK - 1 - s.depth;
     let text, pct = 0;
-    if (left <= 0) {
+    const atBottom = s.depth >= sim.ground.bottom();
+    if (atBottom) {
+      text = fill(G.bottom, { n: s.depth + 1 });
+    } else if (left <= 0) {
       const cap = sim.ground.at(doorK).cap;
       pct = cap > 0 ? Math.max(0, Math.min(1, s.capProgress / cap)) : 0;
       text = fill(G.at, { name });
@@ -654,7 +657,7 @@ export function createUI(doc, sim, cfg, actions) {
       if (!nodes.goalFill) { clear(nodes.goalBar); nodes.goalFill = el('span'); nodes.goalBar.appendChild(nodes.goalFill); }
       // Hidden without giving up its place, so the goal is the same height
       // with the bar and without it.
-      if (nodes.goalBar.style) nodes.goalBar.style.visibility = left <= 0 ? 'visible' : 'hidden';
+      if (nodes.goalBar.style) nodes.goalBar.style.visibility = left <= 0 && !atBottom ? 'visible' : 'hidden';
       nodes.goalFill.style.width = Math.round(pct * 100) + '%';
       nodes.goalFill.style.background = hue;
     }
@@ -662,7 +665,7 @@ export function createUI(doc, sim, cfg, actions) {
     // beside the bar and in the lord's colour. It keeps its place when there
     // is no door to break, so nothing under it moves.
     if (nodes.goalPct) {
-      const said = left <= 0 ? fmtPct(pct) : '';
+      const said = left <= 0 && !atBottom ? fmtPct(pct) : '';
       if (nodes.goalPct.textContent !== said) nodes.goalPct.textContent = said;
       if (nodes.goalPct.style && nodes.goalPct.style.color !== hue) nodes.goalPct.style.color = hue;
     }
