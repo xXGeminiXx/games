@@ -13,8 +13,8 @@
 // number. Nothing is stored: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=48';
-import * as Lore from './lore.js?v=48';
+import { hash } from './rng.js?v=49';
+import * as Lore from './lore.js?v=49';
 
 /** Which lord's stretch layer k is in, counting from zero. */
 export function realmOf(k, cfg) {

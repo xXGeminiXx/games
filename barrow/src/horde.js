@@ -31,20 +31,29 @@ export function raiseCostBulk(n, count, cfg, softMult) {
   return cfg.boneCostBase * (m + (m * n + m * (m - 1) / 2) / soft);
 }
 
-/** The most diggers `bones` will raise from n. */
+/**
+ * The most diggers `bones` will raise from n. The bulk cost is a quadratic in
+ * the count, so the count is solved for outright. It used to be found by
+ * doubling a guess, and the guess stopped at a million billion: past that
+ * every raise, the dead raising themselves, a work gang and a room's free
+ * crew all came to 1.13e15 however many bones there were.
+ */
 export function maxRaisable(bones, n, cfg, softMult) {
   if (!(bones >= raiseCost(n, cfg, softMult))) return 0;
-  let lo = 1, hi = 1;
-  while (raiseCostBulk(n, hi, cfg, softMult) <= bones) {
-    lo = hi;
-    hi *= 2;
-    if (hi > 1e15) break;
+  const soft = cfg.boneCostSoft * (softMult || 1);
+  const base = cfg.boneCostBase;
+  // cost(m) = base * (m + (m*n + m*(m-1)/2) / soft) = bones, as a*m^2 + b*m = c,
+  // taken in the form that stays accurate when b*b dwarfs a*c.
+  const a = 1 / (2 * soft), b = 1 + (n - 0.5) / soft, c = bones / base;
+  let m = Math.floor(2 * c / (b + Math.sqrt(b * b + 4 * a * c)));
+  if (!Number.isFinite(m)) return 0;
+  // Below 2^50 a count is exact to the digger, so the rounding is walked
+  // back to the largest count the bones really cover.
+  if (m < 2 ** 50) {
+    while (m > 1 && raiseCostBulk(n, m, cfg, softMult) > bones) m--;
+    while (raiseCostBulk(n, m + 1, cfg, softMult) <= bones) m++;
   }
-  while (hi - lo > 1) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (raiseCostBulk(n, mid, cfg, softMult) <= bones) lo = mid; else hi = mid;
-  }
-  return lo;
+  return Math.max(1, m);
 }
 
 /**

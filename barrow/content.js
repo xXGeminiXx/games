@@ -635,7 +635,7 @@ export const CONTENT = {
         { name: 'Her salts', line: '2x the bones for the rest of this barrow.' },
       ],
       trophy: { name: 'Mother Natron\'s jar', line: '1 in 100 of your diggers comes with you to the next barrow.' },
-      power: { name: 'Mother Natron\'s salt', line: 'While you\'re away the dead dig at 90% of full speed instead of 75%.' },
+      power: { name: 'Mother Natron\'s salt', line: 'Every deal and boost a caller sells you lasts twice as long.' },
       artifact: { name: 'Mother Natron\'s hook', line: 'Past layer 50 every lord\'s door breaks 2x faster.' },
     },
     mortifer: {

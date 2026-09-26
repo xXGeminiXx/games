@@ -409,12 +409,12 @@ export const CONFIG = {
     // What each lord hands over for good beside his trophy, the first time his
     // door breaks. Never for sale. Pater's bones, Rey's prices, Sepulturero's
     // digging down, Neb-Amenti's digging and Dona's callers are each `factor`;
-    // Rex's brings diggers with every new layer; Natron's keeps the pace up
-    // while nobody watches; Mortifer's raises the dead by itself.
+    // Rex's brings diggers with every new layer; Natron's salt makes every
+    // caller's deal and boost keep longer; Mortifer's raises the dead by itself.
     power: {
       factor: 2,
       musterSeconds: 300,   // Rex Mortis's: each new layer raises this many seconds of bones' worth of diggers
-      awayPace: 0.9,        // Mother Natron's: the pace while nobody watches, instead of time.awayPace
+      boostLasts: 2,        // Mother Natron's: a caller's deal or boost lasts this many times as long
     },
     affixes: [
       { id: 'elder',     door: 2,   hoard: 2 },
@@ -826,7 +826,8 @@ export const CONFIG = {
     catchUpAfter: 4,       // a gap longer than this is stepped in coarse chunks
     offlineStep: 1,        // seconds per chunk when catching up
     offlineMaxHours: 12,   // the dead stop after this long without you
-    awayPace: 0.75,        // share of full speed the dead dig at with nobody watching
+    awayPace: 1,           // share of full speed the dead dig at with nobody watching: all of it. What
+                           // only a watching player gets is the callers and the rooms, and those pay for it
     awayGrace: 60,         // seconds out of sight that still count in full (a look at another tab)
     autosaveSeconds: 5,
     incomeWindow: 10,      // seconds the coin/s figure averages over
@@ -914,7 +915,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 48,
+    build: 49,
   },
 };
 

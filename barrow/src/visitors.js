@@ -20,10 +20,10 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=48';
-import * as Lore from './lore.js?v=48';
-import { fill } from '../config.js?v=48';
-import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=48';
+import { hash, unit, range } from './rng.js?v=49';
+import * as Lore from './lore.js?v=49';
+import { fill } from '../config.js?v=49';
+import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=49';
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in
@@ -251,9 +251,10 @@ function buildKind(api, i, kind) {
     const k = from + (hash(seed, 'visit-good:' + i) % n);
     const g = api.ground.at(k);
     const mult = range(seed, 'visit-mult:' + i, v.buyer.multMin, v.buyer.multMax) * pay;
-    rec.data = { id: 's' + k, k, mult, lasts: v.buyer.lasts };
+    const lasts = v.buyer.lasts * (md.boostLasts || 1);
+    rec.data = { id: 's' + k, k, mult, lasts };
     rec.text = spoken(words.name, fill(said, { name: g.name, mult: mult.toFixed(1) }))
-      + offer({ name: g.name, t: fmtTime(v.buyer.lasts) });
+      + offer({ name: g.name, t: fmtTime(lasts) });
     return rec;
   }
 
@@ -313,8 +314,9 @@ function buildKind(api, i, kind) {
     // few coins in the hat.
     const c = v[kind];
     const price = cost * c.seconds;
-    rec.data = { price, key: c.key, factor: c.factor, lasts: c.lasts };
-    rec.text = spoken(words.name, said) + offer({ t: fmtTime(c.lasts), x: c.factor, coin: fmtCoin(price) });
+    const lasts = c.lasts * (md.boostLasts || 1);
+    rec.data = { price, key: c.key, factor: c.factor, lasts };
+    rec.text = spoken(words.name, said) + offer({ t: fmtTime(lasts), x: c.factor, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;

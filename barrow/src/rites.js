@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=48';
-import * as Rb from './rebirth.js?v=48';
-import * as Lore from './lore.js?v=48';
-import * as Lords from './lords.js?v=48';
-import * as Ranks from './ranks.js?v=48';
+import * as Ch from './chambers.js?v=49';
+import * as Rb from './rebirth.js?v=49';
+import * as Lore from './lore.js?v=49';
+import * as Lords from './lords.js?v=49';
+import * as Ranks from './ranks.js?v=49';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -146,7 +146,9 @@ export function modsOf(s, cfg, legacy) {
     // The lords' powers that are not a doubling.
     muster: P && trophy('rex') ? P.musterSeconds : 0,
     autoRaise: !!P && trophy('mortifer'),
-    awayPace: P && trophy('natron') ? P.awayPace : cfg.time.awayPace,
+    awayPace: cfg.time.awayPace,
+    // Mother Natron's salt: what a caller sells keeps longer.
+    boostLasts: P && trophy('natron') ? (P.boostLasts || 1) : 1,
     // What rank has handed over that the run has to know about.
     autoBuy: rank('autoBuy'),
     autoSeal: rank('autoSeal'),
