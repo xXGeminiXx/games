@@ -2,19 +2,22 @@
 // The lords of the dead, and the ground they own.
 //
 // The dig is cut into stretches of `lords.every` layers, and each stretch
-// belongs to one lord. The floor under its last layer is his door. Which lord
-// owns which stretch is fixed the moment a barrow is opened, from its seed:
-// the first door is always Rex Mortis and every fifth is Mortifer, and the
-// three between are dealt from the rest, so no two barrows meet the same
-// three. Past Mortifer the round starts again with everybody in the deal and
-// one pass harder, which is where the affixes come from.
+// belongs to one lord. The floor under its last layer is his door. The same
+// lord stands at the same door in every barrow, so each door is somebody the
+// player knows: Rex Mortis at 10, the three of `lords.order` at 20, 30 and 40,
+// Mortifer at 50, the next four of the order from 60 to 90, Mortifer again at
+// 100, and past that the same fixed deal every time, one pass harder a round,
+// which is where the affixes come from.
+//
+// A barrow opened before the lords were fixed was dealt from its own seed,
+// and keeps that deal until it is filled in: `lordSeed` says which.
 //
 // Everything here is a pure function of the config, the seed and a layer
 // number. Nothing is stored: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import { hash } from './rng.js?v=49';
-import * as Lore from './lore.js?v=49';
+import { hash } from './rng.js?v=50';
+import * as Lore from './lore.js?v=50';
 
 /** Which lord's stretch layer k is in, counting from zero. */
 export function realmOf(k, cfg) {
@@ -46,28 +49,46 @@ function dealt(list, seed, salt) {
   return out;
 }
 
+/** The seed every barrow with fixed lords deals from, so they all agree. */
+const FIXED = 0x6c6f7264;
+
+/**
+ * What a barrow's lords are dealt from: null for the fixed lords every barrow
+ * opened since build 50 meets, or the barrow's own seed for one opened before.
+ */
+export function lordSeed(state) {
+  return state && state.lordsFixed ? null : (state ? state.seed : null);
+}
+
 /**
  * The lord who owns stretch r of this barrow: who he is, which pass of the
- * round this is, and the affixes that pass has put on him.
+ * round this is, and the affixes that pass has put on him. A null seed is
+ * the fixed lords.
  */
 export function lordAt(cfg, seed, r) {
   const L = cfg.lords;
+  const fixed = seed === null || seed === undefined;
+  const deal = fixed ? FIXED : seed;
   const round = Math.floor(r / L.round);
   const pos = r % L.round;
   let id;
   if (pos === L.round - 1) id = L.last;
   else if (round === 0 && pos === 0) id = L.first;
-  else {
+  else if (fixed && L.order && L.order[round]) {
+    // The fixed lords: the order names the middle doors of the first rounds.
+    const row = L.order[round];
+    id = row[(round === 0 ? pos - 1 : pos) % row.length];
+  } else {
     // The first round deals the rotating lords into the three middle doors;
     // every round after deals everybody but Mortifer into four.
     const pool = round === 0 ? L.rotating : [L.first].concat(L.rotating);
-    const deck = dealt(pool, seed, 'lords-round:' + round);
+    const deck = dealt(pool, deal, 'lords-round:' + round);
     id = deck[(round === 0 ? pos - 1 : pos) % deck.length];
   }
   const def = L.list[id];
   const affixes = [];
   if (round > 0) {
-    const deck = dealt(L.affixes, seed, 'affixes:' + r);
+    const deck = dealt(L.affixes, deal, 'affixes:' + r);
     for (let i = 0; i < Math.min(round, deck.length); i++) affixes.push(deck[i]);
   }
   let door = 1, hoard = 1;

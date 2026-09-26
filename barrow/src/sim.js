@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=49';
-import * as Mat from './materials.js?v=49';
-import * as H from './horde.js?v=49';
-import * as Crew from './crew.js?v=49';
-import * as R from './rites.js?v=49';
-import * as Rv from './reveal.js?v=49';
-import * as Ch from './chambers.js?v=49';
-import * as Vi from './visitors.js?v=49';
-import * as Rb from './rebirth.js?v=49';
-import * as Lore from './lore.js?v=49';
-import * as Lords from './lords.js?v=49';
-import * as Ranks from './ranks.js?v=49';
-import { createGround } from './ground.js?v=49';
-import { hash } from './rng.js?v=49';
-import { fill } from '../config.js?v=49';
-import { fmt, fmtCoin } from './numbers.js?v=49';
+import { CONFIG as DEFAULT } from '../config.js?v=50';
+import * as Mat from './materials.js?v=50';
+import * as H from './horde.js?v=50';
+import * as Crew from './crew.js?v=50';
+import * as R from './rites.js?v=50';
+import * as Rv from './reveal.js?v=50';
+import * as Ch from './chambers.js?v=50';
+import * as Vi from './visitors.js?v=50';
+import * as Rb from './rebirth.js?v=50';
+import * as Lore from './lore.js?v=50';
+import * as Lords from './lords.js?v=50';
+import * as Ranks from './ranks.js?v=50';
+import { createGround } from './ground.js?v=50';
+import { hash } from './rng.js?v=50';
+import { fill } from '../config.js?v=50';
+import { fmt, fmtCoin } from './numbers.js?v=50';
 
 export const SAVE_VERSION = 2;
 
@@ -43,6 +43,7 @@ export function freshState(cfg, seed) {
   return {
     v: SAVE_VERSION,
     seed: seed >>> 0,
+    lordsFixed: true,     // the same lord at the same door as every other barrow
     t: 0,                 // simulation seconds since this barrow was opened
     coin: 0,
     bones: 0,
@@ -106,7 +107,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
   const seed = (opts.seed === undefined ? (Math.random() * 4294967296) : opts.seed) >>> 0;
   const state = opts.state || freshState(cfg, seed);
   const legacy = opts.legacy || Rb.freshLegacy();
-  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill));
+  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill), Lords.lordSeed(state));
   const mods = () => R.modsOf(state, cfg, legacy);
   // A save from before ranks gets credit for what it had already done.
   if (legacy.renown === null || legacy.renown === undefined) legacy.renown = Ranks.fromHistory(legacy, cfg);
@@ -395,17 +396,45 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * line and the last layer that has any: shallower ground has none, and
    * past it there is nothing new to find yet.
    */
-  const giveArtifact = (events, id, k) => {
+  const giveArtifact = (events, id, k, rank) => {
     const A = cfg.artifacts;
     const words = Lore.lord(id);
-    if (!A || !A.list[id] || !(k > A.from && k <= A.to) || !words || !words.artifact) return;
+    if (!A || !A.list[id] || !words || !words.artifact) return;
+    // A rank's artifact comes wherever the dig is; a door's or a new layer's
+    // only past the deep line.
+    if (!rank && !(k > A.from && (!(A.to > 0) || k <= A.to))) return;
     if (!legacy.artifacts) legacy.artifacts = {};
     if (A.most > 0 && (legacy.artifacts[id] || 0) >= A.most) return;
     const n = (legacy.artifacts[id] || 0) + 1;
     legacy.artifacts[id] = n;
     const D = Lore.doors();
     events.push({ type: 'artifact', lord: id, n });
-    events.push({ type: 'log', key: 'artifact', text: fill(n > 1 ? D.artifactMore : D.artifact, { name: words.artifact.name, line: words.artifact.line, n }) });
+    const said = rank ? D.artifactRank : (n > 1 ? D.artifactMore : D.artifact);
+    events.push({ type: 'log', key: 'artifact', text: fill(said, { name: words.artifact.name, line: words.artifact.line, n, rank }) });
+  };
+
+  /**
+   * Every rank from `artifacts.rankFrom` on hands over an artifact, from the
+   * lord the player holds fewest of. `legacy.rankArtifacts` is the last rank
+   * paid, so a rank reached before this existed is paid the first time the
+   * game runs, and none is ever paid twice.
+   */
+  const payRankArtifacts = (events) => {
+    const A = cfg.artifacts;
+    if (!A || !(A.rankFrom > 0) || !cfg.ranks) return;
+    const now = Ranks.rankOf(legacy.renown || 0, cfg);
+    let paid = Math.max(legacy.rankArtifacts || 0, A.rankFrom - 1);
+    if (now <= paid) return;
+    const ids = Object.keys(A.list);
+    while (paid < now) {
+      paid++;
+      let pick = ids[0];
+      for (const id of ids) {
+        if (((legacy.artifacts && legacy.artifacts[id]) || 0) < ((legacy.artifacts && legacy.artifacts[pick]) || 0)) pick = id;
+      }
+      giveArtifact(events, pick, state.depth, paid);
+      legacy.rankArtifacts = paid;
+    }
   };
 
   /**
@@ -485,7 +514,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     // easier to reach, and one barrow went from 86 to 107.
     if (cfg.lords && !state.recordFind && !ground.at(k).door) {
       const before = legacy.artifacts ? JSON.stringify(legacy.artifacts) : '';
-      giveArtifact(events, Lords.lordAt(cfg, state.seed, Lords.realmOf(k, cfg)).id, k);
+      giveArtifact(events, Lords.lordAt(cfg, Lords.lordSeed(state), Lords.realmOf(k, cfg)).id, k);
       if ((legacy.artifacts ? JSON.stringify(legacy.artifacts) : '') !== before) state.recordFind = true;
     }
     addRenown(events, cfg.ranks.points.newDepth);
@@ -794,7 +823,9 @@ export function createSim(cfg = DEFAULT, opts = {}) {
         if (lost > 0) state.horde -= lost;
       }
     }
-    const opened = H.dig(state, dt, cfg, md, ground, sp);
+    // The layer the barrow fills itself in at is as deep as it digs.
+    const sealAt = md.autoSeal && legacy.autoSealAt > 0 ? legacy.autoSealAt - 1 : -1;
+    const opened = H.dig(state, dt, cfg, md, ground, sp, sealAt >= cfg.seal.unlockDepth ? sealAt : undefined);
     cashIn(events, md);
     turnUp(unwatched ? null : events, md);
     for (const k of opened) {
@@ -810,6 +841,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     }
     if (opened.length) readAhead();
     if (state.chamber || (state.chamberQueue && state.chamberQueue.length)) takeLordsGifts(events);
+    payRankArtifacts(events);
 
     // A rank that lets upgrades buy themselves: the cheapest one on the panel
     // that coin will cover, one a step, while the player has it switched on.
@@ -828,6 +860,12 @@ export function createSim(cfg = DEFAULT, opts = {}) {
 
     state.t += dt;
     trimIncome();
+    // The largest number the game can hold is about 1.8e308. Past it a number
+    // reads Infinity, and a save written with Infinity in it loses the value,
+    // so nothing is let past it. That ceiling is where the game will be built
+    // out next, the way the games it follows do (docs/RESEARCH-ACCELERATING-INCREMENTALS.md).
+    for (const key of ['coin', 'bones', 'horde', 'rate']) if (state[key] > Number.MAX_VALUE) state[key] = Number.MAX_VALUE;
+    for (const key of Object.keys(state.totals)) if (state.totals[key] > Number.MAX_VALUE) state.totals[key] = Number.MAX_VALUE;
     Vi.tick(visitorApi, unwatched ? null : events, unwatched);
 
     if (opened.length) tidy();
@@ -1129,13 +1167,21 @@ export function restoreSim(cfg, snap) {
   // Likewise a run saved while there was still a market: the fresh state
   // says it never had one, which is not true of it.
   if (!Object.prototype.hasOwnProperty.call(st, 'marketGone')) state.marketGone = 0;
+  // And a barrow opened before the lords were fixed keeps the lords it was
+  // dealt until it is filled in.
+  if (!Object.prototype.hasOwnProperty.call(st, 'lordsFixed')) state.lordsFixed = false;
   state.totals = Object.assign(defaults.totals, st.totals || {});
   state.milestones = Object.assign(defaults.milestones, st.milestones || {});
   state.hand = Object.assign(defaults.hand, st.hand || {});
   for (const key of ['coin', 'bones', 'horde', 'depth', 'capProgress', 'faceWeight', 't', 'rate', 'visitCount', 'remBonus']) {
-    if (!Number.isFinite(state[key])) state[key] = defaults[key];
+    // A number that ran off the top is kept at the top, not thrown away.
+    if (state[key] === Infinity) state[key] = Number.MAX_VALUE;
+    else if (!Number.isFinite(state[key])) state[key] = defaults[key];
   }
-  for (const key of Object.keys(state.totals)) if (!Number.isFinite(state.totals[key])) state.totals[key] = 0;
+  for (const key of Object.keys(state.totals)) {
+    if (state.totals[key] === Infinity) state.totals[key] = Number.MAX_VALUE;
+    else if (!Number.isFinite(state.totals[key])) state.totals[key] = 0;
+  }
   if (!Array.isArray(state.weights)) state.weights = [cfg.horde.weightNew];
   while (state.weights.length <= state.depth) state.weights.push(0);
   if (!Array.isArray(state.income)) state.income = [];
@@ -1198,7 +1244,7 @@ export function openedState(cfg, legacy, seed, lines, hill) {
   const o = Rb.oathMods(legacy, cfg);
   // The barrow just filled in gets a card at the top of the next one.
   state.ending = Array.isArray(legacy.barrows) && legacy.barrows.length > 0;
-  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill));
+  const ground = createGround(cfg, state.seed, Rb.hillRule(cfg, state.hill), Lords.lordSeed(state));
   if (lines) state.log = lines.slice(0, 14);
 
   for (const id of o.startRites) state.rites[id] = 1;

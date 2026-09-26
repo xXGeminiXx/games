@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=49';
-import * as Rb from './rebirth.js?v=49';
-import * as Lore from './lore.js?v=49';
-import * as Lords from './lords.js?v=49';
-import * as Ranks from './ranks.js?v=49';
+import * as Ch from './chambers.js?v=50';
+import * as Rb from './rebirth.js?v=50';
+import * as Lore from './lore.js?v=50';
+import * as Lords from './lords.js?v=50';
+import * as Ranks from './ranks.js?v=50';
 
 export function defs(cfg) {
   return cfg.rites.list;
@@ -99,7 +99,7 @@ export function modsOf(s, cfg, legacy) {
   const rank = (id) => !!(legacy && cfg.ranks && Ranks.has(legacy, cfg, id));
   // The lord whose layers the dig is in: his rule on callers holds while the
   // shaft is in his ten.
-  const here = cfg.lords ? Lords.lordAt(cfg, s.seed, Lords.realmOf(s.depth, cfg)) : null;
+  const here = cfg.lords ? Lords.lordAt(cfg, Lords.lordSeed(s), Lords.realmOf(s.depth, cfg)) : null;
   const hereGap = here && here.rule.visitGap !== undefined ? here.rule.visitGap : 1;
   // The hill's twist on callers and on how far a bone goes.
   const hill = Rb.hillRule(cfg, s.hill);

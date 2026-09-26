@@ -119,7 +119,7 @@ export function distribute(weights, faceWeight, from = 0) {
  * @param {object} [given] where the diggers stand, if the caller worked it out
  * @returns {number[]}    layers opened during this step, in order
  */
-export function dig(s, dt, cfg, mods, ground, given) {
+export function dig(s, dt, cfg, mods, ground, given, stopAt) {
   const opened = [];
   if (!(dt > 0) || !(s.horde > 0)) return opened;
 
@@ -157,6 +157,9 @@ export function dig(s, dt, cfg, mods, ground, given) {
       : 1);
     let progress = s.capProgress + rate * split.face * faceMult * ease(target) / target.hardness;
     while (progress >= target.cap) {
+      // A barrow set to fill itself in at a layer never digs past it, however
+      // many layers one step could open.
+      if (stopAt !== undefined && s.depth >= stopAt) { progress = Math.min(progress, target.cap * 0.999); break; }
       progress -= target.cap;
       s.depth += 1;
       opened.push(s.depth);

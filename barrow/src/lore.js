@@ -10,9 +10,9 @@
 // values and gives back a sentence.
 // ---------------------------------------------------------------------------
 
-import { CONTENT } from '../content.js?v=49';
-import { pick } from './rng.js?v=49';
-import { fill } from '../config.js?v=49';
+import { CONTENT } from '../content.js?v=50';
+import { pick } from './rng.js?v=50';
+import { fill } from '../config.js?v=50';
 
 /**
  * One line from a log pool.

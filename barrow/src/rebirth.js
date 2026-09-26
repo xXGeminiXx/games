@@ -12,10 +12,10 @@
 // hour is worth before spending it.
 // ---------------------------------------------------------------------------
 
-import * as Lore from './lore.js?v=49';
-import { pick, hash } from './rng.js?v=49';
-import { fill } from '../config.js?v=49';
-import { fmt, fmtCoin, fmtCount } from './numbers.js?v=49';
+import * as Lore from './lore.js?v=50';
+import { pick, hash } from './rng.js?v=50';
+import { fill } from '../config.js?v=50';
+import { fmt, fmtCoin, fmtCount } from './numbers.js?v=50';
 
 export const LEGACY_VERSION = 1;
 
@@ -58,6 +58,8 @@ export function freshLegacy() {
     // Who placed the crew when the last barrow filled in, and where: the next
     // barrow starts the same way. Null until a barrow has been filled in.
     placing: null,
+    // The last rank that has handed over its artifact.
+    rankArtifacts: 0,
   };
 }
 
@@ -75,6 +77,7 @@ export function restoreLegacy(raw) {
   l.autoRaise = raw.autoRaise !== false;
   if ([1, 5, 25, 'max'].includes(raw.ritePick)) l.ritePick = raw.ritePick;
   if (Number.isFinite(raw.crewMark) && raw.crewMark > 0) l.crewMark = Math.floor(raw.crewMark);
+  if (Number.isFinite(raw.rankArtifacts) && raw.rankArtifacts > 0) l.rankArtifacts = Math.floor(raw.rankArtifacts);
   if (raw.placing && typeof raw.placing === 'object') {
     const p = raw.placing;
     const notch = (w) => (Number.isFinite(w) && w > 0 ? Math.floor(w) : 0);

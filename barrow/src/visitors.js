@@ -20,10 +20,10 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=49';
-import * as Lore from './lore.js?v=49';
-import { fill } from '../config.js?v=49';
-import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=49';
+import { hash, unit, range } from './rng.js?v=50';
+import * as Lore from './lore.js?v=50';
+import { fill } from '../config.js?v=50';
+import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=50';
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in
@@ -353,9 +353,10 @@ function buildKind(api, i, kind) {
     const price = cost * v.herald.seconds;
     if (!(price > 0)) return null;
     const pct = Math.round((v.herald.ease - 1) * 100);
+    const x = +v.herald.ease.toFixed(2);
     rec.name = fill(words.name, { lord: d.lord });
-    rec.data = { price, k: d.k, ease: v.herald.ease, lord: d.lord, pct };
-    rec.text = spoken(rec.name, fill(said, { lord: d.lord })) + offer({ lord: d.lord, pct, coin: fmtCoin(price) });
+    rec.data = { price, k: d.k, ease: v.herald.ease, lord: d.lord, pct, x };
+    rec.text = spoken(rec.name, fill(said, { lord: d.lord })) + offer({ lord: d.lord, pct, x, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
     rec.cost = price;
     return rec;
@@ -494,7 +495,7 @@ export function accept(api) {
     line = say('taken', { coin: fmtCoin(rec.data.coin), n: rec.data.relics });
   } else if (rec.kind === 'herald') {
     api.easeDoor(rec.data.k, rec.data.ease);
-    line = say('taken', { lord: rec.data.lord, pct: rec.data.pct });
+    line = say('taken', { lord: rec.data.lord, pct: rec.data.pct, x: rec.data.x });
   } else {
     // A mourner. What they leave is priced off what the barrow earns, and a
     // barrow that has earned nothing yet gets no gift and no line about one.

@@ -12,9 +12,9 @@
 // first ask, and stored nowhere: a save is still just a depth.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=49';
-import * as Lords from './lords.js?v=49';
-import { pickWeighted, unit } from './rng.js?v=49';
+import * as Mat from './materials.js?v=50';
+import * as Lords from './lords.js?v=50';
+import { pickWeighted, unit } from './rng.js?v=50';
 
 const ONE = { value: 1, hardness: 1, bones: 1, cap: 1 };
 
@@ -22,7 +22,10 @@ const ONE = { value: 1, hardness: 1, bones: 1, cap: 1 };
  * @param {object} cfg   the whole config
  * @param {number} seed  the run seed
  */
-export function createGround(cfg, seed, hillRule) {
+export function createGround(cfg, seed, hillRule, lords) {
+  // Who the lords are is dealt from `lords`: null for the fixed lords, or a
+  // seed. Left out, it is the run seed, as it was before the lords were fixed.
+  const lordSeed = lords === undefined ? seed : lords;
   const hill = hillRule || {};
   const cache = new Map();
   const sc = cfg.seams;
@@ -44,7 +47,7 @@ export function createGround(cfg, seed, hillRule) {
   const build = (k) => {
     // The name and the colour are the owning lord's; the worth still climbs
     // with the depth, so a stretch reads right wherever the deal put it.
-    const lorded = cfg.lords ? Lords.materialAt(cfg, seed, k) : null;
+    const lorded = cfg.lords ? Lords.materialAt(cfg, lordSeed, k) : null;
     const good = lorded ? { id: 's' + k, name: lorded.name, hue: lorded.hue } : Mat.goodAt(k, cfg.strata);
     const seam = seamAt(k);
     const s = seam || ONE;
@@ -52,7 +55,7 @@ export function createGround(cfg, seed, hillRule) {
     const rule = (lorded && lorded.lord.rule) || {};
     const f = (key) => (s[key] === undefined ? 1 : s[key]) * (rule[key] === undefined ? 1 : rule[key])
       * (hill[key] === undefined ? 1 : hill[key]);
-    const door = cfg.lords ? Lords.doorAt(cfg, seed, k) : null;
+    const door = cfg.lords ? Lords.doorAt(cfg, lordSeed, k) : null;
     return {
       k,
       id: good.id,

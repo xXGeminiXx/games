@@ -165,7 +165,7 @@ export const CONFIG = {
       unmet:    'Break the door to keep it.',
       atRank:   'Rank {n}',
       artifacts: 'Artifacts',
-      artifactsHow: 'Found past layer 50, up to {n} of each. Every lord\'s door from layer 60 to 100 hands over one of his, and your first new deepest layer in a barrow turns up another. They stack, and they only work past layer 50.',
+      artifactsHow: 'Every lord\'s door from layer 60 down hands over one of his, every time, and your first new deepest layer in a barrow turns up another. From rank 26, every rank hands over one more, from the lord you have fewest of. They stack, and there\'s no limit.',
       artifactHeld: '{Name} x{n}',
       artifactFull: '{Name} x{n}, all he has',
       artifactTotal: 'Together, {x}x.',
@@ -392,6 +392,13 @@ export const CONFIG = {
     last: 'mortifer',
     round: 5,               // doors in a round: the first, three dealt, the last
     rotating: ['pater', 'rey', 'dona', 'sepulturero', 'neb', 'natron'],
+    // Who stands at the middle doors, the same in every barrow: 20, 30, 40,
+    // then 60, 70, 80, 90. Everybody is met by door 100; rounds after that are
+    // one fixed deal, the same for everybody.
+    order: [
+      ['pater', 'rey', 'dona'],
+      ['sepulturero', 'neb', 'natron', 'rex'],
+    ],
     doorThickness: 24,      // a door is this many ordinary floors deep
     hoardSeconds: 1800,     // coin a broken door pays: this much of the income
     hoardRelics: 10,        // relics it pays, times which door of the round it is
@@ -569,21 +576,22 @@ export const CONFIG = {
   //
   // Past layer `from`, every lord's door that gives way hands over one of his
   // artifacts, every time, not only the first. They are kept forever and they
-  // stack: holding three of one is three times its step. They only work in
-  // the deep - while the dig is past layer `below` - so the first fifty
-  // layers of a barrow go exactly as they always did. Doors past `to` hand
-  // over nothing new, which is what makes layer 100 the place the game levels
-  // off, until something new is put under it.
+  // stack: each one multiplies again. They work at every depth, so the layers
+  // a barrow has to walk through again come faster every time, which is the
+  // acceleration the game is built on (docs/RESEARCH-ACCELERATING-INCREMENTALS.md).
+  // Nothing stops them: no last door, no most of one lord's. Rank hands them
+  // over too, one a rank from `rankFrom`.
   //
   // Each step is a multiplier on one thing: face (digging down), dig (every
   // digger), bones, value (what things sell for), door (how fast a lord's door
   // gives way).
   // -------------------------------------------------------------------------
   artifacts: {
-    from: 50,
-    to: 100,
-    below: 50,
-    most: 10,     // of any one lord's; with all eight lords full the dig levels off a little past layer 100 (measured: 99 by the 37th barrow from his save, 108 by the 49th, 114 by the 61st)
+    from: 50,     // every lord's door past this layer hands over one of his
+    to: 0,        // and there is no last door that does: 0 is none
+    below: 0,     // they work at every depth, so every barrow opens faster than the last
+    most: 0,      // and there is no most of any one lord's: 0 is none
+    rankFrom: 26, // every rank from this one on hands over one more, from the lord held fewest of
     list: {
       rex:         { face: 2 },
       pater:       { bones: 3 },
@@ -608,8 +616,8 @@ export const CONFIG = {
     // Somebody who can only be turned away never comes (visitors.js), so every
     // caller is one the player can answer; the gaps are half again as long as
     // when a third of them were dead time at the gate.
-    gapMin: 300,
-    gapMax: 780,
+    gapMin: 200,
+    gapMax: 520,
     stay: 300,           // seconds a visitor waits at the gate
     // How often each kind comes, against one for anybody not listed. The kind
     // that came last never comes next, and the few before it come at
@@ -622,12 +630,12 @@ export const CONFIG = {
     recentWeight: 0.35,
     recentKeep: 3,
     buyer: {
-      multMin: 2.5,      // he pays this many times a material's worth
-      multMax: 7,
-      lasts: 300,        // for everything of it the crew digs in this many seconds
+      multMin: 5,        // he pays this many times a material's worth
+      multMax: 15,
+      lasts: 600,        // for everything of it the crew digs in this many seconds
     },
     bonecart: {
-      seconds: 180,      // bones worth about this many seconds of bone income
+      seconds: 900,      // bones worth about this many seconds of bone income
       priceSeconds: 90,  // and costs about this many seconds of coin income
       floor: 40,         // never fewer bones than this
     },
@@ -635,13 +643,13 @@ export const CONFIG = {
       // Free diggers, priced the same way a chamber prices them: seconds of
       // the growth the horde is already managing. Never a share of the horde,
       // which would compound every time somebody walked up the track.
-      secondsMin: 400,
-      secondsMax: 1400,
+      secondsMin: 1800,
+      secondsMax: 5400,
       floor: 4,
     },
     reeve: {
       seconds: 240,      // costs about this many seconds of income
-      value: 1.18,       // paid: everything is worth this much more for the run
+      value: 1.5,        // paid: everything is worth this much more for the run
       sting: 0.7,        // refused: everything is worth this much for a while
       stingLasts: 600,   // and the while is this long
       max: 5,            // and he only has this many arrangements to sell
@@ -649,8 +657,8 @@ export const CONFIG = {
     },
     relic: {
       seconds: 600,      // costs about this many seconds of income
-      boonMin: 1.12,     // and gives a permanent multiplier in this range
-      boonMax: 1.3,
+      boonMin: 1.25,     // and gives a permanent multiplier in this range
+      boonMax: 1.6,
       // A barrow holds only so many of these. Anything that hands out a
       // permanent multiplier on a timer compounds with the clock, and a run
       // left open overnight would come back with a number nobody chose.
@@ -662,34 +670,34 @@ export const CONFIG = {
       seconds: 60,
     },
     mourner: {
-      seconds: 120,      // leaves about this many seconds of income on the heap
+      seconds: 600,      // leaves about this many seconds of income on the heap
     },
     preacher: {
       seconds: 30,       // what goes in his hat, in seconds of income
-      key: 'bones',      // and what he does for it: 2x bones for five minutes
-      factor: 2,
-      lasts: 300,
+      key: 'bones',      // and what he does for it: 3x bones for ten minutes
+      factor: 3,
+      lasts: 600,
     },
     tinker: {
       seconds: 60,       // sharpening costs this many seconds of income
-      key: 'dig',        // and every spade digs 2x as fast for five minutes
-      factor: 2,
-      lasts: 300,
+      key: 'dig',        // and every spade digs 3x as fast for ten minutes
+      factor: 3,
+      lasts: 600,
     },
     cups: {
       seconds: 300,      // the stake, in seconds of income
       odds: 0.5,         // the pea is found this often
-      pays: 3,           // and pays this many times the stake back
+      pays: 4,           // and pays this many times the stake back
     },
     collector: {
-      seconds: 900,      // coin for the find, in seconds of income
-      relics: 3,         // or this many relics instead
+      seconds: 3600,     // coin for the find, in seconds of income
+      relics: 10,        // or this many relics instead
       max: 3,            // and he buys this many finds a barrow
     },
     herald: {
       within: 4,         // comes once his lord's door is this close
       seconds: 600,      // costs this many seconds of income
-      ease: 1.5,         // and that door breaks this much faster
+      ease: 3,           // and that door breaks this much faster
     },
   },
 
@@ -915,7 +923,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 49,
+    build: 50,
   },
 };
 
