@@ -8,21 +8,23 @@
 // as time away and caught up in coarse chunks, then reported in the log. The
 // save carries the wall clock so a reload knows how long that was.
 //
-// It also owns the one thing that outlives a run. Sealing a barrow does not
-// edit the state in place: it writes the next barrow's opening state, with
-// the oaths already applied and the closing lines already in its log, and
-// reloads onto it.
+// It also owns the one thing that outlives a run. Filling a barrow in writes
+// the next barrow's opening state, with the oaths already applied and the
+// closing lines already in its log, and opens it on the page that is already
+// up. The page used to reload onto it, and a strong crew set to fill in at a
+// shallow layer reloaded it several times a second: the page flashed, would
+// not scroll, and the one control that could stop it was out of reach.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=54';
-import { createSim, restoreSim, openedState } from './sim.js?v=54';
-import * as Save from './save.js?v=54';
-import * as Rb from './rebirth.js?v=54';
-import * as Lore from './lore.js?v=54';
-import { hash } from './rng.js?v=54';
-import { createUI } from './ui.js?v=54';
-import { createView } from './view.js?v=54';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=54';
+import { storageKey, fill } from '../config.js?v=55';
+import { createSim, restoreSim, openedState } from './sim.js?v=55';
+import * as Save from './save.js?v=55';
+import * as Rb from './rebirth.js?v=55';
+import * as Lore from './lore.js?v=55';
+import { hash } from './rng.js?v=55';
+import { createUI } from './ui.js?v=55';
+import { createView } from './view.js?v=55';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=55';
 
 /**
  * @param {object} o
@@ -45,10 +47,21 @@ export function createGame(o) {
   const resumed = !!sim;
   if (!sim) sim = createSim(cfg, { seed: o.seed });
 
-  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground, cfg.lords);
+  // The page reads the barrow through this, so a new barrow opening swaps
+  // what it reads without the page being built again.
+  const live = new Proxy({}, {
+    get: (_, k) => sim[k],
+    set: (_, k, v) => { sim[k] = v; return true; },
+    has: (_, k) => k in sim,
+  });
+
+  // The picture is drawn on ground made from the barrow's own seed, so each
+  // barrow gets a fresh one on the same canvas.
+  const makeView = () => createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground, cfg.lords);
+  let view = makeView();
 
   const actions = {};
-  const ui = createUI(doc, sim, cfg, actions);
+  const ui = createUI(doc, live, cfg, actions);
   const tell = (events) => { for (const e of events) ui.say(e); };
 
   const wrap = (fn) => (...args) => {
@@ -94,10 +107,25 @@ export function createGame(o) {
   // Time away that belongs to the next barrow: the one open now reached the
   // layer it fills itself in at before the time ran out.
   let owedNext = 0;
+  // Time away still to be dug by barrows not yet opened. A strong crew set to
+  // fill in shallow can go through thousands of barrows in a few hours away,
+  // so they are worked off a few a frame and the page keeps answering.
+  let backlog = 0;
+  // What those barrows came to, said once in the log when they are done.
+  let behind = null;
+  const clockMs = win.performance && typeof win.performance.now === 'function' ? () => win.performance.now() : null;
+  const FRAME_BUDGET_MS = 8;
+  const FRAME_MAX_BARROWS = 25;
 
-  const away = (seconds) => {
+  // `quiet` is the backlog being dug after a fill-in: those barrows are summed
+  // up in one line once they are all done, instead of a line each.
+  const away = (seconds, quiet) => {
+    const relics0 = sim.legacy.remembrance || 0;
     const r = sim.advance(seconds, { unwatched: true, stopForFillIn: true });
     owedNext = r.stopped ? r.leftover : 0;
+    if (!quiet && r.stopped && !behind) behind = { gone: seconds, barrows: 0, relics: relics0, layer: sim.legacy.autoSealAt };
+    // A barrow that did not fill in keeps going, so what it did is said.
+    if (quiet) { if (!r.stopped) tell(r.events); return r; }
     tell(r.events);
     if (r.away && r.elapsed > 30) {
       // The stat labels are stored the way a label reads, so they come back
@@ -155,8 +183,10 @@ export function createGame(o) {
     const md = sim.mods();
     view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md, sim.legacy);
 
-    // A barrow the player asked to fill itself in, once it is deep enough.
-    if (sim.autoSealDue()) { sim.answerForFillIn(); seal(null, owedNext); return; }
+    // A barrow the player asked to fill itself in, once it is deep enough, and
+    // whatever time away the barrows after it are still owed.
+    if (sim.autoSealDue()) fillIn();
+    catchUp();
     owedNext = 0;
 
     sinceSave += dt;
@@ -167,9 +197,11 @@ export function createGame(o) {
 
   // -- saving ---------------------------------------------------------------
 
+  // Time away not yet dug is kept by dating the save back, so closing the tab
+  // part way through loses none of it.
   const save = () => {
     if (!storage || disposed) return false;
-    const ok = Save.write(storage, KEY, sim.snapshot(), now());
+    const ok = Save.write(storage, KEY, sim.snapshot(), now() - backlog * 1000);
     if (!ok) ui.savedNote('Couldn\'t save');
     return ok;
   };
@@ -190,27 +222,73 @@ export function createGame(o) {
   /**
    * Close this barrow and open the next one. What the run paid is folded into
    * the legacy, the closing lines go to the top of the new run's log, and the
-   * page comes back on ground it has never seen.
+   * page goes on, on ground it has never seen.
    */
-  // `owed` is time away the next barrow is still to be given: its save is
-  // dated that far back, so the page that comes up catches it up the way it
-  // would any time away.
-  const seal = (hill, owed) => {
+  // `owed` is time away the next barrow is still to be given; it joins the
+  // backlog and is dug by the frames that follow. `auto` is a barrow that
+  // filled itself in: the card summing up the last barrow stays the way the
+  // player left it, so one closed stays closed instead of coming back every
+  // few seconds and shoving everything under it down the page.
+  const seal = (hill, owed, auto) => {
     if (!sim.canSeal()) return null;
     // The next hill: the one picked, or the first on offer when the barrow
     // filled itself in, or a plain one when rank offers no choice.
     const choices = sim.hillChoices();
     const next = choices.includes(hill) ? hill : (choices[0] || null);
+    const cardUp = !!sim.state.ending;
     sim.keepPlacing();
     const result = Rb.seal(sim.state, cfg, sim.legacy);
     const seed = hash(sim.state.seed, 'next-barrow:' + sim.legacy.seals);
     const state = openedState(cfg, sim.legacy, seed, result.lines.slice().reverse(), next);
-    const snap = { state, markets: [], legacy: JSON.parse(JSON.stringify(sim.legacy)) };
-    disposed = true;
-    running = false;
-    if (storage) Save.write(storage, KEY, snap, now() - (owed > 0 ? owed * 1000 : 0));
-    reload();
+    if (auto) state.ending = state.ending && cardUp;
+    // The same trip through the save a reload would have taken, so the barrow
+    // that opens here is the one a fresh page would have opened.
+    const snap = Save.migrate(JSON.parse(JSON.stringify({ state, markets: [], legacy: sim.legacy })));
+    const opened = snap && restoreSim(cfg, snap);
+    if (!opened) return null;
+    sim = opened;
+    view = makeView();
+    fit();
+    ui.newBarrow();
+    if (owed > 0) backlog += owed;
+    if (behind) behind.barrows++;
+    save();
+    ui.render();
     return result;
+  };
+
+  const fillIn = () => {
+    sim.answerForFillIn();
+    const owed = owedNext;
+    owedNext = 0;
+    return seal(null, owed, true);
+  };
+
+  // Time away the barrows after a fill-in are still owed, dug a few barrows a
+  // frame. Each one stops at the layer it fills in at like any time away, and
+  // what it leaves over goes to the one after.
+  const catchUp = () => {
+    const until = clockMs ? clockMs() + FRAME_BUDGET_MS : 0;
+    for (let n = 0; backlog > 0 && n < FRAME_MAX_BARROWS; n++) {
+      const owed = backlog;
+      backlog = 0;
+      away(owed, true);
+      if (sim.autoSealDue()) fillIn();
+      if (clockMs && clockMs() >= until) break;
+    }
+    if (!(backlog > 0) && behind) {
+      if (behind.barrows > 0) ui.log(behindLine(behind));
+      behind = null;
+    }
+  };
+
+  const behindLine = (b) => {
+    const T = cfg.text;
+    const relics = (sim.legacy.remembrance || 0) - b.relics;
+    let line = fill(b.barrows === 1 ? T.filledAwayOne : T.filledAway,
+      { t: fmtTime(b.gone), n: fmt(b.barrows), depth: sim.legacy.autoSealAt || b.layer });
+    if (relics >= 1) line += ' ' + fill(T.filledAwayPaid, { n: fmt(Math.floor(relics)) });
+    return line;
   };
 
   const exportSave = () => Save.exportString(sim.snapshot(), now());
@@ -283,7 +361,10 @@ export function createGame(o) {
   }
 
   const game = {
-    sim, view, ui, actions, cfg, start, stop, frame, save, reset, seal, exportSave, importSave, fit,
+    ui, actions, cfg, start, stop, frame, save, reset, seal, exportSave, importSave, fit,
+    get sim() { return sim; },
+    get view() { return view; },
+    get backlog() { return backlog; },
     get resumed() { return resumed; },
     get key() { return KEY; },
   };

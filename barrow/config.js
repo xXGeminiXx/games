@@ -102,6 +102,10 @@ export const CONFIG = {
     autoSeal:   'Fill in by itself at layer {n}',
     autoSealOff: 'Fill in by itself: off',
     autoSealTip: 'The barrow fills itself in once it reaches this layer, and the next one starts',
+    // Said once when time away ran through barrows that filled themselves in.
+    filledAway:    'You were away {t}, and {n} barrows filled themselves in at layer {depth}.',
+    filledAwayOne: 'You were away {t}, and a barrow filled itself in at layer {depth}.',
+    filledAwayPaid: 'Filling them in paid {n} relics.',
     faceLine:   'Put some of them here and they break through to the layer below.',
     export:     'Export',
     import:     'Import',
@@ -928,7 +932,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 54,
+    build: 55,
   },
 };
 

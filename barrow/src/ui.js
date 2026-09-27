@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=54';
-import * as H from './horde.js?v=54';
-import * as R from './rites.js?v=54';
-import * as Rb from './rebirth.js?v=54';
-import * as Lore from './lore.js?v=54';
-import * as Advice from './advice.js?v=54';
-import * as Lords from './lords.js?v=54';
-import * as Ranks from './ranks.js?v=54';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=54';
-import { fill } from '../config.js?v=54';
-import * as Icons from './icons.js?v=54';
+import * as Mat from './materials.js?v=55';
+import * as H from './horde.js?v=55';
+import * as R from './rites.js?v=55';
+import * as Rb from './rebirth.js?v=55';
+import * as Lore from './lore.js?v=55';
+import * as Advice from './advice.js?v=55';
+import * as Lords from './lords.js?v=55';
+import * as Ranks from './ranks.js?v=55';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=55';
+import { fill } from '../config.js?v=55';
+import * as Icons from './icons.js?v=55';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -92,7 +92,7 @@ export function createUI(doc, sim, cfg, actions) {
 
   // The log lives on the state so a reload shows what was last said.
   if (!Array.isArray(sim.state.log)) sim.state.log = [];
-  const lines = sim.state.log;
+  let lines = sim.state.log;
   const LOG_MAX = 14;
 
   const showLog = () => {
@@ -721,25 +721,32 @@ export function createUI(doc, sim, cfg, actions) {
    * it got against the best, the lords it broke, what it paid and the rank it
    * left, until the player moves on.
    */
-  let endingShown = false;
+  // Built once and only ever retexted: barrows that fill themselves in can
+  // come a second apart, and a button rebuilt that often cannot be pressed.
+  let endingCard = null;
+  let endingFor = -1;
   const renderEnding = () => {
     if (!nodes.ending) return;
     const s = sim.state;
     const b = s.ending && sim.legacy.barrows && sim.legacy.barrows[0];
     show(nodes.ending, !!b);
-    if (!b) { endingShown = false; return; }
-    if (endingShown) return;
-    endingShown = true;
+    if (!b) { endingFor = -1; return; }
+    if (endingFor === b.n) return;
+    endingFor = b.n;
     const E = Lore.seal().ending;
+    if (!endingCard) {
+      clear(nodes.ending);
+      endingCard = { title: el('h2'), depth: el('p'), lords: el('p'), paid: el('p'), totals: el('p', { class: 'dim' }) };
+      for (const n of Object.values(endingCard)) nodes.ending.appendChild(n);
+      nodes.ending.appendChild(el('button', { text: E.button, onclick: () => actions.dismissEnding() }));
+    }
     const best = ((sim.legacy.best && sim.legacy.best.depth) || 0) + 1;
-    clear(nodes.ending);
-    nodes.ending.appendChild(el('h2', { text: fill(E.title, { n: b.n }) }));
-    nodes.ending.appendChild(el('p', { text: b.depth >= best ? fill(E.best, { depth: b.depth }) : fill(E.depth, { depth: b.depth, best }) }));
-    nodes.ending.appendChild(el('p', { text: b.lords > 0 ? fill(E.lords, { n: b.lords }) : E.noLords }));
     const rk = Ranks.standing(sim.legacy, cfg);
-    nodes.ending.appendChild(el('p', { text: fill(E.paid, { n: fmt(b.relics), rank: rk.name }) }));
-    nodes.ending.appendChild(el('p', { class: 'dim', text: fill(E.totals, { coin: fmtCoin(b.coin), horde: fmtCount(b.horde) }) }));
-    nodes.ending.appendChild(el('button', { text: E.button, onclick: () => actions.dismissEnding() }));
+    endingCard.title.textContent = fill(E.title, { n: b.n });
+    endingCard.depth.textContent = b.depth >= best ? fill(E.best, { depth: b.depth }) : fill(E.depth, { depth: b.depth, best });
+    endingCard.lords.textContent = b.lords > 0 ? fill(E.lords, { n: b.lords }) : E.noLords;
+    endingCard.paid.textContent = fill(E.paid, { n: fmt(b.relics), rank: rk.name });
+    endingCard.totals.textContent = fill(E.totals, { coin: fmtCoin(b.coin), horde: fmtCount(b.horde) });
   };
 
   // -- rank and trophies ------------------------------------------------------
@@ -1033,8 +1040,10 @@ export function createUI(doc, sim, cfg, actions) {
   // words change on their own - the next move, the next door, a layer row
   // folding away - and every time one got shorter, everything under it came
   // up to meet the pointer. The room it once needed stays kept, so it can
-  // grow but never pull back. A new barrow is a new page, so it starts
-  // snug; a window of a different size starts over too.
+  // grow but never pull back, and that holds across a new barrow too: the
+  // crew list is short at the top of a barrow and long at the bottom, and
+  // the fill-in controls under it would jump every time one opened. A window
+  // of a different size starts over.
   const held = new Map();
   const hold = (node) => {
     if (!node || node.hidden) return;
@@ -1053,5 +1062,24 @@ export function createUI(doc, sim, cfg, actions) {
 
   const savedNote = (text) => { if (nodes.saved) nodes.saved.textContent = text; };
 
-  return { render, log, say, savedNote, restore, lines };
+  /**
+   * A new barrow opened on this page. Everything drawn from the old one - its
+   * log, its layer rows, its upgrades, whoever was at the gate, a room - is
+   * let go so the next render draws the new one, the same as a fresh page
+   * would. What carries between barrows (the switches, the fill-in layer, the
+   * relics list) keeps its buttons, so a pointer on one stays on it.
+   */
+  const newBarrow = () => {
+    if (!Array.isArray(sim.state.log)) sim.state.log = [];
+    lines = sim.state.log;
+    showLog();
+    clear(nodes.weights); weightRows.clear();
+    clear(nodes.rites); riteRows.clear();
+    visitorKey = ''; lastingSaid = null; chamberKey = '';
+    goalSaid = ''; compassSaid = ''; standingKey = ''; endingFor = -1;
+    if (sealButton && sealArmed) { sealArmed = false; sealButton.textContent = Lore.seal().button; }
+    dropHills();
+  };
+
+  return { render, log, say, savedNote, restore, newBarrow, get lines() { return lines; } };
 }
