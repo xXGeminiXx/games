@@ -17,6 +17,35 @@ export const SUFFIXES = ['', 'K', 'M', 'B', 'T'];
 /** The figure past which there is no suffix left and the exponent takes over. */
 export const SUFFIX_CEILING = Math.pow(10, SUFFIXES.length * 3);
 
+/**
+ * A figure held at the top. The largest number the game can hold is about
+ * 1.8e308; a product that goes past it reads Infinity, and one that mixes
+ * Infinity with nothing reads NaN. Past the top counts as the top, and NaN
+ * as nothing, so a figure that grew too big is never mistaken for zero.
+ */
+export function sat(x) {
+  if (x !== x) return 0;
+  if (x > Number.MAX_VALUE) return Number.MAX_VALUE;
+  if (x < -Number.MAX_VALUE) return -Number.MAX_VALUE;
+  return x;
+}
+
+/**
+ * base^n written out, for a total too big to hold: 2 to the 6000th is a
+ * 1807-digit number, and is written 8.02e1805 rather than as a question mark.
+ */
+export function fmtPow(base, n) {
+  const v = Math.pow(base, n);
+  if (Number.isFinite(v)) return fmt(v);
+  const e = n * Math.log10(base);
+  if (!Number.isFinite(e)) return '?';
+  const whole = Math.floor(e);
+  let mant = Math.pow(10, e - whole);
+  let exp = whole;
+  if (mant >= 9.995) { mant /= 10; exp += 1; }
+  return mant.toFixed(2) + 'e' + exp;
+}
+
 /** A number with a suffix, sensible decimals, and an exponent only past the end of the list. */
 export function fmt(n, decimals) {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '?';

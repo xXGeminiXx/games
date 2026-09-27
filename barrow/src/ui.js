@@ -11,17 +11,17 @@
 // The panels appear in the order the reveal flags are set and never go away.
 // ---------------------------------------------------------------------------
 
-import * as Mat from './materials.js?v=56';
-import * as H from './horde.js?v=56';
-import * as R from './rites.js?v=56';
-import * as Rb from './rebirth.js?v=56';
-import * as Lore from './lore.js?v=56';
-import * as Advice from './advice.js?v=56';
-import * as Lords from './lords.js?v=56';
-import * as Ranks from './ranks.js?v=56';
-import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct } from './numbers.js?v=56';
-import { fill } from '../config.js?v=56';
-import * as Icons from './icons.js?v=56';
+import * as Mat from './materials.js?v=57';
+import * as H from './horde.js?v=57';
+import * as R from './rites.js?v=57';
+import * as Rb from './rebirth.js?v=57';
+import * as Lore from './lore.js?v=57';
+import * as Advice from './advice.js?v=57';
+import * as Lords from './lords.js?v=57';
+import * as Ranks from './ranks.js?v=57';
+import { fmt, fmtCoin, fmtCount, fmtRate, fmtTime, fmtPct, fmtPow, sat } from './numbers.js?v=57';
+import { fill } from '../config.js?v=57';
+import * as Icons from './icons.js?v=57';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -480,7 +480,7 @@ export function createUI(doc, sim, cfg, actions) {
     for (const key of Object.keys(boon)) {
       const v = boon[key];
       if (key === 'windfall') {
-        const coin = sim.steadyIncome() * Math.min(v, cfg.chambers.windfallCap);
+        const coin = sat(sim.steadyIncome() * Math.min(v, cfg.chambers.windfallCap));
         if (coin > 0) parts.push(fill(E.windfall, { coin: fmtCoin(coin) }));
       } else if (key === 'diggers') {
         const n = Math.max(1, Math.floor(sim.growthOver(v * cfg.chambers.diggerSeconds)));
@@ -805,7 +805,7 @@ export function createUI(doc, sim, cfg, actions) {
       if (deep && A.list[id] && words.artifact) {
         card.appendChild(n > 0
           ? el('div', { class: 'art', title: words.artifact.line }, el('b', { text: fill(A.most > 0 && n >= A.most ? W.artifactFull : W.artifactHeld, { name: words.artifact.name, n }) }),
-            ' - ' + words.artifact.line + (n > 1 ? ' ' + fill(W.artifactTotal, { x: fmt(Math.pow(Object.values(A.list[id])[0], n)) }) : ''))
+            ' - ' + words.artifact.line + (n > 1 ? ' ' + fill(W.artifactTotal, { x: fmtPow(Object.values(A.list[id])[0], n) }) : ''))
           : el('div', { class: 'art none' }, el('b', { text: words.artifact.name }), ' - ' + W.artifactNone));
       }
       grid.appendChild(card);
@@ -886,7 +886,7 @@ export function createUI(doc, sim, cfg, actions) {
     const st = nodes.stats;
     if (st.coin) st.coin.textContent = fmtCoin(s.coin);
     if (st.income) st.income.textContent = fmtRate(s.rate);
-    if (st.bones) st.bones.textContent = fmt(Math.floor(s.bones * 10) / 10);
+    if (st.bones) st.bones.textContent = fmt(s.bones < 1e6 ? Math.floor(s.bones * 10) / 10 : s.bones);
     if (st.horde) st.horde.textContent = fmtCount(s.horde);
     if (st.depth) {
       const layer = sim.ground.at(s.depth);
@@ -990,7 +990,7 @@ export function createUI(doc, sim, cfg, actions) {
         if (key === 'face' && r.nameEl) {
           // Breaking a lord's door is the row's whole meaning while it lasts.
           const door = sim.ground.at(s.depth + 1).door;
-          const want = door ? fill(T.doorRow, { name: Lords.shortName(door.lord) }) : T.face;
+          const want = s.depth >= sim.ground.bottom() ? T.faceBottom : door ? fill(T.doorRow, { name: Lords.shortName(door.lord) }) : T.face;
           if (r.nameEl.textContent !== want) r.nameEl.textContent = want;
         }
         if (key === 'face') {
@@ -1034,6 +1034,10 @@ export function createUI(doc, sim, cfg, actions) {
     if (nodes.fieldhint) show(nodes.fieldhint, !f.field);
 
     hold(nodes.compass); hold(nodes.goal); hold(nodes.hordePanel);
+    // The hill takes whatever height the panel under it leaves, so a panel
+    // that shrinks and grows as its rows are rebuilt resized the hill with
+    // it, and a canvas resized is cleared.
+    hold(nodes.ritesPanel);
   };
 
   // A box with buttons under it only ever grows while the page is up. Its

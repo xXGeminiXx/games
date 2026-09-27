@@ -20,22 +20,22 @@
 // line they want said. The simulation never touches the page.
 // ---------------------------------------------------------------------------
 
-import { CONFIG as DEFAULT } from '../config.js?v=56';
-import * as Mat from './materials.js?v=56';
-import * as H from './horde.js?v=56';
-import * as Crew from './crew.js?v=56';
-import * as R from './rites.js?v=56';
-import * as Rv from './reveal.js?v=56';
-import * as Ch from './chambers.js?v=56';
-import * as Vi from './visitors.js?v=56';
-import * as Rb from './rebirth.js?v=56';
-import * as Lore from './lore.js?v=56';
-import * as Lords from './lords.js?v=56';
-import * as Ranks from './ranks.js?v=56';
-import { createGround } from './ground.js?v=56';
-import { hash } from './rng.js?v=56';
-import { fill } from '../config.js?v=56';
-import { fmt, fmtCoin } from './numbers.js?v=56';
+import { CONFIG as DEFAULT } from '../config.js?v=57';
+import * as Mat from './materials.js?v=57';
+import * as H from './horde.js?v=57';
+import * as Crew from './crew.js?v=57';
+import * as R from './rites.js?v=57';
+import * as Rv from './reveal.js?v=57';
+import * as Ch from './chambers.js?v=57';
+import * as Vi from './visitors.js?v=57';
+import * as Rb from './rebirth.js?v=57';
+import * as Lore from './lore.js?v=57';
+import * as Lords from './lords.js?v=57';
+import * as Ranks from './ranks.js?v=57';
+import { createGround } from './ground.js?v=57';
+import { hash } from './rng.js?v=57';
+import { fill } from '../config.js?v=57';
+import { fmt, fmtCoin, sat } from './numbers.js?v=57';
 
 export const SAVE_VERSION = 2;
 
@@ -554,12 +554,15 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * does not make a lord's hoard any smaller.
    */
   const steadyIncome = () => {
+    // A figure past the top counts as the top: at the deep end every sale is
+    // too big to hold, and reading that as nothing priced every gift, hoard
+    // and caller at 0 coin.
     const coinOf = (sp) => {
       let made = 0;
-      try { for (const r of layerRates(sp).values()) made += r.coin || 0; } catch (e) { made = 0; }
-      return Number.isFinite(made) ? made : 0;
+      try { for (const r of layerRates(sp).values()) made = sat(made + (r.coin || 0)); } catch (e) { made = 0; }
+      return made;
     };
-    const rate = Number.isFinite(state.rate) ? state.rate : 0;
+    const rate = sat(state.rate || 0);
     const here = coinOf(null);
     const best = state.byHand ? coinOf(Crew.bestSplit(crewApi)) : here;
     return Math.max(0, rate, here, best);
@@ -573,15 +576,14 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    */
   const earningNow = () => {
     let made = 0;
-    try { for (const r of layerRates().values()) made += r.coin || 0; } catch (e) { made = 0; }
-    const rate = Number.isFinite(state.rate) ? state.rate : 0;
-    return Math.max(0, rate, Number.isFinite(made) ? made : 0);
+    try { for (const r of layerRates().values()) made = sat(made + (r.coin || 0)); } catch (e) { made = 0; }
+    return Math.max(0, sat(state.rate || 0), made);
   };
 
   /** How many the horde would raise, unaided, in `seconds` at its present rate. */
   const growthOver = (seconds) => {
     const md = mods();
-    const bones = boneRate() * seconds;
+    const bones = sat(boneRate() * seconds);
     return H.maxRaisable(bones, state.horde, cfg.horde, md.softMult);
   };
 
@@ -592,9 +594,17 @@ export function createSim(cfg = DEFAULT, opts = {}) {
    * the rows when the player has asked to set it by hand.
    */
   const crewApi = { state, cfg, ground, mods, worthOf };
+  // At the bottom of the world the way down has nothing under it to break,
+  // so whoever stands on it works the deepest layer instead. A crew placed by
+  // hand, all of it straight down, stood in the shaft there earning nothing,
+  // barrow after barrow. The notches stay as they were set, for the next one.
   const split = () => {
-    if (state.byHand) return H.distribute(state.weights, state.faceWeight, activeFrom());
-    return Crew.bestSplit(crewApi);
+    const sp = state.byHand ? H.distribute(state.weights, state.faceWeight, activeFrom()) : Crew.bestSplit(crewApi);
+    if (sp.face > 0 && state.depth >= ground.bottom()) {
+      sp.strata[state.depth] = (sp.strata[state.depth] || 0) + sp.face;
+      sp.face = 0;
+    }
+    return sp;
   };
 
   /** Bones per second the horde is turning up as it currently stands. */
@@ -605,7 +615,7 @@ export function createSim(cfg = DEFAULT, opts = {}) {
     let q = 0;
     for (let k = from; k <= state.depth; k++) q += (sp.strata[k] || 0) * ground.at(k).bones;
     q += sp.face * ground.at(state.depth + 1).bones;
-    return q * state.horde * cfg.horde.digRate * md.boneMult;
+    return sat(q * state.horde * cfg.horde.digRate * md.boneMult);
   };
 
   /**
@@ -634,13 +644,13 @@ export function createSim(cfg = DEFAULT, opts = {}) {
           coin += q * worthOf(id, md);
         }
       }
-      rows.set(k, { share, parts, coin, bones: diggerSeconds * share * layer.bones * md.boneMult });
+      rows.set(k, { share, parts, coin: sat(coin), bones: sat(diggerSeconds * share * layer.bones * md.boneMult) });
     }
     // The dead on the way down bring up no goods, only the bones of the layer
     // they are breaking into.
     rows.set('face', {
       share: sp.face, parts: [], coin: 0,
-      bones: diggerSeconds * sp.face * ground.at(state.depth + 1).bones * md.boneMult,
+      bones: sat(diggerSeconds * sp.face * ground.at(state.depth + 1).bones * md.boneMult),
     });
     return rows;
   };

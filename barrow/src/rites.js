@@ -9,11 +9,11 @@
 // them separately.
 // ---------------------------------------------------------------------------
 
-import * as Ch from './chambers.js?v=56';
-import * as Rb from './rebirth.js?v=56';
-import * as Lore from './lore.js?v=56';
-import * as Lords from './lords.js?v=56';
-import * as Ranks from './ranks.js?v=56';
+import * as Ch from './chambers.js?v=57';
+import * as Rb from './rebirth.js?v=57';
+import * as Lore from './lore.js?v=57';
+import * as Lords from './lords.js?v=57';
+import * as Ranks from './ranks.js?v=57';
 
 export function defs(cfg) {
   return cfg.rites.list;

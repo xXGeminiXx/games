@@ -90,6 +90,7 @@ export const CONFIG = {
     rowCleared:  'Cleared',
     rowRateTip:  'What this layer pays and how many of the dead it turns up, every second',
     face:       'Digging down',
+    faceBottom: 'Nothing under here',
     doorRow:    '{Name}\'s door',
     // The switches rank hands over.
     autoBuyOn:  'Auto-buy: on',
@@ -932,7 +933,7 @@ export const CONFIG = {
     allowOverrides: true,
     // Bump when src/ changes so a browser cannot pair a stale module with a
     // fresh page. Every import in index.html and src/ carries ?v=<this>.
-    build: 56,
+    build: 57,
   },
 };
 

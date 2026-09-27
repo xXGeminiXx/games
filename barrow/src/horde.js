@@ -28,7 +28,11 @@ export function raiseCostBulk(n, count, cfg, softMult) {
   if (!(count > 0)) return 0;
   const soft = cfg.boneCostSoft * (softMult || 1);
   const m = count;
-  return cfg.boneCostBase * (m + (m * n + m * (m - 1) / 2) / soft);
+  // m times the price of the average one, so a crew raised by the 1e160 does
+  // not square its count past the largest number there is on the way to a
+  // price that fits.
+  const cost = cfg.boneCostBase * m * (1 + n / soft + (m - 1) / (2 * soft));
+  return cost > Number.MAX_VALUE ? Number.MAX_VALUE : cost;
 }
 
 /**
@@ -44,9 +48,15 @@ export function maxRaisable(bones, n, cfg, softMult) {
   const base = cfg.boneCostBase;
   // cost(m) = base * (m + (m*n + m*(m-1)/2) / soft) = bones, as a*m^2 + b*m = c,
   // taken in the form that stays accurate when b*b dwarfs a*c.
-  const a = 1 / (2 * soft), b = 1 + (n - 0.5) / soft, c = bones / base;
-  let m = Math.floor(2 * c / (b + Math.sqrt(b * b + 4 * a * c)));
-  if (!Number.isFinite(m)) return 0;
+  // Worked so no step runs past the largest number the game holds: bones at
+  // the top doubled to Infinity here, the count came out NaN, and a crew with
+  // the most bones there can be raised nobody at all.
+  const MAX = Number.MAX_VALUE;
+  const a = 1 / (2 * soft), b = 1 + (n - 0.5) / soft, c = Math.min(MAX, bones / base);
+  const root = Math.hypot(b, 2 * Math.sqrt(a * c));
+  let m = Math.floor(c / (b / 2 + root / 2));
+  if (m !== m) return 0;
+  if (m > MAX) m = MAX;
   // Below 2^50 a count is exact to the digger, so the rounding is walked
   // back to the largest count the bones really cover.
   if (m < 2 ** 50) {
@@ -208,6 +218,9 @@ export function yieldUnits(s, k, units, cfg, ground, pure) {
  * deciding. Returns how many stood up.
  */
 export function raise(s, count, cfg, softMult) {
+  // Bones past the top are the top; spending from Infinity left NaN behind.
+  if (s.bones > Number.MAX_VALUE) s.bones = Number.MAX_VALUE;
+  if (!(s.bones >= 0)) s.bones = 0;
   if (count === 'max') count = maxRaisable(s.bones, s.horde, cfg, softMult);
   count = Math.floor(count);
   if (!(count > 0)) return 0;
@@ -218,9 +231,9 @@ export function raise(s, count, cfg, softMult) {
     cost = raiseCostBulk(s.horde, count, cfg, softMult);
   }
   s.bones -= cost;
-  if (s.bones < 0) s.bones = 0;
-  s.horde += count;
-  s.totals.raised += count;
+  if (!(s.bones > 0)) s.bones = 0;
+  s.horde = Math.min(Number.MAX_VALUE, s.horde + count);
+  s.totals.raised = Math.min(Number.MAX_VALUE, s.totals.raised + count);
   return count;
 }
 
@@ -228,7 +241,7 @@ export function raise(s, count, cfg, softMult) {
 export function raiseFree(s, count) {
   count = Math.floor(count);
   if (!(count > 0)) return 0;
-  s.horde += count;
-  s.totals.raised += count;
+  s.horde = Math.min(Number.MAX_VALUE, s.horde + count);
+  s.totals.raised = Math.min(Number.MAX_VALUE, s.totals.raised + count);
   return count;
 }

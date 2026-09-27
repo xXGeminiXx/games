@@ -20,10 +20,12 @@
 // it was not handed.
 // ---------------------------------------------------------------------------
 
-import { hash, unit, range } from './rng.js?v=56';
-import * as Lore from './lore.js?v=56';
-import { fill } from '../config.js?v=56';
-import { fmtCoin, fmtCount, fmtTime } from './numbers.js?v=56';
+import { hash, unit, range } from './rng.js?v=57';
+import * as Lore from './lore.js?v=57';
+import { fill } from '../config.js?v=57';
+import { fmtCoin, fmtCount, fmtTime, sat } from './numbers.js?v=57';
+// Every price and gift is held at the top: sized off an income that is
+// itself past the top, one read as a question mark and asked for Infinity.
 
 /**
  * Everyone who can come up the track. How often each one comes is a weight in
@@ -259,8 +261,8 @@ function buildKind(api, i, kind) {
   }
 
   if (kind === 'bonecart') {
-    const bones = Math.max(v.bonecart.floor, boneRef(api) * v.bonecart.seconds);
-    const price = cost * v.bonecart.priceSeconds;
+    const bones = sat(Math.max(v.bonecart.floor, boneRef(api) * v.bonecart.seconds));
+    const price = sat(cost * v.bonecart.priceSeconds);
     if (!(price > 0)) return null;
     rec.data = { bones, price };
     rec.text = spoken(words.name, said) + offer({ n: fmtCount(bones), coin: fmtCoin(price) });
@@ -278,7 +280,7 @@ function buildKind(api, i, kind) {
   }
 
   if (kind === 'reeve') {
-    const price = cost * v.reeve.seconds * Math.pow(v.reeve.priceGrowth, takenOf(state, 'reeve'));
+    const price = sat(cost * v.reeve.seconds * Math.pow(v.reeve.priceGrowth, takenOf(state, 'reeve')));
     if (!(price > 0)) return null;
     rec.data = { price };
     rec.text = spoken(words.name, said) + offer({ coin: fmtCoin(price) });
@@ -288,7 +290,7 @@ function buildKind(api, i, kind) {
   }
 
   if (kind === 'relic') {
-    const price = cost * v.relic.seconds * Math.pow(v.relic.priceGrowth, takenOf(state, 'relic'));
+    const price = sat(cost * v.relic.seconds * Math.pow(v.relic.priceGrowth, takenOf(state, 'relic')));
     if (!(price > 0)) return null;
     const keys = ['dig', 'bones', 'value', 'face'];
     const key = keys[hash(seed, 'visit-boon:' + i) % keys.length];
@@ -301,7 +303,7 @@ function buildKind(api, i, kind) {
   }
 
   if (kind === 'surveyor') {
-    const price = cost * v.surveyor.seconds;
+    const price = sat(cost * v.surveyor.seconds);
     rec.data = { price, reads: v.surveyor.reads };
     rec.text = spoken(words.name, said) + offer({ n: v.surveyor.reads, coin: fmtCoin(price) });
     rec.take = priced(words.take, price);
@@ -313,7 +315,7 @@ function buildKind(api, i, kind) {
     // Something for a while: twice the bones, or twice the digging, for a
     // few coins in the hat.
     const c = v[kind];
-    const price = cost * c.seconds;
+    const price = sat(cost * c.seconds);
     const lasts = c.lasts * (md.boostLasts || 1);
     rec.data = { price, key: c.key, factor: c.factor, lasts };
     rec.text = spoken(words.name, said) + offer({ t: fmtTime(lasts), x: c.factor, coin: fmtCoin(price) });
@@ -337,7 +339,7 @@ function buildKind(api, i, kind) {
 
   if (kind === 'collector') {
     // Something your crew dug up: coin for it now, or relics kept forever.
-    const coin = ref * v.collector.seconds;
+    const coin = sat(ref * v.collector.seconds);
     if (!(coin > 0)) return null;
     const relics = v.collector.relics;
     rec.data = { coin, relics };
@@ -350,7 +352,7 @@ function buildKind(api, i, kind) {
     // faster. One per door.
     const d = api.doorAhead(v.herald.within);
     if (!d) return null;
-    const price = cost * v.herald.seconds;
+    const price = sat(cost * v.herald.seconds);
     if (!(price > 0)) return null;
     const pct = Math.round((v.herald.ease - 1) * 100);
     const x = +v.herald.ease.toFixed(2);
@@ -363,7 +365,7 @@ function buildKind(api, i, kind) {
   }
 
   // mourner
-  const gift = ref * v.mourner.seconds;
+  const gift = sat(ref * v.mourner.seconds);
   rec.data = { gift };
   rec.text = spoken(words.name, said);
   return rec;

@@ -16,15 +16,15 @@
 // not scroll, and the one control that could stop it was out of reach.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=56';
-import { createSim, restoreSim, openedState } from './sim.js?v=56';
-import * as Save from './save.js?v=56';
-import * as Rb from './rebirth.js?v=56';
-import * as Lore from './lore.js?v=56';
-import { hash } from './rng.js?v=56';
-import { createUI } from './ui.js?v=56';
-import { createView } from './view.js?v=56';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=56';
+import { storageKey, fill } from '../config.js?v=57';
+import { createSim, restoreSim, openedState } from './sim.js?v=57';
+import * as Save from './save.js?v=57';
+import * as Rb from './rebirth.js?v=57';
+import * as Lore from './lore.js?v=57';
+import { hash } from './rng.js?v=57';
+import { createUI } from './ui.js?v=57';
+import { createView } from './view.js?v=57';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=57';
 
 /**
  * @param {object} o
@@ -190,8 +190,7 @@ export function createGame(o) {
       shownAt = t;
       view.setGround(sim.ground);
     }
-    const md = shown.mods();
-    view.draw(shown.state, shown.state.worked || [], dt, md.activeStrata, shown.split(), md, shown.legacy);
+    paint(dt);
 
     // A barrow the player asked to fill itself in, once it is deep enough, and
     // whatever time away the barrows after it are still owed.
@@ -203,6 +202,11 @@ export function createGame(o) {
     if (sinceSave >= cfg.time.autosaveSeconds) { save(); sinceSave = 0; }
 
     win.requestAnimationFrame(frame);
+  };
+
+  const paint = (dt) => {
+    const md = shown.mods();
+    view.draw(shown.state, shown.state.worked || [], dt, md.activeStrata, shown.split(), md, shown.legacy);
   };
 
   // -- saving ---------------------------------------------------------------
@@ -321,6 +325,9 @@ export function createGame(o) {
     const now0 = view.size;
     if (now0 && now0.width === w && now0.height === h && now0.dpr === (win.devicePixelRatio || 1)) return;
     view.resize(w, h, win.devicePixelRatio || 1);
+    // Sizing a canvas clears it, and the browser can show it before the next
+    // frame draws: the hill went black for a moment every time its box moved.
+    paint(0);
   };
 
   // The hill's box changes size after the page opens - the upgrades panel
