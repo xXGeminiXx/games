@@ -14,10 +14,10 @@
 // per-frame cost is the dots.
 // ---------------------------------------------------------------------------
 
-import { goodAt, valueAt, hardnessAt, capUnits } from './materials.js?v=55';
-import { activeFrom } from './horde.js?v=55';
-import * as Lore from './lore.js?v=55';
-import * as Icons from './icons.js?v=55';
+import { goodAt, valueAt, hardnessAt, capUnits } from './materials.js?v=56';
+import { activeFrom } from './horde.js?v=56';
+import * as Lore from './lore.js?v=56';
+import * as Icons from './icons.js?v=56';
 
 /** mulberry32 */
 function rng(seed) {
@@ -232,7 +232,8 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
   /** A lord's own colour, falling back to the page's for a lord without one. */
   const lordColor = (lord) => (lord && lord.def && lord.def.color) || palette.deepink;
   let hillTint = null;
-  const layerAt = ground ? (k) => ground.at(k) : (k) => {
+  const layerAt = (k) => {
+    if (ground) return ground.at(k);
     const g = goodAt(k, strataCfg);
     return { name: g.name, hue: g.hue, seam: null, cap: capUnits(Math.max(0, k - 1), strataCfg) };
   };
@@ -1286,5 +1287,22 @@ export function createView(canvas, cfg, palette, strataCfg, hordeCfg, doc, groun
     return L;
   };
 
-  return { resize, draw, layout: () => layout(width, height, 0, cfg), particles, get size() { return { width, height, dpr }; } };
+  /**
+   * A new barrow on the same canvas. The picture is drawn over the old one on
+   * the next frame, never cleared first: a canvas resized or rebuilt for every
+   * barrow went black for a frame each time, and barrows a fifth of a second
+   * apart made the hill flash.
+   */
+  const setGround = (g) => {
+    ground = g || null;
+    segCache.clear();
+    carve.key = '';
+    lastDepth = -1;
+    doorsSeen = -1;
+    flash.k = -1; flash.t = 0;
+    embers.length = 0;
+    bits.length = 0;
+  };
+
+  return { resize, draw, setGround, layout: () => layout(width, height, 0, cfg), particles, get size() { return { width, height, dpr }; } };
 }

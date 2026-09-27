@@ -16,15 +16,15 @@
 // not scroll, and the one control that could stop it was out of reach.
 // ---------------------------------------------------------------------------
 
-import { storageKey, fill } from '../config.js?v=55';
-import { createSim, restoreSim, openedState } from './sim.js?v=55';
-import * as Save from './save.js?v=55';
-import * as Rb from './rebirth.js?v=55';
-import * as Lore from './lore.js?v=55';
-import { hash } from './rng.js?v=55';
-import { createUI } from './ui.js?v=55';
-import { createView } from './view.js?v=55';
-import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=55';
+import { storageKey, fill } from '../config.js?v=56';
+import { createSim, restoreSim, openedState } from './sim.js?v=56';
+import * as Save from './save.js?v=56';
+import * as Rb from './rebirth.js?v=56';
+import * as Lore from './lore.js?v=56';
+import { hash } from './rng.js?v=56';
+import { createUI } from './ui.js?v=56';
+import { createView } from './view.js?v=56';
+import { fmtTime, fmt, fmtCoin, fmtCount } from './numbers.js?v=56';
 
 /**
  * @param {object} o
@@ -55,10 +55,15 @@ export function createGame(o) {
     has: (_, k) => k in sim,
   });
 
-  // The picture is drawn on ground made from the barrow's own seed, so each
-  // barrow gets a fresh one on the same canvas.
-  const makeView = () => createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground, cfg.lords);
-  let view = makeView();
+  const view = createView(canvas, cfg.view, cfg.palette, cfg.strata, cfg.horde, doc, sim.ground, cfg.lords);
+  // The barrow the hill is drawing. It moves on to a new barrow at most once
+  // a second: a strong crew set to fill in shallow opens barrows a fifth of a
+  // second apart, one at layer 10 and the next at 75, and a hill swapping
+  // between them at that rate is a flashing light. Barrows go on filling in
+  // at their own pace underneath; only the picture waits.
+  let shown = sim;
+  let shownAt = -Infinity;
+  const HILL_HOLD_MS = 1000;
 
   const actions = {};
   const ui = createUI(doc, live, cfg, actions);
@@ -180,8 +185,13 @@ export function createGame(o) {
 
     sinceRender += dt;
     if (sinceRender >= 0.1) { ui.render(); sinceRender = 0; }
-    const md = sim.mods();
-    view.draw(sim.state, sim.state.worked || [], dt, md.activeStrata, sim.split(), md, sim.legacy);
+    if (shown !== sim && t - shownAt >= HILL_HOLD_MS) {
+      shown = sim;
+      shownAt = t;
+      view.setGround(sim.ground);
+    }
+    const md = shown.mods();
+    view.draw(shown.state, shown.state.worked || [], dt, md.activeStrata, shown.split(), md, shown.legacy);
 
     // A barrow the player asked to fill itself in, once it is deep enough, and
     // whatever time away the barrows after it are still owed.
@@ -247,8 +257,8 @@ export function createGame(o) {
     const opened = snap && restoreSim(cfg, snap);
     if (!opened) return null;
     sim = opened;
-    view = makeView();
-    fit();
+    // Filled in by hand, the hill shows the new barrow straight away.
+    if (!auto) shownAt = -Infinity;
     ui.newBarrow();
     if (owed > 0) backlog += owed;
     if (behind) behind.barrows++;
